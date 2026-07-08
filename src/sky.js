@@ -265,6 +265,7 @@ export function createSky(g) {
     sc.left = -SHADOW_EXTENT; sc.right = SHADOW_EXTENT;
     sc.top = SHADOW_EXTENT;   sc.bottom = -SHADOW_EXTENT;
     sc.near = 1; sc.far = 320;
+    sc.updateProjectionMatrix();
     sunLight.shadow.bias = -0.0006;
     sunLight.shadow.normalBias = 1.2; // flat-shaded low-poly: generous normal bias kills acne
   }
