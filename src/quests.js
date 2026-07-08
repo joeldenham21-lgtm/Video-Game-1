@@ -1135,10 +1135,7 @@ export function createQuests(g) {
           {
             label: 'It\'s here. Take it.',
             next: 'f2',
-            do: () => {
-              doReturn();
-              if (g.player) { /* reward already granted in doReturn */ }
-            },
+            do: doReturn,
           },
           {
             label: 'The dock was bare. Silt and old rope.',
