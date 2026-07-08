@@ -11,7 +11,7 @@
 // ============================================================================
 import * as THREE from 'three';
 import {
-  WATER_LEVEL, POIS, BIOME, biomeAt, terrainHeight, hash2,
+  WATER_LEVEL, POIS, BIOME, biomeAt, terrainHeight, hash2, snoise,
   clamp, lerp, smoothstep, dist2d,
 } from './core.js';
 
@@ -52,59 +52,70 @@ function insidePOI(wx, wz) {
 // pushed through ACES, so they read a touch brighter/warmer than raw numbers.
 // ---------------------------------------------------------------------------
 function terrainColor(wx, wz, h, slope, arr, o) {
-  // Deterministic per-vertex jitter (two independent channels) + big patches.
+  // Deterministic per-vertex jitter (two independent channels) + organic
+  // large-scale drifts from low-frequency noise (no blocky grid patches).
   const qx = Math.round(wx * 2.3), qz = Math.round(wz * 2.3);
   const j1 = hash2(qx, qz, 911) - 0.5;
   const j2 = hash2(qx, qz, 917) - 0.5;
-  const patch = hash2(Math.floor(wx * 0.052), Math.floor(wz * 0.052), 923); // ~19u
+  const patch = snoise(wx * 0.021 + 37.2, wz * 0.021) * 0.5 + 0.5;  // ~50u swathes
+  const micro = snoise(wx * 0.11, wz * 0.11 - 91.3) * 0.5 + 0.5;    // ~9u mottling
+
+  // Strata rock (shared by ROCKY/SNOW base and the grass→rock blend below):
+  // banded by altitude, warped by the patch noise, with warm iron veins.
+  const band = 0.5 + 0.5 * Math.sin(h * 0.52 + patch * 3.4 + j1 * 1.8);
+  const iron = smoothstep(0.35, 0.85, patch) * 0.05;
+  const rockR = lerp(0.29, 0.48, band) + iron + j1 * 0.05;
+  const rockG = lerp(0.28, 0.44, band) + iron * 0.55 + j1 * 0.05;
+  const rockB = lerp(0.30, 0.40, band) + j1 * 0.04;
 
   let r, g, b;
   const bio = biomeAt(wx, wz, h);
 
   if (bio === BIOME.MEADOW) {
-    // Warm meadow: fresh spring green drifting into sun-dried gold patches.
+    // Warm meadow: fresh spring green drifting into sun-dried golden swathes,
+    // with darker clover mottling so the flats never read as one flat green.
     const t = patch * patch;
-    r = lerp(0.30, 0.47, t) + j2 * 0.06;
-    g = lerp(0.45, 0.44, t) + j1 * 0.07;
-    b = lerp(0.16, 0.14, t) + j1 * 0.02;
+    r = lerp(0.30, 0.51, t) + j2 * 0.05;
+    g = lerp(0.46, 0.43, t) + j1 * 0.06;
+    b = lerp(0.155, 0.13, t) + j1 * 0.02;
+    const clover = smoothstep(0.62, 0.95, micro) * 0.22;
+    r *= 1 - clover; g *= 1 - clover * 0.5; b *= 1 - clover * 0.35;
   } else if (bio === BIOME.FOREST) {
-    // Dark forest floor: deep green + leaf-litter brown, baked AO darkening.
-    const t = patch * 0.55;
-    r = lerp(0.13, 0.21, t);
-    g = lerp(0.23, 0.17, t);
-    b = lerp(0.09, 0.10, t);
-    const ao = 0.76 + j1 * 0.14; // ambient occlusion under the canopy
+    // Dark forest floor: deep moss green ↔ leaf-litter brown, baked AO.
+    const t = patch * 0.55 + micro * 0.25;
+    r = lerp(0.115, 0.215, t);
+    g = lerp(0.225, 0.165, t);
+    b = lerp(0.085, 0.095, t);
+    const ao = 0.70 + micro * 0.16 + j1 * 0.12; // ambient occlusion under canopy
     r = r * ao + j2 * 0.02;
     g = g * ao + j1 * 0.03;
     b = b * ao;
   } else if (bio === BIOME.SAND) {
-    r = 0.72 + j1 * 0.08;
-    g = 0.62 + j1 * 0.07 + j2 * 0.02;
-    b = 0.42 + j1 * 0.05;
-    // Wet darkening right at the waterline.
+    // Warm shore sand, paler where dry, wet-darkened right at the waterline.
+    const t = micro * 0.5 + patch * 0.5;
+    r = lerp(0.68, 0.76, t) + j1 * 0.07;
+    g = lerp(0.58, 0.66, t) + j1 * 0.06 + j2 * 0.02;
+    b = lerp(0.39, 0.46, t) + j1 * 0.04;
     const wet = smoothstep(WATER_LEVEL + 1.1, WATER_LEVEL + 0.25, h);
     r *= 1 - wet * 0.35; g *= 1 - wet * 0.32; b *= 1 - wet * 0.20;
   } else if (bio === BIOME.MARSH) {
-    const t = patch;
-    r = lerp(0.24, 0.17, t) + j2 * 0.03;
-    g = lerp(0.28, 0.23, t) + j1 * 0.04;
-    b = lerp(0.13, 0.12, t);
+    // Boggy olive greens sinking into peaty brown pools.
+    const t = patch * 0.7 + micro * 0.3;
+    r = lerp(0.25, 0.16, t) + j2 * 0.03;
+    g = lerp(0.29, 0.22, t) + j1 * 0.04;
+    b = lerp(0.135, 0.11, t);
   } else {
     // ROCKY / SNOW both start from banded strata rock; snow overlays below.
-    const band = 0.5 + 0.5 * Math.sin(h * 0.52 + j1 * 2.4);
-    r = lerp(0.30, 0.47, band) + j1 * 0.05;
-    g = lerp(0.29, 0.43, band) + j1 * 0.05;
-    b = lerp(0.30, 0.38, band) + j1 * 0.04;
+    r = rockR; g = rockG; b = rockB;
   }
 
   // Smooth grass→rock transition around the biome threshold (58u).
   if (h > 46 && bio !== BIOME.ROCKY && bio !== BIOME.SNOW) {
-    const t = smoothstep(48, 62, h + j1 * 9);
+    const t = smoothstep(48, 62, h + j1 * 9 + (patch - 0.5) * 6);
     if (t > 0) {
-      const band = 0.5 + 0.5 * Math.sin(h * 0.52 + j1 * 2.4);
-      r = lerp(r, lerp(0.30, 0.47, band) + j1 * 0.05, t);
-      g = lerp(g, lerp(0.29, 0.43, band) + j1 * 0.05, t);
-      b = lerp(b, lerp(0.30, 0.38, band) + j1 * 0.04, t);
+      r = lerp(r, rockR, t);
+      g = lerp(g, rockG, t);
+      b = lerp(b, rockB, t);
     }
   }
 
@@ -405,6 +416,7 @@ export function createWorld(g) {
     paintTerrainGeometry(geo, 0, 0, segs);
     geo.computeBoundingSphere();
     const shell = new THREE.Mesh(geo, shellMat);
+    shell.receiveShadow = true; // free when shadow maps are off
     shell.position.y = -0.5;
     shell.matrixAutoUpdate = false;
     shell.updateMatrix();
@@ -419,7 +431,9 @@ export function createWorld(g) {
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
     const mesh = new THREE.Mesh(geo, terrainMat);
     mesh.visible = false;
-    mesh.receiveShadow = shadows;
+    // Always on: costs nothing while shadow maps are disabled, and quality
+    // settings may enable g.quality.shadows even on flagship mobile.
+    mesh.receiveShadow = true;
     mesh.userData.segs = segs;
     scene.add(mesh);
     return mesh;
@@ -518,12 +532,15 @@ export function createWorld(g) {
     return { mesh, cap, n: 0, maxWritten: 0 };
   }
 
-  const pine = makePool(buildPineGeom(), vegMat, 420, shadows);
-  const oak = makePool(buildOakGeom(), vegMat, 230, shadows);
-  const rock = makePool(buildRockGeom(), vegMat, 450, false);
-  const grass = makePool(buildGrassGeom(), grassMat, 3500, false);
-  const bush = makePool(buildBushGeom(), vegMat, 250, false);
-  const flower = makePool(buildFlowerGeom(), grassMat, 200, false);
+  // Capacities at the generous end of the contract budgets (primary target is
+  // a flagship phone). Cells are filled nearest-first, so hitting a cap only
+  // ever drops the FARTHEST instances.
+  const pine = makePool(buildPineGeom(), vegMat, 460, shadows);
+  const oak = makePool(buildOakGeom(), vegMat, 260, shadows);
+  const rock = makePool(buildRockGeom(), vegMat, 500, false);
+  const grass = makePool(buildGrassGeom(), grassMat, 4200, false);
+  const bush = makePool(buildBushGeom(), vegMat, 300, false);
+  const flower = makePool(buildFlowerGeom(), grassMat, 260, false);
   const allPools = [pine, oak, rock, grass, bush, flower];
 
   function put(pool, x, y, z, rotY, sx, sy, cr, cg, cb) {
@@ -609,9 +626,9 @@ export function createWorld(g) {
     if (h0 < WATER_LEVEL + 1.0 || h0 > 88) return;
     const bio = biomeAt(bx, bz, h0);
     let tries = 0, density = 0;
-    if (bio === BIOME.MEADOW) { tries = 3; density = 0.78; }
-    else if (bio === BIOME.FOREST) { tries = 2; density = 0.42; }
-    else if (bio === BIOME.MARSH) { tries = 2; density = 0.62; }
+    if (bio === BIOME.MEADOW) { tries = 3; density = 0.86; }
+    else if (bio === BIOME.FOREST) { tries = 2; density = 0.46; }
+    else if (bio === BIOME.MARSH) { tries = 2; density = 0.66; }
     else if (bio === BIOME.SAND) { tries = 1; density = 0.10; }
     else if (bio === BIOME.ROCKY) { tries = 1; density = 0.10; }
     if (!tries || insidePOI(bx, bz)) return;
@@ -663,7 +680,7 @@ export function createWorld(g) {
     const h = terrainHeight(wx, wz);
     if (h < WATER_LEVEL + 1.2 || h > 60) return;
     const bio = biomeAt(wx, wz, h);
-    const density = bio === BIOME.MEADOW ? 0.30 : bio === BIOME.FOREST ? 0.06 : 0;
+    const density = bio === BIOME.MEADOW ? 0.36 : bio === BIOME.FOREST ? 0.07 : 0;
     if (!density || hash2(cx, cz, 173) >= density) return;
     if (insidePOI(wx, wz)) return;
     const tint = FLOWER_TINTS[(hash2(cx, cz, 174) * FLOWER_TINTS.length) | 0];
@@ -696,6 +713,7 @@ export function createWorld(g) {
   function hideLeftovers(pool) {
     for (let i = pool.n; i < pool.maxWritten; i++) pool.mesh.setMatrixAt(i, ZERO_M);
     pool.maxWritten = pool.n;
+    pool.mesh.count = pool.n; // draw only live instances
     pool.mesh.instanceMatrix.needsUpdate = true;
     pool.mesh.instanceColor.needsUpdate = true;
   }
