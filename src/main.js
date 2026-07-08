@@ -15,6 +15,10 @@ import { createCombat } from './combat.js';
 import { createQuests } from './quests.js';
 import { createUI } from './ui.js';
 import { createSave } from './save.js';
+import { createRPG } from './rpg.js';
+import { createBooks } from './books.js';
+import { createFauna } from './fauna.js';
+import { createVoice } from './voice.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -129,6 +133,10 @@ function boot(loadSave) {
       g.quests = createQuests(g);
       g.ui = createUI(g);
       g.save = createSave(g);
+      g.rpg = createRPG(g);
+      g.books = createBooks(g);
+      g.fauna = createFauna(g);
+      g.voice = createVoice(g);
       if (loadSave) g.save.load();
       titleEl.classList.add('hidden');
       setTimeout(() => titleEl.remove(), 1400);
@@ -181,6 +189,10 @@ function tick(now) {
     g.quests.update(dt);
     g.audio.update(dt);
     g.ui.update(dt);
+    g.rpg.update(dt);
+    g.books.update(dt);
+    g.fauna.update(dt);
+    g.voice.update(dt);
     g.ui.input.endFrame();
   } catch (err) {
     if (DEBUG) showErr('TICK: ' + (err.stack || err));
