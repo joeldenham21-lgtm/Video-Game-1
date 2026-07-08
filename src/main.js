@@ -45,7 +45,7 @@ renderer.toneMappingExposure = 1.15;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const IS_COARSE = matchMedia('(pointer: coarse)').matches;
-const DPR_CAP = IS_COARSE ? 1.5 : 2.0;
+const DPR_CAP = 2.0; // flagship phones stay sharp; adaptive scaler protects weaker GPUs
 let resScale = 1.0;
 function applyResolution() {
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, DPR_CAP) * resScale);
@@ -66,7 +66,7 @@ addEventListener('resize', () => {
 // ---------------------------------------------------------------------------
 const qualityPref = localStorage.getItem('elderfall_quality');
 const tier = qualityPref || (IS_COARSE ? 'high' : 'high'); // 'low' available via menu
-const quality = { tier, shadows: tier === 'high' && !IS_COARSE };
+const quality = { tier, shadows: tier === 'high' };
 if (quality.shadows) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
