@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0d14">
+<title>Elderfall — Open World RPG</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100dvh; overflow: hidden; background: #0a0d14;
+    overscroll-behavior: none; touch-action: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+
+  /* ---------- Title screen ---------- */
+  #title {
+    position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background:
+      radial-gradient(ellipse at 50% 110%, rgba(214,143,60,0.28), transparent 55%),
+      radial-gradient(ellipse at 50% -20%, rgba(66,106,180,0.25), transparent 60%),
+      linear-gradient(180deg, #0b1020 0%, #131b2e 45%, #2a2030 78%, #3d2317 100%);
+    color: #e8dcc0; transition: opacity 1.2s ease; padding: 24px;
+  }
+  #title.hidden { opacity: 0; pointer-events: none; }
+  #title .mountains {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 34%;
+    background:
+      linear-gradient(115deg, transparent 42%, #0d0f18 42.5%, #0d0f18 57%, transparent 57.5%) no-repeat 12% 100% / 44% 100%,
+      linear-gradient(65deg, transparent 40%, #121525 40.5%, #121525 62%, transparent 62.5%) no-repeat 78% 100% / 55% 90%,
+      linear-gradient(90deg, transparent 30%, #080a12 31%, #080a12 69%, transparent 70%) no-repeat 50% 100% / 70% 65%;
+    opacity: 0.9; pointer-events: none;
+  }
+  #title h1 {
+    font-size: clamp(46px, 12vw, 96px); font-weight: 400; letter-spacing: 0.22em;
+    text-shadow: 0 0 30px rgba(230,180,90,0.35), 0 2px 8px rgba(0,0,0,0.8);
+    background: linear-gradient(180deg, #f4e8c8 20%, #d9b46a 70%, #a67c3d 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 6px; z-index: 1;
+  }
+  #title .tag {
+    font-style: italic; letter-spacing: 0.14em; color: #b9a888; font-size: clamp(13px, 3.2vw, 17px);
+    margin-bottom: 44px; z-index: 1;
+  }
+  #title button {
+    z-index: 1; pointer-events: auto; cursor: pointer; display: block;
+    font-family: inherit; font-size: clamp(17px, 4.2vw, 21px); letter-spacing: 0.18em;
+    color: #f0e4c4; background: linear-gradient(180deg, rgba(90,66,38,0.9), rgba(56,40,24,0.9));
+    border: 1px solid #a3813f; border-radius: 4px; padding: 14px 54px; margin: 8px auto;
+    box-shadow: 0 0 18px rgba(200,150,60,0.25), inset 0 1px 0 rgba(255,230,170,0.25);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  #title button:active { transform: scale(0.96); }
+  #title button.secondary { opacity: 0.85; font-size: clamp(14px, 3.4vw, 17px); padding: 10px 38px; }
+  #title .hint { margin-top: 30px; font-size: 12px; color: #8a7c62; letter-spacing: 0.1em; z-index: 1; }
+  #loading { margin-top: 26px; font-size: 14px; letter-spacing: 0.2em; color: #d9b46a; display: none; z-index: 1; }
+  #loading.on { display: block; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.45; } }
+</style>
+<script type="importmap">
+  { "imports": { "three": "./vendor/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"></div>
+<div id="title">
+  <div class="mountains"></div>
+  <h1>ELDERFALL</h1>
+  <div class="tag">— A Tale of Emberhollow —</div>
+  <button id="btn-new">NEW  JOURNEY</button>
+  <button id="btn-continue" class="secondary" style="display:none">CONTINUE</button>
+  <div id="loading">FORGING THE WORLD…</div>
+  <div class="hint">Headphones recommended · Landscape works best</div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
