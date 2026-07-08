@@ -763,7 +763,416 @@ export function createQuests(g) {
     return { start, nodes: N };
   }
 
-  // __PART3B__
+  // --------------------------------------------------------------- Sylva ---
+  function sylvaTree() {
+    const N = {};
+    let start = 'idle';
+
+    if (state.fold === 0) {
+      start = 's1';
+      const accept = () => {
+        if (state.fold !== 0) return;
+        state.fold = 1;
+        qStart(QUESTS.fold, 'Wolf pelts for Sylva: ' + Math.min(state.pelts, 5) + '/5');
+      };
+      N.s1 = {
+        text: 'You hunt? No — you fight. Different walk, same tools. Good enough. Something\'s ' +
+          'been at the fold three nights running: not one wolf, a pack that\'s stopped fearing ' +
+          'fire. Six ewes dead and Marta\'s boy nearly the seventh.',
+        choices: [
+          { label: 'What do you need?', next: 's2' },
+          { label: 'Wolves are just hungry.', next: 's3' },
+        ],
+      };
+      N.s2 = {
+        text: 'Pelts. Five. That\'s the pack\'s spine broken and proof it\'s broken — the flock ' +
+          'won\'t sleep for less and neither will I. They den in the pines and hunt the meadows ' +
+          'at dusk.',
+        choices: [
+          { label: 'I\'ll thin them.', next: 's4', do: accept },
+          { label: 'Not my flock, not my fight.', next: null },
+        ],
+      };
+      N.s3 = {
+        text: 'So are we. Difference is I don\'t apologize to my dinner. Five pelts breaks the ' +
+          'pack and saves the fold — will you do it or won\'t you?',
+        choices: [
+          { label: 'I\'ll thin them.', next: 's4', do: accept },
+          { label: 'Find another blade.', next: null },
+        ],
+      };
+      N.s4 = {
+        text: 'Skin them clean — a torn pelt tells the pack nothing. Dusk and the forest edge. ' +
+          'Come back whole.',
+        choices: [{ label: 'Farewell.', next: null }],
+      };
+    } else if (state.fold === 1 && state.pelts < 5) {
+      N.idle = {
+        text: 'Count again: ' + state.pelts + ' of five. The pack won\'t mourn the ones you ' +
+          'took, but the fold might live out the week. Dusk, forest edge. Go.',
+        choices: [{ label: 'Farewell.', next: null }],
+      };
+    } else if (state.fold === 1) {
+      start = 'p1';
+      N.p1 = {
+        text: 'Five. And clean cuts — you didn\'t panic in the dark, then. The fold owes you, ' +
+          'and I pay debts one of two ways. Coin... or an hour of my time, and I\'ll show you ' +
+          'where to put a blade so nothing gets up after. Hunter\'s trade. Pick.',
+        choices: [
+          {
+            label: 'The coin. (50 gold)',
+            next: 'pCoin',
+            do: () => {
+              if (state.fold !== 1) return;
+              state.fold = 2; g.flags.foldChoice = 'coin';
+              if (g.player) g.player.addGold(50);
+              qDone(QUESTS.fold, 'Sylva paid 50 gold');
+            },
+          },
+          {
+            label: 'Teach me.',
+            next: 'pCraft',
+            do: () => {
+              if (state.fold !== 1) return;
+              state.fold = 2; g.flags.foldChoice = 'craft';
+              if (g.player) g.player.bonus.dmg += 0.08;
+              notify("Hunter's craft", 'All damage +8%');
+              qDone(QUESTS.fold, "Learned Sylva's craft: +8% damage");
+            },
+          },
+        ],
+      };
+      N.pCoin = {
+        text: 'Smart. Coin spends anywhere and lessons die with the student. ...That was a ' +
+          'joke, mostly. Wool\'s safe, stranger. Drink one for the sheep.',
+        choices: [{ label: 'Farewell.', next: null }],
+      };
+      N.pCraft = {
+        text: 'Shoulders first, then the wrist — the blade arrives before the arm does. ' +
+          'Again. ...Again. There. Now you kill like you mean it instead of like you\'re ' +
+          'apologizing. Go be terrible somewhere useful.',
+        choices: [{ label: 'Farewell.', next: null }],
+      };
+    } else {
+      N.idle = {
+        text: g.flags.foldChoice === 'craft'
+          ? 'Shoulders, then wrist — you remember. I can tell by the dead things you leave ' +
+            'lying around the valley. Best coin I never spent.'
+          : 'Spent that gold yet? Wool\'s back on the hills either way. The fold sleeps, so ' +
+            'I sleep. Simple ledger.',
+        choices: [{ label: 'Farewell.', next: null }],
+      };
+    }
+
+    return { start, nodes: N };
+  }
+
+  // ---------------------------------------------------------------- Bram ---
+  function bramTree() {
+    const N = {};
+    const gold = () => (g.player ? g.player.stats.gold : 0);
+    const buyChoice = {
+      label: 'Buy a healing draught. (20 gold)',
+      next: 'shop',
+      if: () => gold() >= 20,
+      do: () => {
+        if (!g.player || g.player.stats.gold < 20) return;
+        g.player.addGold(-20);
+        g.player.stats.potions += 1;
+        notify('Healing draught bought', 'Potions: ' + g.player.stats.potions);
+      },
+    };
+    const sellAmulet = {
+      label: 'Sell the lake-silver amulet. (80 gold)',
+      next: 'amulet',
+      if: () => !!g.flags.amuletKept && !g.flags.amuletSold && !g.flags.amuletReturned,
+      do: () => {
+        g.flags.amuletSold = true;
+        if (g.player) g.player.addGold(80);
+        if (state.mere === 1) { state.mere = 2; }
+        qDone(QUESTS.mere, "Sold Enna's amulet for 80 gold");
+      },
+    };
+
+    let greet;
+    if (state.debt === 2) {
+      greet = g.flags.debtChoice === 'blood'
+        ? 'The Ember\'s Rest, safest taproom in the valley — ask anyone, now that Redfang\'s ' +
+          'feeding crows. What\'ll it be, friend? And it IS friend.'
+        : 'Welcome back! Trade\'s up since the west road opened — Redfang keeps a bargain once ' +
+          'it\'s bought, I\'ll give the pig that much. What\'ll it be?';
+    } else if (g.flags.drakeDead) {
+      greet = 'The dragonslayer drinks at MY inn. I\'ve told the story eleven times today and ' +
+        'it gets better every telling. What\'ll it be?';
+    } else {
+      greet = 'Welcome to the Ember\'s Rest — beds upstairs, stew\'s brown, ale\'s browner. ' +
+        'What\'ll it be?';
+    }
+    N.greet = {
+      text: greet,
+      choices: [
+        buyChoice,
+        {
+          label: 'You count your coin like it hurts. What\'s wrong?',
+          next: 'd1',
+          if: () => state.debt === 0,
+        },
+        {
+          label: 'About your debt — here\'s the sixty. I\'ll see it delivered.',
+          next: 'dPaid',
+          if: () => state.debt === 1 && !g.flags.vargrDead && gold() >= 60,
+          do: payDebt,
+        },
+        {
+          label: 'Vargr Redfang is dead. Your ledger\'s clear.',
+          next: 'dBlood',
+          if: () => state.debt === 1 && !!g.flags.vargrDead,
+          do: bloodDebt,
+        },
+        sellAmulet,
+        { label: 'Farewell.', next: null },
+      ],
+    };
+    N.shop = {
+      text: 'Careful with those — I brew them strong enough to wake a stone. Anything else?',
+      choices: [buyChoice, sellAmulet, { label: 'That\'s all.', next: null }],
+    };
+    N.amulet = {
+      text: 'Lake-silver! Rare as honest weather, that... moon on the face, even. Wendel\'s ' +
+        'Enna had one just like it, gods rest her. Well — eighty, as agreed. Odd how things ' +
+        'wash around, isn\'t it?',
+      choices: [{ label: 'Odd. Yes.', next: null }],
+    };
+
+    function payDebt() {
+      if (state.debt !== 1 || !g.player || g.player.stats.gold < 60) return;
+      g.player.addGold(-60);
+      settleDebt('coin');
+    }
+    function bloodDebt() {
+      if (state.debt !== 1) return;
+      settleDebt('blood');
+    }
+    function settleDebt(how) {
+      state.debt = 2;
+      g.flags.debtChoice = how;
+      if (how === 'coin') g.flags.campPeaceful = true;
+      if (g.player) g.player.stats.potions += 3;
+      notify('Bram\'s gratitude', 'Three of his own draughts, pressed into your hands');
+      qDone(QUESTS.debt, how === 'coin'
+        ? 'Paid Vargr off — the west road is quiet'
+        : 'Vargr Redfang is dead — the debt died with him');
+    }
+
+    N.d1 = {
+      text: 'That obvious? ...Vargr Redfang. Bandit lord squatting in the west hills. My boy ' +
+        'ran the inn\'s strongbox through his valley in spring and Vargr "taxed" it — calls ' +
+        'the shortfall a debt now. Sixty gold, or he collects in fingers. Mine or the boy\'s. ' +
+        'He wasn\'t specific.',
+      choices: [
+        {
+          label: 'Here\'s sixty. Consider it settled.',
+          next: 'dPaid',
+          if: () => gold() >= 60,
+          do: () => {
+            state.debt = 1;
+            qStart(QUESTS.debt, "Settle Bram's debt");
+            payDebt();
+          },
+        },
+        {
+          label: 'Redfang can collect from my blade.',
+          next: 'd2',
+          do: () => {
+            if (state.debt !== 0) return;
+            state.debt = 1;
+            qStart(QUESTS.debt, "Settle Bram's debt — 60 gold, or Vargr Redfang's head");
+          },
+        },
+        { label: 'Not my ledger.', next: 'd3' },
+      ],
+    };
+    N.d2 = {
+      text: 'He\'s no field bandit — he remembers faces, holds grudges like coin, and every ' +
+        'man who\'s hurt him has paid double for it later. However it lands, gold or blood... ' +
+        'I won\'t forget it. Camp\'s west, under the skull totems.',
+      choices: [{ label: 'Farewell.', next: null }],
+    };
+    N.d3 = {
+      text: 'No. No, of course not. Forget I— the stew\'s brown, the ale\'s browner, and ' +
+        'everything here is fine.',
+      choices: [{ label: 'Farewell.', next: null }],
+    };
+    N.dPaid = {
+      text: 'You\'d carry sixty gold west for a fat innkeep you barely know? I— gods. Take ' +
+        'these, and don\'t argue: brewed for bad nights, and it sounds like you go looking ' +
+        'for yours. The road just got safer for everyone. One purse lighter, but safer.',
+      choices: [{ label: 'Keep the stew warm.', next: null }],
+    };
+    N.dBlood = {
+      text: 'Dead? Vargr Redfang is DEAD? Ha! HA! ...I shouldn\'t laugh at a killing. Yes I ' +
+        'should. Take these — brewed for bad nights, and you clearly make your own. First ' +
+        'ale\'s free until I stop grinning, which may be never.',
+      choices: [{ label: 'Keep the stew warm.', next: null }],
+    };
+
+    return { start: 'greet', nodes: N };
+  }
+
+  // -------------------------------------------------------------- Wendel ---
+  function wendelTree() {
+    const N = {};
+    let start = 'idle';
+    const found = () => !!g.flags.amuletFound;
+    const doReturn = () => {
+      g.flags.amuletReturned = true;
+      g.flags.amuletKept = false;
+      g.flags.wendelLantern = true;
+      if (state.mere === 1) {
+        state.mere = 2;
+        if (g.player) g.player.addGold(30);
+        qDone(QUESTS.mere, 'Enna\'s amulet is home — 30 gold');
+      }
+    };
+
+    if (g.flags.amuletReturned) {
+      N.idle = {
+        text: 'She\'s here. ...He taps his chest, where a moon-faced coin of silver hangs. ' +
+          'The lamp\'s lit tonight, and it\'ll be lit tomorrow. That\'s more than most men my ' +
+          'age get to say.',
+        choices: [{ label: 'Good night, Wendel.', next: null }],
+      };
+    } else if (g.flags.amuletSold) {
+      N.idle = {
+        text: 'Bram says a trader came through with lake-silver. Moon on the face, he says. ' +
+          'Funny old world — that the lake would give up its dead to a stranger and not to ' +
+          'me. ...Well. The seam of the day\'s come loose again. Good night.',
+        choices: [{ label: 'Good night, Wendel.', next: null }],
+      };
+    } else if (state.mere === 0) {
+      start = 'w1';
+      N.w1 = {
+        text: 'Evening. Or morning — I lose the seam of the day out here. You\'re the one ' +
+          'Maera has running the whole valley? Then you\'ll pass Mirrormere sooner or later, ' +
+          'and I\'d ask a small thing of anyone passing.',
+        choices: [
+          { label: 'Ask it.', next: 'w2' },
+          { label: 'Another time, old man.', next: null },
+        ],
+      };
+      N.w2 = {
+        text: 'My Enna. Three winters gone. She\'d row out at dusk and the lake would go still ' +
+          'for her — I\'d swear it on the harvest. Her amulet went down with the boat, off the ' +
+          'old south dock. Lake-silver, a moon on its face. It\'s all of her that\'s left to ' +
+          'find, and I\'m too old to dive.',
+        choices: [
+          {
+            label: 'I\'ll search the dock.',
+            next: 'w3',
+            do: () => {
+              if (state.mere !== 0) return;
+              state.mere = 1;
+              qStart(QUESTS.mere, "Search the old dock on Mirrormere's south shore");
+            },
+          },
+          { label: 'The lake keeps what it takes.', next: 'w4' },
+        ],
+      };
+      N.w3 = {
+        text: 'The boards are half-rot, mind your step. And... whatever you find or don\'t — ' +
+          'come tell me either way. Not knowing is the heaviest part.',
+        choices: [{ label: 'Farewell.', next: null }],
+      };
+      N.w4 = {
+        text: 'Aye. Maybe it does. But it doesn\'t love what it takes, and I did. If you pass ' +
+          'the south dock — that\'s all I ask. If you pass.',
+        choices: [
+          {
+            label: 'If I pass... I\'ll look.',
+            next: 'w3',
+            do: () => {
+              if (state.mere !== 0) return;
+              state.mere = 1;
+              qStart(QUESTS.mere, "Search the old dock on Mirrormere's south shore");
+            },
+          },
+          { label: 'Farewell.', next: null },
+        ],
+      };
+    } else if (state.mere >= 1 && !found()) {
+      N.idle = {
+        text: 'The south dock — where the shore looks back at the village. The boards are ' +
+          'half-rot. Enna would tell you to mind your boots and never mind her silver.',
+        choices: [{ label: 'Farewell.', next: null }],
+      };
+    } else if (found() && g.flags.amuletKept) {
+      // The player lied. Redemption is still on the table until it's sold.
+      start = 'k1';
+      N.k1 = {
+        text: 'You\'d think the lake would give SOMETHING back, wouldn\'t you. Silt and old ' +
+          'rope, you said. ...Forgive me. An old man shouldn\'t pick at a kindness like a scab.',
+        choices: [
+          {
+            label: 'About the dock. I found this — it\'s yours.',
+            next: 'k2',
+            do: doReturn,
+          },
+          { label: 'Good night, Wendel.', next: null },
+        ],
+      };
+      N.k2 = {
+        text: 'Oh. ...Oh, there she is. He doesn\'t ask why. He never will. He ties it round ' +
+          'his neck with shaking hands and looks twenty years younger and a hundred years ' +
+          'older, both at once. The lamp will be lit tonight. You\'ll see it from the fields.',
+        choices: [{ label: 'Good night, Wendel.', next: null }],
+      };
+    } else if (found()) {
+      start = 'f1';
+      N.f1 = {
+        text: 'You went out there. I can see it in your boots — Mirrormere mud dries grey. ' +
+          'Did the water... did you find her silver?',
+        choices: [
+          {
+            label: 'It\'s here. Take it.',
+            next: 'f2',
+            do: () => {
+              doReturn();
+              if (g.player) { /* reward already granted in doReturn */ }
+            },
+          },
+          {
+            label: 'The dock was bare. Silt and old rope.',
+            next: 'f3',
+            do: () => {
+              g.flags.amuletKept = true;
+              qUpdate(QUESTS.mere, 'You kept the amulet. Lake-silver sells — Bram would pay 80 gold.');
+            },
+          },
+        ],
+      };
+      N.f2 = {
+        text: 'Oh. Oh, there she is. He ties it round his neck with shaking hands. I\'ll light ' +
+          'the lamp for her tonight — she always found the house by it. You\'ll see it burning ' +
+          'any night you pass, and you\'ll know why. Here — thirty in silver. It\'s nothing ' +
+          'against what you\'ve carried back, but take it.',
+        choices: [{ label: 'Wear it well, Wendel.', next: null }],
+      };
+      N.f3 = {
+        text: '...Aye. Of course. Three winters of current — it was a foolish hope, and old men ' +
+          'keep those the way other men keep dogs. Thank you for wading, stranger. Truly. Few ' +
+          'would have.',
+        choices: [{ label: 'Good night, Wendel.', next: null }],
+      };
+    } else {
+      N.idle = {
+        text: 'The fields don\'t weed themselves, and the day\'s lost its seam again. Safe ' +
+          'roads, stranger.',
+        choices: [{ label: 'Farewell.', next: null }],
+      };
+    }
+
+    return { start, nodes: N };
+  }
 
   return { update, markerPos, serialize, deserialize, npcs };
 }
