@@ -216,7 +216,7 @@ export function createUI(g) {
 #ef-banner.on{animation:ef-ban 3.2s ease forwards;}
 @keyframes ef-ban{0%{opacity:0;transform:translateY(8px) scale(.985)}12%{opacity:1;transform:none}
   78%{opacity:1}100%{opacity:0}}
-#ef-banner .t{font-size:clamp(28px,6vw,46px);letter-spacing:.26em;color:#f2e6c6;font-weight:400;
+#ef-banner .t{font-size:clamp(24px,4.6vw,40px);letter-spacing:.24em;color:#f2e6c6;font-weight:400;
   text-shadow:0 2px 14px rgba(0,0,0,.9),0 0 26px rgba(217,180,106,.35);}
 #ef-banner .s{margin-top:4px;font-style:italic;letter-spacing:.2em;color:var(--gold);
   font-size:clamp(12px,2.4vw,15px);text-shadow:0 1px 4px #000;}
@@ -326,6 +326,9 @@ export function createUI(g) {
 #hud.ef-modal-open #ef-touch,#hud.ef-modal-open #ef-pill,#hud.ef-modal-open #ef-cross,
 #hud.ef-modal-open #ef-joy,#hud.ef-modal-open #ef-hint{opacity:0!important;pointer-events:none!important;}
 #hud.ef-modal-open #ef-touch *{pointer-events:none!important;}
+/* while the weapon wheel is open, clear the center of competing chrome */
+#hud.ef-wheel-open #ef-pill,#hud.ef-wheel-open #ef-cross,
+#hud.ef-wheel-open #ef-hint{opacity:0!important;pointer-events:none!important;}
 `;
   document.head.appendChild(style);
 
@@ -807,6 +810,7 @@ export function createUI(g) {
     if (g.requestSlowmo) g.requestSlowmo(0.15);
     sfx('wheelOpen');
     elWheel.classList.add('on');
+    hud.classList.add('ef-wheel-open');
   }
   function closeWheel(select) {
     if (!wheel.open) return;
@@ -815,6 +819,7 @@ export function createUI(g) {
     wheel.keyHeld = false;
     wheel.pid = null;
     elWheel.classList.remove('on', 'sticky');
+    hud.classList.remove('ef-wheel-open');
     if (g.releaseSlowmo) g.releaseSlowmo();
     if (select && wheel.sel >= 0) {
       input.hotkeySelected = WHEEL_IDS[wheel.sel];
