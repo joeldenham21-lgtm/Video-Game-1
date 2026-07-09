@@ -459,8 +459,52 @@ export function createQuests(g) {
   // ==========================================================================
   // Quest event listeners
   // ==========================================================================
+  // Loose matcher — the enemies agent owns exact type strings for the new
+  // roster, so match on type OR display name.
+  function killedIs(d, keys) {
+    const s = ((d.type || '') + ' ' + (d.name || '')).toLowerCase();
+    for (let i = 0; i < keys.length; i++) if (s.indexOf(keys[i]) >= 0) return true;
+    return false;
+  }
+
   ev.on('enemyKilled', (d) => {
     if (!d) return;
+
+    // --- The Crone of the Pines: Grimhilde slain ---
+    if (killedIs(d, ['grimhilde', 'witch', 'crone'])) {
+      g.flags.witchDead = true;
+      g.flags.witchHostile = true; // she certainly is no friend of yours now
+      if (state.crone >= 1 && state.crone <= 5) {
+        state.crone = 6;
+        notify('Grimhilde is dead', 'The green light gutters out among the pines.');
+        qUpdate(QUESTS.crone, 'The witch is dead — bring word to Wendel');
+      }
+    }
+
+    // --- Blood Below the Barrows: Morvane destroyed ---
+    if (killedIs(d, ['morvane', 'vampire lord', 'vampire_lord', 'vampirelord'])) {
+      g.flags.morvaneDead = true;
+      if (state.blood >= 1 && state.blood <= 4) {
+        const pact = !!g.flags.morvanePact;
+        state.blood = 5;
+        notify('Morvane is ash', pact
+          ? 'The pact-mark on your wrist goes quiet. Three doors stay dark.'
+          : 'The crypt exhales, and the dark below is only dark.');
+        qDone(QUESTS.blood, pact
+          ? 'The bargain is paid in ash — but Jori, Hessa and Marta are not coming home'
+          : 'Morvane is destroyed. Osric is avenged');
+      }
+    }
+
+    // --- The Toll of Stonebridge: the direct approach ---
+    if (killedIs(d, ['troll'])) {
+      g.flags.trollDead = true;
+      if (state.toll === 1) {
+        state.toll = 3;
+        qDone(QUESTS.toll, 'The troll is dead — Stonebridge stands open');
+      }
+    }
+
     if (d.type === 'barrowlord') {
       g.flags.barrowlordDead = true;
       if (state.main === 3 && state.stage === 0) {
@@ -490,17 +534,93 @@ export function createQuests(g) {
       notify("Aldric's Ember", 'Cold in the hand. Waiting.');
       qUpdate(QUESTS.main3, 'Bring the blade to Torvald the smith');
     }
+    // Morvane's drop (destroyed-him path): the seal works for the living too.
+    if (d.itemId === 'bloodseal') {
+      notify('The Bloodseal', 'A cold sigil, taken not given. Your blade drinks deeper after dark: +15% night damage.');
+    }
   });
 
   // ==========================================================================
   // Update: auto-start, beacon watch, waves, discovery
   // ==========================================================================
   let discT = 0;
+  let wasNight = null; // dawn edge detector for the pact (null = uninitialized)
+
+  // The Bloodseal: +15% damage after sundown. Applied/removed through
+  // player.bonus.dmg with a persisted marker flag so save/load (which stores
+  // both flags AND bonus) stays consistent in every combination.
+  function hasBloodseal() {
+    return !!(g.flags.morvanePact || g.flags.item_bloodseal);
+  }
+  function updateBloodseal() {
+    if (!g.player || !g.player.bonus) return;
+    const want = hasBloodseal() && isNight();
+    if (want && !g.flags.bloodsealApplied) {
+      g.player.bonus.dmg += 0.15;
+      g.flags.bloodsealApplied = true;
+    } else if (!want && g.flags.bloodsealApplied) {
+      g.player.bonus.dmg -= 0.15;
+      g.flags.bloodsealApplied = false;
+    }
+  }
+
+  // A villager vanishes each dawn while Morvane's pact stands.
+  function onDawn() {
+    if (!g.flags.morvanePact || g.flags.morvaneDead) return;
+    if (state.blood !== 3 && state.blood !== 4) return;
+    state.vanished++;
+    if (state.vanished === 1) {
+      notify('Dawn over Emberhollow', "Jori the cooper's lad did not come to the well this morning.");
+    } else if (state.vanished === 2) {
+      notify('Another dawn', "Old Hessa's loom stands silent. Her door was open to the wind.");
+    } else if (state.vanished === 3) {
+      notify('A third dawn', "Marta's garden gate swings unlatched. The pact keeps its terms.");
+    } else {
+      notify('Dawn', 'Another door in Emberhollow stands open to the wind.');
+    }
+    if (state.blood === 3 && state.vanished >= 3) {
+      state.blood = 4;
+      qUpdate(QUESTS.blood, 'End Morvane — no bargain is worth the dawn count');
+    } else if (state.blood === 3) {
+      qUpdate(QUESTS.blood, 'The pact holds. ' + state.vanished + ' gone at dawn. Morvane waits below.');
+    }
+  }
+
+  // First-visit callouts for the wave-2 spots (not core.POIS — notify only).
+  function checkSpots(px, pz) {
+    if (!g.flags.spotHut && dist2d(px, pz, SPOT.hut.x, SPOT.hut.z) < 42) {
+      g.flags.spotHut = true;
+      notify("The Crone's Hut", 'Smoke through the pines that does not rise straight.');
+    }
+    if (!g.flags.spotGraves && dist2d(px, pz, SPOT.graves.x, SPOT.graves.z) < 45) {
+      g.flags.spotGraves = true;
+      notify('The Barrowdeep Cemetery', 'Leaning stones and dead trees. The ground remembers.');
+    }
+    if (dist2d(px, pz, SPOT.bridge.x, SPOT.bridge.z) < 42) {
+      if (!g.flags.spotBridge) {
+        g.flags.spotBridge = true;
+        notify('Stonebridge', 'Something huge shifts in the shadow beneath the span.');
+      }
+      // Meeting the troll starts the quest — he makes sure of that.
+      if (state.toll === 0 && !g.flags.trollDead) {
+        state.toll = 1;
+        qStart(QUESTS.toll, 'A troll bars Stonebridge — pay his toll, or argue in steel');
+      }
+    }
+  }
 
   function update(dt) {
+    // NPC visuals tick even while paused (Interact clip during dialogue);
+    // movement freezes inside updateNPCs when g.paused.
+    updateNPCs(dt);
     if (g.paused) return;
 
-    updateNPCs(dt);
+    // Bloodseal night buff + dawn ledger
+    updateBloodseal();
+    const night = isNight();
+    if (wasNight === null) wasNight = night;
+    else if (wasNight && !night) { wasNight = night; onDawn(); }
+    else wasNight = night;
 
     // Act 1 auto-start ~8s into a new game
     if (state.main === 0 && g.time.elapsed > 8) {
@@ -529,6 +649,7 @@ export function createQuests(g) {
       discT = 0.5;
       const p = g.player && g.player.position;
       if (p) {
+        checkSpots(p.x, p.z);
         const disc = g.flags.discovered || (g.flags.discovered = {});
         for (let i = 0; i < POIS.length; i++) {
           const poi = POIS[i];
@@ -558,8 +679,17 @@ export function createQuests(g) {
       case 3: return s === 0 ? markAt(POI.ruins.x, POI.ruins.z) : markNpc(npcs.torvald);
       case 4: return s === 0 || s === 3 ? markNpc(npcs.maera) : markAt(POI.stones.x, POI.stones.z);
       case 5: return s === 0 ? markAt(POI.peak.x, POI.peak.z) : markNpc(npcs.maera);
-      default: return null;
     }
+    // No main objective → guide the most urgent side quest.
+    if (state.blood === 4) return markAt(SPOT.crypt.x, SPOT.crypt.z); // the dawns are counting
+    if (state.crone === 1 || state.crone === 5) return markAt(SPOT.hut.x, SPOT.hut.z);
+    if (state.crone === 2) return markAt(SPOT.well.x, SPOT.well.z);
+    if (state.crone === 3) return markAt(SPOT.hut.x, SPOT.hut.z);
+    if (state.crone === 6) return markNpc(npcs.wendel);
+    if (state.blood === 1) return markAt(SPOT.graves.x, SPOT.graves.z);
+    if (state.blood === 2) return markAt(SPOT.crypt.x, SPOT.crypt.z); // pact (3) shows no marker — you chose this
+    if (state.toll === 1) return markAt(SPOT.bridge.x, SPOT.bridge.z);
+    return null;
   }
 
   // ==========================================================================
@@ -569,12 +699,15 @@ export function createQuests(g) {
     return {
       main: state.main, stage: state.stage, pelts: state.pelts,
       fold: state.fold, debt: state.debt, mere: state.mere,
+      crone: state.crone, blood: state.blood, toll: state.toll,
+      vanished: state.vanished,
     };
   }
 
   function deserialize(o) {
     if (!o) return;
-    for (const k of ['main', 'stage', 'pelts', 'fold', 'debt', 'mere']) {
+    for (const k of ['main', 'stage', 'pelts', 'fold', 'debt', 'mere',
+      'crone', 'blood', 'toll', 'vanished']) {
       if (typeof o[k] === 'number' && isFinite(o[k])) state[k] = o[k];
     }
     // Survive-stages can't restore tracked wave enemies — roll back one step
@@ -591,6 +724,34 @@ export function createQuests(g) {
         ? "You have Enna's amulet. Wendel waits — or Bram pays for silver."
         : "Search the old dock on Mirrormere's south shore");
     }
+    // Wave-2 side quests — repopulate journal entries for whatever's live.
+    if (state.crone >= 1 && state.crone <= 3) {
+      qStart(QUESTS.crone, state.crone === 1
+        ? "Seek the witch's hut in the southern pines"
+        : state.crone === 2
+          ? 'Inspect the old stock-well north of the fold'
+          : 'Bring the truth to Grimhilde — or to Wendel');
+    } else if (state.crone === 5) {
+      qStart(QUESTS.crone, 'Drive Grimhilde from the pines');
+    } else if (state.crone === 6) {
+      qStart(QUESTS.crone, 'The witch is dead — bring word to Wendel');
+    }
+    if (state.blood >= 1 && state.blood <= 4) {
+      qStart(QUESTS.blood, state.blood === 1
+        ? 'Search the cemetery by Barrowdeep — after dark'
+        : state.blood === 2
+          ? 'Enter the barrow crypt — at night, when it wakes'
+          : state.blood === 3
+            ? 'The pact holds. Do not count the dawns.'
+            : 'End Morvane — no bargain is worth the dawn count');
+    }
+    if (state.toll === 1) {
+      qStart(QUESTS.toll, (g.flags.trollPaid | 0) >= 1
+        ? 'The troll honors one toll... once. Pay again, or fight'
+        : 'A troll bars Stonebridge — pay his toll, or argue in steel');
+    }
+    // Dawn detector re-arms from current time-of-day on load.
+    wasNight = null;
   }
 
   // ==========================================================================
@@ -845,6 +1006,30 @@ export function createQuests(g) {
       };
     }
 
+    // --- The Crone of the Pines: Maera does not forgive the torch. Her
+    // disapproval shadows every later conversation on the idle branches.
+    if (g.flags.croneChoice === 'blood' && N.idle) {
+      N.mCrone = {
+        text: 'I\'ve buried plague-dead, drake-burned, and men who picked fights with rivers. ' +
+          'Grimhilde set half their bones and asked for firewood in return. Her tea was ' +
+          'bitter and her tongue worse, and this valley was safer with both. She looks past ' +
+          'you, toward the pines. You did what a frightened village asked of you. Sit with ' +
+          'how easy that was, some night.',
+        choices: [
+          { label: 'The herds were dying, Maera.', next: 'mCrone2' },
+          { label: 'Farewell.', next: null },
+        ],
+      };
+      N.mCrone2 = {
+        text: 'Herds die, stranger. That is what winter is FOR. Courage would have been the ' +
+          'truth carried up the square in daylight; fear only needed a blade, and blades are ' +
+          'cheap. She turns back to the well. We won\'t speak of it again. But I will think ' +
+          'of it every time you pass.',
+        choices: [{ label: 'Farewell.', next: null }],
+      };
+      N.idle.choices.unshift({ label: 'You\'ve been cold since the pines, Maera.', next: 'mCrone' });
+    }
+
     return { start, nodes: N };
   }
 
@@ -1081,6 +1266,21 @@ export function createQuests(g) {
           if: () => state.debt === 1 && !!g.flags.vargrDead,
           do: bloodDebt,
         },
+        {
+          label: 'You look like a man who hasn\'t slept.',
+          next: 'v1',
+          if: () => state.blood === 0,
+        },
+        {
+          label: 'Any word of the missing?',
+          next: 'vGuilt',
+          if: () => state.blood === 3 || state.blood === 4,
+        },
+        {
+          label: 'About Osric. It\'s finished.',
+          next: 'vDone',
+          if: () => state.blood === 5 && !g.flags.bramBloodClosure,
+        },
         sellAmulet,
         { label: 'Farewell.', next: null },
       ],
@@ -1166,6 +1366,87 @@ export function createQuests(g) {
         'should. Take these — brewed for bad nights, and you clearly make your own. First ' +
         'ale\'s free until I stop grinning, which may be never.',
       choices: [{ label: 'Keep the stew warm.', next: null }],
+    };
+
+    // --- Blood Below the Barrows: Bram's night terrors and the missing guest.
+    N.v1 = {
+      text: 'That obvious too? ...Nine nights now. A wool-trader — Osric — took the corner ' +
+        'bed, paid a week through, ate like a man with nowhere better to be. Walked out at ' +
+        'dusk to "see the old stones" and never came back for his boots. His BOOTS, stranger. ' +
+        'A man comes back for his boots.',
+      choices: [
+        { label: 'And the dreams?', next: 'v2' },
+        { label: 'Travelers wander off. It happens.', next: 'vDecl' },
+      ],
+    };
+    N.v2 = {
+      text: 'He leans close and drops his voice under the fire-crackle. He stands in the lane. ' +
+        'Every night since. Wrong-eyed — like lamplight behind smoked glass. He asks to come ' +
+        'in, polite as Sunday, and I wake with the window open and frost on the INSIDE of the ' +
+        'glass. My gran had a word for guests like that. It wasn\'t "guest".',
+      choices: [
+        {
+          label: 'I\'ll search the barrows. After dark.',
+          next: 'v3',
+          do: () => {
+            if (state.blood !== 0) return;
+            state.blood = 1;
+            qStart(QUESTS.blood, 'Search the cemetery by Barrowdeep — after dark');
+          },
+        },
+        { label: 'Dreams are dreams, Bram. Sleep with the window barred.', next: 'vDecl' },
+      ],
+    };
+    N.v3 = {
+      text: 'The graves by Barrowdeep — that\'s where folk say the ground\'s been turned. Go ' +
+        'armed, go fed, and if a polite voice asks you to come CLOSER... you charge it my ' +
+        'full winter rate. He tries to smile. It doesn\'t take.',
+      choices: [{ label: 'Keep the lamps lit.', next: null }],
+    };
+    N.vDecl = {
+      text: 'No. No, fair enough. He wipes a clean mug cleaner. I\'ll keep the corner bed ' +
+        'made, then. He paid the week through, after all. Paid the whole week through.',
+      choices: [{ label: 'Farewell.', next: null }],
+    };
+    N.vGuilt = {
+      text: state.vanished === 0
+        ? 'Osric, still. But the nights have gone quiet — no one in the lane, no frost. He ' +
+          'looks at you a moment too long. You went out to the barrows, didn\'t you. And came ' +
+          'back... rested.'
+        : state.vanished < 3
+          ? 'Jori didn\'t come for the morning bread. Then Hessa\'s loom stopped mid-cloth. ' +
+            'He counts mugs without seeing them. Doors don\'t open THEMSELVES at dawn, ' +
+            'stranger. Something out there is keeping terms with somebody.'
+          : 'Three. THREE, and no wardens, and the roads quiet, and nobody counting but me. ' +
+            'He grips the bar until the wood complains. Whatever you found under the barrows ' +
+            '— and I think you found something — FINISH it. I\'ll pay what an innkeep can. ' +
+            'Just finish it.',
+      choices: [{ label: 'The nights aren\'t done with me yet.', next: null }],
+    };
+    N.vDone = {
+      text: state.vanished > 0
+        ? 'He sets three mugs on the bar, then a fourth, and fills none of them. Done, you ' +
+          'said. Ash, you said. He nods, slow. I\'ll tell you what I tell my dreams: done ' +
+          'matters. Done is worth something. But it isn\'t worth three of everything, ever ' +
+          'again.'
+        : 'You gave a stranger his grave back, and this valley one less polite voice in the ' +
+          'dark. He slides a purse across the bar. Osric\'s board — the week he paid and ' +
+          'never slept. He\'d want the one who avenged him to drink it. That\'s innkeep ' +
+          'theology, and I\'m sticking to it.',
+      choices: [
+        {
+          label: state.vanished > 0 ? 'I\'ll carry the count, Bram.' : 'To Osric, then.',
+          next: null,
+          do: () => {
+            if (g.flags.bramBloodClosure) return;
+            g.flags.bramBloodClosure = true;
+            if (state.vanished === 0 && g.player) {
+              g.player.addGold(40);
+              notify("Osric's board", '40 gold — innkeep theology');
+            }
+          },
+        },
+      ],
     };
 
     return { start: 'greet', nodes: N };
@@ -1317,6 +1598,561 @@ export function createQuests(g) {
         text: 'The fields don\'t weed themselves, and the day\'s lost its seam again. Safe ' +
           'roads, stranger.',
         choices: [{ label: 'Farewell.', next: null }],
+      };
+    }
+
+    // --- The Crone of the Pines: Wendel is the herds' man, so the whisper,
+    // the truth, and the reckoning all pass through him. Hook into whatever
+    // branch of his amulet-tree is live.
+    const croneAccept = () => {
+      if (state.crone !== 0) return;
+      state.crone = 1;
+      qStart(QUESTS.crone, "Seek the witch's hut in the southern pines");
+    };
+    N.cw1 = {
+      text: 'Ehh. You\'ve heard the whispering, then. Two heifers dead, a third gone hollow ' +
+        'and dry, and Sunna\'s boy swears he saw the crone digging at the field\'s edge by ' +
+        'moonlight. Folk want her burned. I\'ve... buried a wife, stranger. It makes a man ' +
+        'slow to bury anyone else on a maybe.',
+      choices: [
+        { label: 'I\'ll find the truth of it.', next: 'cw2', do: croneAccept },
+        { label: 'Maybe the village is right to be afraid.', next: 'cw3' },
+        { label: 'Not my herds.', next: null },
+      ],
+    };
+    N.cw2 = {
+      text: 'Her hut\'s south-west, deep in the pines — follow the smoke that doesn\'t rise ' +
+        'straight. And stranger... whatever you find out there, bring back the TRUTH. Not ' +
+        'just a story. We\'ve enough stories; it\'s truth we\'re short of.',
+      choices: [{ label: 'Farewell.', next: null }],
+    };
+    N.cw3 = {
+      text: 'Maybe. Fear\'s right about once a year, by my count. It\'s the other three ' +
+        'hundred days that worry me — fear doesn\'t clean up after itself.',
+      choices: [
+        { label: 'Then I\'ll find the truth of it.', next: 'cw2', do: croneAccept },
+        { label: 'Farewell.', next: null },
+      ],
+    };
+    N.cwT = {
+      text: 'A stag? In the STOCK-WELL? He sits down slowly on the fence rail. ...Gods. Two ' +
+        'moons we drank fear like it was water, and it was just — winter. And her out there ' +
+        'pulling the rot out of our cattle while we sharpened her name at supper.',
+      choices: [
+        {
+          label: 'Grimhilde heals your herds. She has for years.',
+          next: 'cwT2',
+          do: () => {
+            if (state.crone !== 3) return;
+            state.crone = 4;
+            g.flags.croneChoice = 'peace';
+            grantCharm();
+            qDone(QUESTS.crone, 'The valley and its witch have made peace — her door is open to you');
+          },
+        },
+      ],
+    };
+    N.cwT2 = {
+      text: 'Then the village will hear it from ME, and they\'ll sit still for it. He nods, ' +
+        'firming up around the idea. I\'ll take her honey myself. First basket. A man should ' +
+        'carry his own apologies while his legs still work. ...Days later, a knot of ' +
+        'pine-root and red thread hangs at your door. It smells of resin, and of being wrong.',
+      choices: [{ label: 'Good ending to a bad season.', next: null }],
+    };
+    N.cwD = {
+      text: 'It\'s done, then. There was smoke over the pines this morning. He looks at his ' +
+        'boots for a while. Folk are grateful — Marta sent a cake to the inn, first cake in ' +
+        'this village since the burnings up north. Here. The herd-money we\'d scraped for a ' +
+        'witch-finder. You\'ve... earned it. That\'s the word we\'re using.',
+      choices: [
+        {
+          label: 'Take the purse.',
+          next: 'cwD2',
+          do: () => {
+            if (state.crone !== 6) return;
+            state.crone = 7;
+            g.flags.croneChoice = 'blood';
+            if (g.player) g.player.addGold(60);
+            qDone(QUESTS.crone, 'The witch is gone. The village calls it justice — 60 gold');
+            notify('Maera said nothing', 'Her door was shut before you crossed the square.');
+          },
+        },
+      ],
+    };
+    N.cwD2 = {
+      text: g.flags.wellCleansed
+        ? 'The herds are mending, anyway — since the well came clean. He doesn\'t look up ' +
+          'when he says it. Since the WELL came clean. Funny, how that worked out. ...Well. ' +
+          'Safe roads, stranger.'
+        : 'The third heifer\'s still sick, mind. Curse takes a while to lift, they say. He ' +
+          'watches the pines a moment too long. ...They say. Safe roads, stranger.',
+      choices: [{ label: 'Farewell.', next: null }],
+    };
+    N.cwP = {
+      text: g.flags.croneChoice === 'peace'
+        ? 'Fat and stupid, gods keep them. The crone sent a salve for Marta\'s knee, and ' +
+          'Marta sent honey back. Strange season. Good strange — the kind you don\'t question ' +
+          'too loud in case it hears you.'
+        : g.flags.wellCleansed
+          ? 'Mending, since the well came clean. He busies his hands with the fence. We ' +
+            'don\'t talk about the pines much. Turns out there\'s not much to say that sits well.'
+          : 'The third heifer died Tuesday. Curse takes a while to lift, folk say. ...Folk ' +
+            'say a lot of things. Said a lot of things.',
+      choices: [{ label: 'Farewell.', next: null }],
+    };
+    {
+      // Inject the live crone topic into whatever node greets the player —
+      // but only where the greeting already ends in a farewell, so we never
+      // wedge gossip into the middle of the amulet decision.
+      const entry = N[start];
+      const last = entry && entry.choices && entry.choices[entry.choices.length - 1];
+      if (last && last.next === null) {
+        let hook = null;
+        if (state.crone === 0) {
+          hook = { label: 'Folk say a witch is souring the herds.', next: 'cw1' };
+        } else if (state.crone === 3 && g.flags.wellCleansed) {
+          hook = { label: 'About the witch — and your well.', next: 'cwT' };
+        } else if (state.crone === 6) {
+          hook = { label: 'The witch of the pines is dead.', next: 'cwD' };
+        } else if (state.crone === 4 || state.crone === 7) {
+          hook = { label: 'How fare the herds?', next: 'cwP' };
+        }
+        if (hook) entry.choices.splice(Math.max(0, entry.choices.length - 1), 0, hook);
+      }
+    }
+
+    return { start, nodes: N };
+  }
+
+  // ----------------------------------------------------------- Grimhilde ---
+  // The witch of the pines. Innocent, prickly, and very tired of torches.
+  function grimhildeTree() {
+    const N = {};
+    let start = 'g1';
+    const gold = () => (g.player ? g.player.stats.gold : 0);
+
+    // One-time charm + reconciliation reward, shared by both peace endings.
+    const makePeace = () => {
+      if (state.crone === 4 || state.crone === 7) return;
+      state.crone = 4;
+      g.flags.croneChoice = 'peace';
+      grantCharm();
+      qDone(QUESTS.crone, 'The valley and its witch have made peace — her door is open to you');
+    };
+
+    if (g.flags.croneChoice === 'peace') {
+      // Vendor: potions at 15g (Bram charges 20 — she undercuts him happily).
+      start = 'v1';
+      const buy = {
+        label: 'Buy a pine-bitter draught. (15 gold)',
+        next: 'vBuy',
+        if: () => gold() >= 15,
+        do: () => {
+          if (!g.player || g.player.stats.gold < 15) return;
+          g.player.addGold(-15);
+          g.player.stats.potions += 1;
+          notify('Pine-bitter draught', 'Potions: ' + g.player.stats.potions);
+        },
+      };
+      N.v1 = {
+        text: 'The kettle knows your step now. Sit, or don\'t — you strike me as a don\'t. ' +
+          'The village sends its sick to me openly again. Wendel brought honey. HONEY. Fifty ' +
+          'years in these pines and it took a stranger with well-rot on their boots.',
+        choices: [
+          buy,
+          { label: 'What\'s in the draughts?', next: 'v2' },
+          { label: 'Farewell, Grimhilde.', next: null },
+        ],
+      };
+      N.vBuy = {
+        text: 'Drink it slow or it comes back up singing. Fifteen — the fat innkeep charges ' +
+          'twenty and his taste like regret. Anything else?',
+        choices: [buy, { label: 'That\'s all.', next: null }],
+      };
+      N.v2 = {
+        text: 'Pine resin, marsh-mallow root, three things you\'d rather not know, and one ' +
+          'thing I\'ll never tell. It mends what\'s torn and quiets what\'s loud. The village ' +
+          'called that witchcraft for fifty years. Now they call it "the old woman\'s way." ' +
+          'Progress limps, but it walks.',
+        choices: [buy, { label: 'Farewell.', next: null }],
+      };
+    } else if (state.crone === 3) {
+      // The player has hauled the stag from the well: the truth is in hand.
+      start = 'r1';
+      N.r1 = {
+        text: 'You smell of well-rot and honest work — there\'s a sentence I don\'t say twice. ' +
+          'So. A winter stag, drowned and swelling since the thaw, poisoning every trough from ' +
+          'the fold to the mill. And they burned MY name for it around their suppers.',
+        choices: [
+          { label: 'Wendel will hear the truth. The village will stand down.', next: 'r2', do: makePeace },
+          { label: 'They were afraid. Fear needed a face.', next: 'r3' },
+        ],
+      };
+      N.r2 = {
+        text: 'Then take this. Pine-root, red thread, and a word older than the valley — wear ' +
+          'it, and hurts will find you harder to hold. And tell them my door is open. To the ' +
+          'sick, and to you. For the rest it can stay a story — stories keep the firewood ' +
+          'thieves away.',
+        choices: [{ label: 'Wear it well yourself, Grimhilde.', next: null }],
+      };
+      N.r3 = {
+        text: 'Fear always needs a face, and mine\'s cheap: old, alone, and good with herbs. ' +
+          'You could have given them the stag\'s face instead. You still can.',
+        choices: [
+          { label: 'I will. The village stands down today.', next: 'r2', do: makePeace },
+          { label: 'I need to think.', next: null },
+        ],
+      };
+    } else if (state.crone === 1 || state.crone === 2) {
+      // Investigation: her side of the story.
+      start = 'q1';
+      const goHostile = () => {
+        if (state.crone >= 4) return;
+        g.flags.witchHostile = true;
+        state.crone = 5;
+        qUpdate(QUESTS.crone, 'You chose the torch — drive Grimhilde from the pines');
+      };
+      N.q1 = {
+        text: 'Come to burn the witch? You\'d be the third this year. The first two left with ' +
+          'poultices for their trouble. Well? The kettle\'s on and my patience isn\'t.',
+        choices: [
+          { label: 'The herds sicken. The village names you.', next: 'q2' },
+          { label: 'The valley wants you gone, crone.', next: 'qWarn' },
+        ],
+      };
+      N.q2 = {
+        text: 'My work is why only the herds are sick and not the children. Two moons I\'ve ' +
+          'been pulling the same rot out of cattle that drink at the old stock-well past the ' +
+          'fold — something died in its throat this winter and nobody thought to look, because ' +
+          'looking is work and hating me is Sunday sport. Go see for yourself. Or fetch your ' +
+          'torch. I\'m here either way. I\'m always here.',
+        choices: [
+          {
+            label: 'I\'ll look at the well.',
+            next: 'q3',
+            do: () => {
+              if (state.crone === 1) {
+                state.crone = 2;
+                qUpdate(QUESTS.crone, 'Inspect the old stock-well north of the fold');
+              }
+            },
+          },
+          { label: 'Or I end this now.', next: 'qWarn' },
+        ],
+      };
+      N.q3 = {
+        text: 'North of Sylva\'s fold, sunk in the pasture weeds. Mind the rope — it was old ' +
+          'when I was young. And when you\'ve seen what\'s down there, tell THEM. Truth from ' +
+          'me is witchcraft. From you it\'s news.',
+        choices: [{ label: 'Farewell.', next: null }],
+      };
+      N.qWarn = {
+        text: 'Then you\'re exactly the fool this village deserves. She rises, and the green ' +
+          'light gathers in her hands like sickness given shape. Fifty years I healed them. ' +
+          'Know this before you swing: I heal slow, and I hate fast.',
+        choices: [
+          { label: 'So be it, witch.', next: null, do: goHostile },
+          { label: 'Wait. Show me your proof first.', next: 'q2' },
+        ],
+      };
+    } else {
+      // No rumor yet — a stranger at a strange door.
+      N.g1 = {
+        text: 'Lost, or curious? Both pay the same toll here: none. But the pines are mine ' +
+          'after dark, stranger, and the village will tell you worse than that about me. ' +
+          'Believe what you like. They will anyway.',
+        choices: [{ label: 'Just passing, old mother.', next: null }],
+      };
+    }
+
+    return { start, nodes: N };
+  }
+
+  function grantCharm() {
+    if (g.flags.witchCharm) return;
+    g.flags.witchCharm = true;
+    if (g.player) g.player.bonus.maxHp += 15;
+    notify("The Crone's Charm", 'Pine-root and red thread: +15 max health');
+  }
+
+  // The sick well — the real culprit behind the cursed herds.
+  function wellTree() {
+    return {
+      start: 'w1',
+      nodes: {
+        w1: {
+          text: 'The rope is green with slime, and far below the water lies still and wrong. ' +
+            'Something pale turns in it: a winter-dead stag, wedged and swollen, a whole ' +
+            'season of poison seeping into every trough the herds drink from.',
+          choices: [
+            {
+              label: 'Haul the carcass out. (Filthy work)',
+              next: 'w2',
+              do: () => {
+                g.flags.wellCleansed = true;
+                if (state.crone === 2) {
+                  state.crone = 3;
+                  qUpdate(QUESTS.crone, 'Bring the truth to Grimhilde — or to Wendel');
+                }
+                notify('The well runs foul no more', 'A dead stag. Not witchcraft. Someone owes an old woman an apology.');
+              },
+            },
+            { label: 'Leave it. (Come back later)', next: null },
+          ],
+        },
+        w2: {
+          text: 'It comes up in pieces, and the smell will live in your clothes for days — ' +
+            'but by the next rain the water will run clean. This was never witchcraft. Just ' +
+            'winter, and bad luck, and fear filling the silence where the truth should be.',
+          choices: [{ label: 'The village needs to hear this.', next: null }],
+        },
+      },
+    };
+  }
+
+  // ---------------------------------------------------- the cemetery, night --
+  function gravesTree() {
+    return {
+      start: 'c1',
+      nodes: {
+        c1: {
+          text: 'Lantern-light finds the third grave open — thrown wide from the INSIDE, soil ' +
+            'scattered like a door kicked off its hinges. In the dew lies a trader\'s satchel, ' +
+            'wool samples still neatly tied. Osric\'s. Drag-marks lead away between the stones, ' +
+            'down toward the barrow crypt, and in their bottom the dew has not settled.',
+          choices: [
+            {
+              label: 'Something passed here tonight. Follow the drag-marks.',
+              next: null,
+              do: () => {
+                if (state.blood !== 1) return;
+                g.flags.guestFound = true;
+                if (g.flags.morvaneDead) {
+                  // The player already burned the crypt clean before asking why.
+                  state.blood = 5;
+                  qDone(QUESTS.blood, 'The thing that took Osric is already ash — the graves can rest');
+                  return;
+                }
+                state.blood = 2;
+                notify("Osric's satchel", 'He never left the barrows. Something carried him below.');
+                qUpdate(QUESTS.blood, 'Enter the barrow crypt — at night, when it wakes');
+              },
+            },
+          ],
+        },
+      },
+    };
+  }
+
+  // ------------------------------------------------------------- Morvane ---
+  // The vampire lord under Barrowdeep. Courteous, ancient, and utterly wrong.
+  function morvaneTree() {
+    const N = {};
+    let start = 'm1';
+
+    if (state.blood === 2) {
+      const makePact = () => {
+        if (state.blood !== 2) return;
+        state.blood = 3;
+        g.flags.morvanePact = true;
+        g.flags.item_bloodseal = true;
+        notify('The Bloodseal', 'Cold sinks into your wrist like a nail. +15% damage after dark.');
+        qUpdate(QUESTS.blood, 'The pact holds. Do not count the dawns.');
+      };
+      N.m1 = {
+        text: '"You smell of the road. Woodsmoke, iron... and the innkeep\'s stew." A pale ' +
+          'figure unfolds from the dark between the coffins, courteous as a hangman. "He ' +
+          'worries after his wool-trader. How touching. Worry is the better part of grief — ' +
+          'I have spared him the rest."',
+        choices: [
+          { label: 'Where is Osric?', next: 'm2' },
+          { label: 'You\'ll answer for him.', next: 'm3' },
+        ],
+      };
+      N.m2 = {
+        text: '"Below. What remains keeps well down here — the cold is kind that way. He was ' +
+          'sweet with fear, if it comforts you. The fearful always are. The brave are thinner ' +
+          'fare, but I confess... I prefer the conversation."',
+        choices: [
+          { label: 'Enough. This ends here.', next: 'm3' },
+        ],
+      };
+      N.m3 = {
+        text: '"Does it? Kill me, and you bleed for a stranger who is already bones. Or — ' +
+          'leave me the dark below, and I make your nights profitable. My seal on your sword ' +
+          'hand: after sundown, your blade drinks as I drink. And no villager will miss what ' +
+          'I take from... travelers." He smiles. It has too much patience in it.',
+        choices: [
+          { label: 'Give me the seal. Keep your dark.', next: 'mPact', do: makePact },
+          { label: 'The only thing you\'ll give me is ashes.', next: 'mFight' },
+          { label: 'I need to think.', next: null },
+        ],
+      };
+      N.mPact = {
+        text: '"A wise hunger." His thumb presses your wrist and the cold goes in like a nail, ' +
+          'and stays. "Hunt well after dark, little wolf. And do not count the dawns too ' +
+          'closely — arithmetic has ruined finer arrangements than ours."',
+        choices: [{ label: 'Leave the crypt.', next: null }],
+      };
+      N.mFight = {
+        text: '"Then the stew-fat fool will grieve twice." He bows — courtly, unhurried, ' +
+          'wrong. "Come, little wolf. The dark down here has been so dull."',
+        choices: [{ label: 'Draw steel.', next: null }],
+      };
+    } else if (state.blood === 3 || state.blood === 4) {
+      // Returning while the pact stands. He keeps the ledger better than you.
+      start = 'p1';
+      N.p1 = {
+        text: state.vanished > 0
+          ? '"You counted the dawns after all." He does not turn around. "Jori. Hessa. Marta. ' +
+            'You knew their names — I never did. That was your half of the bargain, little ' +
+            'wolf. Mine was only the taking."'
+          : '"Back so soon? The seal itches, doesn\'t it. New gifts always do." He trails a ' +
+            'finger along a coffin lid. "Go. Enjoy your nights. They are the finest part of ' +
+            'our arrangement — for both of us."',
+        choices: [
+          { label: 'It ends tonight, Morvane.', next: 'p2' },
+          { label: 'Not yet.', next: 'p3' },
+        ],
+      };
+      N.p2 = {
+        text: '"It always does, eventually." He turns, and the pact-mark on your wrist burns ' +
+          'cold. "Keep the seal. I made it well, and the dead have no use for craftsmanship. ' +
+          'Come, then — you owe me a better ending than the wool-trader gave."',
+        choices: [{ label: 'Draw steel.', next: null }],
+      };
+      N.p3 = {
+        text: '"No. Not yet. Never quite yet." The smile again, patient as winter. "Then go ' +
+          'and eat at the inn, little wolf... and see who serves you."',
+        choices: [{ label: 'Leave the crypt.', next: null }],
+      };
+    } else {
+      // Shouldn't be reachable (interactable gates on blood state), but safe.
+      N.m1 = {
+        text: 'The crypt-dark swallows your voice. Nothing answers. Nothing needs to.',
+        choices: [{ label: 'Leave.', next: null }],
+      };
+    }
+
+    return { start, nodes: N };
+  }
+
+  // ------------------------------------------------------- Grum the Troll ---
+  function trollTree() {
+    const N = {};
+    let start = 't1';
+    const gold = () => (g.player ? g.player.stats.gold : 0);
+    const paid = () => (g.flags.trollPaid | 0);
+
+    const payToll = () => {
+      if (!g.player || g.player.stats.gold < 30) return;
+      g.player.addGold(-30);
+      g.flags.trollPaid = paid() + 1;
+      if (g.flags.trollPaid >= 2) {
+        g.flags.trollRespect = true;
+        if (state.toll === 1) {
+          state.toll = 2;
+          qDone(QUESTS.toll, 'Twice paid — the troll respects coin. Stonebridge is free to you, forever');
+        }
+        notify('Coin-friend', 'Grum will never charge you again. He is very moved.');
+      } else {
+        if (state.toll === 1) {
+          qUpdate(QUESTS.toll, 'Toll paid — the bridge is yours today. The troll remains');
+        }
+        notify('Toll paid', 'The troll bites your coin, nods gravely. It passes inspection.');
+      }
+    };
+
+    if (g.flags.trollRespect) {
+      start = 'f1';
+      N.f1 = {
+        text: 'COIN-FRIEND! Grum\'s bridge is your bridge. Walk in middle, is strongest part. ' +
+          '...Nobody else pays toll now. All go around through river. Wet and stupid. Times ' +
+          'is hard for honest troll.',
+        choices: [
+          { label: 'Times are hard everywhere, Grum.', next: 'f2' },
+          { label: 'Keep the bridge standing.', next: null },
+        ],
+      };
+      N.f2 = {
+        text: 'Yes. YES. You understand economy. He sits down. The bridge groans. Grum had ' +
+          'plan once: two bridges, double toll. But two bridges is two places to be, and Grum ' +
+          'is one troll. He sighs, boulder-deep. Business is complicate.',
+        choices: [{ label: 'Farewell, coin-friend.', next: null }],
+      };
+    } else if (paid() === 1) {
+      N.t1 = {
+        text: 'Small thing AGAIN. He holds up a finger the size of your forearm. Rule is rule: ' +
+          'toll is for CROSSING, not for LIFE. Bridge got fresh-closed since you left. Thirty ' +
+          'shiny. Is good bridge. Best bridge. Only bridge.',
+        choices: [
+          { label: 'Pay the thirty. Again. (30 gold)', next: 'tPay2', if: () => gold() >= 30, do: payToll },
+          { label: 'I already paid you once, you great heap.', next: 't2' },
+          { label: 'Walk away.', next: null },
+        ],
+      };
+      N.tPay2 = {
+        text: 'TWO thirty. He stares at the coins, then at you, then at the coins. Grum has ' +
+          'never had two thirty from same small thing. You are... coin-friend. He says it like ' +
+          'a coronation. Bridge is YOUR bridge now. Toll-free. Forever. Tell other small ' +
+          'things: still closed.',
+        choices: [{ label: 'An honor, Grum.', next: null }],
+      };
+      N.t2 = {
+        text: 'Yes! And it was GOOD paying. Grum remembers. Grum tells the under-bridge fish ' +
+          'about it. But yesterday-shiny is yesterday-bridge. He shrugs with geological ' +
+          'slowness. Is not Grum\'s fault you keep leaving.',
+        choices: [
+          { label: 'Fine. Thirty. (30 gold)', next: 'tPay2', if: () => gold() >= 30, do: payToll },
+          { label: 'The only toll I pay today is in teeth.', next: 'tFight' },
+          { label: 'Walk away.', next: null },
+        ],
+      };
+      N.tFight = {
+        text: 'Teeth is bad money. He stands. The sun goes somewhere else. Grum gives refunds ' +
+          'in FLAT.',
+        choices: [{ label: 'Draw steel.', next: null }],
+      };
+    } else {
+      N.t1 = {
+        text: 'BRIDGE CLOSED. He rises from under the span like a hillside changing its mind. ' +
+          'Is troll bridge. Troll law: small thing pays thirty shiny, or small thing goes ' +
+          'around. Or — he cracks knuckles like falling masonry — small thing gets FLAT.',
+        choices: [
+          { label: 'Pay the toll. (30 gold)', next: 'tPay1', if: () => gold() >= 30, do: payToll },
+          { label: 'Who taught a troll to count to thirty?', next: 't3' },
+          { label: 'I could just kill you.', next: 'tThreat' },
+          { label: 'Walk away.', next: null },
+        ],
+      };
+      N.tPay1 = {
+        text: 'He counts it twice, moving his lips, loses count, starts over, gives up and ' +
+          'bites one. Mm. Real. Bridge open for you, small thing. TODAY. Tomorrow is new ' +
+          'bridge. He pauses. Same bridge. New DAY. Toll rules is complicate.',
+        choices: [{ label: 'A pleasure doing business.', next: null }],
+      };
+      N.t3 = {
+        text: 'Grum taught Grum. He looks proud enough to burst. Started at one. Was long ' +
+          'winter. He leans in, confidential, breath like a wet cave: past thirty is just ' +
+          '"more thirty". Is why toll stops there. Honest pricing.',
+        choices: [
+          { label: 'Honest pricing. Here\'s thirty. (30 gold)', next: 'tPay1', if: () => gold() >= 30, do: payToll },
+          { label: 'Walk away.', next: null },
+        ],
+      };
+      N.tThreat = {
+        text: 'Many small things say that. He nods slowly, agreeably. Grum counts them. ' +
+          'A pause, vast and untroubled. Grum cannot count. Is MANY.',
+        choices: [
+          { label: 'Then it\'s teeth.', next: 'tFight' },
+          { label: '...Thirty it is. (30 gold)', next: 'tPay1', if: () => gold() >= 30, do: payToll },
+          { label: 'Walk away.', next: null },
+        ],
+      };
+      N.tFight = {
+        text: 'Teeth is bad money. He stands all the way up. The bridge stops being the ' +
+          'biggest thing at the bridge. Grum gives refunds in FLAT.',
+        choices: [{ label: 'Draw steel.', next: null }],
       };
     }
 
