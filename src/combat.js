@@ -251,9 +251,9 @@ export function createCombat(g) {
   // Tuned so weapons sit LOWER-RIGHT and angled forward like a modern FPS
   // melee viewmodel (≲35% of screen height) instead of towering upright.
   const BASE_POSE = {
-    sword:      [0.33, -0.42, -0.60, -0.42, -0.42, 0.22],
-    axe:        [0.37, -0.45, -0.65, -0.50, -0.32, 0.26],
-    greatsword: [0.33, -0.48, -0.70, -0.55, -0.30, 0.18],
+    sword:      [0.40, -0.54, -0.76, -0.66, -0.44, 0.30],
+    axe:        [0.42, -0.55, -0.78, -0.66, -0.36, 0.30],
+    greatsword: [0.38, -0.56, -0.80, -0.68, -0.34, 0.22],
     bow:        [0.20, -0.26, -0.58,  0.00,  0.35, -0.12],
     fire:       [0.32, -0.34, -0.56, -0.25, -0.15, 0.00],
     frost:      [0.32, -0.34, -0.56, -0.25, -0.15, 0.00],

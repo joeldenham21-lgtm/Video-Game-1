@@ -264,7 +264,7 @@ export function createSky(g) {
     const sc = sunLight.shadow.camera;
     sc.left = -SHADOW_EXTENT; sc.right = SHADOW_EXTENT;
     sc.top = SHADOW_EXTENT;   sc.bottom = -SHADOW_EXTENT;
-    sc.near = 1; sc.far = 140; // tight: culls distant casters from the shadow pass
+    sc.near = 1; sc.far = 175; // light sits 150u out — far must clear receivers (+margin)
     sc.updateProjectionMatrix();
     sunLight.shadow.bias = -0.0006;
     sunLight.shadow.normalBias = 1.2; // flat-shaded low-poly: generous normal bias kills acne
@@ -306,7 +306,7 @@ export function createSky(g) {
     // sets in the west (-x) at f=0.75. Elevation is a pure sine of the cycle.
     const ang = (f - 0.25) * Math.PI * 2;
     const sunEl = Math.sin(ang); // -1..1, >0 means sun above horizon
-    sunDir.set(Math.cos(ang) * 0.92, sunEl, 0.34).normalize();
+    sunDir.set(Math.cos(ang) * 0.92, sunEl, 0.5).normalize(); // southerly lean: noon still models forms
     // Moon: roughly opposite the sun, on a slightly different (northern) track
     const mAng = ang + Math.PI * 1.045;
     moonDir.set(Math.cos(mAng) * 0.95, Math.sin(mAng), -0.30).normalize();
@@ -335,7 +335,7 @@ export function createSky(g) {
     if (wSum > 1e-4) lightCol.lerpColors(MOON_BLUE, sunColKF, dayW / wSum);
     else lightCol.copy(MOON_BLUE);
     sunLight.color.copy(lightCol);
-    sunLight.intensity = cur.si * dayW * overcastDim + 0.35 * moonW;
+    sunLight.intensity = cur.si * dayW * overcastDim + 0.52 * moonW; // readable nights
 
     // --- position the light (and snap the shadow bubble to texels) -----------
     if (g.quality.shadows) {
