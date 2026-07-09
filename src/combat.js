@@ -92,6 +92,27 @@ const FX = {
   zap:     { c1: [1.0, 1.0, 1.0],  c2: [0.55, 0.75, 1.0], speed: 5.5, up: 0.4,  grav: 3,  drag: 2.6, life: 0.26 },
 };
 
+// ---------------------------------------------------------------------------
+// Forge / enchant support (wave 3) — school colors, wisp presets, undead set,
+// tier steel-brightening curve. Read via g.forge (guarded ?? everywhere).
+// ---------------------------------------------------------------------------
+const SCHOOL_HEX = {
+  flametongue: 0xff5a22, frostbite: 0x66ccff, stormbrand: 0xb18cff,
+  bloodthirst: 0xaa1133, gravebane: 0x9fffce,
+};
+const FX_SCHOOL = {
+  flametongue: { c1: [1.0, 0.45, 0.16], c2: [1.0, 0.24, 0.05], speed: 0.5,  up: 0.9, grav: -1.6, drag: 1.4, life: 0.5  },
+  frostbite:   { c1: [0.55, 0.82, 1.0], c2: [0.3, 0.62, 1.0],  speed: 0.45, up: 0.7, grav: -0.8, drag: 1.4, life: 0.55 },
+  stormbrand:  { c1: [0.78, 0.62, 1.0], c2: [0.52, 0.4, 0.95], speed: 0.7,  up: 0.6, grav: -0.6, drag: 1.6, life: 0.4  },
+  bloodthirst: { c1: [0.75, 0.08, 0.22], c2: [0.45, 0.02, 0.1], speed: 0.4, up: 0.5, grav: 0.5,  drag: 1.4, life: 0.55 },
+  gravebane:   { c1: [0.62, 1.0, 0.8],  c2: [0.35, 0.85, 0.6], speed: 0.45, up: 0.8, grav: -1.0, drag: 1.4, life: 0.55 },
+};
+const UNDEAD = { skeleton: 1, skelarcher: 1, barrowlord: 1, wraith: 1, thrall: 1, morvane: 1 };
+const TIER_BRIGHT = [0, 0.5, 0.6, 0.7, 0.8]; // color lerp toward bright steel per tier
+const LOOK_IDS = ['sword', 'axe', 'greatsword', 'bow'];
+const _cA = new THREE.Color();
+const _cB = new THREE.Color();
+
 // ===========================================================================
 export function createCombat(g) {
   const events = g.events;
@@ -403,7 +424,7 @@ export function createCombat(g) {
   // Lightning bolt renderer — one pooled jagged LineSegments flash
   // -------------------------------------------------------------------------
   const BOLT_SUB = 6;                       // subdivisions per chain hop
-  const BOLT_MAX = (WEAPONS.lightning.chain + 1) * BOLT_SUB * 2; // verts (pairs)
+  const BOLT_MAX = (5 + 1) * BOLT_SUB * 2;  // verts (pairs) — sized for the tome-upgraded 5-target chain
   const boltPos = new Float32Array(BOLT_MAX * 3);
   const boltGeo = new THREE.BufferGeometry();
   boltGeo.setAttribute('position', new THREE.BufferAttribute(boltPos, 3));

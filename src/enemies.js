@@ -65,6 +65,9 @@ const RANGED = {
 // New POI coordinates (ASSETS-ART.md; structures.js builds the scenery)
 const WITCH_HUT   = { x: -260, z: -520 };
 const STONEBRIDGE = { x: 330,  z: -260 };
+// Boss-class types: lock their scaling at first engagement, persist state,
+// never despawn by distance, excluded from elite rolls.
+const BOSS_TYPES = { barrowlord: true, drake: true, morvane: true, troll: true, vargr: true, witch: true };
 
 const TELEGRAPH_T = 0.55;   // readable windup — contract (per-type teleT overrides)
 const STRIKE_T    = 0.30;   // lunge duration; hit lands at STRIKE_HIT_T
@@ -253,6 +256,9 @@ export function createEnemies(g) {
       });
     }
     if (spec.isVargr) applyVargrLook(h, Math.min(g.flags.vargrWins | 0, 3));
+    // wave-3 looks requested before the GLB resolved
+    if (h.eliteGlowOn) attachEliteEyes(h);
+    if (h.ghosted) applyGhost(h);
   }
 
   function requestRig(h, specKey) {
@@ -475,6 +481,8 @@ export function createEnemies(g) {
     h.bar.visible = false;
     if (h.mixer) { h.mixer.stopAllAction(); h.cur = null; h.curName = ''; }
     h.deathPlayed = false;
+    setEliteEyes(h, false);        // pooled holders return to their plain look
+    if (h.ghosted) clearGhost(h);  // echoes give the body back
     pools[h.type].push(h);
   }
 
@@ -999,6 +1007,7 @@ export function createEnemies(g) {
       e.spawner.respawnAt = g.time.elapsed + (e.spawner.nightRespawn && night ? NIGHT_RESPAWN_T : RESPAWN_T);
       if (e.boss || e.isVargr || e.spawner.deadFlag) e.spawner.permaDead = true; // bosses & flagged uniques stay dead
     }
+    if (e.echo) { finishEcho(e); return; } // shrine echoes never touch world flags/quests
     if (e.type === 'drake') { bossState.drake.dead = true; bossState.drake.hp = 0; sfx('drakeRoar'); }
     if (e.type === 'barrowlord') { bossState.barrowlord.dead = true; bossState.barrowlord.hp = 0; }
     if (e.isVargr) g.flags.vargrDead = true;
@@ -1008,6 +1017,11 @@ export function createEnemies(g) {
     events.emit('enemyKilled', { type: e.type, name: e.name, pos: { x: e.pos.x, y: e.pos.y, z: e.pos.z }, xp: e.xp });
     if (g.player && g.player.addXP) g.player.addXP(e.xp);
     dropLoot(e);
+    if (e.huntTarget) completeHunt(e);
+    if (e.bloodMoon && moonActive) {
+      const BM = g.flags.bloodMoon;
+      if (BM) BM.kills = (BM.kills | 0) + 1;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -1065,8 +1079,11 @@ export function createEnemies(g) {
     }
     if (e.state === 'guard') { amount *= 0.35; e.blockHit = true; sfx('block'); }
     e.hp -= amount;
-    if (e.type === 'drake') bossState.drake.hp = Math.max(0, e.hp);
-    if (e.type === 'barrowlord') bossState.barrowlord.hp = Math.max(0, e.hp);
+    // Boss hp persists in BASE units so saves stay compatible across levels
+    if (e.type === 'drake' && !e.echo) bossState.drake.hp = Math.max(0, e.hp / (e.hpScale || 1));
+    if (e.type === 'barrowlord' && !e.echo) bossState.barrowlord.hp = Math.max(0, e.hp / (e.hpScale || 1));
+    // Striking a pact-bound vampire breaks the truce for this fight
+    if (e.type === 'morvane' || e.type === 'thrall') e.pactProvoked = true;
     // knockback impulse along dir (scaled by mass)
     if (dir) {
       const k = ((opts && opts.heavy) ? 7 : 3.5) * e.mass;
@@ -1083,8 +1100,11 @@ export function createEnemies(g) {
     // Morvane calls his thralls from the graves at half hp
     if (e.type === 'morvane' && !e.summoned && e.hp <= e.maxHp * 0.5 && e.hp > 0) {
       e.summoned = true;
-      startAggro(spawnEnemy('thrall', e.pos.x + 2.4, e.pos.z + 1.2, null), true);
-      startAggro(spawnEnemy('thrall', e.pos.x - 2.4, e.pos.z - 1.2, null), true);
+      const t1 = spawnEnemy('thrall', e.pos.x + 2.4, e.pos.z + 1.2, null);
+      const t2 = spawnEnemy('thrall', e.pos.x - 2.4, e.pos.z - 1.2, null);
+      t1.pactProvoked = t2.pactProvoked = true; // summoned to fight — no truce
+      startAggro(t1, true);
+      startAggro(t2, true);
       emitBurst(e.pos.x, e.pos.y + 1.2, e.pos.z, 14, 0.8, 0.1, 0.2, 1);
       sfx('fireCast');
       events.emit('notify', { text: 'Morvane calls to the graves', sub: 'His thralls rise.' });
@@ -1156,9 +1176,16 @@ export function createEnemies(g) {
 
   // Sight-based aggro gates: the witch stays neutral until the quest turns
   // her hostile (damage always provokes); the troll stands down once paid.
+  // Morvane and his thralls honor the blood pact while it stands — until the
+  // player draws blood first (damage() marks pactProvoked for that fight).
+  function pactPassive(e) {
+    return (e.type === 'morvane' || e.type === 'thrall') && !e.pactProvoked &&
+      !!g.flags.morvanePact && !g.flags.morvaneDead;
+  }
   function canSightAggro(e) {
     if (e.type === 'witch') return !!g.flags.witchHostile;
     if (e.type === 'troll') return !g.flags.trollPaid;
+    if (pactPassive(e)) return false;
     return true;
   }
 
@@ -1183,6 +1210,20 @@ export function createEnemies(g) {
     if (e.isVargr && !e.taunted && (g.flags.vargrWins | 0) > 0) {
       e.taunted = true;
       events.emit('notify', { text: 'Vargr Redfang remembers you', sub: 'His scars have made him stronger.' });
+    }
+    // Bosses lock their scale at first engagement — the fight you start is
+    // the fight you finish, whatever you level to mid-way
+    if (!e.echo && BOSS_TYPES[e.type] === true) {
+      const lk = g.flags.bossLock || (g.flags.bossLock = {});
+      if (typeof lk[e.type] !== 'number') lk[e.type] = e.lockScale;
+    }
+    // Elites announce themselves once (no hp-bar name label exists)
+    if (e.elite && !e.eliteNotified) {
+      e.eliteNotified = true;
+      events.emit('notify', {
+        text: e.name,
+        sub: e.huntTarget ? 'Your mark has found you.' : 'A greater foe turns its eyes on you.',
+      });
     }
     if (e.type === 'wraith' && !g.flags.wraithHint) {
       g.flags.wraithHint = true;
@@ -1388,6 +1429,8 @@ export function createEnemies(g) {
       case 'chase': {
         const dr = e.type === 'drake' ? DRAKE_DEAGGRO_R : DEAGGRO_R;
         if (pd > dr || p.stats.hp <= 0) { e.aggro = false; e.state = 'return'; e.stateT = 0; break; }
+        // Blood pact struck mid-fight → the vampires stand down
+        if (pactPassive(e)) { e.aggro = false; e.state = 'return'; e.stateT = 0; break; }
         if (R) {
           // ranged: hold the band, back off when crowded, fire when clear
           if (pd < R.min) {
@@ -1409,6 +1452,15 @@ export function createEnemies(g) {
           break;
         }
         let tx = p.position.x, tz = p.position.z;
+        // Blood Moon raiders press the village EDGE but never past the inner
+        // ward (r 40 around the well) — guards and villagers stay safe
+        if (e.bloodMoon) {
+          const dv = Math.hypot(tx, tz);
+          if (dv < 40) {
+            if (dv > 0.01) { tx *= 40 / dv; tz *= 40 / dv; }
+            else { tx = 40; tz = 0; }
+          }
+        }
         if (e.type === 'wolf' && e.cooldown > 0.35 && pd < 9) {
           // wolves circle their prey between bites, offset per pack member
           e.orbitA += dt * 1.15 * e.orbitDir;
@@ -1837,7 +1889,7 @@ export function createEnemies(g) {
       if (e.hover && e.pos.y > e.groundY) e.pos.y = Math.max(e.groundY, e.pos.y - 3 * dt); // wraith settles
       gp.rotation.set(0, e.yaw, tiltZ);
       if (e.deadT > SINK_AFTER) gp.position.y -= (e.deadT - SINK_AFTER) / SINK_T * (e.height + 0.6);
-      if (gp.scale.x !== 1) gp.scale.setScalar(1);
+      if (gp.scale.x !== e.baseScale) gp.scale.setScalar(e.baseScale);
       return;
     }
 
@@ -1855,9 +1907,9 @@ export function createEnemies(g) {
     if (e.state === 'blink') {
       const f = e.stateT / BLINK_T;
       const s = f < 0.4 ? 1 - (f / 0.4) * 0.96 : f < 0.55 ? 0.04 : 0.04 + ((f - 0.55) / 0.45) * 0.96;
-      gp.scale.setScalar(clamp(s, 0.04, 1));
-    } else if (gp.scale.x !== 1) {
-      gp.scale.setScalar(1);
+      gp.scale.setScalar(clamp(s, 0.04, 1) * e.baseScale);
+    } else if (gp.scale.x !== e.baseScale) {
+      gp.scale.setScalar(e.baseScale);
     }
 
     gp.rotation.set(tiltX, e.yaw, tiltZ);
