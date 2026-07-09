@@ -54,6 +54,16 @@ export function createUI(g) {
   background:radial-gradient(ellipse at center,transparent 40%,rgba(165,12,12,.6) 100%);}
 #ef-flash{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 1.1s ease;
   background:radial-gradient(circle at 50% 45%,rgba(255,224,140,.55),rgba(255,200,80,.14) 55%,transparent 78%);}
+#ef-pdodge{position:absolute;inset:0;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse at center,transparent 42%,rgba(255,205,90,.4) 80%,rgba(255,185,60,.62) 100%);}
+
+/* ---------- counter-window cue (⚔ above crosshair) ---------- */
+#ef-counter{position:absolute;left:50%;top:calc(50% - 52px);opacity:0;pointer-events:none;
+  font-size:26px;color:var(--goldhi);will-change:transform,opacity;
+  transform:translateX(-50%) scale(.6);transition:opacity .12s ease,transform .12s ease;
+  text-shadow:0 0 14px rgba(255,216,115,.95),0 1px 3px #000;}
+#ef-counter.on{opacity:1;animation:ef-cpulse .42s ease-in-out infinite alternate;}
+@keyframes ef-cpulse{from{transform:translateX(-50%) scale(1)}to{transform:translateX(-50%) scale(1.25)}}
 
 /* ---------- compass ---------- */
 #ef-compass{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:50%;
@@ -164,8 +174,21 @@ export function createUI(g) {
   bottom:calc(30px + env(safe-area-inset-bottom,0px));}
 #ef-b-jmp{width:58px;height:58px;right:calc(30px + env(safe-area-inset-right,0px));
   bottom:calc(152px + env(safe-area-inset-bottom,0px));}
-#ef-b-whl{width:52px;height:52px;right:calc(116px + env(safe-area-inset-right,0px));
-  bottom:calc(112px + env(safe-area-inset-bottom,0px));}
+#ef-b-dgd{width:54px;height:54px;right:calc(118px + env(safe-area-inset-right,0px));
+  bottom:calc(106px + env(safe-area-inset-bottom,0px));}
+#ef-b-whl{width:52px;height:52px;right:calc(96px + env(safe-area-inset-right,0px));
+  bottom:calc(184px + env(safe-area-inset-bottom,0px));}
+.ef-tbtn.dim{opacity:.45;}
+.ef-qbtn{width:40px;height:40px;font-size:7px;letter-spacing:.1em;}
+.ef-qbtn svg{width:18px;height:18px;}
+#ef-b-tch{right:calc(152px + env(safe-area-inset-right,0px));
+  bottom:calc(170px + env(safe-area-inset-bottom,0px));}
+#ef-b-pot{right:calc(152px + env(safe-area-inset-right,0px));
+  bottom:calc(218px + env(safe-area-inset-bottom,0px));}
+.ef-qbadge{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;
+  border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;
+  color:var(--parch);background:linear-gradient(180deg,#7a2a1e,#4a140c);
+  border:1px solid var(--gold2);box-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none;}
 #ef-b-spr{width:52px;height:52px;left:calc(26px + env(safe-area-inset-left,0px));
   bottom:calc(170px + env(safe-area-inset-bottom,0px));}
 .ef-corner{position:absolute;pointer-events:auto;width:40px;height:40px;border-radius:9px;
@@ -299,6 +322,17 @@ export function createUI(g) {
 #ef-journal .done{color:#6d5c3a;text-decoration:line-through;font-size:14px;margin:4px 0;}
 #ef-journal .loc{display:inline-block;font-size:13px;color:#4a3517;margin:3px 10px 3px 0;}
 #ef-journal .none{font-style:italic;color:#84714a;font-size:13.5px;}
+#ef-journal .tabs{display:flex;gap:8px;justify-content:center;margin:6px 0 2px;}
+#ef-journal .tab{font-family:inherit;font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+  color:#6b4f22;background:rgba(107,79,34,.08);border:1px solid rgba(107,79,34,.4);
+  border-radius:4px;padding:5px 14px;cursor:pointer;transition:background .12s ease;}
+#ef-journal .tab.on{background:rgba(107,79,34,.22);color:#3a2a12;border-color:#6b4f22;}
+#ef-journal .be{margin:9px 0;}
+#ef-journal .be .n{font-size:15px;color:#3a2a12;}
+#ef-journal .be .n .k{font-size:12px;color:#6b4f22;margin-left:8px;font-style:italic;}
+#ef-journal .be .f{font-size:13px;font-style:italic;color:#5c4520;margin-top:1px;line-height:1.35;}
+#ef-journal .be.unk .n{color:#84714a;font-style:italic;}
+#ef-journal .tally{text-align:center;font-size:12px;font-style:italic;color:#6d5c3a;margin-top:10px;}
 
 /* ---------- death ---------- */
 #ef-death{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
@@ -324,10 +358,11 @@ export function createUI(g) {
 
 /* ---------- modal state: hide gameplay chrome ---------- */
 #hud.ef-modal-open #ef-touch,#hud.ef-modal-open #ef-pill,#hud.ef-modal-open #ef-cross,
-#hud.ef-modal-open #ef-joy,#hud.ef-modal-open #ef-hint{opacity:0!important;pointer-events:none!important;}
+#hud.ef-modal-open #ef-joy,#hud.ef-modal-open #ef-hint,#hud.ef-modal-open #ef-counter{
+  opacity:0!important;pointer-events:none!important;}
 #hud.ef-modal-open #ef-touch *{pointer-events:none!important;}
 /* while the weapon wheel is open, clear the center of competing chrome */
-#hud.ef-wheel-open #ef-pill,#hud.ef-wheel-open #ef-cross,
+#hud.ef-wheel-open #ef-pill,#hud.ef-wheel-open #ef-cross,#hud.ef-wheel-open #ef-counter,
 #hud.ef-wheel-open #ef-hint{opacity:0!important;pointer-events:none!important;}
 `;
   document.head.appendChild(style);
@@ -335,13 +370,22 @@ export function createUI(g) {
   // ==========================================================================
   // Weapon wheel geometry / icons (SVG built as a string once)
   // ==========================================================================
-  const WHEEL_IDS = ['sword', 'bow', 'fire', 'heal', 'torch', 'potion'];
-  const WHEEL_LABELS = { sword: 'Sword', bow: 'Bow', fire: 'Fireball', heal: 'Heal', torch: 'Torch', potion: 'Potion' };
+  const WHEEL_IDS = ['sword', 'axe', 'greatsword', 'bow', 'fire', 'frost', 'lightning', 'heal'];
+  const WHEEL_LABELS = {
+    sword: 'Sword', axe: 'War Axe', greatsword: 'Greatsword', bow: 'Bow',
+    fire: 'Fireball', frost: 'Frost', lightning: 'Lightning', heal: 'Heal',
+  };
+  const MANA_COST = { fire: 14, frost: 18, lightning: 22, heal: 20 };
+  const SEG_N = WHEEL_IDS.length, SEG_STEP = 360 / SEG_N;
   // Stroke-style icon paths, centered on (0,0), roughly 28u tall.
   const WICONS = {
     sword: 'M0 -14 L2.8 -10 V4 L0 8 L-2.8 4 V-10 Z M-7 8.5 H7 M0 8.5 V14.5',
+    axe: 'M0 -14 V14 M0 -12 C6 -13 9.5 -8.5 9 -2 C5.5 -5 2.5 -5.5 0 -5 M0 -12 C-6 -13 -9.5 -8.5 -9 -2 C-5.5 -5 -2.5 -5.5 0 -5',
+    greatsword: 'M0 -15 L3.4 -10 V4 L0 8 L-3.4 4 V-10 Z M0 -10.5 V3 M-8.5 8.5 H8.5 M0 8.5 V14 M-2.8 14.2 H2.8',
     bow: 'M-5 -13 C7 -8 7 8 -5 13 M-5 -13 L-5 13 M-5 0 H11 M11 0 L6.5 -3 M11 0 L6.5 3',
     fire: 'M0 -13 C5 -7 8 -2.5 8 2.5 A8 8.6 0 1 1 -8 2.5 C-8 -1.5 -5.5 -4.5 -3.2 -8.5 C-2 -5.5 0.5 -4.5 1.2 -6.8 Z',
+    frost: 'M0 -13 V13 M-11.3 -6.5 L11.3 6.5 M-11.3 6.5 L11.3 -6.5 M-3.2 -9.5 L0 -6.3 L3.2 -9.5 M-3.2 9.5 L0 6.3 L3.2 9.5',
+    lightning: 'M3.5 -14 L-5.5 1.5 H-0.5 L-3.5 14 L6.5 -1.5 H1 Z',
     heal: 'M0 -12 L2.5 -2.5 L12 0 L2.5 2.5 L0 12 L-2.5 2.5 L-12 0 L-2.5 -2.5 Z',
     torch: 'M-1.8 2.5 L-1.1 14 H1.1 L1.8 2.5 M-4.5 2.5 H4.5 M0 -11 C3.2 -8 4.2 -4.8 3 -2.4 A3.7 4.1 0 1 1 -3 -2.4 C-4.2 -4.8 -3.2 -8 0 -11 Z',
     potion: 'M-2.6 -13.5 H2.6 M-2 -13 V-7 C-7 -4.5 -8.6 2 -6 6.5 C-3 11.6 3 11.6 6 6.5 C8.6 2 7 -4.5 2 -7 V-13 M-5.6 3 H5.6',
@@ -351,19 +395,19 @@ export function createUI(g) {
     return [+(r * Math.cos(a)).toFixed(2), +(r * Math.sin(a)).toFixed(2)];
   }
   function wedgePath(i) {
-    const c = i * 60, a0 = c - 26.5, a1 = c + 26.5, r0 = 52, r1 = 150;
+    const c = i * SEG_STEP, a0 = c - 19.5, a1 = c + 19.5, r0 = 52, r1 = 150;
     const [x0, y0] = polar(r0, a0), [x1, y1] = polar(r1, a0);
     const [x2, y2] = polar(r1, a1), [x3, y3] = polar(r0, a1);
     return `M${x0} ${y0} L${x1} ${y1} A${r1} ${r1} 0 0 1 ${x2} ${y2} L${x3} ${y3} A${r0} ${r0} 0 0 0 ${x0} ${y0} Z`;
   }
   let wheelSvg = '<svg viewBox="-170 -170 340 340">';
-  for (let i = 0; i < 6; i++) wheelSvg += `<path class="ef-seg" data-i="${i}" d="${wedgePath(i)}"/>`;
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < SEG_N; i++) wheelSvg += `<path class="ef-seg" data-i="${i}" d="${wedgePath(i)}"/>`;
+  for (let i = 0; i < SEG_N; i++) {
     const id = WHEEL_IDS[i];
-    const [gx, gy] = polar(102, i * 60);
-    wheelSvg += `<g class="ef-wgrp" data-i="${i}" transform="translate(${gx},${gy}) scale(1.35)">` +
+    const [gx, gy] = polar(102, i * SEG_STEP);
+    wheelSvg += `<g class="ef-wgrp" data-i="${i}" transform="translate(${gx},${gy}) scale(1.2)">` +
       `<path class="ef-wicon" d="${WICONS[id]}"/>` +
-      `<text class="ef-wcnt" y="24" id="ef-wc-${id}"></text></g>`;
+      `<text class="ef-wcnt" y="22" id="ef-wc-${id}"></text></g>`;
   }
   wheelSvg += '<circle id="ef-whub" r="44"/><text id="ef-wname" y="5"></text></svg>';
 
@@ -372,6 +416,7 @@ export function createUI(g) {
   const ICO_ATT = 'M-9 9 L8 -8 M4 -10 L10 -4 M-9 9 L-12 12 M-9 5 L-5 9';
   const ICO_BLK = 'M0 -10 C5 -8 8 -8 10.5 -9 C10.5 -1 7 7 0 11.5 C-7 7 -10.5 -1 -10.5 -9 C-8 -8 -5 -8 0 -10 Z';
   const ICO_JMP = 'M0 11 V-8 M-6.5 -1.5 L0 -9 L6.5 -1.5';
+  const ICO_DGD = 'M-11 4 A11 11 0 1 1 5 -10 M5 -10 L5.5 -4.5 M5 -10 L-0.5 -10.5';
   const ICO_WHL = 'M0 -11 A11 11 0 1 0 0.01 -11 M0 -11 V-4.5 M9.5 5.5 L4 2.5 M-9.5 5.5 L-4 2.5';
   const ICO_SPR = 'M-9 -6 L-2 0 L-9 6 M0 -6 L7 0 L0 6';
   const ICO_JRN = 'M0 -8 C-3 -10.5 -8 -10.5 -10.5 -8.5 V8.5 C-8 6.5 -3 6.5 0 8.5 C3 6.5 8 6.5 10.5 8.5 V-8.5 C8 -10.5 3 -10.5 0 -8 V8';
@@ -410,8 +455,11 @@ export function createUI(g) {
 <div id="ef-touch">
   <div class="ef-tbtn" id="ef-b-att">${bico(ICO_ATT)}<span>ATTACK</span></div>
   <div class="ef-tbtn" id="ef-b-blk">${bico(ICO_BLK)}<span>BLOCK</span></div>
+  <div class="ef-tbtn" id="ef-b-dgd">${bico(ICO_DGD)}<span>DODGE</span></div>
   <div class="ef-tbtn" id="ef-b-jmp">${bico(ICO_JMP)}<span>JUMP</span></div>
   <div class="ef-tbtn" id="ef-b-whl">${bico(ICO_WHL)}<span>WHEEL</span></div>
+  <div class="ef-tbtn ef-qbtn" id="ef-b-tch">${bico(WICONS.torch, 1.8)}<span>TORCH</span></div>
+  <div class="ef-tbtn ef-qbtn" id="ef-b-pot">${bico(WICONS.potion, 1.8)}<span>POTION</span><span class="ef-qbadge" id="ef-qb-pot">0</span></div>
   <div class="ef-tbtn" id="ef-b-spr">${bico(ICO_SPR)}<span>SPRINT</span></div>
 </div>
 <div class="ef-corner" id="ef-b-jrn">${bico(ICO_JRN, 1.7)}</div>
@@ -442,12 +490,16 @@ export function createUI(g) {
 </div>
 <div id="ef-death"><div class="t">YOU HAVE FALLEN</div><div class="s">— the road ends here… for now —</div><button id="ef-respawn">RISE AGAIN</button></div>
 <div id="ef-flash"></div>
+<div id="ef-pdodge"></div>
+<div id="ef-counter">⚔</div>
 <div id="ef-hint"></div>
 `;
   hud.appendChild(root);
 
   const $ = (id) => root.querySelector('#' + id);
   const elDmg = $('ef-dmg'), elLowHp = $('ef-lowhp'), elFlash = $('ef-flash');
+  const elPDodge = $('ef-pdodge'), elCounter = $('ef-counter');
+  const elQTorch = $('ef-b-tch'), elQPot = $('ef-b-pot'), elQPotB = $('ef-qb-pot');
   const elCompass = $('ef-compass'), elTicks = $('ef-ticks'), elCItems = $('ef-citems');
   const elBoss = $('ef-boss'), elBossN = $('ef-bossn'), elBossF = $('ef-bossf');
   const elCross = $('ef-cross');
@@ -485,11 +537,16 @@ export function createUI(g) {
     interactPressed: false,
     sprintOn: false,
     hotkeySelected: null,
+    // dodgePressed: edge-triggered dodge intent (mobile DODGE button, desktop
+    // C/Alt); direction comes from the current move vector. Cleared in
+    // endFrame like the other *Pressed flags — part of the input contract.
+    dodgePressed: false,
     endFrame() {
       input.jumpPressed = false;
       input.attackPressed = false;
       input.attackReleased = false;
       input.interactPressed = false;
+      input.dodgePressed = false;
       input.look.dx = 0;
       input.look.dy = 0;
       // combat consumes hotkeySelected during its update (which runs before
@@ -638,6 +695,38 @@ export function createUI(g) {
     () => { input.blockHeld = true; },
     () => { input.blockHeld = false; });
   bindBtn($('ef-b-jmp'), () => { input.jumpPressed = true; });
+  bindBtn($('ef-b-dgd'), () => { input.dodgePressed = true; });
+
+  // ---- torch / potion quick-buttons (beside the wheel button) ---------------
+  // Torch is a toggle: prefer g.combat.useTorch()/usePotion() when combat
+  // exposes them; otherwise fall back to hotkeySelected (combat consumes it).
+  let torchLit = false;
+  let lastWeapon = 'sword'; // last non-torch selection, used to toggle torch off
+  function selectWeapon(id) {
+    input.hotkeySelected = id;
+    if (id !== 'torch') {
+      torchLit = false;
+      elQTorch.classList.remove('lit');
+      if (id !== 'potion') lastWeapon = id;
+    }
+  }
+  function useTorchAction() {
+    if (g.combat && typeof g.combat.useTorch === 'function') {
+      const r = g.combat.useTorch();
+      torchLit = typeof r === 'boolean' ? r : !torchLit;
+    } else {
+      torchLit = !torchLit;
+      input.hotkeySelected = torchLit ? 'torch' : lastWeapon;
+    }
+    elQTorch.classList.toggle('lit', torchLit);
+  }
+  function usePotionAction() {
+    if (g.combat && typeof g.combat.usePotion === 'function') g.combat.usePotion();
+    else input.hotkeySelected = 'potion';
+  }
+  bindBtn(elQTorch, () => { useTorchAction(); }, null, { click: true });
+  bindBtn(elQPot, () => { usePotionAction(); }, null, { click: true });
+
   const elSpr = $('ef-b-spr');
   bindBtn(elSpr, () => {
     sprintToggle = !sprintToggle;
@@ -697,12 +786,19 @@ export function createUI(g) {
       case 'Space': input.jumpPressed = true; break;
       case 'ShiftLeft': case 'ShiftRight': shiftDown = true; break;
       case 'KeyE': input.interactPressed = true; break;
+      case 'KeyC': case 'AltLeft': case 'AltRight':
+        e.preventDefault();
+        input.dodgePressed = true;
+        break;
+      case 'KeyT': useTorchAction(); break;
+      case 'KeyR': usePotionAction(); break;
       case 'KeyQ': case 'Tab':
         if (!wheel.open) { openWheel(); wheel.keyHeld = true; }
         break;
-      case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4': case 'Digit5': case 'Digit6': {
+      case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4':
+      case 'Digit5': case 'Digit6': case 'Digit7': case 'Digit8': {
         const i = parseInt(e.code.slice(5), 10) - 1;
-        input.hotkeySelected = WHEEL_IDS[i];
+        if (WHEEL_IDS[i]) selectWeapon(WHEEL_IDS[i]);
         break;
       }
     }
@@ -768,16 +864,12 @@ export function createUI(g) {
 
   function refreshWheelCounts() {
     const st = g.player && g.player.stats;
-    const mana = st ? st.mana : 0, pots = st ? st.potions : 0;
-    wcntEls.fire.textContent = '14 MP';
-    wcntEls.heal.textContent = '20 MP';
-    wcntEls.potion.textContent = '×' + pots;
-    wcntEls.sword.textContent = '';
-    wcntEls.bow.textContent = '';
-    wcntEls.torch.textContent = '';
-    grpEls[2].classList.toggle('dim', mana < 14);
-    grpEls[3].classList.toggle('dim', mana < 20);
-    grpEls[5].classList.toggle('dim', pots < 1);
+    const mana = st ? st.mana : 0;
+    for (let i = 0; i < SEG_N; i++) {
+      const id = WHEEL_IDS[i], cost = MANA_COST[id];
+      wcntEls[id].textContent = cost ? cost + ' MP' : '';
+      grpEls[i].classList.toggle('dim', !!cost && mana < cost);
+    }
   }
 
   function setWheelSel(i) {
@@ -795,7 +887,7 @@ export function createUI(g) {
   function setWheelVec(vx, vy) {
     if (Math.hypot(vx, vy) < 26) { setWheelSel(-1); return; }
     const ang = wrap360(Math.atan2(vx, -vy) * 180 / Math.PI); // 0 = up, cw
-    setWheelSel(Math.round(ang / 60) % 6);
+    setWheelSel(Math.round(ang / SEG_STEP) % SEG_N);
   }
 
   function openWheel() {
@@ -822,7 +914,7 @@ export function createUI(g) {
     hud.classList.remove('ef-wheel-open');
     if (g.releaseSlowmo) g.releaseSlowmo();
     if (select && wheel.sel >= 0) {
-      input.hotkeySelected = WHEEL_IDS[wheel.sel];
+      selectWeapon(WHEEL_IDS[wheel.sel]);
       click();
     }
     setWheelSel(-1);
@@ -997,7 +1089,12 @@ export function createUI(g) {
     setFill(elXpf, 'xp', st.xp / Math.max(1, st.xpNext));
     if (st.level !== barCache.lvl) { barCache.lvl = st.level; elLvl.textContent = st.level; }
     if (st.gold !== barCache.gold) { barCache.gold = st.gold; elGold.textContent = st.gold; }
-    if (st.potions !== barCache.pot) { barCache.pot = st.potions; elPot.textContent = st.potions; }
+    if (st.potions !== barCache.pot) {
+      barCache.pot = st.potions;
+      elPot.textContent = st.potions;
+      elQPotB.textContent = st.potions;
+      elQPot.classList.toggle('dim', st.potions < 1);
+    }
     const low = fhp < 0.3 && !deathOpen;
     if (low !== barCache.lowhp) { barCache.lowhp = low; elLowHp.classList.toggle('on', low); }
   }
@@ -1049,6 +1146,13 @@ export function createUI(g) {
     void elFlash.offsetWidth;
     elFlash.style.transition = 'opacity 1.1s ease';
     elFlash.style.opacity = '0';
+  }
+  function pdodgeFlash() {
+    elPDodge.style.transition = 'none';
+    elPDodge.style.opacity = '0.9';
+    void elPDodge.offsetWidth;
+    elPDodge.style.transition = 'opacity .7s ease';
+    elPDodge.style.opacity = '0';
   }
   let hitIdx = 0;
   function hitMark(kill) {
@@ -1171,29 +1275,111 @@ export function createUI(g) {
   const journal = { active: new Map(), completed: [] };
   const qKey = (q) => (q && (q.id || q.name || q.title)) || String(q);
   const qName = (q) => (q && (q.name || q.title || q.id)) || 'Quest';
+  let journalTab = 'quests';
+
+  // ---- Bestiary — kill counts persisted under g.flags.bestiary --------------
+  // [canonical key, display name, flavor line]
+  const BESTIARY = [
+    ['wolf', 'Wolf', 'Grey hunters of the pinewood. They circle twice before they lunge — and flee when blooded.'],
+    ['goblin', 'Goblin', 'A cackling wretch with a rusted knife. Brave in a pack, pitiful alone.'],
+    ['bandit', 'Bandit', 'Redfang oath-breakers who bleed travelers for coin. They guard high and strike low.'],
+    ['skeleton', 'Skeleton', 'Barrow-dead rattled up from old soil. The rattling stops a breath before the swing.'],
+    ['skeletonArcher', 'Skeleton Archer', 'A hollow-eyed marksman of the ruins. Dead fingers never tire on the string.'],
+    ['wraith', 'Wraith', 'Cold light wearing the memory of a man. Arrows drift through it; fire does not.'],
+    ['thrall', 'Vampire Thrall', 'A pale servant of the crypt, quick as regret. Every cut it lands, it drinks.'],
+    ['morvane', 'Morvane', 'The lord beneath the cemetery. He steps between shadows and calls the dead to table.'],
+    ['witch', 'Grimhilde', 'The crone of the pines. The village names her curse what she names medicine.'],
+    ['troll', 'Troll', 'The toll-keeper under Stonebridge. Slow to anger, slower to move — mind the slam.'],
+    ['werewolf', 'Werewolf', 'Umber terror of the night woods. It hunts until dawn; then the dawn hunts it.'],
+    ['barrowlord', 'Barrow Lord', 'Crowned king of the deep barrows. His buried court still answers when he calls.'],
+    ['vargr', 'Vargr Redfang', 'The bandit lord himself. He earned every scar on that hide — and gave far worse.'],
+    ['drake', 'Vhastrix', 'Terror of the high peak. First the sky darkens, then the throat glows. Then fire.'],
+    ['guard', 'Village Guard', 'A knight sworn to Emberhollow\'s gate. Who raises a blade against a friend?'],
+    ['boar', 'Boar', 'A bristle-backed tusker of the thickets. Even the hedge-pig dies angrier than it lived.'],
+  ];
+  // Normalize whatever type id enemies.js emits to a canonical bestiary key.
+  const BEST_ALIAS = {
+    wolf: 'wolf', goblin: 'goblin', bandit: 'bandit', skeleton: 'skeleton',
+    skeletonarcher: 'skeletonArcher', skelarcher: 'skeletonArcher', archer: 'skeletonArcher',
+    wraith: 'wraith',
+    vampirethrall: 'thrall', thrall: 'thrall', vampire: 'thrall',
+    vampirelord: 'morvane', morvane: 'morvane',
+    grimhilde: 'witch', witch: 'witch',
+    troll: 'troll', werewolf: 'werewolf', barrowlord: 'barrowlord', vargr: 'vargr',
+    drake: 'drake', vhastrix: 'drake',
+    guard: 'guard', knight: 'guard',
+    boar: 'boar',
+  };
+  const bestKey = (t) => BEST_ALIAS[String(t || '').toLowerCase().replace(/[^a-z]/g, '')] || null;
+
+  function renderBestiary() {
+    let html = '';
+    const raw = g.flags.bestiary || {};
+    const agg = {}; // canonical key (or raw id) → count
+    for (const k in raw) {
+      const c = bestKey(k) || k;
+      agg[c] = (agg[c] || 0) + (raw[k] | 0);
+    }
+    let seen = 0;
+    for (const [key, name, flavor] of BESTIARY) {
+      const n = agg[key];
+      delete agg[key];
+      if (n > 0) {
+        seen++;
+        html += `<div class="be"><div class="n">${esc(name)}<span class="k">slain ×${n}</span></div>` +
+          `<div class="f">${esc(flavor)}</div></div>`;
+      } else {
+        html += '<div class="be unk"><div class="n">??? — not yet encountered</div></div>';
+      }
+    }
+    // Any kills whose type id we don't recognize still get a row.
+    for (const key in agg) {
+      if (!(agg[key] > 0)) continue;
+      const name = String(key).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      html += `<div class="be"><div class="n">${esc(name)}<span class="k">slain ×${agg[key]}</span></div>` +
+        '<div class="f">Little is written of this creature. Perhaps you should write it.</div></div>';
+    }
+    html += `<div class="tally">${seen} of ${BESTIARY.length} beasts recorded in the vale</div>`;
+    return html;
+  }
 
   function renderJournal() {
     let html = '<div class="ef-x" id="ef-j-x">✕</div><h2>JOURNAL</h2><div class="ef-rule"></div>';
-    html += '<h3>Active Quests</h3>';
-    if (journal.active.size === 0) html += '<div class="none">No active quests. Seek out the folk of Emberhollow.</div>';
-    else {
-      for (const [, q] of journal.active) {
-        html += `<div class="q"><div class="n">${esc(q.name)}</div>` +
-          (q.text ? `<div class="o">✦ ${esc(q.text)}</div>` : '') + '</div>';
+    html += `<div class="tabs"><button class="tab${journalTab === 'quests' ? ' on' : ''}" data-t="quests">Quests</button>` +
+      `<button class="tab${journalTab === 'bestiary' ? ' on' : ''}" data-t="bestiary">Bestiary</button></div>`;
+    if (journalTab === 'bestiary') {
+      html += renderBestiary();
+    } else {
+      html += '<h3>Active Quests</h3>';
+      if (journal.active.size === 0) html += '<div class="none">No active quests. Seek out the folk of Emberhollow.</div>';
+      else {
+        for (const [, q] of journal.active) {
+          html += `<div class="q"><div class="n">${esc(q.name)}</div>` +
+            (q.text ? `<div class="o">✦ ${esc(q.text)}</div>` : '') + '</div>';
+        }
       }
+      html += '<h3>Completed</h3>';
+      if (journal.completed.length === 0) html += '<div class="none">Nothing yet — your legend awaits.</div>';
+      else for (const n of journal.completed) html += `<div class="done">${esc(n)}</div>`;
+      html += '<h3>Discovered Places</h3>';
+      const disc = g.flags.discovered;
+      let any = false;
+      for (const p of POIS) {
+        if (disc && disc[p.id]) { any = true; html += `<span class="loc">${POI_GLYPH[p.id] || '◆'} ${esc(p.name)}</span>`; }
+      }
+      if (!any) html += '<div class="none">The map of the vale is still blank.</div>';
     }
-    html += '<h3>Completed</h3>';
-    if (journal.completed.length === 0) html += '<div class="none">Nothing yet — your legend awaits.</div>';
-    else for (const n of journal.completed) html += `<div class="done">${esc(n)}</div>`;
-    html += '<h3>Discovered Places</h3>';
-    const disc = g.flags.discovered;
-    let any = false;
-    for (const p of POIS) {
-      if (disc && disc[p.id]) { any = true; html += `<span class="loc">${POI_GLYPH[p.id] || '◆'} ${esc(p.name)}</span>`; }
-    }
-    if (!any) html += '<div class="none">The map of the vale is still blank.</div>';
     elJournal.innerHTML = html;
     elJournal.querySelector('#ef-j-x').addEventListener('click', () => { click(); closeJournal(); });
+    elJournal.querySelectorAll('.tab').forEach((b) => {
+      b.addEventListener('click', () => {
+        const t = b.dataset.t;
+        if (t === journalTab) return;
+        journalTab = t;
+        click();
+        renderJournal();
+      });
+    });
   }
   function esc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1365,13 +1551,23 @@ export function createUI(g) {
   });
   ev.on('gameSaved', () => { toast('Game Saved', 'Your tale is recorded.'); });
   ev.on('gameLoaded', () => { toast('Game Loaded', 'The tale resumes.'); });
+  // Combat wave-2 cues
+  ev.on('counterWindow', (d) => { elCounter.classList.toggle('on', !!(d && d.open)); });
+  ev.on('perfectDodge', () => { pdodgeFlash(); });
+  // Bestiary tally (persisted via g.flags so save.js carries it)
+  ev.on('enemyKilled', (d) => {
+    if (!d || !d.type) return;
+    const b = g.flags.bestiary || (g.flags.bestiary = {});
+    b[d.type] = (b[d.type] || 0) + 1;
+    if (journalOpen && journalTab === 'bestiary') renderJournal();
+  });
 
   // ==========================================================================
   // Input hints (shown briefly, per detected input type)
   // ==========================================================================
   elHint.textContent = IS_COARSE
     ? 'Left thumb: move  ·  Right thumb: look'
-    : 'WASD move · Mouse look · LMB attack · RMB block · E interact · Q wheel · J journal · Esc menu';
+    : 'WASD move · Mouse look · LMB attack · RMB block · C dodge · E interact · Q wheel · J journal · Esc menu';
   setTimeout(() => elHint.classList.add('off'), 16000);
 
   // ==========================================================================
