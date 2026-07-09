@@ -76,7 +76,7 @@ const DODGE_T     = 0.4;    // thrall sidestep
 const BLINK_T     = 0.55;   // Morvane teleport-blink
 const SINK_AFTER  = 6.0;    // corpse sits, then sinks
 const SINK_T      = 1.4;
-const ACTIVE_CAP  = 10;     // non-boss actives within range
+const ACTIVE_CAP  = 12;     // non-boss actives within range (danger-area packs)
 const SPAWN_R     = 260;
 const DESPAWN_R   = 320;
 const DEAGGRO_R   = 45;
@@ -505,6 +505,17 @@ export function createEnemies(g) {
     }
     return true;
   }
+  // Ambush placement: probe a ring and take the highest ground (ridge/wall line)
+  function highSpot(cx, cz, r) {
+    let bx = cx, bz = cz, bh = terrainHeight(cx, cz);
+    for (let i = 0; i < 7; i++) {
+      const a = i * 0.897 + 0.4;
+      const px = cx + Math.cos(a) * r, pz = cz + Math.sin(a) * r;
+      const h = terrainHeight(px, pz);
+      if (h > bh) { bh = h; bx = px; bz = pz; }
+    }
+    return { x: bx, z: bz };
+  }
 
   // Wolf packs (~14) via hash grid over the map
   {
@@ -519,7 +530,9 @@ export function createEnemies(g) {
         const b = biomeAt(px, pz, h);
         if (b !== BIOME.FOREST && b !== BIOME.MEADOW) continue;
         if (dist2d(px, pz, 0, 0) < 150 || !farFromPOIs(px, pz, 40)) continue;
-        const size = 2 + (hash2(gx * 3, gz * 5, WORLD_SEED + 99) < 0.5 ? 0 : 1); // packs of 2-3
+        let size = 2 + (hash2(gx * 3, gz * 5, WORLD_SEED + 99) < 0.5 ? 0 : 1); // packs of 2-3
+        // encounter design: deep-forest packs run one head larger
+        if (b === BIOME.FOREST && dist2d(px, pz, 0, 0) > 300) size += 1;
         for (let i = 0; i < size; i++) {
           const a = i * 2.4 + hash2(gx, gz + i, 55) * 2;
           addSpawner('wolf', px + Math.cos(a) * (2 + i * 2), pz + Math.sin(a) * (2 + i * 2), { packId: packs });
@@ -544,7 +557,9 @@ export function createEnemies(g) {
         else if ((b === BIOME.MEADOW || b === BIOME.FOREST) && hash2(gx, gz, WORLD_SEED + 61) < 0.6) nightOnly = true;
         else continue;
         if (dist2d(px, pz, 0, 0) < 150 || !farFromPOIs(px, pz, 40)) continue;
-        const size = 1 + (hash2(gx * 7, gz * 3, WORLD_SEED + 77) < 0.4 ? 1 : 0);
+        let size = 1 + (hash2(gx * 7, gz * 3, WORLD_SEED + 77) < 0.4 ? 1 : 0);
+        // encounter design: far night raiding parties come a knife heavier
+        if (nightOnly && dist2d(px, pz, 0, 0) > 350) size += 1;
         for (let i = 0; i < size; i++) {
           addSpawner('goblin', px + i * 3.2 - 1.6, pz + (hash2(i, gx, 5) - 0.5) * 4, { nightOnly });
         }
@@ -587,6 +602,28 @@ export function createEnemies(g) {
   addSpawner('witch', WITCH_HUT.x + 6, WITCH_HUT.z + 5, { deadFlag: 'witchDead' });
   // The Stonebridge troll, living under the bridge on the ruins road
   addSpawner('troll', STONEBRIDGE.x + 3, STONEBRIDGE.z + 4, { boss: true, deadFlag: 'trollDead' });
+
+  // --- wave-3 encounter design: danger areas get bigger, mixed packs --------
+  // Redfang Camp: a lookout on the high ground + one more blade in the tents
+  {
+    const lk = highSpot(POI.camp.x, POI.camp.z, 34);
+    addSpawner('bandit', lk.x, lk.z);
+    addSpawner('bandit', POI.camp.x - 14, POI.camp.z + 11);
+  }
+  // Cemetery at night: one more thrall in the graves, a wraith over the stones
+  addSpawner('thrall', CEMETERY.x - 14, CEMETERY.z - 8, { nightOnly: true });
+  addSpawner('wraith', CEMETERY.x + 13, CEMETERY.z + 9, { nightOnly: true });
+  // Drakespire approach: dead wardens hold the ridges — archers on the high
+  // ground, blades below, a wraith drifting the pass at night
+  {
+    const a1 = highSpot(90, -1040, 26);
+    addSpawner('skelarcher', a1.x, a1.z);
+    addSpawner('skeleton', 90 + 6, -1040 + 8);
+    const a2 = highSpot(230, -1120, 26);
+    addSpawner('skelarcher', a2.x, a2.z);
+    addSpawner('skeleton', 230 - 7, -1120 + 6);
+    addSpawner('wraith', 150, -1170, { nightOnly: true });
+  }
 
   // Persistent boss state (serialized — format unchanged; new minibosses
   // persist through g.flags which save.js already stores)
@@ -795,7 +832,7 @@ export function createEnemies(g) {
 
   function sfx(name) { if (g.audio) g.audio.play(name); }
 
-  function spawnEnemy(type, x, z, spawner) {
+  function spawnEnemy(type, x, z, spawner, mods) {
     const T = TYPES[type];
     const holder = acquireHolder(type);
     let hpMul = 1, dmgMul = 1;
@@ -805,13 +842,43 @@ export function createEnemies(g) {
     }
     let hp = Math.round(T.hp * hpMul);
     if ((type === 'drake' || type === 'barrowlord') && bossState[type] && !bossState[type].dead) {
-      hp = clamp(Math.round(bossState[type].hp), 1, T.hp); // bosses resume saved hp
+      hp = clamp(Math.round(bossState[type].hp), 1, T.hp); // bosses resume saved hp (base units)
     }
+    // --- wave-3 scaling: the world scales WITH the player -------------------
+    // Non-boss: base × playerScale × encounter mod (danger spots ≤ +15%).
+    // Bosses lock playerScale at first engagement (floor = base stats) and
+    // take a softened damage curve so late fights stay hard but readable.
+    const bossType = BOSS_TYPES[type] === true;
+    const enc = (mods && (mods.bloodMoon || mods.echo)) ? ENC_BASE : encounterAt(x, z);
+    let pScale = playerScale();
+    if (bossType && !(mods && mods.echo)) {
+      const lk = g.flags.bossLock;
+      if (lk && typeof lk[type] === 'number') pScale = clamp(lk[type], 1, 2.6);
+    }
+    const postDrake = g.flags.drakeDead ? 1.15 : 1;
+    const hpScale = pScale * postDrake * (bossType ? 1 : enc.mod);
+    const dmgScale = (bossType ? (1 + (pScale - 1) * 0.75) : pScale) * postDrake * (bossType ? 1 : enc.mod);
+    // Elite roll: 8% of non-boss spawns (deterministic per spawner per game-day;
+    // ~15% in danger areas, higher on Blood Moon nights). Hunts force it.
+    const dayIx = g.flags.dayCount | 0;
+    let elite = false;
+    if (mods && mods.elite) elite = true;
+    else if (ELITE_NAMES[type] && !(mods && mods.noElite) && !(spawner && (spawner.boss || spawner.isVargr || spawner.deadFlag))) {
+      const chance = (mods && mods.eliteChance) || enc.elite;
+      const roll = spawner
+        ? hash2(spawner.id * 13 + 7, dayIx * 3 + 1, WORLD_SEED + 2027)
+        : hash2((x * 7) | 0, ((z * 7) | 0) + dayIx * 101, WORLD_SEED + 2027);
+      elite = roll < chance;
+    }
+    const eHp = elite ? 2.5 : 1, eDmg = elite ? 1.5 : 1, eSize = elite ? 1.15 : 1;
+    hp = Math.max(1, Math.round(hp * hpScale * eHp));
     const y = terrainHeight(x, z);
     const e = {
-      type, name: T.name, hp, maxHp: Math.round(T.hp * hpMul),
-      dmg: Math.round(T.dmg * dmgMul), speed: T.speed, xp: T.xp,
-      reach: T.reach, bodyR: T.bodyR, height: T.height,
+      type, name: (mods && mods.name) || (elite ? ELITE_NAMES[type] : T.name), hp,
+      maxHp: Math.max(1, Math.round(T.hp * hpMul * hpScale * eHp)),
+      dmg: Math.max(1, Math.round(T.dmg * dmgMul * dmgScale * eDmg)),
+      speed: T.speed, xp: Math.max(1, Math.round(T.xp * pScale * postDrake * enc.mod * (elite ? 1.6 : 1))),
+      reach: T.reach, bodyR: T.bodyR * eSize, height: T.height * eSize,
       sightR: T.sightR, atkCd: T.atkCd, mass: T.mass,
       teleT: T.teleT || TELEGRAPH_T, strikeT: T.strikeT || STRIKE_T,
       pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(),
@@ -831,6 +898,12 @@ export function createEnemies(g) {
       isVargr: type === 'vargr',
       spawner: spawner || null,
       summoned: false, taunted: false,
+      // wave-3 endgame bookkeeping
+      hpScale, lockScale: pScale, elite, eliteNotified: false,
+      baseScale: eSize,
+      bloodMoon: !!(mods && mods.bloodMoon),
+      huntTarget: !!(mods && mods.huntTarget),
+      echo: false, echoDef: null, pactProvoked: false,
       holder,
       // animation bookkeeping
       animState: '', atkIdx: -1, hitTog: false, blockHit: false,
@@ -857,10 +930,11 @@ export function createEnemies(g) {
     const gp = holder.root;
     gp.position.set(x, y, z);
     gp.rotation.set(0, e.yaw, 0);
-    gp.scale.setScalar(1);
+    gp.scale.setScalar(e.baseScale);
     gp.visible = true;
     holder.deathPlayed = false;
     if (holder.mixer) { holder.mixer.stopAllAction(); holder.cur = null; holder.curName = ''; }
+    setEliteEyes(holder, elite);
     const shadowD = type === 'drake' ? 8 : type === 'troll' ? 3.4 :
       type === 'barrowlord' ? 3 : e.bodyR * 2.6;
     holder.shadow.scale.set(shadowD, shadowD, 1);
@@ -886,7 +960,11 @@ export function createEnemies(g) {
   function dropLoot(e) {
     const gr = GOLD[e.type] || [4, 10];
     const p = { x: e.pos.x, y: e.pos.y + 0.6, z: e.pos.z };
-    events.emit('spawnLoot', { pos: p, kind: 'gold', amount: Math.round(gr[0] + Math.random() * (gr[1] - gr[0])) });
+    // Gold scales with the player like the enemy did; elites pay ×3, Blood
+    // Moon kills ×2; the shadow tree's goldFind applies to everything here.
+    const goldFind = (g.rpg && g.rpg.mult) ? g.rpg.mult('goldFind') : 1;
+    const goldMul = (e.hpScale || 1) * (e.elite ? 3 : 1) * (e.bloodMoon && moonActive ? 2 : 1) * goldFind;
+    events.emit('spawnLoot', { pos: p, kind: 'gold', amount: Math.max(1, Math.round((gr[0] + Math.random() * (gr[1] - gr[0])) * goldMul)) });
     if (Math.random() < 0.25) {
       events.emit('spawnLoot', { pos: { x: p.x + 0.5, y: p.y, z: p.z + 0.3 }, kind: 'potion', amount: 1 });
     }
@@ -896,8 +974,20 @@ export function createEnemies(g) {
     if (e.type === 'morvane') {
       events.emit('spawnLoot', { pos: { x: p.x - 0.4, y: p.y, z: p.z - 0.3 }, kind: 'item', amount: 1, itemId: 'bloodseal' });
     }
-    if (e.type === 'troll') {
-      events.emit('spawnLoot', { pos: { x: p.x - 0.5, y: p.y, z: p.z - 0.4 }, kind: 'item', amount: 1, itemId: 'trollheart' });
+    // Material drop table (ids coordinated with economy.js MATERIALS).
+    // Elites always roll something; Blood Moon doubles the chance.
+    const mt = MAT_DROPS[e.type];
+    if (mt) {
+      let ch = mt[1] * (e.bloodMoon && moonActive ? 2 : 1);
+      if (e.elite) ch = 1;
+      if (ch > 0 && Math.random() < ch) {
+        events.emit('spawnLoot', { pos: { x: p.x - 0.5, y: p.y, z: p.z - 0.4 }, kind: 'item', amount: 1, itemId: mt[0] });
+      }
+    }
+    if (e.type === 'drake') {
+      for (let i = 0; i < 3; i++) {
+        events.emit('spawnLoot', { pos: { x: p.x + Math.sin(i * 2.1) * 0.9, y: p.y, z: p.z + Math.cos(i * 2.1) * 0.9 }, kind: 'item', amount: 1, itemId: 'drake_scale' });
+      }
     }
   }
 
