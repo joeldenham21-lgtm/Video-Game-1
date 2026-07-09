@@ -1,10 +1,14 @@
 // ============================================================================
-// ELDERFALL — combat.js
+// ELDERFALL — combat.js (wave 2: state-of-the-art combat)
 // Weapons, first-person viewmodel (procedural low-poly arm + weapons parented
-// to the camera), hand-animated attack curves, hitstop/parry juice, pooled
-// projectiles (arrows + fireballs), loot pickups, and ONE pooled additive
-// particle system for sparks / blood / embers / heal swirls / explosions.
-// Owns the shared g.pointLight (torch / fireball / explosion flash).
+// to the camera, real KayKit weapon meshes streamed in where they exist),
+// hand-animated attack curves, hitstop/parry juice, pooled projectiles
+// (arrows + fireballs), loot pickups, and ONE pooled additive particle system
+// for sparks / blood / embers / heal swirls / explosions / frost / lightning.
+// Owns the shared g.pointLight (torch / fireball / explosion / storm flash).
+// Wave-2 additions: dodge roll w/ i-frames + PERFECT DODGE slow-mo, sword
+// 3-hit combo chains, Mordor-style counter window + riposte, kill finishers,
+// axe / greatsword / frost / lightning weapons, rpg.mult hooks, spellCast.
 // ============================================================================
 import * as THREE from 'three';
 import { clamp, lerp, terrainHeight } from './core.js';
@@ -18,6 +22,8 @@ const _v3 = new THREE.Vector3();
 const _camPos = new THREE.Vector3();
 const _camDir = new THREE.Vector3();
 const _hitPos = new THREE.Vector3(); // reused hitLanded payload position
+const _box = new THREE.Box3();
+const _chain = [];                   // reused lightning chain target list
 
 // Easing helpers ------------------------------------------------------------
 const easeIn2 = (t) => t * t;
@@ -25,24 +31,49 @@ const easeIn3 = (t) => t * t * t;
 const easeOut3 = (t) => { const u = 1 - t; return 1 - u * u * u; };
 const easeOut4 = (t) => { const u = 1 - t; return 1 - u * u * u * u; };
 const smooth = (t) => t * t * (3 - 2 * t);
+const TWO_PI = Math.PI * 2;
 
 // ---------------------------------------------------------------------------
-// Weapon definitions (contract section 4)
+// Weapon definitions (contract section 4 + wave-2 additions)
 // ---------------------------------------------------------------------------
 const WEAPONS = {
-  sword:  { name: 'Iron Sword',    light: 14, heavy: 26, range: 2.9, arc: 65 },
-  bow:    { name: 'Hunting Bow',   dmgMin: 10, dmgMax: 34, drawTime: 0.9 },
-  fire:   { name: 'Flamecall',     mana: 14, dmg: 30, radius: 3.5 },
-  heal:   { name: 'Mending Light', mana: 20, amount: 35 },
-  torch:  { name: 'Torch',         light: 6, range: 2.2, arc: 50 },
-  potion: { name: 'Health Potion', amount: 45 },
+  sword:      { name: 'Iron Sword',     light: 14, heavy: 26, range: 2.9, arc: 65 },
+  axe:        { name: 'Battle Axe',     light: 34, heavy: 48, range: 3.0, arc: 100 },
+  greatsword: { name: 'Greatsword',     light: 42, heavy: 46, range: 3.3, arc: 80, spinR: 3.8 },
+  bow:        { name: 'Hunting Bow',    dmgMin: 10, dmgMax: 34, drawTime: 0.9 },
+  fire:       { name: 'Flamecall',      mana: 14, dmg: 30, radius: 3.5 },
+  frost:      { name: "Winter's Breath", mana: 18, dmg: 18, range: 7.5, arc: 70, slow: 0.45, slowDur: 3 },
+  lightning:  { name: 'Stormcall',      mana: 22, dmg: 26, range: 18, chain: 3, jumpR: 8 },
+  heal:       { name: 'Mending Light',  mana: 20, amount: 35 },
+  torch:      { name: 'Torch',          light: 6, heavy: 6, range: 2.2, arc: 50 },
+  potion:     { name: 'Health Potion',  amount: 45 },
 };
-const HOTBAR = ['sword', 'bow', 'fire', 'heal', 'torch', 'potion'];
+// Weapon wheel ids (ui builds the 8-slot wheel from this; torch & potion
+// moved to quick-buttons — still fully equippable via hotkeySelected).
+const HOTBAR = ['sword', 'axe', 'greatsword', 'bow', 'fire', 'frost', 'lightning', 'heal'];
+const QUICK = ['torch', 'potion'];
 
-const STAMINA_LIGHT = 10;
-const STAMINA_HEAVY = 22;
-const HEAVY_HOLD = 0.35;      // hold this long → heavy on release (sword)
+const MELEE = { sword: 1, axe: 1, greatsword: 1, torch: 1 };
+const MELEE_TIME = { sword: [0.32, 0.55], torch: [0.32, 0.55], axe: [0.5, 0.72], greatsword: [0.62, 0.95] };
+const STAM_LIGHT = { sword: 10, torch: 10, axe: 13, greatsword: 15 };
+const STAM_HEAVY = { sword: 22, torch: 22, axe: 26, greatsword: 30 };
+const HEAVY_HOLD = 0.35;      // hold this long → heavy on release (melee)
 const PARRY_WINDOW = 0.22;    // seconds after block start
+
+// Dodge roll ------------------------------------------------------------------
+const DODGE_T = 0.32;         // roll duration
+const DODGE_IFRAME = 0.25;    // invulnerable window from roll start
+const DODGE_STAMINA = 18;
+const DODGE_SPEED = 13.5;     // initial roll speed (eases off)
+const DODGE_CD = 0.55;        // min real seconds between rolls
+const DOUBLE_TAP_T = 0.32;    // double-tap window (real seconds)
+
+// Sword combo -----------------------------------------------------------------
+const COMBO_MULT = [1, 1.1, 1.25];
+const COMBO_WINDOW = 1.1;
+
+// Counter window --------------------------------------------------------------
+const COUNTER_RANGE = 3.5;
 
 // Particle FX presets (preallocated — passed by reference, never per-frame)
 const FX = {
@@ -56,6 +87,9 @@ const FX = {
   smoke:   { c1: [0.45, 0.35, 0.25], c2: [0.2, 0.15, 0.1], speed: 2.0, up: 0.8, grav: -1.0, drag: 2.0, life: 0.9 },
   sparkle: { c1: [1.0, 0.95, 0.55], c2: [1.0, 0.8, 0.2],  speed: 2.2, up: 0.8,  grav: 3,  drag: 1.5, life: 0.45 },
   dust:    { c1: [0.55, 0.5, 0.4], c2: [0.35, 0.3, 0.22], speed: 2.0, up: 0.7,  grav: 5,  drag: 2.0, life: 0.4  },
+  frost:   { c1: [0.8, 0.92, 1.0], c2: [0.45, 0.68, 1.0], speed: 3.6, up: 0.35, grav: 2.5, drag: 2.0, life: 0.55 },
+  mist:    { c1: [0.7, 0.85, 1.0], c2: [0.5, 0.7, 0.95],  speed: 0.7, up: 0.6,  grav: -0.5, drag: 1.2, life: 0.9 },
+  zap:     { c1: [1.0, 1.0, 1.0],  c2: [0.55, 0.75, 1.0], speed: 5.5, up: 0.4,  grav: 3,  drag: 2.6, life: 0.26 },
 };
 
 // ===========================================================================
@@ -65,6 +99,9 @@ export function createCombat(g) {
   // Camera must be in the scene graph for viewmodel children to render.
   // (Does not alter camera transform/projection — player still owns those.)
   if (!g.camera.parent) g.scene.add(g.camera);
+
+  // rpg.mult hook — safe before rpg exists (??1 fallback everywhere)
+  const rmult = (name) => (g.rpg && g.rpg.mult ? (g.rpg.mult(name) ?? 1) : 1);
 
   // -------------------------------------------------------------------------
   // Shared materials / geometries (built ONCE)
@@ -82,6 +119,8 @@ export function createCombat(g) {
     feather: new THREE.MeshLambertMaterial({ color: 0xe8e2d0, flatShading: true }),
     fireOrb: new THREE.MeshLambertMaterial({ color: 0x442200, emissive: 0xff7722, emissiveIntensity: 1.6, flatShading: true }),
     healOrb: new THREE.MeshLambertMaterial({ color: 0x0a3320, emissive: 0x33ee77, emissiveIntensity: 1.4, flatShading: true }),
+    frostOrb:new THREE.MeshLambertMaterial({ color: 0x0a2035, emissive: 0x66ccff, emissiveIntensity: 1.5, flatShading: true }),
+    stormOrb:new THREE.MeshLambertMaterial({ color: 0x1a1030, emissive: 0xb9a4ff, emissiveIntensity: 1.7, flatShading: true }),
     flame:   new THREE.MeshLambertMaterial({ color: 0x331100, emissive: 0xffa030, emissiveIntensity: 1.7, flatShading: true }),
     flask:   new THREE.MeshLambertMaterial({ color: 0x7a1420, emissive: 0xaa1122, emissiveIntensity: 0.35, flatShading: true }),
     rune:    new THREE.MeshLambertMaterial({ color: 0x0a2a3a, emissive: 0x35c8ff, emissiveIntensity: 1.3, flatShading: true }),
@@ -119,12 +158,35 @@ export function createCombat(g) {
 
   // --- Sword (blade material swappable for Aldric's Ember) ---
   const swordG = new THREE.Group();
-  const blade = part(M.steel, 0.055, 0.68, 0.016, 0, 0.44, 0);
-  const bladeTip = part(M.steel, 0.11, 0.09, 0.032, 0, 0.82, 0, 0, 0, 0, GEO.cone);
+  const blade = part(M.steel, 0.05, 0.62, 0.015, 0, 0.4, 0);
+  const bladeTip = part(M.steel, 0.1, 0.08, 0.03, 0, 0.75, 0, 0, 0, 0, GEO.cone);
   swordG.add(blade, bladeTip);
-  swordG.add(part(M.gold,    0.17, 0.032, 0.045, 0, 0.095, 0));  // crossguard
-  swordG.add(part(M.leather, 0.04, 0.15, 0.04, 0, 0, 0));        // grip
-  swordG.add(part(M.gold,    0.055, 0.055, 0.055, 0, -0.095, 0, 0, 0, 0, GEO.sphere)); // pommel
+  const swordProc = [blade, bladeTip];
+  swordProc.push(part(M.gold,    0.16, 0.03, 0.042, 0, 0.09, 0));  // crossguard
+  swordProc.push(part(M.leather, 0.038, 0.14, 0.038, 0, 0, 0));    // grip
+  swordProc.push(part(M.gold,    0.05, 0.05, 0.05, 0, -0.09, 0, 0, 0, 0, GEO.sphere)); // pommel
+  for (let i = 2; i < swordProc.length; i++) swordG.add(swordProc[i]);
+
+  // --- Battle axe (procedural placeholder, real 2H_Axe streams in) ---
+  const axeG = new THREE.Group();
+  const axeProc = [
+    part(M.wood, 0.045, 0.82, 0.045, 0, 0.3, 0),                     // haft
+    part(M.steel, 0.3, 0.22, 0.035, 0.14, 0.62, 0),                  // head plate
+    part(M.steel, 0.14, 0.3, 0.03, 0.27, 0.62, 0, 0, 0, Math.PI / 2, GEO.cone), // edge wedge
+    part(M.leather, 0.055, 0.12, 0.055, 0, -0.02, 0),                // grip wrap
+  ];
+  for (const p of axeProc) axeG.add(p);
+
+  // --- Greatsword (procedural placeholder, real 2H_Sword streams in) ---
+  const gsG = new THREE.Group();
+  const gsProc = [
+    part(M.steel, 0.07, 0.92, 0.02, 0, 0.58, 0),                     // long blade
+    part(M.steel, 0.14, 0.12, 0.038, 0, 1.1, 0, 0, 0, 0, GEO.cone),  // tip
+    part(M.gold, 0.24, 0.035, 0.05, 0, 0.11, 0),                     // wide crossguard
+    part(M.leather, 0.045, 0.2, 0.045, 0, -0.02, 0),                 // two-hand grip
+    part(M.gold, 0.06, 0.06, 0.06, 0, -0.14, 0, 0, 0, 0, GEO.sphere),// pommel
+  ];
+  for (const p of gsProc) gsG.add(p);
 
   // --- Bow (vertical limbs + string + nocked arrow shown while drawing) ---
   const bowG = new THREE.Group();
@@ -141,7 +203,7 @@ export function createCombat(g) {
   nockArrow.visible = false;
   bowG.add(nockArrow);
 
-  // --- Fire / Heal casting orbs (hover over the open palm) ---
+  // --- Casting orbs (hover over the open palm) ---
   const fireG = new THREE.Group();
   const fireOrbMesh = part(M.fireOrb, 0.13, 0.13, 0.13, 0, 0.1, -0.06, 0, 0, 0, GEO.sphere);
   fireG.add(fireOrbMesh);
@@ -150,11 +212,22 @@ export function createCombat(g) {
   const healOrbMesh = part(M.healOrb, 0.12, 0.12, 0.12, 0, 0.1, -0.06, 0, 0, 0, GEO.sphere);
   healG.add(healOrbMesh);
   healG.add(part(M.rune, 0.17, 0.17, 0.17, 0, 0.1, -0.06, 0.4, 0.6, 0, GEO.octa));
+  const frostG = new THREE.Group();
+  const frostOrbMesh = part(M.frostOrb, 0.12, 0.12, 0.12, 0, 0.1, -0.06, 0, 0, 0, GEO.sphere);
+  frostG.add(frostOrbMesh);
+  frostG.add(part(M.frostOrb, 0.19, 0.19, 0.19, 0, 0.1, -0.06, 0.4, 0.5, 0, GEO.octa));
+  const lightG = new THREE.Group();
+  const stormOrbMesh = part(M.stormOrb, 0.12, 0.12, 0.12, 0, 0.1, -0.06, 0, 0, 0, GEO.sphere);
+  lightG.add(stormOrbMesh);
+  lightG.add(part(M.stormOrb, 0.18, 0.18, 0.18, 0, 0.1, -0.06, 0.6, 0.3, 0, GEO.octa));
 
-  // --- Torch ---
+  // --- Torch (real dungeon torch prop streams in) ---
   const torchG = new THREE.Group();
-  torchG.add(part(M.wood, 0.045, 0.42, 0.045, 0, 0.14, 0));
-  torchG.add(part(M.woodDark, 0.09, 0.1, 0.09, 0, 0.37, 0));
+  const torchProc = [
+    part(M.wood, 0.045, 0.42, 0.045, 0, 0.14, 0),
+    part(M.woodDark, 0.09, 0.1, 0.09, 0, 0.37, 0),
+  ];
+  for (const p of torchProc) torchG.add(p);
   const torchFlame = part(M.flame, 0.11, 0.2, 0.11, 0, 0.5, 0, 0, 0, 0, GEO.cone);
   torchG.add(torchFlame);
 
@@ -164,21 +237,93 @@ export function createCombat(g) {
   potionG.add(part(M.flask, 0.045, 0.09, 0.045, 0, 0.12, 0));
   potionG.add(part(M.wood, 0.05, 0.03, 0.05, 0, 0.17, 0));
 
-  const weaponGroups = { sword: swordG, bow: bowG, fire: fireG, heal: healG, torch: torchG, potion: potionG };
+  const weaponGroups = {
+    sword: swordG, axe: axeG, greatsword: gsG, bow: bowG,
+    fire: fireG, frost: frostG, lightning: lightG, heal: healG,
+    torch: torchG, potion: potionG,
+  };
   for (const id in weaponGroups) {
     weaponGroups[id].visible = false;
     vmRoot.add(weaponGroups[id]);
   }
 
-  // Per-weapon base pose of vmRoot (camera-local): px py pz rx ry rz
+  // Per-weapon base pose of vmRoot (camera-local): px py pz rx ry rz.
+  // Tuned so weapons sit LOWER-RIGHT and angled forward like a modern FPS
+  // melee viewmodel (≲35% of screen height) instead of towering upright.
   const BASE_POSE = {
-    sword:  [0.36, -0.35, -0.62, -0.35, -0.30, 0.10],
-    bow:    [0.20, -0.26, -0.58,  0.00,  0.35, -0.12],
-    fire:   [0.32, -0.32, -0.56, -0.25, -0.15, 0.00],
-    heal:   [0.32, -0.32, -0.56, -0.25, -0.15, 0.00],
-    torch:  [0.36, -0.30, -0.60, -0.20, -0.20, 0.08],
-    potion: [0.32, -0.36, -0.55, -0.15, -0.10, 0.00],
+    sword:      [0.33, -0.42, -0.60, -0.42, -0.42, 0.22],
+    axe:        [0.37, -0.45, -0.65, -0.50, -0.32, 0.26],
+    greatsword: [0.33, -0.48, -0.70, -0.55, -0.30, 0.18],
+    bow:        [0.20, -0.26, -0.58,  0.00,  0.35, -0.12],
+    fire:       [0.32, -0.34, -0.56, -0.25, -0.15, 0.00],
+    frost:      [0.32, -0.34, -0.56, -0.25, -0.15, 0.00],
+    lightning:  [0.32, -0.34, -0.56, -0.25, -0.15, 0.00],
+    heal:       [0.32, -0.34, -0.56, -0.25, -0.15, 0.00],
+    torch:      [0.36, -0.34, -0.60, -0.28, -0.20, 0.08],
+    potion:     [0.32, -0.36, -0.55, -0.15, -0.10, 0.00],
   };
+
+  // -------------------------------------------------------------------------
+  // Real KayKit weapon meshes — streamed in async, replacing the procedural
+  // placeholders (logic-first, mesh-on-arrival). Weapon meshes live inside
+  // the character GLBs (Knight: 1H_Sword/2H_Sword, Barbarian: 2H_Axe) as
+  // plain meshes parented to the hand bone; the dungeon pack has a torch.
+  // -------------------------------------------------------------------------
+  let realSword = null;
+  let assetsRequested = false;
+
+  // Normalize a cloned weapon mesh: +Y is the blade axis with the grip near
+  // the origin in KayKit rigs; scale so the total length = len.
+  function mountReal(root, name, group, hideParts, len) {
+    const src = root.getObjectByName(name);
+    if (!src) return null;
+    const m = src.clone(true);
+    m.position.set(0, 0, 0);
+    m.rotation.set(0, 0, 0);
+    m.scale.set(1, 1, 1);
+    _box.setFromObject(m);
+    _box.getSize(_v1);
+    const longest = Math.max(_v1.x, _v1.y, _v1.z, 1e-4);
+    m.scale.setScalar(len / longest);
+    m.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
+    group.add(m);
+    for (const h of hideParts) h.visible = false;
+    return m;
+  }
+
+  function requestRealWeapons() {
+    const A = g.assets;
+    if (!A || !A.char) return;
+    A.char('knight').then((c) => {
+      realSword = mountReal(c.scene, '1H_Sword', swordG, swordProc, 0.8);
+      mountReal(c.scene, '2H_Sword', gsG, gsProc, 1.08);
+      if (realSword && aldricApplied) applyAldricToReal();
+    }).catch(() => {});
+    A.char('barbarian').then((c) => {
+      mountReal(c.scene, '2H_Axe', axeG, axeProc, 0.92);
+    }).catch(() => {});
+    if (A.prop) {
+      A.prop('dungeon/torch.gltf.glb').then((obj) => {
+        // prop() returns a plain Object3D clone — normalize it directly
+        obj.position.set(0, 0, 0);
+        obj.rotation.set(0, 0, 0);
+        obj.scale.set(1, 1, 1);
+        _box.setFromObject(obj);
+        _box.getSize(_v1);
+        const longest = Math.max(_v1.x, _v1.y, _v1.z, 1e-4);
+        obj.scale.setScalar(0.48 / longest);
+        obj.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
+        torchG.add(obj);
+        for (const h of torchProc) h.visible = false;
+      }).catch(() => {});
+    }
+  }
+
+  function applyAldricToReal() {
+    if (realSword && g.assets && g.assets.tint) {
+      g.assets.tint(realSword, '#ffb27a', { emissive: '#ff5a18', emissiveIntensity: 0.7 });
+    }
+  }
 
   // -------------------------------------------------------------------------
   // ONE pooled additive Points particle system (~300 verts)
@@ -251,6 +396,54 @@ export function createCombat(g) {
       pGeo.attributes.position.needsUpdate = true;
       pGeo.attributes.color.needsUpdate = true;
       pDirty = false;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Lightning bolt renderer — one pooled jagged LineSegments flash
+  // -------------------------------------------------------------------------
+  const BOLT_SUB = 6;                       // subdivisions per chain hop
+  const BOLT_MAX = (WEAPONS.lightning.chain + 1) * BOLT_SUB * 2; // verts (pairs)
+  const boltPos = new Float32Array(BOLT_MAX * 3);
+  const boltGeo = new THREE.BufferGeometry();
+  boltGeo.setAttribute('position', new THREE.BufferAttribute(boltPos, 3));
+  boltGeo.setDrawRange(0, 0);
+  const boltMat = new THREE.LineBasicMaterial({
+    color: 0xd8ecff, transparent: true, opacity: 1,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const boltLine = new THREE.LineSegments(boltGeo, boltMat);
+  boltLine.frustumCulled = false;
+  boltLine.visible = false;
+  g.scene.add(boltLine);
+  let boltT = 0;
+  let boltVerts = 0;
+
+  // Append a jagged run from (ax,ay,az) → (bx,by,bz) into boltPos
+  function boltRun(ax, ay, az, bx, by, bz) {
+    const dx = bx - ax, dy = by - ay, dz = bz - az;
+    const len = Math.max(0.001, Math.hypot(dx, dy, dz));
+    // Perpendicular basis for jitter
+    let ux = -dz / len, uy = 0, uz = dx / len;
+    const ul = Math.hypot(ux, uy, uz) || 1;
+    ux /= ul; uz /= ul;
+    const wx = (dy * uz - dz * uy) / len, wy = (dz * ux - dx * uz) / len, wz = (dx * uy - dy * ux) / len;
+    let px = ax, py = ay, pz = az;
+    for (let s = 1; s <= BOLT_SUB; s++) {
+      const t = s / BOLT_SUB;
+      const jag = s === BOLT_SUB ? 0 : (0.12 + len * 0.045);
+      const j1 = (Math.random() * 2 - 1) * jag;
+      const j2 = (Math.random() * 2 - 1) * jag;
+      const nx = ax + dx * t + ux * j1 + wx * j2;
+      const ny = ay + dy * t + uy * j1 + wy * j2;
+      const nz = az + dz * t + uz * j1 + wz * j2;
+      if (boltVerts + 2 <= BOLT_MAX) {
+        let o = boltVerts * 3;
+        boltPos[o] = px; boltPos[o + 1] = py; boltPos[o + 2] = pz;
+        boltPos[o + 3] = nx; boltPos[o + 4] = ny; boltPos[o + 5] = nz;
+        boltVerts += 2;
+      }
+      px = nx; py = ny; pz = nz;
     }
   }
 
@@ -371,11 +564,12 @@ export function createCombat(g) {
   // -------------------------------------------------------------------------
   let current = 'sword';
   let prevWeapon = 'sword';   // for potion auto-return
+  let torchPrev = 'sword';    // for useTorch() toggle-back
   let pendingEquip = null;
   let state = 'raise';        // idle|charge|swingL|swingH|draw|shootRecoil|cast|heal|drink|lower|raise
   let stateT = 0;
   let didAct = false;         // one-shot flag per state (hit test / spawn / apply)
-  let chargeT = 0;            // attack button hold time (sword heavy)
+  let chargeT = 0;            // attack button hold time (melee heavy)
   let drawT = 0;              // bow draw time
   let lastDraw01 = 0;
   let blockBlend = 0;
@@ -386,8 +580,30 @@ export function createCombat(g) {
   let emberT = 0, flameT = 0, healSwirlT = 0, healSwirlLeft = 0;
   let castOrbCharge = 0;
   let flashT = 0;             // explosion light flash
+  let flashColor = 0xffb050;
   const flashPos = new THREE.Vector3();
   let aldricApplied = false;
+  let swingDur = 0.32;        // dynamic melee state duration (attackSpeed-aware)
+  let swingVariant = 0;       // sword combo arc variant 0|1|2
+
+  // Wave-2 systems state ------------------------------------------------------
+  let rawClock = 0;           // unscaled seconds (accumulated rawDt, unpaused)
+  let comboIdx = 0;
+  let comboExpire = -10;      // g.time.elapsed deadline for next chain hit
+  let dodging = false, dodgeT = 0, dodgeLat = 0, dodgeCdUntil = -10, perfectUsed = false;
+  const dodgeDir = new THREE.Vector3();
+  let tapT = -10, tapAng = 0, moveWasActive = false, keyDodge = false;
+  let slowmoLeft = 0, slowmoF = 1;
+  let fovKick = 0;            // added to camera.fov post-player, decays exp
+  let counterOpen = false;
+  let counterTarget = null;
+  let finisherCdUntil = -10;
+  let damageWrapped = false;
+  const counterEvt = { open: false };
+  const spellCastEvt = { school: '', cost: 0 };
+
+  // Frost slow bookkeeping (fields stored on the enemy objects themselves)
+  const frostSlowed = [];
 
   function setWeaponVisible(id) {
     for (const k in weaponGroups) weaponGroups[k].visible = (k === id);
@@ -399,6 +615,7 @@ export function createCombat(g) {
       aldricApplied = true;
       blade.material = M.ember;
       bladeTip.material = M.ember;
+      applyAldricToReal();
     }
   }
 
@@ -409,6 +626,7 @@ export function createCombat(g) {
   function dmgMul() {
     return 1 + ((g.player && g.player.bonus) ? g.player.bonus.dmg : 0);
   }
+  function isMeleeId(id) { return !!MELEE[id]; }
 
   // Best-effort enemy world position (contract doesn't pin the field name)
   function enemyPos(e, out) {
@@ -433,31 +651,84 @@ export function createCombat(g) {
     _hitPos.copy(pos);
     events.emit('hitLanded', { pos: _hitPos, kill: !!kill, heavy: !!heavy });
   }
+  // Lighter event-only variant for spells (no blood — frost/zap FX supplied by caller)
+  function hitLandedEvt(pos, heavy, kill) {
+    _hitPos.copy(pos);
+    events.emit('hitLanded', { pos: _hitPos, kill: !!kill, heavy: !!heavy });
+  }
+
+  // Crit roll — base 5% scaled by rpg critChance mult
+  function rollCrit() { return Math.random() < 0.05 * rmult('critChance'); }
+  // Sneak multiplier for a target (only un-aggroed enemies can be sneak-hit)
+  function sneakMul(e, name) {
+    return (g.player && g.player.sneaking && !e.aggro) ? rmult(name) : 1;
+  }
+
+  // Kill finisher: cinematic on melee killing blows that weren't trivial
+  // one-shots (prevHp had to be a meaningful chunk of the damage dealt).
+  function maybeFinisher(prevHp, dmg) {
+    if (rawClock < finisherCdUntil) return;
+    if (prevHp < dmg * 0.35) return; // massive overkill on trash — skip
+    finisherCdUntil = rawClock + 2.5;
+    g.requestHitstop(120);
+    startSlowmo(0.3, 0.6);
+    fovKick = -8;
+  }
+
+  function startSlowmo(f, dur) {
+    slowmoF = f;
+    slowmoLeft = Math.max(slowmoLeft, dur);
+  }
 
   // Melee swing hit test at swing apex
   function meleeHit(heavy) {
     if (!g.enemies || !g.enemies.queryHit) return;
-    const w = current === 'torch' ? WEAPONS.torch : WEAPONS.sword;
-    const base = current === 'torch' ? WEAPONS.torch.light : swordDmg(heavy);
+    const w = WEAPONS[current] || WEAPONS.sword;
+    const cleave = current === 'sword' && !heavy && comboIdx === 2; // 3rd combo hit
+    const spin = current === 'greatsword' && heavy;                 // 360° AoE
     g.camera.getWorldPosition(_camPos);
     g.camera.getWorldDirection(_camDir);
-    const halfAngle = (w.arc * 0.5) * Math.PI / 180;
-    const hits = g.enemies.queryHit(_camPos, _camDir, w.range, halfAngle);
+    let hits;
+    if (spin && g.enemies.queryPoint) {
+      _v1.set(g.player.position.x, g.player.position.y + 0.9, g.player.position.z);
+      hits = g.enemies.queryPoint(_v1, w.spinR || 3.8);
+    } else {
+      const arcScale = cleave ? 1.7 : 1;
+      const range = w.range + (cleave ? 0.3 : 0);
+      const halfAngle = (w.arc * arcScale * 0.5) * Math.PI / 180;
+      hits = g.enemies.queryHit(_camPos, _camDir, range, halfAngle);
+    }
     if (!hits || hits.length === 0) return;
+    let base;
+    if (current === 'sword') base = swordDmg(heavy) * (heavy ? 1 : COMBO_MULT[comboIdx]);
+    else base = heavy ? w.heavy : w.light;
+    const mul = rmult('meleeDmg') * (heavy ? rmult('heavyDmg') : 1) * dmgMul();
     for (let i = 0; i < hits.length; i++) {
       const e = hits[i];
       enemyPos(e, _v3);
       _v2.subVectors(_v3, _camPos).normalize();
-      g.enemies.damage(e, base * dmgMul(), _v2, { heavy });
-      hitJuice(_v3, heavy, isDead(e));
+      let dmg = base * mul * sneakMul(e, 'sneakMeleeMult');
+      const crit = rollCrit();
+      if (crit) dmg *= 1.5;
+      const prevHp = e.hp !== undefined ? e.hp : dmg;
+      // Axe hits count as heavy for interrupt/knockback purposes — it staggers
+      g.enemies.damage(e, dmg, _v2, { heavy: heavy || current === 'axe' });
+      if (current === 'axe' && heavy && e.alive && !e.dead && !e.fly && !e.boss) {
+        e.state = 'stagger'; e.stateT = 0;
+      }
+      const kill = isDead(e);
+      hitJuice(_v3, heavy || crit, kill);
+      if (crit) spawnBurst(FX.sparkle, _v3.x, _v3.y, _v3.z, 6, 1.4);
+      if (kill) maybeFinisher(prevHp, dmg);
     }
+    if (cleave || spin) g.player.addShake(spin ? 0.6 : 0.45);
   }
 
   // ---- Projectile launches --------------------------------------------------
   function shootArrow(draw01) {
     const a = firstFreeOf(arrows);
     a.active = true; a.stuck = 0; a.life = 6;
-    a.dmg = lerp(WEAPONS.bow.dmgMin, WEAPONS.bow.dmgMax, draw01) * dmgMul();
+    a.dmg = lerp(WEAPONS.bow.dmgMin, WEAPONS.bow.dmgMax, draw01) * dmgMul() * rmult('bowDmg');
     g.camera.getWorldPosition(_camPos);
     g.camera.getWorldDirection(_camDir);
     a.obj.position.copy(_camPos).addScaledVector(_camDir, 0.5);
@@ -491,6 +762,7 @@ export function createCombat(g) {
     spawnBurst(FX.spark, p.x, p.y, p.z, 12, 1.8);
     spawnBurst(FX.smoke, p.x, p.y + 0.4, p.z, 8, 1);
     flashT = 0.28;
+    flashColor = 0xffb050;
     flashPos.copy(p);
     if (g.audio) g.audio.play('fireExplode');
     // AoE damage
@@ -501,7 +773,7 @@ export function createCombat(g) {
           const e = hits[i];
           enemyPos(e, _v3);
           _v2.subVectors(_v3, p); _v2.y = 0.4; _v2.normalize();
-          g.enemies.damage(e, WEAPONS.fire.dmg * dmgMul(), _v2, { heavy: true });
+          g.enemies.damage(e, WEAPONS.fire.dmg * dmgMul() * rmult('spellDmg'), _v2, { heavy: true });
           hitJuice(_v3, true, isDead(e));
         }
       }
@@ -511,6 +783,143 @@ export function createCombat(g) {
       const d = p.distanceTo(g.player.position);
       if (d < 14) g.player.addShake(clamp(0.7 - d * 0.05, 0, 0.6));
     }
+  }
+
+  // ---- Frost cone: 45% slow 3s + damage + ice mist ---------------------------
+  function applyFrost(e) {
+    if (e._frostBase === undefined) {
+      e._frostBase = e.speed;
+      e.speed = e._frostBase * (1 - WEAPONS.frost.slow);
+      e._mistT = 0;
+      frostSlowed.push(e);
+    }
+    e._frostUntil = g.time.elapsed + WEAPONS.frost.slowDur;
+  }
+  function castFrost() {
+    const w = WEAPONS.frost;
+    g.camera.getWorldPosition(_camPos);
+    g.camera.getWorldDirection(_camDir);
+    if (g.audio) g.audio.play('fireCast');
+    events.emit('attackSwing', { weapon: 'frost', heavy: false });
+    // Ice mist cone billowing from the palm
+    for (let n = 0; n < 26; n++) {
+      const s = 3 + Math.random() * 5.5;
+      const spX = (Math.random() - 0.5) * 2.4;
+      const spY = (Math.random() - 0.5) * 1.6;
+      spawnDirected(n % 3 ? FX.frost : FX.mist,
+        _camPos.x + _camDir.x * 0.7, _camPos.y - 0.15 + _camDir.y * 0.7, _camPos.z + _camDir.z * 0.7,
+        _camDir.x * s + spX, _camDir.y * s + spY + 0.4, _camDir.z * s + spX * 0.5);
+    }
+    if (!g.enemies || !g.enemies.queryHit) return;
+    const halfAngle = (w.arc * 0.5) * Math.PI / 180;
+    const hits = g.enemies.queryHit(_camPos, _camDir, w.range, halfAngle);
+    if (!hits || hits.length === 0) return;
+    const mul = rmult('spellDmg') * dmgMul();
+    for (let i = 0; i < hits.length; i++) {
+      const e = hits[i];
+      enemyPos(e, _v3);
+      _v2.subVectors(_v3, _camPos).normalize();
+      g.enemies.damage(e, w.dmg * mul, _v2, {});
+      applyFrost(e);
+      spawnBurst(FX.frost, _v3.x, _v3.y, _v3.z, 9, 1);
+      hitLandedEvt(_v3, false, isDead(e));
+    }
+    g.player.addShake(0.15);
+  }
+
+  function updateFrostSlows() {
+    const t = g.time.elapsed;
+    for (let i = frostSlowed.length - 1; i >= 0; i--) {
+      const e = frostSlowed[i];
+      if (e.dead || !e.alive || t >= e._frostUntil) {
+        if (e._frostBase !== undefined) { e.speed = e._frostBase; e._frostBase = undefined; }
+        frostSlowed.splice(i, 1);
+        continue;
+      }
+      // Cold mist wisps off slowed enemies
+      e._mistT += g.time.dt;
+      if (e._mistT > 0.14) {
+        e._mistT = 0;
+        spawnDirected(FX.mist,
+          e.pos.x + (Math.random() - 0.5) * 0.8, e.pos.y + 0.4 + Math.random() * 0.8, e.pos.z + (Math.random() - 0.5) * 0.8,
+          (Math.random() - 0.5) * 0.4, 0.5 + Math.random() * 0.4, (Math.random() - 0.5) * 0.4);
+      }
+    }
+  }
+
+  // ---- Lightning: instant chain bolt up to 3 enemies --------------------------
+  function castLightning() {
+    const w = WEAPONS.lightning;
+    g.camera.getWorldPosition(_camPos);
+    g.camera.getWorldDirection(_camDir);
+    events.emit('attackSwing', { weapon: 'lightning', heavy: false });
+    if (g.audio) g.audio.play('thunder');
+    // Pick first target: nearest in a narrow forward cone
+    _chain.length = 0;
+    if (g.enemies && g.enemies.queryHit) {
+      const hits = g.enemies.queryHit(_camPos, _camDir, w.range, 12 * Math.PI / 180);
+      let best = null, bestD = 1e9;
+      for (let i = 0; i < (hits ? hits.length : 0); i++) {
+        enemyPos(hits[i], _v3);
+        const d = _v3.distanceToSquared(_camPos);
+        if (d < bestD) { bestD = d; best = hits[i]; }
+      }
+      if (best) {
+        _chain.push(best);
+        // Chain to nearest unhit enemies within jump radius of the last struck
+        while (_chain.length < w.chain && g.enemies.queryPoint) {
+          const last = _chain[_chain.length - 1];
+          enemyPos(last, _v1);
+          const near = g.enemies.queryPoint(_v1, w.jumpR);
+          let nb = null, nd = 1e9;
+          for (let i = 0; i < (near ? near.length : 0); i++) {
+            const c = near[i];
+            if (_chain.indexOf(c) >= 0) continue;
+            enemyPos(c, _v3);
+            const d = _v3.distanceToSquared(_v1);
+            if (d < nd) { nd = d; nb = c; }
+          }
+          if (!nb) break;
+          _chain.push(nb);
+        }
+      }
+    }
+    // Build the jagged bolt: hand muzzle → each chained target (or a fizzle arc)
+    boltVerts = 0;
+    const yaw = g.player ? g.player.yaw : 0;
+    const mx = _camPos.x + _camDir.x * 0.45 + Math.cos(yaw) * 0.25;
+    const my = _camPos.y - 0.22 + _camDir.y * 0.45;
+    const mz = _camPos.z + _camDir.z * 0.45 - Math.sin(yaw) * 0.25;
+    if (_chain.length === 0) {
+      boltRun(mx, my, mz, _camPos.x + _camDir.x * 11, _camPos.y + _camDir.y * 11, _camPos.z + _camDir.z * 11);
+      flashPos.copy(_camPos).addScaledVector(_camDir, 4);
+    } else {
+      let px = mx, py = my, pz = mz;
+      const mul = rmult('spellDmg') * dmgMul();
+      let dmg = w.dmg * mul;
+      for (let i = 0; i < _chain.length; i++) {
+        const e = _chain[i];
+        enemyPos(e, _v3);
+        boltRun(px, py, pz, _v3.x, _v3.y, _v3.z);
+        px = _v3.x; py = _v3.y; pz = _v3.z;
+        _v2.subVectors(_v3, _camPos).normalize();
+        g.enemies.damage(e, dmg, _v2, { heavy: i === 0 });
+        spawnBurst(FX.zap, _v3.x, _v3.y, _v3.z, 10, 1.2);
+        spawnBurst(FX.spark, _v3.x, _v3.y, _v3.z, 5, 1);
+        hitLandedEvt(_v3, i === 0, isDead(e));
+        dmg *= 0.75; // falloff per hop
+      }
+      enemyPos(_chain[0], flashPos);
+      g.requestHitstop(60);
+    }
+    boltGeo.setDrawRange(0, boltVerts);
+    boltGeo.attributes.position.needsUpdate = true;
+    boltLine.visible = true;
+    boltT = 0.14;
+    flashT = 0.22;
+    flashColor = 0xa9c8ff;
+    g.player.addShake(0.35);
+    _chain.length = 0;
   }
 
   function updateProjectiles(dt) {
@@ -532,9 +941,12 @@ export function createCombat(g) {
           const e = hits[0];
           enemyPos(e, _v3);
           _v2.copy(a.vel).normalize();
-          const heavy = a.dmg > 26;
-          g.enemies.damage(e, a.dmg, _v2, { heavy });
-          hitJuice(_v3, heavy, isDead(e));
+          let dmg = a.dmg * sneakMul(e, 'sneakBowMult');
+          const crit = rollCrit();
+          if (crit) dmg *= 1.5;
+          const heavy = dmg > 26;
+          g.enemies.damage(e, dmg, _v2, { heavy });
+          hitJuice(_v3, heavy || crit, isDead(e));
           if (g.audio) g.audio.play('arrowHit');
           a.active = false; a.obj.visible = false;
           continue;
@@ -572,9 +984,151 @@ export function createCombat(g) {
   }
 
   // -------------------------------------------------------------------------
+  // Dodge roll: i-frames, camera dip + FOV kick, PERFECT DODGE slow-mo
+  // -------------------------------------------------------------------------
+  function iframesActive() { return dodging && dodgeT <= DODGE_IFRAME; }
+
+  function onPerfectDodge() {
+    if (perfectUsed) return;
+    perfectUsed = true;
+    startSlowmo(0.35, 1.2);              // Witcher time-dilation
+    fovKick = -8;
+    g.requestHitstop(60);
+    if (g.player) g.player.addShake(0.2);
+    g.camera.getWorldPosition(_camPos);
+    g.camera.getWorldDirection(_camDir);
+    _v1.copy(_camPos).addScaledVector(_camDir, 1.2);
+    spawnBurst(FX.parry, _v1.x, _v1.y, _v1.z, 16, 1);
+    if (g.audio) g.audio.play('parry');
+    events.emit('perfectDodge', {});
+  }
+
+  function tryDodge(mx, my) {
+    if (dodging || rawClock < dodgeCdUntil) return;
+    if (!g.player || g.player.stats.hp <= 0) return;
+    const st = g.player.stats;
+    if (st.stamina < DODGE_STAMINA) return;
+    st.stamina -= DODGE_STAMINA;
+    let dx = mx, dy = my;
+    if (Math.hypot(dx, dy) < 0.3) { dx = 0; dy = -1; } // idle → hop backward
+    const n = Math.hypot(dx, dy);
+    dx /= n; dy /= n;
+    const yaw = g.player.yaw;
+    const sy = Math.sin(yaw), cy = Math.cos(yaw);
+    // Same input→world mapping as the player controller
+    dodgeDir.set(-sy * dy + cy * dx, 0, -cy * dy - sy * dx);
+    dodgeLat = dx; // lateral component in view space (for camera roll)
+    dodging = true; dodgeT = 0; perfectUsed = false;
+    dodgeCdUntil = rawClock + DODGE_CD;
+    fovKick = Math.max(fovKick, 4.5);
+    if (g.audio) g.audio.play('swing');
+    // Cancel charge/draw so the roll reads clean
+    if (state === 'charge' || state === 'draw') {
+      state = 'idle'; stateT = 0;
+      nockArrow.visible = false;
+    }
+  }
+
+  function detectDodgeInput(input, dt) {
+    // 1) explicit button/key from ui (input.dodgePressed — may not exist yet)
+    let want = !!(input && input.dodgePressed) || keyDodge;
+    keyDodge = false;
+    // 2) double-tap a move direction (we own this detection)
+    if (input && input.move) {
+      const mvx = input.move.x || 0, mvy = input.move.y || 0;
+      const mag = Math.hypot(mvx, mvy);
+      if (!moveWasActive && mag > 0.5) {
+        const ang = Math.atan2(mvx, mvy);
+        let da = Math.abs(ang - tapAng);
+        if (da > Math.PI) da = TWO_PI - da;
+        if (rawClock - tapT < DOUBLE_TAP_T && da < 1.0) {
+          tryDodge(mvx, mvy);
+          tapT = -10;
+        } else {
+          tapT = rawClock; tapAng = ang;
+        }
+      }
+      moveWasActive = mag > 0.35;
+      if (want) tryDodge(mvx, mvy);
+    } else if (want) {
+      tryDodge(0, -1);
+    }
+    // Advance the roll: drive player velocity along the dodge arc
+    if (dodging) {
+      dodgeT += dt;
+      const t01 = clamp(dodgeT / DODGE_T, 0, 1);
+      const sp = DODGE_SPEED * (1 - 0.55 * t01);
+      if (g.player && g.player.velocity) {
+        g.player.velocity.x = dodgeDir.x * sp;
+        g.player.velocity.z = dodgeDir.z * sp;
+      }
+      if (dodgeT >= DODGE_T) dodging = false;
+    }
+  }
+
+  // Desktop fallback dodge key (C) — ui also exposes a DODGE control that
+  // sets input.dodgePressed; the dodging guard makes double-triggers a no-op.
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyC' && !e.repeat && !g.paused) keyDodge = true;
+  });
+
+  // -------------------------------------------------------------------------
+  // Counter window (Mordor): enemy telegraphs in range → block tap = riposte
+  // -------------------------------------------------------------------------
+  function scanCounterWindow() {
+    counterTarget = null;
+    if (g.enemies && g.enemies.list && g.player) {
+      const list = g.enemies.list;
+      const p = g.player.position;
+      let bestD = COUNTER_RANGE;
+      for (let i = 0; i < list.length; i++) {
+        const e = list[i];
+        if (!e.alive || e.state !== 'telegraph' || !e.aggro) continue;
+        const d = Math.hypot(e.pos.x - p.x, e.pos.z - p.z);
+        if (d < bestD) { bestD = d; counterTarget = e; }
+      }
+    }
+    const open = counterTarget !== null;
+    if (open !== counterOpen) {
+      counterOpen = open;
+      counterEvt.open = open;
+      events.emit('counterWindow', counterEvt);
+    }
+  }
+
+  function riposte(e) {
+    g.camera.getWorldPosition(_camPos);
+    enemyPos(e, _v3);
+    _v2.subVectors(_v3, _camPos).normalize();
+    const w = WEAPONS[current];
+    const base = isMeleeId(current)
+      ? (current === 'sword' ? swordDmg(false) : w.light)
+      : WEAPONS.sword.light;
+    const dmg = base * 2 * rmult('meleeDmg') * dmgMul();
+    const prevHp = e.hp !== undefined ? e.hp : dmg;
+    g.enemies.damage(e, dmg, _v2, { heavy: true, parried: true });
+    if (e.alive && !e.dead && !e.fly) { e.state = 'stagger'; e.stateT = 0; }
+    g.requestHitstop(150);
+    g.player.addShake(0.4);
+    spawnBurst(FX.parry, _v3.x, _v3.y, _v3.z, 18, 1);
+    hitJuice(_v3, true, isDead(e));
+    if (g.audio) g.audio.play('parry');
+    if (isDead(e)) maybeFinisher(prevHp, dmg);
+    // Snap the viewmodel through a strike (no stamina, hit already applied)
+    state = 'swingL'; stateT = 0; didAct = true;
+    swingVariant = 0;
+    swingDur = 0.32;
+  }
+
+  // -------------------------------------------------------------------------
   // Block / parry — enemies call g.combat.tryBlock(dmg)
   // -------------------------------------------------------------------------
   function tryBlock(dmg) {
+    // i-frames swallow the hit entirely — and reward a PERFECT DODGE
+    if (iframesActive()) {
+      onPerfectDodge();
+      return { blocked: true, parried: false };
+    }
     if (!blocking) return { blocked: false, parried: false };
     const sinceBlock = g.time.elapsed - blockStartAt;
     g.camera.getWorldPosition(_camPos);
@@ -600,6 +1154,18 @@ export function createCombat(g) {
     return { blocked: true, parried: false };
   }
 
+  // Wrap player.damage once so i-frames also negate direct damage calls
+  // (drake breath ticks, AoEs) — signature and behavior otherwise unchanged.
+  function wrapPlayerDamage() {
+    if (damageWrapped || !g.player || typeof g.player.damage !== 'function') return;
+    damageWrapped = true;
+    const orig = g.player.damage;
+    g.player.damage = function (amount, fromPos) {
+      if (iframesActive()) { onPerfectDodge(); return; }
+      return orig.call(g.player, amount, fromPos);
+    };
+  }
+
   // -------------------------------------------------------------------------
   // Equip
   // -------------------------------------------------------------------------
@@ -615,10 +1181,21 @@ export function createCombat(g) {
     } else if (id === current && state !== 'lower' && pendingEquip === null) {
       return;
     }
+    if (id === 'torch' && current !== 'torch' && current !== 'potion') torchPrev = current;
     pendingEquip = id;
     if (state !== 'lower') { state = 'lower'; stateT = 0; }
     events.emit('equip', { id });
   }
+
+  // Quick-button API for ui: torch toggle + potion use
+  function useTorch() {
+    if (current === 'torch' || pendingEquip === 'torch') {
+      if (current === 'torch') equip(torchPrev || 'sword');
+    } else {
+      equip('torch');
+    }
+  }
+  function usePotion() { equip('potion'); }
 
   function finishLower() {
     const id = pendingEquip || current;
@@ -633,35 +1210,68 @@ export function createCombat(g) {
   // -------------------------------------------------------------------------
   // Attack input state machine
   // -------------------------------------------------------------------------
+  function meleeSwingDur(heavy) {
+    const t = (MELEE_TIME[current] || MELEE_TIME.sword)[heavy ? 1 : 0];
+    return t / Math.max(0.25, rmult('attackSpeed'));
+  }
+
   function startLight() {
     const st = g.player.stats;
-    if (st.stamina < STAMINA_LIGHT) return;
-    st.stamina -= STAMINA_LIGHT;
+    const cost = STAM_LIGHT[current] ?? 10;
+    if (st.stamina < cost) return;
+    st.stamina -= cost;
+    // Sword combo chain: consecutive lights within the window escalate
+    if (current === 'sword') {
+      const now = g.time.elapsed;
+      comboIdx = now < comboExpire ? (comboIdx + 1) % 3 : 0;
+      comboExpire = now + COMBO_WINDOW;
+      swingVariant = comboIdx;
+    } else {
+      comboIdx = 0;
+      swingVariant = 0;
+    }
+    swingDur = meleeSwingDur(false) * (current === 'sword' && comboIdx === 2 ? 1.12 : 1);
     state = 'swingL'; stateT = 0; didAct = false;
-    if (g.audio) g.audio.play('swing');
+    if (g.audio) g.audio.play(current === 'axe' || current === 'greatsword' ? 'swingHeavy' : 'swing');
     events.emit('attackSwing', { weapon: current, heavy: false });
   }
   function startHeavy() {
     const st = g.player.stats;
-    if (st.stamina < STAMINA_HEAVY) { startLight(); return; } // downgrade
-    st.stamina -= STAMINA_HEAVY;
+    const cost = STAM_HEAVY[current] ?? 22;
+    if (st.stamina < cost) { startLight(); return; } // downgrade
+    st.stamina -= cost;
+    comboIdx = 0; comboExpire = -10;
+    swingDur = meleeSwingDur(true);
     state = 'swingH'; stateT = 0; didAct = false;
     if (g.audio) g.audio.play('swingHeavy');
     events.emit('attackSwing', { weapon: current, heavy: true });
+  }
+
+  function effDrawTime() { return WEAPONS.bow.drawTime / Math.max(0.25, rmult('drawSpeed')); }
+
+  function tryCastSpell(school) {
+    const w = WEAPONS[school];
+    const cost = Math.round(w.mana * rmult('spellCost'));
+    if (g.player.stats.mana < cost) return false;
+    g.player.stats.mana -= cost;
+    spellCastEvt.school = school;
+    spellCastEvt.cost = cost;
+    events.emit('spellCast', spellCastEvt);
+    return true;
   }
 
   function updateAttackInput(input, dt) {
     const busy = state === 'lower' || state === 'raise' || state === 'drink' ||
                  state === 'cast' || state === 'heal' || state === 'swingL' ||
                  state === 'swingH' || state === 'shootRecoil';
-    if (current === 'sword' || current === 'torch') {
+    if (isMeleeId(current)) {
       if (input.attackPressed && !busy && state !== 'charge') {
         state = 'charge'; chargeT = 0;
       }
       if (state === 'charge') {
         if (input.attackReleased || !input.attackHeld) {
           state = 'idle'; stateT = 0; // startLight/Heavy override on success
-          if (current === 'sword' && chargeT >= HEAVY_HOLD) startHeavy();
+          if (current !== 'torch' && chargeT >= HEAVY_HOLD) startHeavy();
           else startLight();
         } else {
           chargeT += dt;
@@ -677,7 +1287,7 @@ export function createCombat(g) {
         if (input.attackReleased || !input.attackHeld) {
           nockArrow.visible = false;
           if (drawT >= 0.12) {
-            lastDraw01 = clamp(drawT / WEAPONS.bow.drawTime, 0, 1);
+            lastDraw01 = clamp(drawT / effDrawTime(), 0, 1);
             shootArrow(lastDraw01);
             state = 'shootRecoil'; stateT = 0;
           } else {
@@ -687,18 +1297,18 @@ export function createCombat(g) {
           drawT += dt;
         }
       }
-    } else if (current === 'fire') {
+    } else if (current === 'fire' || current === 'frost' || current === 'lightning') {
       if (input.attackPressed && !busy) {
-        if (g.player.stats.mana >= WEAPONS.fire.mana) {
-          g.player.stats.mana -= WEAPONS.fire.mana;
+        if (tryCastSpell(current)) {
           state = 'cast'; stateT = 0; didAct = false;
         }
       }
     } else if (current === 'heal') {
       if (input.attackPressed && !busy) {
         const st = g.player.stats;
-        if (st.mana >= WEAPONS.heal.mana && st.hp < st.maxHp + (g.player.bonus.maxHp || 0)) {
-          st.mana -= WEAPONS.heal.mana;
+        if (st.mana >= Math.round(WEAPONS.heal.mana * rmult('spellCost')) &&
+            st.hp < st.maxHp + (g.player.bonus.maxHp || 0)) {
+          tryCastSpell('heal');
           state = 'heal'; stateT = 0; didAct = false;
           if (g.audio) g.audio.play('heal');
         }
@@ -713,7 +1323,7 @@ export function createCombat(g) {
   let px = 0, py = 0, pz = 0, rx = 0, ry = 0, rz = 0; // pose offsets (module of closure)
 
   function poseSwingLight(t) {
-    // 0.32s: fast pull-back → violent diagonal slash → smooth recovery
+    // 0.32s: fast pull-back → violent horizontal slash → smooth recovery
     if (t < 0.25) {
       const k = easeIn3(t / 0.25);
       ry += 0.55 * k; rx += -0.35 * k; px += 0.10 * k; pz += 0.14 * k; rz += 0.25 * k;
@@ -727,8 +1337,38 @@ export function createCombat(g) {
       px += lerp(-0.28, 0, k); pz += lerp(-0.30, 0, k); py += lerp(-0.10, 0, k);
     }
   }
+  function poseSwingDiag(t) {
+    // Combo hit 2: reverse diagonal — left-to-right rising cut
+    if (t < 0.25) {
+      const k = easeIn3(t / 0.25);
+      ry += -0.5 * k; rx += 0.3 * k; px += -0.16 * k; pz += 0.14 * k; rz += -0.24 * k;
+    } else if (t < 0.55) {
+      const k = easeOut4((t - 0.25) / 0.3);
+      ry += lerp(-0.5, 1.05, k); rx += lerp(0.3, -0.4, k); rz += lerp(-0.24, 0.62, k);
+      px += lerp(-0.16, 0.24, k); pz += lerp(0.14, -0.30, k); py += -0.08 * k;
+    } else {
+      const k = smooth((t - 0.55) / 0.45);
+      ry += lerp(1.05, 0, k); rx += lerp(-0.4, 0, k); rz += lerp(0.62, 0, k);
+      px += lerp(0.24, 0, k); pz += lerp(-0.30, 0, k); py += lerp(-0.08, 0, k);
+    }
+  }
+  function poseSwingChop(t) {
+    // Combo hit 3 / axe light: quick overhead chop with body weight
+    if (t < 0.24) {
+      const k = easeIn2(t / 0.24);
+      rx += -1.0 * k; py += 0.22 * k; pz += 0.15 * k; ry += 0.18 * k;
+    } else if (t < 0.52) {
+      const k = easeOut4((t - 0.24) / 0.28);
+      rx += lerp(-1.0, 0.85, k); ry += lerp(0.18, -0.15, k); rz += -0.22 * k;
+      py += lerp(0.22, -0.26, k); pz += lerp(0.15, -0.36, k);
+    } else {
+      const k = smooth((t - 0.52) / 0.48);
+      rx += lerp(0.85, 0, k); ry += lerp(-0.15, 0, k); rz += lerp(-0.22, 0, k);
+      py += lerp(-0.26, 0, k); pz += lerp(-0.36, 0, k);
+    }
+  }
   function poseSwingHeavy(t) {
-    // 0.55s: overhead raise → crash down with body weight → slow recovery
+    // 0.55s+: overhead raise → crash down with body weight → slow recovery
     if (t < 0.22) {
       const k = easeIn2(t / 0.22);
       rx += -0.95 * k; ry += 0.35 * k; py += 0.22 * k; pz += 0.16 * k;
@@ -740,6 +1380,24 @@ export function createCombat(g) {
       const k = smooth((t - 0.48) / 0.52);
       rx += lerp(0.85, 0, k); ry += lerp(-0.35, 0, k); rz += lerp(-0.35, 0, k);
       py += lerp(-0.24, 0, k); pz += lerp(-0.34, 0, k);
+    }
+  }
+  function poseSpin(t) {
+    // Greatsword heavy: wind up, whirl a full 360°, settle
+    if (t < 0.28) {
+      const k = easeIn2(t / 0.28);
+      ry += 0.85 * k; rx += -0.4 * k; px += 0.12 * k; py += 0.08 * k;
+    } else if (t < 0.74) {
+      const k = smooth((t - 0.28) / 0.46);
+      ry += 0.85 - TWO_PI * k;
+      rx += lerp(-0.4, 0.25, k);
+      py += -0.12 * Math.sin(k * Math.PI);
+      pz += -0.26 * Math.sin(k * Math.PI);
+    } else {
+      const k = smooth((t - 0.74) / 0.26);
+      // Finish the revolution: (0.85 − 2π) → −2π ≡ 0.85 → 0 visually
+      ry += lerp(0.85 - TWO_PI, -TWO_PI, k);
+      rx += lerp(0.25, 0, k);
     }
   }
   function poseCharge(hold01) {
@@ -769,7 +1427,7 @@ export function createCombat(g) {
     bowString.position.z = -0.12;
   }
   function poseCast(t) {
-    // Fire: draw hand back to hip charging, then hard palm-thrust forward
+    // Fire/frost/lightning: draw hand back to hip charging, then hard palm-thrust
     if (t < 0.42) {
       const k = easeIn2(t / 0.42);
       pz += 0.20 * k; px += 0.08 * k; rx += -0.35 * k;
@@ -814,24 +1472,30 @@ export function createCombat(g) {
   const ACT_T = { swingL: 0.38, swingH: 0.42, cast: 0.5, heal: 0.45, drink: 0.6 }; // normalized
 
   function updateViewmodel(input, dt) {
-    const dur = STATE_DUR[state];
+    let dur = STATE_DUR[state];
+    if (state === 'swingL' || state === 'swingH') dur = swingDur;
     if (dur !== undefined) stateT += dt;
     const t01 = dur ? clamp(stateT / dur, 0, 1) : 0;
 
     // One-shot action moments (hit test / projectile spawn / apply effect)
-    if (!didAct && ACT_T[state] !== undefined && t01 >= ACT_T[state]) {
+    let actT = ACT_T[state];
+    if (state === 'swingH' && current === 'greatsword') actT = 0.5; // spin apex
+    if (!didAct && actT !== undefined && t01 >= actT) {
       didAct = true;
       if (state === 'swingL') meleeHit(false);
       else if (state === 'swingH') meleeHit(true);
-      else if (state === 'cast') castFireball();
-      else if (state === 'heal') {
-        g.player.heal(WEAPONS.heal.amount);
+      else if (state === 'cast') {
+        if (current === 'frost') castFrost();
+        else if (current === 'lightning') castLightning();
+        else castFireball();
+      } else if (state === 'heal') {
+        g.player.heal(Math.round(WEAPONS.heal.amount * rmult('spellDmg')));
         healSwirlLeft = 26; healSwirlT = 0;
       } else if (state === 'drink') {
         const st = g.player.stats;
         if (st.potions > 0) {
           st.potions--;
-          g.player.heal(WEAPONS.potion.amount);
+          g.player.heal(Math.round(WEAPONS.potion.amount * rmult('potionPower')));
           if (g.audio) g.audio.play('potion');
           healSwirlLeft = 14; healSwirlT = 0;
         }
@@ -859,10 +1523,20 @@ export function createCombat(g) {
     px = 0; py = 0; pz = 0; rx = 0; ry = 0; rz = 0;
 
     switch (state) {
-      case 'swingL': poseSwingLight(t01); break;
-      case 'swingH': poseSwingHeavy(t01); break;
-      case 'charge': poseCharge(current === 'sword' ? clamp(chargeT / HEAVY_HOLD, 0, 1) : 0); break;
-      case 'draw': poseDraw(clamp(drawT / WEAPONS.bow.drawTime, 0, 1), g.time.elapsed); break;
+      case 'swingL':
+        if (current === 'sword') {
+          if (swingVariant === 1) poseSwingDiag(t01);
+          else if (swingVariant === 2) poseSwingChop(t01);
+          else poseSwingLight(t01);
+        } else if (current === 'axe') poseSwingChop(t01);
+        else poseSwingLight(t01);
+        break;
+      case 'swingH':
+        if (current === 'greatsword') poseSpin(t01);
+        else poseSwingHeavy(t01);
+        break;
+      case 'charge': poseCharge(isMeleeId(current) && current !== 'torch' ? clamp(chargeT / HEAVY_HOLD, 0, 1) : 0); break;
+      case 'draw': poseDraw(clamp(drawT / effDrawTime(), 0, 1), g.time.elapsed); break;
       case 'shootRecoil': poseShootRecoil(t01); break;
       case 'cast': poseCast(t01); break;
       case 'heal': poseHeal(t01); break;
@@ -877,6 +1551,13 @@ export function createCombat(g) {
       }
     }
     if (state !== 'draw') { nockArrow.position.z = 0.1; bowString.position.z = -0.12; }
+
+    // Dodge roll body-lean on the viewmodel
+    if (dodging) {
+      const k = Math.sin(Math.PI * clamp(dodgeT / DODGE_T, 0, 1));
+      py += -0.06 * k;
+      rz += 0.16 * k * (dodgeLat >= 0 ? 1 : -1);
+    }
 
     // Block pose blend (weapon raised across the face)
     blockBlend += ((blocking ? 1 : 0) - blockBlend) * Math.min(1, dt * 14);
@@ -915,6 +1596,12 @@ export function createCombat(g) {
     } else if (current === 'heal') {
       const s = 1 + Math.sin(g.time.elapsed * 4) * 0.1 + castOrbCharge * 0.8;
       healOrbMesh.scale.set(0.12 * s, 0.12 * s, 0.12 * s);
+    } else if (current === 'frost') {
+      const s = 1 + Math.sin(g.time.elapsed * 5) * 0.09 + castOrbCharge * 0.9;
+      frostOrbMesh.scale.set(0.12 * s, 0.12 * s, 0.12 * s);
+    } else if (current === 'lightning') {
+      const s = 1 + Math.sin(g.time.elapsed * 13) * 0.14 + castOrbCharge * 0.9;
+      stormOrbMesh.scale.set(0.12 * s, 0.12 * s, 0.12 * s);
     }
     // Torch flame flicker scale
     if (current === 'torch') {
@@ -925,7 +1612,27 @@ export function createCombat(g) {
   }
 
   // -------------------------------------------------------------------------
-  // Ambient VFX: torch embers, Aldric blade embers, heal swirl
+  // Camera feel layered AFTER player.update (we run later in the tick):
+  // dodge dip/roll + FOV kick pulses (dodge out-kick, finisher/perfect in-kick)
+  // -------------------------------------------------------------------------
+  function updateCameraFeel() {
+    const rawDt = g.time.rawDt;
+    if (dodging) {
+      const t01 = clamp(dodgeT / DODGE_T, 0, 1);
+      const k = Math.sin(Math.PI * t01);
+      g.camera.position.y -= 0.16 * k;                      // roll dip
+      g.camera.rotation.z += -dodgeLat * 0.09 * k;          // lean into it
+    }
+    if (fovKick !== 0) {
+      g.camera.fov += fovKick;
+      g.camera.updateProjectionMatrix();
+      fovKick *= Math.exp(-6.5 * rawDt);
+      if (Math.abs(fovKick) < 0.05) fovKick = 0;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Ambient VFX: torch embers, Aldric blade embers, heal swirl, frost mist
   // -------------------------------------------------------------------------
   function updateAmbientFX(dt) {
     const t = g.time.elapsed;
@@ -964,7 +1671,7 @@ export function createCombat(g) {
   }
 
   // -------------------------------------------------------------------------
-  // Shared point light: explosion flash > fireball in flight > torch > off
+  // Shared point light: flash (explosion/storm) > fireball in flight > torch
   // -------------------------------------------------------------------------
   function updateLight(dt) {
     const L = g.pointLight;
@@ -972,7 +1679,7 @@ export function createCombat(g) {
     if (flashT > 0) {
       flashT -= dt;
       L.position.copy(flashPos);
-      L.color.setHex(0xffb050);
+      L.color.setHex(flashColor);
       L.distance = 16;
       L.intensity = 9 * clamp(flashT / 0.28, 0, 1);
       return;
@@ -1006,22 +1713,43 @@ export function createCombat(g) {
   // -------------------------------------------------------------------------
   function update(dt) {
     if (g.paused) return; // gameplay frozen (menus/dialogue)
+    const rawDt = g.time.rawDt;
+    rawClock += rawDt;
     checkAldric();
+    wrapPlayerDamage();
+    if (!assetsRequested && g.assets) { assetsRequested = true; requestRealWeapons(); }
 
     const input = g.ui && g.ui.input;
 
-    // Consume weapon-wheel / hotkey selection
+    // Consume weapon-wheel / hotkey selection (backward-compatible: all 10 ids)
     if (input && input.hotkeySelected) {
       const id = input.hotkeySelected;
       input.hotkeySelected = null;
       equip(id);
     }
 
+    // Timed slow-mo (perfect dodge / finisher) — real-time countdown
+    if (slowmoLeft > 0) {
+      g.requestSlowmo(slowmoF);
+      slowmoLeft -= rawDt;
+      if (slowmoLeft <= 0) { slowmoLeft = 0; g.releaseSlowmo(); }
+    }
+
+    // Dodge input (double-tap + dodgePressed + desktop C) & roll motion
+    detectDodgeInput(input, dt);
+
+    // Counter window: telegraphing enemy in range → prompt via event
+    scanCounterWindow();
+
     // Blocking state (parry window measured from block press)
     const canBlock = state !== 'drink' && state !== 'cast' && state !== 'heal' &&
                      state !== 'swingL' && state !== 'swingH';
     const wantBlock = !!(input && input.blockHeld) && canBlock;
-    if (wantBlock && !blocking) blockStartAt = g.time.elapsed;
+    if (wantBlock && !blocking) {
+      blockStartAt = g.time.elapsed;
+      // Mordor counter: block TAP during an open window = instant riposte
+      if (counterOpen && counterTarget && counterTarget.alive) riposte(counterTarget);
+    }
     blocking = wantBlock;
     if (g.player) g.player.isBlocking = blocking;
     if (blocking && (state === 'charge' || state === 'draw')) {
@@ -1033,10 +1761,19 @@ export function createCombat(g) {
 
     updateViewmodel(input, dt);
     updateProjectiles(dt);
+    updateFrostSlows();
     updateLoot(dt);
     updateAmbientFX(dt);
     updateParticles(dt);
     updateLight(dt);
+    updateCameraFeel();
+
+    // Lightning bolt flash fade (real time so hitstop doesn't freeze it)
+    if (boltT > 0) {
+      boltT -= rawDt;
+      boltMat.opacity = clamp(boltT / 0.14, 0, 1);
+      if (boltT <= 0) { boltLine.visible = false; boltMat.opacity = 1; }
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -1044,9 +1781,12 @@ export function createCombat(g) {
     update,
     equip,
     tryBlock,
+    useTorch,
+    usePotion,
     current,
     WEAPONS,
     HOTBAR,
+    QUICK,
   };
   return api;
 }
