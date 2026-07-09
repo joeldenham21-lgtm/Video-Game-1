@@ -1239,6 +1239,8 @@ export function createUI(g) {
     dlg.full = node.text || '';
     dlg.chars = 0;
     dlg.typing = true;
+    // voice.js speaks each line as it starts typing
+    g.events.emit('dialogueLine', { speaker: elDlgName.textContent, text: dlg.full });
     elDlgText.textContent = '';
     // build choices (hidden until typing finishes)
     elDlgCh.classList.remove('on');
