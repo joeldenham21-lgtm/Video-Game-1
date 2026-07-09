@@ -1,9 +1,15 @@
 // ============================================================================
 // ELDERFALL — quests.js
-// Village NPCs (procedural villagers), data-driven dialogue trees, the 5-act
-// main quest, three side quests with meaningful choices, Bram's potion shop,
+// Village NPCs (animated KayKit characters), data-driven dialogue trees, the
+// 5-act main quest, six side quests with meaningful choices (Fangs in the
+// Fold, The Redfang Debt, The Mirrormere Light, The Crone of the Pines,
+// Blood Below the Barrows, The Toll of Stonebridge), Bram's potion shop,
 // and POI discovery. Owns events: `discover`, `questStarted`, `questUpdated`,
 // `questCompleted`, `dialogueStart`.
+// NPC visuals follow the wave-2 async asset pattern: logic + interactables
+// exist immediately on an empty Group; the skinned mesh attaches when
+// g.assets.char() resolves. Idle/Walking_A locomotion is speed-matched
+// (walk clip authored ≈2.2 u/s), Interact plays during dialogue.
 // ============================================================================
 import * as THREE from 'three';
 import {
@@ -25,12 +31,24 @@ export function createQuests(g) {
     fold:  { id: 'fold',  name: 'Fangs in the Fold' },
     debt:  { id: 'debt',  name: 'The Redfang Debt' },
     mere:  { id: 'mere',  name: 'The Mirrormere Light' },
+    crone: { id: 'crone', name: 'The Crone of the Pines' },
+    blood: { id: 'blood', name: 'Blood Below the Barrows' },
+    toll:  { id: 'toll',  name: 'The Toll of Stonebridge' },
   };
 
   // state.main: 0 = not started, 1..5 = act, 6 = saga complete.
   // state.stage: progress within the current act.
   // side quests: 0 = not taken, 1 = active, 2 = resolved.
-  const state = { main: 0, stage: 0, pelts: 0, fold: 0, debt: 0, mere: 0 };
+  // crone: 0 none, 1 seek the hut, 2 inspect the well, 3 truth known,
+  //        4 resolved (peace), 5 hostile hunt, 6 witch dead, 7 resolved (blood)
+  // blood: 0 none, 1 search cemetery (night), 2 enter the crypt (night),
+  //        3 pact made (dawns count), 4 re-opened (finish him), 5 resolved
+  // toll:  0 none, 1 troll met, 2 resolved (respect, paid twice), 3 resolved (dead)
+  // vanished: villagers taken at dawn while the pact held (guilt echoes).
+  const state = {
+    main: 0, stage: 0, pelts: 0, fold: 0, debt: 0, mere: 0,
+    crone: 0, blood: 0, toll: 0, vanished: 0,
+  };
 
   const qStart  = (q, text) => ev.emit('questStarted',   { quest: q, text });
   const qUpdate = (q, text) => ev.emit('questUpdated',   { quest: q, text });
@@ -57,23 +75,20 @@ export function createQuests(g) {
   }
 
   // ==========================================================================
-  // Villager NPCs — procedural low-poly models (≤6 parts + blob shadow)
+  // Villager NPCs — animated KayKit characters (async: logic first, mesh on
+  // load). Tints per the wave-2 art spec; blob shadows stay.
   // ==========================================================================
   const NPC_DEFS = [
-    { id: 'maera',   name: 'Maera',   x: 2.5, z: -5,  tunic: 0x5a4a72, legs: 0x3a3346, skin: 0xd8ac84, hair: 0xcfc8bd, homeR: 2.2 },
-    { id: 'torvald', name: 'Torvald', x: 16,  z: 7,   tunic: 0x6e3f2a, legs: 0x40342b, skin: 0xc98f66, hair: 0x2e2620, homeR: 2.0 },
-    { id: 'sylva',   name: 'Sylva',   x: -26, z: 24,  tunic: 0x3f5a35, legs: 0x4a4034, skin: 0xd3a071, hair: 0x8a5a2e, homeR: 3.2 },
-    { id: 'bram',    name: 'Bram',    x: -9,  z: -13, tunic: 0x8a6a30, legs: 0x4e4238, skin: 0xdcb08c, hair: 0x6b4c33, homeR: 1.8 },
-    { id: 'wendel',  name: 'Wendel',  x: 24,  z: -21, tunic: 0x7a7462, legs: 0x554c3c, skin: 0xcf9f78, hair: 0xb8b2a6, homeR: 2.6 },
+    { id: 'maera',   name: 'Maera',   x: 2.5, z: -5,  char: 'mage',         tint: '#aea7bc', height: 1.72, homeR: 2.2 },
+    { id: 'torvald', name: 'Torvald', x: 16,  z: 7,   char: 'barbarian',    tint: '#7a5230', height: 1.95, homeR: 2.0 },
+    { id: 'sylva',   name: 'Sylva',   x: -26, z: 24,  char: 'rogue',        tint: '#6f8f58', height: 1.76, homeR: 3.2 },
+    { id: 'bram',    name: 'Bram',    x: -9,  z: -13, char: 'knight',       tint: '#d9b184', height: 1.84, homeR: 1.8 },
+    { id: 'wendel',  name: 'Wendel',  x: 24,  z: -21, char: 'rogue_hooded', tint: '#9a8a68', height: 1.70, homeR: 2.6 },
   ];
 
-  // Shared geometries (arms/legs translated so rotation pivots at the joint)
-  const geoBody = new THREE.BoxGeometry(0.6, 0.7, 0.34);
-  const geoHead = new THREE.BoxGeometry(0.34, 0.36, 0.32);
-  const geoHair = new THREE.BoxGeometry(0.38, 0.13, 0.36);
-  const geoArm = new THREE.BoxGeometry(0.15, 0.6, 0.15);
-  geoArm.translate(0, -0.24, 0);
-  const geoLegs = new THREE.BoxGeometry(0.5, 0.62, 0.3);
+  // Locomotion references (KayKit clips as authored)
+  const WALK_CLIP_SPEED = 2.2;  // u/s the Walking_A clip was animated at
+  const NPC_WALK_SPEED = 0.85;  // u/s villagers actually amble at
 
   // Blob shadow — shared radial-gradient CanvasTexture quad
   const shCanvas = document.createElement('canvas');
@@ -94,27 +109,38 @@ export function createQuests(g) {
   const npcs = {};
   const npcList = [];
 
-  function makeMat(color) {
-    return new THREE.MeshLambertMaterial({ color, flatShading: true });
+  // Attach the skinned KayKit model to an already-live npc group.
+  function attachModel(npc, def, asset) {
+    const { scene, animations } = asset;
+    // Scale to the def's target height (KayKit humans ≈1.9u as authored)
+    const box = new THREE.Box3().setFromObject(scene);
+    const rawH = Math.max(0.1, box.max.y - box.min.y);
+    scene.scale.setScalar(def.height / rawH);
+    if (g.assets && g.assets.tint) g.assets.tint(scene, def.tint);
+    npc.group.add(scene);
+
+    npc.mixer = new THREE.AnimationMixer(scene);
+    npc.actions = {};
+    for (const want of ['Idle', 'Walking_A', 'Interact']) {
+      let clip = null;
+      for (let i = 0; i < animations.length; i++) {
+        const nm = animations[i].name;
+        if (nm === want || nm.endsWith('|' + want)) { clip = animations[i]; break; }
+      }
+      if (clip) npc.actions[want] = npc.mixer.clipAction(clip);
+    }
+    const idle = npc.actions.Idle;
+    if (idle) {
+      idle.play();
+      idle.time = Math.random() * (idle.getClip().duration || 1); // desync
+      npc.current = idle;
+    }
   }
 
   function makeVillager(def) {
+    // Logic object with an empty Group IMMEDIATELY — interactables and
+    // wander AI work before the mesh streams in.
     const group = new THREE.Group();
-    const matTunic = makeMat(def.tunic);
-    const matLegs = makeMat(def.legs);
-    const matSkin = makeMat(def.skin);
-    const matHair = makeMat(def.hair);
-
-    const legs = new THREE.Mesh(geoLegs, matLegs); legs.position.y = 0.31;
-    const body = new THREE.Mesh(geoBody, matTunic); body.position.y = 0.97;
-    const head = new THREE.Mesh(geoHead, matSkin); head.position.y = 1.5;
-    const hair = new THREE.Mesh(geoHair, matHair); hair.position.y = 1.72;
-    const armL = new THREE.Mesh(geoArm, matTunic); armL.position.set(-0.38, 1.24, 0);
-    const armR = new THREE.Mesh(geoArm, matTunic); armR.position.set(0.38, 1.24, 0);
-    for (const m of [legs, body, head, hair, armL, armR]) {
-      m.castShadow = true;
-      group.add(m);
-    }
     const shadow = new THREE.Mesh(shGeo, shMat);
     shadow.position.y = 0.02;
     group.add(shadow);
@@ -125,13 +151,20 @@ export function createQuests(g) {
 
     const npc = {
       id: def.id, name: def.name, group,
-      parts: { legs, body, head, hair, armL, armR },
       homeX: def.x, homeZ: def.z, homeR: def.homeR,
       tgtX: def.x, tgtZ: def.z, waitT: 1 + Math.random() * 4,
-      phase: Math.random() * 6.28, t: 0, walking: false,
+      phase: Math.random() * 6.28, t: 0, walking: false, talking: false,
+      mixer: null, actions: null, current: null, animAcc: 0,
     };
     npcs[def.id] = npc;
     npcList.push(npc);
+
+    // Fire-and-forget: mesh arrives whenever the char pack finishes loading.
+    if (g.assets && g.assets.char) {
+      g.assets.char(def.char)
+        .then((asset) => { if (asset) attachModel(npc, def, asset); })
+        .catch(() => {});
+    }
 
     g.interactables.push({
       pos: group.position, radius: 2.8,
@@ -147,60 +180,98 @@ export function createQuests(g) {
     if (!g.ui || !g.ui.openDialogue) return;
     const tree = treeFor(npc);
     if (!tree) return;
+    npc.talking = true;
     ev.emit('dialogueStart', { npc, node: tree.start });
     g.ui.openDialogue(npc, tree);
   }
 
-  // NPC idle wander + face-player + subtle bob (zero allocations)
+  // Dialogue closed → drop the Interact pose on everyone.
+  ev.on('dialogueEnd', () => {
+    for (let i = 0; i < npcList.length; i++) npcList[i].talking = false;
+  });
+
+  // Crossfade helper — swaps the active clip, keeps timeScale speed-matched.
+  function setClip(n, name, timeScale) {
+    const a = n.actions && n.actions[name];
+    if (!a) return;
+    if (n.current !== a) {
+      if (n.current) n.current.fadeOut(0.22);
+      a.reset().fadeIn(0.22).play();
+      n.current = a;
+    }
+    a.timeScale = timeScale;
+  }
+
+  // NPC idle wander + face-player + animation state machine (zero allocs).
+  // Movement freezes while paused; mixers keep ticking so the Interact clip
+  // plays during dialogue. LOD: mixer updates every 2nd frame beyond 40u,
+  // every 4th beyond 80u (accumulated dt, no dropped time).
+  let npcFrame = 0;
   function updateNPCs(dt) {
     const p = g.player ? g.player.position : null;
+    npcFrame++;
     for (let i = 0; i < npcList.length; i++) {
       const n = npcList[i];
       n.t += dt;
       const gp = n.group.position;
-      const nearPlayer = p && dist2d(gp.x, gp.z, p.x, p.z) < 4;
-      n.walking = false;
+      const pd = p ? dist2d(gp.x, gp.z, p.x, p.z) : 1e9;
+      const nearPlayer = pd < 4;
 
-      if (nearPlayer) {
-        // Face the player
+      if (!g.paused) {
+        n.walking = false;
+        if (nearPlayer) {
+          // Face the player
+          const want = Math.atan2(p.x - gp.x, p.z - gp.z);
+          let d = want - n.group.rotation.y;
+          while (d > Math.PI) d -= Math.PI * 2;
+          while (d < -Math.PI) d += Math.PI * 2;
+          n.group.rotation.y += d * Math.min(1, dt * 6);
+        } else if (n.waitT > 0) {
+          n.waitT -= dt;
+          if (n.waitT <= 0) {
+            const a = Math.random() * Math.PI * 2;
+            const r = Math.random() * n.homeR;
+            n.tgtX = n.homeX + Math.sin(a) * r;
+            n.tgtZ = n.homeZ + Math.cos(a) * r;
+          }
+        } else {
+          const dx = n.tgtX - gp.x, dz = n.tgtZ - gp.z;
+          const d = Math.hypot(dx, dz);
+          if (d < 0.15) {
+            n.waitT = 3 + Math.random() * 6;
+          } else {
+            const sp = Math.min(d, NPC_WALK_SPEED * dt) / d;
+            gp.x += dx * sp; gp.z += dz * sp;
+            const want = Math.atan2(dx, dz);
+            let rd = want - n.group.rotation.y;
+            while (rd > Math.PI) rd -= Math.PI * 2;
+            while (rd < -Math.PI) rd += Math.PI * 2;
+            n.group.rotation.y += rd * Math.min(1, dt * 5);
+            n.walking = true;
+          }
+        }
+        gp.y = terrainHeight(gp.x, gp.z);
+      } else if (n.talking && p) {
+        // Paused in dialogue: keep turning to face the player
         const want = Math.atan2(p.x - gp.x, p.z - gp.z);
         let d = want - n.group.rotation.y;
         while (d > Math.PI) d -= Math.PI * 2;
         while (d < -Math.PI) d += Math.PI * 2;
         n.group.rotation.y += d * Math.min(1, dt * 6);
-      } else if (n.waitT > 0) {
-        n.waitT -= dt;
-        if (n.waitT <= 0) {
-          const a = Math.random() * Math.PI * 2;
-          const r = Math.random() * n.homeR;
-          n.tgtX = n.homeX + Math.sin(a) * r;
-          n.tgtZ = n.homeZ + Math.cos(a) * r;
-        }
-      } else {
-        const dx = n.tgtX - gp.x, dz = n.tgtZ - gp.z;
-        const d = Math.hypot(dx, dz);
-        if (d < 0.15) {
-          n.waitT = 3 + Math.random() * 6;
-        } else {
-          const sp = Math.min(d, 0.85 * dt) / d;
-          gp.x += dx * sp; gp.z += dz * sp;
-          const want = Math.atan2(dx, dz);
-          let rd = want - n.group.rotation.y;
-          while (rd > Math.PI) rd -= Math.PI * 2;
-          while (rd < -Math.PI) rd += Math.PI * 2;
-          n.group.rotation.y += rd * Math.min(1, dt * 5);
-          n.walking = true;
-        }
       }
 
-      // Ground + bob + limb animation
-      const bob = Math.sin(n.t * (n.walking ? 7 : 1.7) + n.phase);
-      gp.y = terrainHeight(gp.x, gp.z) + (n.walking ? Math.abs(bob) * 0.05 : bob * 0.02 + 0.02);
-      const swing = n.walking ? bob * 0.5 : Math.sin(n.t * 1.1 + n.phase) * 0.06;
-      n.parts.armL.rotation.x = swing;
-      n.parts.armR.rotation.x = -swing;
-      n.parts.legs.rotation.z = n.walking ? bob * 0.07 : 0;
-      n.parts.head.rotation.y = n.walking ? 0 : Math.sin(n.t * 0.5 + n.phase) * 0.25;
+      // Animation: Interact while talked to, Walking_A speed-matched, Idle
+      if (n.mixer) {
+        setClip(n,
+          n.talking ? 'Interact' : n.walking ? 'Walking_A' : 'Idle',
+          n.walking && !n.talking ? NPC_WALK_SPEED / WALK_CLIP_SPEED : 1);
+        n.animAcc += dt;
+        const step = pd > 80 ? 4 : pd > 40 ? 2 : 1;
+        if (step === 1 || ((npcFrame + i) % step) === 0) {
+          n.mixer.update(n.animAcc);
+          n.animAcc = 0;
+        }
+      }
     }
   }
 
@@ -251,6 +322,87 @@ export function createQuests(g) {
       qUpdate(QUESTS.mere, "You found Enna's amulet. Wendel waits — or Bram pays for silver.");
     },
     enabled: () => state.mere === 1 && !g.flags.amuletFound && !g.paused,
+  });
+
+  // --------------------------------------------------------------------------
+  // Wave-2 locations (match ASSETS-ART.md / structures & enemies agents):
+  // witch hut (-260,-520), Stonebridge (330,-260), cemetery + crypt at the
+  // Barrowdeep ruins (crypt chamber sits ~16u south of the POI center, door
+  // facing north).
+  // --------------------------------------------------------------------------
+  const SPOT = {
+    hut:    { x: -260, z: -520, name: "The Crone's Hut" },
+    bridge: { x: 330,  z: -260, name: 'Stonebridge' },
+    graves: { x: POI.ruins.x - 26, z: POI.ruins.z + 18, name: 'The Barrowdeep Cemetery' },
+    crypt:  { x: POI.ruins.x, z: POI.ruins.z - 25, name: 'The Barrow Crypt' },
+    well:   { x: -64, z: 58, name: 'The Old Stock-Well' },
+  };
+  const spotVec = (s, lift) => new THREE.Vector3(s.x, terrainHeight(s.x, s.z) + (lift || 0.5), s.z);
+
+  function openTalk(name, tree) {
+    if (!g.ui || !g.ui.openDialogue || !tree) return;
+    const who = { name };
+    ev.emit('dialogueStart', { npc: who, node: tree.start });
+    g.ui.openDialogue(who, tree);
+  }
+
+  // --- The Crone of the Pines ---
+  // Grimhilde herself is enemies.js' entity (neutral until g.flags.witchHostile);
+  // this is her door — where words happen.
+  const hutPos = spotVec(SPOT.hut, 0.6);
+  g.interactables.push({
+    pos: hutPos, radius: 4.2,
+    label: 'Speak — Grimhilde',
+    onInteract: () => openTalk('Grimhilde', grimhildeTree()),
+    enabled: () => !g.paused && !g.flags.witchHostile && !g.flags.witchDead,
+  });
+  // Her cauldron — lootable only after the torch-and-pitchfork ending.
+  g.interactables.push({
+    pos: hutPos, radius: 4.2,
+    label: "Loot the witch's cauldron",
+    onInteract: () => {
+      if (g.flags.cauldronLooted) return;
+      g.flags.cauldronLooted = true;
+      notify('The cauldron scraped clean', 'Coin, herbs, and two draughts that smell of pine.');
+      ev.emit('spawnLoot', { pos: { x: SPOT.hut.x, y: hutPos.y, z: SPOT.hut.z }, kind: 'gold', amount: 45 });
+      ev.emit('spawnLoot', { pos: { x: SPOT.hut.x + 1, y: hutPos.y, z: SPOT.hut.z + 1 }, kind: 'potion', amount: 1 });
+      ev.emit('spawnLoot', { pos: { x: SPOT.hut.x - 1, y: hutPos.y, z: SPOT.hut.z + 1 }, kind: 'potion', amount: 1 });
+    },
+    enabled: () => !g.paused && !!g.flags.witchDead && !!g.flags.witchHostile && !g.flags.cauldronLooted,
+  });
+  // The sick stock-well north of the fold — the real culprit.
+  const wellPos = spotVec(SPOT.well, 0.5);
+  g.interactables.push({
+    pos: wellPos, radius: 3,
+    label: 'Inspect the old stock-well',
+    onInteract: () => openTalk('The Old Stock-Well', wellTree()),
+    enabled: () => !g.paused && state.crone === 2 && !g.flags.wellCleansed,
+  });
+
+  // --- Blood Below the Barrows ---
+  const gravesPos = spotVec(SPOT.graves, 0.5);
+  g.interactables.push({
+    pos: gravesPos, radius: 5,
+    label: 'Search among the graves',
+    onInteract: () => openTalk('The Cemetery', gravesTree()),
+    enabled: () => !g.paused && state.blood === 1 && isNight(),
+  });
+  const cryptPos = spotVec(SPOT.crypt, 0.6);
+  g.interactables.push({
+    pos: cryptPos, radius: 4.5,
+    label: 'Call into the crypt-dark',
+    onInteract: () => openTalk('Morvane', morvaneTree()),
+    enabled: () => !g.paused && isNight() && !g.flags.morvaneDead &&
+      (state.blood === 2 || state.blood === 3 || state.blood === 4),
+  });
+
+  // --- The Toll of Stonebridge ---
+  const bridgePos = spotVec(SPOT.bridge, 0.6);
+  g.interactables.push({
+    pos: bridgePos, radius: 5.5,
+    label: 'Parley — the troll',
+    onInteract: () => openTalk('Grum the Troll', trollTree()),
+    enabled: () => !g.paused && state.toll >= 1 && !g.flags.trollDead,
   });
 
   // ==========================================================================
