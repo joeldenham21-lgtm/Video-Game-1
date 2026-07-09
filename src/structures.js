@@ -951,10 +951,11 @@ export function createStructures(g) {
   }
 
   function buildBreadcrumbs() {
-    let idx = 0, chestsLeft = 5;
+    // Gather every eligible 200u grid cell, then keep exactly 16 (sorted by
+    // hash → deterministic pick regardless of how many pass the filters).
+    const cand = [];
     for (let gx = -4; gx <= 4; gx++) {
-      for (let gz = -4; gz <= 3; gz++) {
-        if (srand(gx, gz, 501) > 0.3) continue;
+      for (let gz = -5; gz <= 4; gz++) {
         const x = gx * 200 + (srand(gx, gz, 502) - 0.5) * 150;
         const z = gz * 200 + (srand(gx, gz, 503) - 0.5) * 150;
         let blocked = false;
@@ -966,6 +967,15 @@ export function createStructures(g) {
         const h = terrainHeight(x, z);
         if (h < WATER_LEVEL + 1.4 || h > 82) continue;
         if (Math.abs(terrainHeight(x + 3, z) - h) + Math.abs(terrainHeight(x, z + 3) - h) > 3.2) continue;
+        cand.push({ gx, gz, x, z, r: srand(gx, gz, 501) });
+      }
+    }
+    cand.sort((a, b) => (a.r - b.r) || (a.gx - b.gx) || (a.gz - b.gz));
+    if (cand.length > 16) cand.length = 16;
+    let idx = 0, chestsLeft = 5;
+    {
+      for (let ci = 0; ci < cand.length; ci++) {
+        const { gx, gz, x, z } = cand[ci];
         const ry = srand(gx, gz, 505) * 6.283;
         const kindR = srand(gx, gz, 504);
         const b = new Builder(900 + idx);
