@@ -34,15 +34,19 @@ Plus wolves in the pines, goblins in the rocks, chests and cairns and cart wreck
 
 ## ✨ Features
 
-- Full **day/night cycle** with long golden hours, dark dangerous nights, drifting clouds, stars, fog-shrouded distance
-- **Weapon wheel** (sword · bow · fireball · heal · torch · potion) with bullet-time
-- **Combat juice**: hitstop, screen shake, parry sparks with slow-mo, readable enemy telegraphs, stamina rhythm
-- **Skyrim-style compass**, discovery banners with a harp sting, quest markers, journal
-- **5-act main quest** + side quests with real choices and consequences, a nemesis who remembers you, a dragon boss with a health bar
-- XP, levels, gold, loot, one-time chests, a legendary sword to earn
-- **Generative music & 100% procedural audio** — lute phrases over warm pads, combat drums, wind that rises with altitude, crickets at night
-- **Save/load** (autosaves every minute), quality toggle, adaptive resolution for weaker phones
-- Zero downloads at runtime: every model, texture, and sound is generated procedurally. One vendored library (three.js, MIT).
+- **Real CC0 art**: professionally rigged KayKit characters (75 animations each), 400+ building/dungeon/cemetery props, all repainted with a dark-fantasy grade — plus a dense procedural wilderness (50+ tree, bush, and rock varieties in seeded groves, fallen logs, glowing mushrooms)
+- Full **day/night cycle** with long golden hours, dark dangerous nights, aurora some nights over Drakespire, shooting stars, fog-shrouded distance
+- **State-of-the-art combat**: 8-weapon wheel with bullet-time (sword · axe · greatsword · bow · fire · frost · chain lightning · heal), dodge rolls with i-frames, perfect-dodge slow-mo, 3-hit combos, Mordor-style counter prompts, kill-cam finishers, hitstop + parry sparks
+- **16+ enemy types**: wolves, goblins, bandits, skeletons & archers, wraiths, werewolves (night forests), vampire thralls, trolls, witches, elite variants with names — plus bosses: the Barrowlord, vampire lord Morvane, the nemesis Vargr Redfang who *remembers killing you*, and the drake Vhastrix
+- **Blacksmithing & enchanting**: 4 weighty upgrade tiers at Torvald's forge (each visually altering your weapon), 5 school enchants with glowing blades at the cleansed Wardstones, hidden spell tomes that upgrade your magic
+- **Global economy**: 5 vendors with daily price moods + a wandering merchant, mining veins, materials & valuables, village reputation discounts
+- **Learn-by-doing skills** (Skyrim-style, less grind): 6 skills leveled by use, 48-perk constellation trees, playstyle-changing capstones
+- **Endless endgame**: the whole world scales with you (encounter design makes danger zones dangerous — never stat walls), daily Hunt Board bounties, Blood Moon village sieges, and the Trial of Echoes boss rematches
+- **Living world**: 45+ ambient micro-details — ants on logs, creaking inn signs, a noon bell, moths at windows, chickens, the answered wolf howl at night, a villager who feeds the hens at dawn
+- **16 readable lore books**, a bestiary, buried treasure, secrets, physics props you can send flying
+- **Voiced dialogue** (system speech synthesis, per-character voices) + generative music & 100% synthesized audio
+- 5-act main quest + 6 side quests with real choices and consequences
+- **Save/load** (autosaves every minute), quality toggle, adaptive resolution
 
 ## 🛠️ Tech
 
