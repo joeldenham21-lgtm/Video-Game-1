@@ -139,11 +139,7 @@ class Builder {
 // ---------------------------------------------------------------------------
 // Palette
 // ---------------------------------------------------------------------------
-const C_PLASTER = [0xd9cbaa, 0xcfc0a0, 0xdad2b8, 0xc9b894];
-const C_THATCH = [0x9c7a36, 0x8f6d30, 0xa5854a];
-const C_CANVAS = [0xa8543c, 0x527a54, 0xb08d3f];
 const C_TIMBER = 0x5a4128;
-const C_STONE = 0x8b8c86;
 const C_DARKSTONE = 0x6f736e;
 const C_MOSS = 0x707a64;
 const C_DIRT = 0x8a6e4b;
@@ -1477,6 +1473,8 @@ export function createStructures(g) {
         cageDoor.grp.rotation.y = -1.9 * cageDoor.open;
       }
     }
+    // windmill sails turn lazily (visual)
+    if (windmillFan) windmillFan.rotation.z += dt * 0.55;
     // ≤1 Hz material/state refresh
     tickAcc += g.time.rawDt;
     if (tickAcc >= 1) { tickAcc = 0; slowTick(); }
@@ -1491,6 +1489,20 @@ export function createStructures(g) {
         p.position.y = TW.topY;
         if (p.velocity.y < 0) p.velocity.y = 0;
         p.onGround = true;
+      }
+      // Stonebridge deck — walkable span over the flooded dip (OBB clamp;
+      // swimmers entering the footprint are lifted onto the deck, anything
+      // well below — troll country — stays beneath)
+      {
+        const bdx = p.position.x - BR.x, bdz = p.position.z - BR.z;
+        const lx = bdx * BR.c - bdz * BR.s;
+        const lz = bdx * BR.s + bdz * BR.c;
+        if (lx > -4.0 && lx < 4.0 && lz > -6.2 && lz < 6.2 &&
+            p.position.y > BR.deckY - 3.4 && p.position.y < BR.deckY) {
+          p.position.y = BR.deckY;
+          if (p.velocity.y < 0) p.velocity.y = 0;
+          p.onGround = true;
+        }
       }
       if (blessTimer > 0) {
         blessTimer -= dt;
@@ -1522,11 +1534,13 @@ export function createStructures(g) {
 
   // ---- build the world (deterministic, once) --------------------------------
   buildVillage();
-  buildRuins();
+  buildRuins();       // includes the NEW cemetery ring
   buildStones();
   buildTower();
   buildCamp();
   buildShrine();
+  buildWitchHut();    // NEW POI
+  buildStonebridge(); // NEW POI
   buildBreadcrumbs();
   buildDocks();
   // finalize the cross-POI merged emissive meshes (1 draw call apiece)
@@ -1534,6 +1548,8 @@ export function createStructures(g) {
   root.add(fireB.build(MAT.fire, false));
   root.add(discB.build(MAT.glowDisc, false));
   root.add(runeB.build(MAT.rune, false));
+  root.add(greenB.build(MAT.greenGlow, false));
+  root.add(greenDiscB.build(MAT.greenDisc, false));
 
   return { update };
 }
