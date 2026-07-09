@@ -161,6 +161,7 @@ btnContinue.addEventListener('click', () => boot(true));
 let last = 0;
 let frameEMA = 16.7;
 let lastPerfCheck = 0;
+const assetBarEl = document.getElementById('assetbar');
 
 function start() {
   last = performance.now();
@@ -206,6 +207,14 @@ function tick(now) {
   }
 
   renderer.render(scene, camera);
+
+  // Asset streaming progress bar (thin gold line at top)
+  const ab = assetBarEl;
+  if (ab) {
+    const p = g.assets.progress;
+    if (p < 1) ab.style.width = (p * 100).toFixed(0) + '%';
+    else if (ab.style.opacity !== '0') { ab.style.width = '100%'; ab.style.opacity = '0'; setTimeout(() => ab.remove(), 1200); }
+  }
 
   // Adaptive resolution: keep frame time healthy on weaker phones
   frameEMA = frameEMA * 0.95 + (rawDt * 1000) * 0.05;

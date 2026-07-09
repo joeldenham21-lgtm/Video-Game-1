@@ -64,6 +64,12 @@
   #loading { margin-top: 26px; font-size: 14px; letter-spacing: 0.2em; color: #d9b46a; display: none; z-index: 1; }
   #loading.on { display: block; animation: pulse 1.2s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: 0.45; } }
+  #assetbar {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%; z-index: 200;
+    background: linear-gradient(90deg, #d9b46a, #f4e8c8); border-radius: 0 2px 2px 0;
+    box-shadow: 0 0 8px rgba(217,180,106,0.6); transition: width .4s ease, opacity 1s ease;
+    pointer-events: none;
+  }
 </style>
 <script type="importmap">
   { "imports": { "three": "./vendor/three.module.js" } }
@@ -71,6 +77,7 @@
 </head>
 <body>
 <canvas id="game"></canvas>
+<div id="assetbar"></div>
 <div id="hud"></div>
 <div id="title">
   <div class="mountains"></div>
