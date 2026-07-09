@@ -805,7 +805,6 @@ function buildCliffChunkGeom() {
 }
 
 // ---- 4 DEBRIS ARCHETYPES (logs authored lying along X; rotY spins them) ----
-const cutRings = (cx, cy, cz, ny, f) => null; // (rings via nx below)
 function logFace(mossy, seed) {
   return (cx, cy, cz, ny, f) => {
     if (Math.abs(cx) > 1.18) return [0.40, 0.315, 0.20]; // pale cut ends
