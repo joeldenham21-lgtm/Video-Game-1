@@ -1094,12 +1094,14 @@ export function createStructures(g) {
       const gy = terrainHeight(tx, tz);
       const ry = Math.atan2(P.x - tx, P.z - tz);
       b.add(TPL.prism, tx, gy, tz, w, h, d, 0, ry + Math.PI / 2, 0, col, 0.1);
-      // dark doorway on the fire-facing gable
-      b.add(TPL.box, tx + Math.sin(ry) * (d / 2 - 0.1), gy + 0.65, tz + Math.cos(ry) * (d / 2 - 0.1),
+      // dark doorway on the fire-facing gable — the prism is rotated ry+π/2,
+      // so that gable sits at w/2 along the fire axis (NOT d/2, which is
+      // inside the tent and swallowed the door + glow entirely)
+      b.add(TPL.box, tx + Math.sin(ry) * (w / 2 - 0.1), gy + 0.65, tz + Math.cos(ry) * (w / 2 - 0.1),
         0.95, 1.3, 0.25, 0, ry, 0, 0x241a12, 0.03);
       // faint warm interior glow in the doorway so tents read at night
       // (MAT.glow — same ≤1 Hz brighten-at-night path as the windows)
-      glowB.add(TPL.quad, tx + Math.sin(ry) * (d / 2 + 0.06), gy + 0.62, tz + Math.cos(ry) * (d / 2 + 0.06),
+      glowB.add(TPL.quad, tx + Math.sin(ry) * (w / 2 + 0.06), gy + 0.62, tz + Math.cos(ry) * (w / 2 + 0.06),
         0.6, 0.9, 1, 0, ry, 0, 0xd0955a, 0);
       addCol(tx, tz, Math.max(w, d) / 2 + 0.2);
       if (i === 2) { // Vargr's banner

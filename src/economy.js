@@ -59,6 +59,18 @@ export function createEconomy(g) {
   const veinsMined = () => g.flags.veinsMined || (g.flags.veinsMined = {});
   const day = () => g.flags.econDay | 0;
 
+  // Deterministic uniform roll in [0,1). core.hash2's float multiply drops
+  // low bits for these parameter ranges and skews badly (it never returns
+  // > 0.5 for the daily-price inputs), so pricing/loot rolls use a proper
+  // imul-based mix (mulberry32 step). Placement keeps hash2 per contract.
+  function rand01(x, y, seed) {
+    let a = ((seed | 0) ^ Math.imul(x | 0, 0x9E3779B1) ^ Math.imul(y | 0, 0x85EBCA77)) >>> 0;
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+
   // ==========================================================================
   // Inventory API
   // ==========================================================================
@@ -164,7 +176,7 @@ export function createEconomy(g) {
   function dailyFor(vendorId) {
     const v = VENDORS[vendorId];
     const idx = v ? v.idx : 0;
-    return 0.85 + 0.30 * hash2(day() * 13 + 7, idx * 29 + 3, 4177);
+    return 0.85 + 0.30 * rand01(day() * 13 + 7, idx * 29 + 3, 4177);
   }
 
   function baseOf(id, vendorId, buying) {
@@ -208,21 +220,22 @@ export function createEconomy(g) {
   const TOMES = [
     { key: 'fire2',  name: 'Twin Flame',       hint: 'the crypt beneath Barrowdeep, close to where Aldric’s blade once lay' },
     { key: 'frost2', name: 'Deep Winter',      hint: 'the very top of Greywatch Tower, where the wind keeps the pages cold' },
-    { key: 'storm2', name: 'Storm Court',      hint: 'the drake’s perch upon Drakespire’s peak' },
+    { key: 'lightning2', name: 'The Storm Court', hint: 'the drake’s perch upon Drakespire’s peak' },
     { key: 'heal2',  name: 'Rites of Mending', hint: 'a crowded shelf inside the crone’s hut, south among the pines' },
   ];
 
   function fenwickRare() {
-    return FEN_RARES[Math.floor(hash2(day() * 7 + 1, 91, 5511) * FEN_RARES.length) % FEN_RARES.length];
+    return FEN_RARES[Math.floor(rand01(day() * 7 + 1, 91, 5511) * FEN_RARES.length) % FEN_RARES.length];
   }
   function fenwickNote() {
+    if (g.flags.fenNoteDay === day()) return null; // one map note per day
     const open = [];
     for (let i = 0; i < TOMES.length; i++) {
       const t = TOMES[i];
       if (!g.flags['tomeHint_' + t.key] && !g.flags['tome_' + t.key]) open.push(t);
     }
     if (!open.length) return null;
-    return open[Math.floor(hash2(day() * 3 + 2, 57, 6613) * open.length) % open.length];
+    return open[Math.floor(rand01(day() * 3 + 2, 57, 6613) * open.length) % open.length];
   }
   function stockFor(vendorId) {
     if (vendorId !== 'fenwick') return (VENDORS[vendorId] && VENDORS[vendorId].sells) || [];
@@ -236,6 +249,7 @@ export function createEconomy(g) {
     if (!g.player || g.player.stats.gold < price) return false;
     addGold(-price);
     g.flags['tomeHint_' + note.key] = true;
+    g.flags.fenNoteDay = day(); // the pack holds one map a day
     notify('Map note — ' + note.name, 'Fenwick taps the page: “Look to ' + note.hint + '.”');
     return true;
   }
@@ -253,8 +267,8 @@ export function createEconomy(g) {
   ev.on('chestOpened', (d) => {
     if (!d || d.id === undefined || d.id === null) return;
     const h = strHash(d.id);
-    if (hash2(h % 65521, 811, 7717) >= 0.40) return;
-    const roll = hash2(h % 65521, 977, 7717);
+    if (rand01(h, 811, 7717) >= 0.40) return;
+    const roll = rand01(h, 977, 7717);
     const id = roll < 0.5 ? 'old_goblet' : roll < 0.85 ? 'silver_ring' : 'rune_trinket';
     give(id, 1, true);
     notify('Tucked beneath the coin', MATERIALS[id].name + ' — a merchant will pay for this.');

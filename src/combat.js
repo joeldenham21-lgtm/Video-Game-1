@@ -317,11 +317,15 @@ export function createCombat(g) {
     if (!A || !A.char) return;
     A.char('knight').then((c) => {
       realSword = mountReal(c.scene, '1H_Sword', swordG, swordProc, 0.8);
-      mountReal(c.scene, '2H_Sword', gsG, gsProc, 1.08);
+      realLook.sword = realSword;
+      realLook.greatsword = mountReal(c.scene, '2H_Sword', gsG, gsProc, 1.08);
       if (realSword && aldricApplied) applyAldricToReal();
+      applyLook('sword');
+      applyLook('greatsword');
     }).catch(() => {});
     A.char('barbarian').then((c) => {
-      mountReal(c.scene, '2H_Axe', axeG, axeProc, 0.92);
+      realLook.axe = mountReal(c.scene, '2H_Axe', axeG, axeProc, 0.92);
+      applyLook('axe');
     }).catch(() => {});
     if (A.prop) {
       A.prop('dungeon/torch.gltf.glb').then((obj) => {
@@ -345,6 +349,88 @@ export function createCombat(g) {
       g.assets.tint(realSword, '#ffb27a', { emissive: '#ff5a18', emissiveIntensity: 0.7 });
     }
   }
+
+  // -------------------------------------------------------------------------
+  // Forge visual progression (wave 3) — refreshWeaponLook(). Each upgradeable
+  // weapon gets its OWN cloned blade/accent materials (built once) so tiers
+  // and enchants restyle one weapon without touching the shared library mats.
+  // Tier: steel brightens → emissive edge-light + darkened guard → gold
+  // accents + ×1.04 heft → ember runes + slow pulse. Enchant: school emissive
+  // ~0.55 + wisp motes along the blade (stronger during swings). Bow enchants
+  // tint the arrow trail. Subtle > over-the-top.
+  // -------------------------------------------------------------------------
+  const realLook = { sword: null, axe: null, greatsword: null, bow: null };
+  const lookParts = {
+    sword:      { blade: [blade, bladeTip], accent: [swordProc[2], swordProc[4]], baseHex: 0xb9c2cc, accentHex: 0xc9a23f, accentSrc: M.gold },
+    axe:        { blade: [axeProc[1], axeProc[2]], accent: [axeProc[3]], baseHex: 0xb9c2cc, accentHex: 0x6b4a2b, accentSrc: M.leather },
+    greatsword: { blade: [gsProc[0], gsProc[1]], accent: [gsProc[2], gsProc[4]], baseHex: 0xb9c2cc, accentHex: 0xc9a23f, accentSrc: M.gold },
+    // bow children: [0] grip riser, [1] upper limb, [2] lower limb
+    bow:        { blade: [bowG.children[1], bowG.children[2]], accent: [bowG.children[0]], baseHex: 0x5a3d22, accentHex: 0x5a3d22, accentSrc: M.wood },
+  };
+  const lookMats = {};
+  for (const id of LOOK_IDS) {
+    const lp = lookParts[id];
+    const bladeMat = (id === 'bow' ? M.wood : M.steel).clone();
+    const accentMat = lp.accentSrc.clone();
+    for (const m of lp.blade) m.material = bladeMat;   // identical at tier 0
+    for (const m of lp.accent) m.material = accentMat;
+    lookMats[id] = { blade: bladeMat, accent: accentMat };
+  }
+  function hex6(h) { return '#' + h.toString(16).padStart(6, '0'); }
+
+  function applyLook(id) {
+    const lp = lookParts[id], lm = lookMats[id];
+    if (!lp || !lm) return;
+    const tier = fTier(id);
+    const ench = fEnch(id);
+    // Tier: blade steel brightens toward polished bright metal (bow: less)
+    _cA.setHex(lp.baseHex);
+    _cB.setHex(0xd8dde4);
+    lm.blade.color.copy(_cA.lerp(_cB, (TIER_BRIGHT[tier] || 0) * (id === 'bow' ? 0.35 : 1)));
+    // Enchant school glow beats the tier-2 steel edge-light
+    if (ench && SCHOOL_HEX[ench]) {
+      lm.blade.emissive.setHex(SCHOOL_HEX[ench]);
+      lm.blade.emissiveIntensity = id === 'bow' ? 0.3 : 0.55;
+    } else if (tier >= 2) {
+      lm.blade.emissive.setHex(0x222833);
+      lm.blade.emissiveIntensity = 0.5;
+    } else {
+      lm.blade.emissive.setHex(0x000000);
+      lm.blade.emissiveIntensity = 0;
+    }
+    // Accents: tier 2 darkened guard → tier 3+ gold-touched fittings
+    _cA.setHex(lp.accentHex);
+    if (tier >= 3) _cA.lerp(_cB.setHex(0xe6c05a), 0.75);
+    else if (tier === 2) _cA.multiplyScalar(0.62);
+    lm.accent.color.copy(_cA);
+    // Tier 3+: very subtle extra heft
+    weaponGroups[id].scale.setScalar(tier >= 3 ? 1.04 : 1);
+    // Streamed KayKit meshes keep their authored colors — emissive tint only
+    const rm = realLook[id];
+    if (rm && g.assets && g.assets.tint) {
+      if (ench && SCHOOL_HEX[ench]) g.assets.tint(rm, '#ffffff', { emissive: hex6(SCHOOL_HEX[ench]), emissiveIntensity: 0.5 });
+      else if (tier >= 2) g.assets.tint(rm, '#ffffff', { emissive: '#222833', emissiveIntensity: 0.5 });
+    }
+  }
+
+  // Cached look of the CURRENT weapon (drives per-frame pulse/wisps cheaply)
+  let curTier = 0, curEnch = null, curLm = null;
+  function syncCurrentLook() {
+    if (LOOK_IDS.indexOf(current) >= 0) {
+      curTier = fTier(current);
+      curEnch = fEnch(current);
+      curLm = lookMats[current];
+    } else {
+      curTier = 0; curEnch = null; curLm = null;
+    }
+  }
+  function refreshWeaponLook() {
+    for (let i = 0; i < LOOK_IDS.length; i++) applyLook(LOOK_IDS[i]);
+    syncCurrentLook();
+  }
+  events.on('weaponForged', refreshWeaponLook);
+  events.on('weaponEnchanted', refreshWeaponLook);
+  events.on('gameLoaded', refreshWeaponLook);
 
   // -------------------------------------------------------------------------
   // ONE pooled additive Points particle system (~300 verts)
@@ -482,16 +568,17 @@ export function createCombat(g) {
     gr.visible = false;
     gr.frustumCulled = false;
     g.scene.add(gr);
-    arrows.push({ obj: gr, vel: new THREE.Vector3(), life: 0, active: false, stuck: 0, dmg: 0 });
+    arrows.push({ obj: gr, vel: new THREE.Vector3(), life: 0, active: false, stuck: 0, dmg: 0, school: null, trailT: 0 });
   }
 
-  const FIREBALL_MAX = 4;
+  // Pool sized for the Twin Flame tome: 1 in flight + 3 bomblets + margin
+  const FIREBALL_MAX = 7;
   const fireballs = [];
   for (let i = 0; i < FIREBALL_MAX; i++) {
     const m = part(M.fireball, 0.3, 0.3, 0.3, 0, 0, 0, 0, 0, 0, GEO.sphere);
     m.visible = false;
     g.scene.add(m);
-    fireballs.push({ obj: m, vel: new THREE.Vector3(), life: 0, active: false, trailT: 0 });
+    fireballs.push({ obj: m, vel: new THREE.Vector3(), life: 0, active: false, trailT: 0, bomblet: false });
   }
 
   function firstFreeOf(pool) {
@@ -626,6 +713,11 @@ export function createCombat(g) {
   // Frost slow bookkeeping (fields stored on the enemy objects themselves)
   const frostSlowed = [];
 
+  // Wave-3 forge state ---------------------------------------------------------
+  let forgeSeen = false;                    // first sight of g.forge → refresh look
+  let wispT = 0;                            // enchant wisp / tier-4 rune emitter
+  let regenLeft = 0, regenAcc = 0, regenFxT = 0; // heal-tome lingering regen
+
   function setWeaponVisible(id) {
     for (const k in weaponGroups) weaponGroups[k].visible = (k === id);
   }
@@ -648,6 +740,21 @@ export function createCombat(g) {
     return 1 + ((g.player && g.player.bonus) ? g.player.bonus.dmg : 0);
   }
   function isMeleeId(id) { return !!MELEE[id]; }
+
+  // ---- Forge hooks (wave 3) — every accessor is safe with g.forge missing --
+  const fTier = (id) => (g.forge && g.forge.tierOf ? (g.forge.tierOf(id) | 0) : 0);
+  const fEnch = (id) => (g.forge && g.forge.enchantOf ? g.forge.enchantOf(id) : null);
+  const fMult = (id) => (g.forge && g.forge.dmgMult ? (g.forge.dmgMult(id) ?? 1) : 1);
+  const fSpellTier = (school) => (g.forge && g.forge.spellTier ? g.forge.spellTier(school) : 1);
+  const fSpellPower = (school) => (g.forge && g.forge.spellPower ? (g.forge.spellPower(school) ?? 1) : 1);
+  // Frost-tome brittle debuff: +15% damage taken for 3s (timestamp on enemy)
+  function brittleMul(e) {
+    return (e._brittleUntil !== undefined && g.time.elapsed < e._brittleUntil) ? 1.15 : 1;
+  }
+  // Gravebane enchant: +35% vs the risen dead
+  function baneMul(e, id) {
+    return (UNDEAD[e.type] && fEnch(id) === 'gravebane') ? 1.35 : 1;
+  }
 
   // Best-effort enemy world position (contract doesn't pin the field name)
   function enemyPos(e, out) {
@@ -723,12 +830,12 @@ export function createCombat(g) {
     let base;
     if (current === 'sword') base = swordDmg(heavy) * (heavy ? 1 : COMBO_MULT[comboIdx]);
     else base = heavy ? w.heavy : w.light;
-    const mul = rmult('meleeDmg') * (heavy ? rmult('heavyDmg') : 1) * dmgMul();
+    const mul = rmult('meleeDmg') * (heavy ? rmult('heavyDmg') : 1) * dmgMul() * fMult(current);
     for (let i = 0; i < hits.length; i++) {
       const e = hits[i];
       enemyPos(e, _v3);
       _v2.subVectors(_v3, _camPos).normalize();
-      let dmg = base * mul * sneakMul(e, 'sneakMeleeMult');
+      let dmg = base * mul * sneakMul(e, 'sneakMeleeMult') * baneMul(e, current) * brittleMul(e);
       const crit = rollCrit();
       if (crit) dmg *= 1.5;
       const prevHp = e.hp !== undefined ? e.hp : dmg;
@@ -740,6 +847,7 @@ export function createCombat(g) {
       const kill = isDead(e);
       hitJuice(_v3, heavy || crit, kill);
       if (crit) spawnBurst(FX.sparkle, _v3.x, _v3.y, _v3.z, 6, 1.4);
+      procEnchant(current, e, _v3.x, _v3.y, _v3.z, dmg); // may clobber _v temps — keep last
       if (kill) maybeFinisher(prevHp, dmg);
     }
     if (cleave || spin) g.player.addShake(spin ? 0.6 : 0.45);
@@ -749,7 +857,9 @@ export function createCombat(g) {
   function shootArrow(draw01) {
     const a = firstFreeOf(arrows);
     a.active = true; a.stuck = 0; a.life = 6;
-    a.dmg = lerp(WEAPONS.bow.dmgMin, WEAPONS.bow.dmgMax, draw01) * dmgMul() * rmult('bowDmg');
+    a.dmg = lerp(WEAPONS.bow.dmgMin, WEAPONS.bow.dmgMax, draw01) * dmgMul() * rmult('bowDmg') * fMult('bow');
+    a.school = fEnch('bow'); // enchanted bow → school-tinted arrow trail + procs
+    a.trailT = 0;
     g.camera.getWorldPosition(_camPos);
     g.camera.getWorldDirection(_camDir);
     a.obj.position.copy(_camPos).addScaledVector(_camDir, 0.5);
@@ -765,6 +875,8 @@ export function createCombat(g) {
   function castFireball() {
     const f = firstFreeOf(fireballs);
     f.active = true; f.life = 6; f.trailT = 0;
+    f.bomblet = false;
+    f.obj.scale.setScalar(0.3);
     g.camera.getWorldPosition(_camPos);
     g.camera.getWorldDirection(_camDir);
     f.obj.position.copy(_camPos).addScaledVector(_camDir, 0.7);
@@ -779,22 +891,28 @@ export function createCombat(g) {
     f.active = false;
     f.obj.visible = false;
     const p = f.obj.position;
-    spawnBurst(FX.boom, p.x, p.y, p.z, 34, 1);
-    spawnBurst(FX.spark, p.x, p.y, p.z, 12, 1.8);
-    spawnBurst(FX.smoke, p.x, p.y + 0.4, p.z, 8, 1);
-    flashT = 0.28;
+    const px = p.x, py = p.y, pz = p.z; // scalars survive pool recycling below
+    const small = f.bomblet;
+    // Twin Flame tome: +40% damage, and the burst mothers three sparks
+    const t2 = fSpellTier('fire') === 2;
+    spawnBurst(FX.boom, px, py, pz, small ? 12 : 34, small ? 0.6 : 1);
+    spawnBurst(FX.spark, px, py, pz, small ? 5 : 12, small ? 1.2 : 1.8);
+    if (!small) spawnBurst(FX.smoke, px, py + 0.4, pz, 8, 1);
+    flashT = small ? 0.16 : 0.28;
     flashColor = 0xffb050;
     flashPos.copy(p);
     if (g.audio) g.audio.play('fireExplode');
     // AoE damage
     if (g.enemies && g.enemies.queryPoint) {
-      const hits = g.enemies.queryPoint(p, WEAPONS.fire.radius);
+      const hits = g.enemies.queryPoint(p, small ? 2.2 : WEAPONS.fire.radius);
       if (hits && hits.length) {
+        const base = WEAPONS.fire.dmg * (small ? 0.35 : (t2 ? 1.4 : 1)) *
+                     dmgMul() * rmult('spellDmg') * fSpellPower('fire');
         for (let i = 0; i < hits.length; i++) {
           const e = hits[i];
           enemyPos(e, _v3);
           _v2.subVectors(_v3, p); _v2.y = 0.4; _v2.normalize();
-          g.enemies.damage(e, WEAPONS.fire.dmg * dmgMul() * rmult('spellDmg'), _v2, { heavy: true });
+          g.enemies.damage(e, base * brittleMul(e), _v2, { heavy: true, kind: 'fire' });
           hitJuice(_v3, true, isDead(e));
         }
       }
@@ -804,17 +922,31 @@ export function createCombat(g) {
       const d = p.distanceTo(g.player.position);
       if (d < 14) g.player.addShake(clamp(0.7 - d * 0.05, 0, 0.6));
     }
+    // Greater Fireball: three arcing bomblets scatter from the blast
+    if (t2 && !small) {
+      for (let b = 0; b < 3; b++) {
+        const nb = firstFreeOf(fireballs);
+        nb.active = true; nb.life = 2.5; nb.trailT = 0; nb.bomblet = true;
+        nb.obj.scale.setScalar(0.18);
+        nb.obj.position.set(px, py + 0.4, pz);
+        const a = Math.random() * TWO_PI;
+        const sp = 3.5 + Math.random() * 3;
+        nb.vel.set(Math.cos(a) * sp, 7 + Math.random() * 2.5, Math.sin(a) * sp);
+        nb.obj.visible = true;
+      }
+    }
   }
 
   // ---- Frost cone: 45% slow 3s + damage + ice mist ---------------------------
-  function applyFrost(e) {
+  // (parameterized for the Deep Winter tome and the frostbite enchant proc)
+  function applyFrost(e, slow, dur) {
     if (e._frostBase === undefined) {
       e._frostBase = e.speed;
-      e.speed = e._frostBase * (1 - WEAPONS.frost.slow);
       e._mistT = 0;
       frostSlowed.push(e);
     }
-    e._frostUntil = g.time.elapsed + WEAPONS.frost.slowDur;
+    e.speed = e._frostBase * (1 - slow);
+    e._frostUntil = g.time.elapsed + dur;
   }
   function castFrost() {
     const w = WEAPONS.frost;
@@ -835,13 +967,18 @@ export function createCombat(g) {
     const halfAngle = (w.arc * 0.5) * Math.PI / 180;
     const hits = g.enemies.queryHit(_camPos, _camDir, w.range, halfAngle);
     if (!hits || hits.length === 0) return;
-    const mul = rmult('spellDmg') * dmgMul();
+    const mul = rmult('spellDmg') * dmgMul() * fSpellPower('frost');
+    // Deep Winter tome: slow 45% → 60%, +50% duration, leaves bone brittle
+    const t2 = fSpellTier('frost') === 2;
+    const slow = t2 ? 0.6 : w.slow;
+    const dur = w.slowDur * (t2 ? 1.5 : 1);
     for (let i = 0; i < hits.length; i++) {
       const e = hits[i];
       enemyPos(e, _v3);
       _v2.subVectors(_v3, _camPos).normalize();
-      g.enemies.damage(e, w.dmg * mul, _v2, {});
-      applyFrost(e);
+      g.enemies.damage(e, w.dmg * mul * brittleMul(e), _v2, {});
+      applyFrost(e, slow, dur);
+      if (t2) e._brittleUntil = g.time.elapsed + 3; // +15% damage taken 3s
       spawnBurst(FX.frost, _v3.x, _v3.y, _v3.z, 9, 1);
       hitLandedEvt(_v3, false, isDead(e));
     }
@@ -868,6 +1005,90 @@ export function createCombat(g) {
     }
   }
 
+  // ---- Enchant procs (wave 3): burn / slow / chain arc / lifesteal ------------
+  const burning = [];                       // enemies with an active burn DoT
+  const _burnOpts = { kind: 'burn' };       // preallocated damage opts
+  const _chainOpts = {};
+  let lifestealAcc = 0;                     // bloodthirst heals whole points
+
+  function applyBurn(e) {
+    if (!e._burnOn) { e._burnOn = true; burning.push(e); }
+    e._burnLeft = 2;    // 4 dmg/s for 2s, in 2-damage half-second ticks
+    e._burnTick = 0.5;
+  }
+  function updateBurns(dt) {
+    for (let i = burning.length - 1; i >= 0; i--) {
+      const e = burning[i];
+      if (isDead(e) || e._burnLeft <= 0) {
+        e._burnOn = false;
+        burning.splice(i, 1);
+        continue;
+      }
+      e._burnLeft -= dt;
+      e._burnTick -= dt;
+      if (e._burnTick <= 0) {
+        e._burnTick += 0.5;
+        if (e.pos) spawnBurst(FX.ember, e.pos.x, e.pos.y + 0.7 + Math.random() * 0.5, e.pos.z, 3, 1);
+        if (g.enemies && g.enemies.damage) g.enemies.damage(e, 2, null, _burnOpts);
+      }
+    }
+  }
+
+  // Stormbrand: small lightning arc from the struck enemy to its nearest ally
+  function chainArc(src, sx, sy, sz) {
+    if (!g.enemies || !g.enemies.queryPoint) return;
+    _v1.set(sx, sy, sz);
+    const near = g.enemies.queryPoint(_v1, 8);
+    let nb = null, nd = 1e9;
+    for (let i = 0; i < (near ? near.length : 0); i++) {
+      const c = near[i];
+      if (c === src || isDead(c)) continue;
+      enemyPos(c, _v3);
+      const d = _v3.distanceToSquared(_v1);
+      if (d < nd) { nd = d; nb = c; }
+    }
+    if (!nb) return;
+    enemyPos(nb, _v3);
+    boltVerts = 0;
+    boltRun(sx, sy, sz, _v3.x, _v3.y, _v3.z);
+    boltGeo.setDrawRange(0, boltVerts);
+    boltGeo.attributes.position.needsUpdate = true;
+    boltLine.visible = true;
+    boltT = 0.1;
+    _v2.subVectors(_v3, _v1).normalize();
+    g.enemies.damage(nb, 8, _v2, _chainOpts);
+    spawnBurst(FX.zap, _v3.x, _v3.y, _v3.z, 8, 1);
+    hitLandedEvt(_v3, false, isDead(nb));
+  }
+
+  // Called after every landed melee blow / arrow with the weapon that hit.
+  // (gravebane is a pre-damage multiplier — see baneMul.) Uses scalar coords
+  // so callers' _v temps stay valid.
+  function procEnchant(id, e, hx, hy, hz, dealt) {
+    const ench = fEnch(id);
+    if (!ench) return;
+    if (ench === 'bloodthirst') {
+      lifestealAcc += dealt * 0.12;
+      if (lifestealAcc >= 1 && g.player) {
+        const n = Math.floor(lifestealAcc);
+        lifestealAcc -= n;
+        g.player.heal(n);
+      }
+      spawnBurst(FX_SCHOOL.bloodthirst, hx, hy, hz, 3, 2.5);
+      return;
+    }
+    if (isDead(e)) return;
+    if (ench === 'flametongue') {
+      applyBurn(e);
+      spawnBurst(FX_SCHOOL.flametongue, hx, hy, hz, 4, 2.5);
+    } else if (ench === 'frostbite') {
+      applyFrost(e, 0.25, 1.5);
+      spawnBurst(FX_SCHOOL.frostbite, hx, hy, hz, 4, 2.5);
+    } else if (ench === 'stormbrand' && Math.random() < 0.1) {
+      chainArc(e, hx, hy, hz);
+    }
+  }
+
   // ---- Lightning: instant chain bolt up to 3 enemies --------------------------
   function castLightning() {
     const w = WEAPONS.lightning;
@@ -875,6 +1096,8 @@ export function createCombat(g) {
     g.camera.getWorldDirection(_camDir);
     events.emit('attackSwing', { weapon: 'lightning', heavy: false });
     if (g.audio) g.audio.play('thunder');
+    // The Storm Court tome: the writ names five souls instead of three
+    const chainN = fSpellTier('lightning') === 2 ? 5 : w.chain;
     // Pick first target: nearest in a narrow forward cone
     _chain.length = 0;
     if (g.enemies && g.enemies.queryHit) {
@@ -888,7 +1111,7 @@ export function createCombat(g) {
       if (best) {
         _chain.push(best);
         // Chain to nearest unhit enemies within jump radius of the last struck
-        while (_chain.length < w.chain && g.enemies.queryPoint) {
+        while (_chain.length < chainN && g.enemies.queryPoint) {
           const last = _chain[_chain.length - 1];
           enemyPos(last, _v1);
           const near = g.enemies.queryPoint(_v1, w.jumpR);
@@ -916,7 +1139,7 @@ export function createCombat(g) {
       flashPos.copy(_camPos).addScaledVector(_camDir, 4);
     } else {
       let px = mx, py = my, pz = mz;
-      const mul = rmult('spellDmg') * dmgMul();
+      const mul = rmult('spellDmg') * dmgMul() * fSpellPower('lightning');
       let dmg = w.dmg * mul;
       for (let i = 0; i < _chain.length; i++) {
         const e = _chain[i];
@@ -924,7 +1147,7 @@ export function createCombat(g) {
         boltRun(px, py, pz, _v3.x, _v3.y, _v3.z);
         px = _v3.x; py = _v3.y; pz = _v3.z;
         _v2.subVectors(_v3, _camPos).normalize();
-        g.enemies.damage(e, dmg, _v2, { heavy: i === 0 });
+        g.enemies.damage(e, dmg * brittleMul(e), _v2, { heavy: i === 0 });
         spawnBurst(FX.zap, _v3.x, _v3.y, _v3.z, 10, 1.2);
         spawnBurst(FX.spark, _v3.x, _v3.y, _v3.z, 5, 1);
         hitLandedEvt(_v3, i === 0, isDead(e));
@@ -967,17 +1190,27 @@ export function createCombat(g) {
       _v1.copy(a.obj.position).add(a.vel);
       a.obj.lookAt(_v1);
       const p = a.obj.position;
+      // Enchanted bow: school-colored wisps stream off the arrow in flight
+      if (a.school && FX_SCHOOL[a.school]) {
+        a.trailT += dt;
+        while (a.trailT > 0.045) {
+          a.trailT -= 0.045;
+          spawnDirected(FX_SCHOOL[a.school], p.x, p.y, p.z,
+            (Math.random() - 0.5) * 0.5, 0.3 + Math.random() * 0.4, (Math.random() - 0.5) * 0.5);
+        }
+      }
       if (g.enemies && g.enemies.queryPoint) {
         if (hits && hits.length) {
           const e = hits[0];
           enemyPos(e, _v3);
           _v2.copy(a.vel).normalize();
-          let dmg = a.dmg * sneakMul(e, 'sneakBowMult');
+          let dmg = a.dmg * sneakMul(e, 'sneakBowMult') * baneMul(e, 'bow') * brittleMul(e);
           const crit = rollCrit();
           if (crit) dmg *= 1.5;
           const heavy = dmg > 26;
-          g.enemies.damage(e, dmg, _v2, { heavy });
+          g.enemies.damage(e, dmg, _v2, { heavy, kind: 'arrow' });
           hitJuice(_v3, heavy || crit, isDead(e));
+          procEnchant('bow', e, _v3.x, _v3.y, _v3.z, dmg);
           if (g.audio) g.audio.play('arrowHit');
           a.active = false; a.obj.visible = false;
           continue;
@@ -997,6 +1230,7 @@ export function createCombat(g) {
       const f = fireballs[i];
       if (!f.active) continue;
       f.life -= dt;
+      if (f.bomblet) f.vel.y -= 18 * dt; // bomblets arc down like mortar sparks
       f.obj.position.addScaledVector(f.vel, dt);
       const p = f.obj.position;
       f.trailT += dt;
@@ -1006,7 +1240,8 @@ export function createCombat(g) {
           (Math.random() - 0.5) * 1.5, (Math.random() - 0.2) * 1.5, (Math.random() - 0.5) * 1.5);
       }
       let boom = f.life <= 0 || p.y <= terrainHeight(p.x, p.z) + 0.2;
-      if (!boom && g.enemies && g.enemies.queryPoint) {
+      // Bomblets arm after 0.15s so they scatter instead of re-popping in place
+      if (!boom && (!f.bomblet || f.life < 2.35) && g.enemies && g.enemies.queryPoint) {
         const hits = g.enemies.queryPoint(p, 1.1);
         if (hits && hits.length) boom = true;
       }
@@ -1135,7 +1370,8 @@ export function createCombat(g) {
     const base = isMeleeId(current)
       ? (current === 'sword' ? swordDmg(false) : w.light)
       : WEAPONS.sword.light;
-    const dmg = base * 2 * rmult('meleeDmg') * dmgMul();
+    const dmg = base * 2 * rmult('meleeDmg') * dmgMul() * fMult(current) *
+                baneMul(e, current) * brittleMul(e);
     const prevHp = e.hp !== undefined ? e.hp : dmg;
     g.enemies.damage(e, dmg, _v2, { heavy: true, parried: true });
     if (e.alive && !e.dead && !e.fly) { e.state = 'stagger'; e.stateT = 0; }
@@ -1143,6 +1379,7 @@ export function createCombat(g) {
     g.player.addShake(0.4);
     spawnBurst(FX.parry, _v3.x, _v3.y, _v3.z, 18, 1);
     hitJuice(_v3, true, isDead(e));
+    procEnchant(current, e, _v3.x, _v3.y, _v3.z, dmg);
     if (g.audio) g.audio.play('parry');
     if (isDead(e)) maybeFinisher(prevHp, dmg);
     // Snap the viewmodel through a strike (no stamina, hit already applied)
@@ -1235,6 +1472,7 @@ export function createCombat(g) {
     api.current = id;
     setWeaponVisible(id);
     checkAldric();
+    syncCurrentLook();
     state = 'raise'; stateT = 0;
   }
 
@@ -1520,7 +1758,9 @@ export function createCombat(g) {
         else if (current === 'lightning') castLightning();
         else castFireball();
       } else if (state === 'heal') {
-        g.player.heal(Math.round(WEAPONS.heal.amount * rmult('spellDmg')));
+        g.player.heal(Math.round(WEAPONS.heal.amount * rmult('spellDmg') * fSpellPower('heal')));
+        // Rites of Mending tome: the light lingers — 4 hp/s for 5s
+        if (fSpellTier('heal') === 2) { regenLeft = 5; regenAcc = 0; }
         healSwirlLeft = 26; healSwirlT = 0;
       } else if (state === 'drink') {
         const st = g.player.stats;
@@ -1686,6 +1926,24 @@ export function createCombat(g) {
           (Math.random() - 0.5) * 0.5, 0.5 + Math.random() * 0.5, (Math.random() - 0.5) * 0.5);
       }
     }
+    // Forge look: school wisps along an enchanted blade (stronger during
+    // swings), or faint ember runes + slow emissive pulse at tier 4.
+    if (curLm && (curEnch || curTier >= 4)) {
+      const swinging = state === 'swingL' || state === 'swingH';
+      if (curEnch) curLm.blade.emissiveIntensity = 0.55 + Math.sin(t * 2.3) * 0.1 + (swinging ? 0.3 : 0);
+      else curLm.blade.emissiveIntensity = 0.5 + Math.sin(t * 1.6) * 0.18 + (swinging ? 0.15 : 0);
+      wispT += dt;
+      const wispEvery = curEnch ? (swinging ? 0.11 : 0.38) : 0.6;
+      if (wispT > wispEvery) {
+        wispT = 0;
+        lookParts[current].blade[0].getWorldPosition(_v1);
+        _v1.x += (Math.random() - 0.5) * 0.22;
+        _v1.y += (Math.random() - 0.4) * 0.34;
+        _v1.z += (Math.random() - 0.5) * 0.22;
+        spawnDirected(curEnch ? FX_SCHOOL[curEnch] : FX.ember, _v1.x, _v1.y, _v1.z,
+          (Math.random() - 0.5) * 0.3, 0.4 + Math.random() * 0.4, (Math.random() - 0.5) * 0.3);
+      }
+    }
     // Heal swirl: green motes spiraling up around the player
     if (healSwirlLeft > 0 && g.player) {
       healSwirlT += dt;
@@ -1749,6 +2007,8 @@ export function createCombat(g) {
     checkAldric();
     wrapPlayerDamage();
     if (!assetsRequested && g.assets) { assetsRequested = true; requestRealWeapons(); }
+    // Forge arrives after combat in boot order — style weapons on first sight
+    if (!forgeSeen && g.forge) { forgeSeen = true; refreshWeaponLook(); }
 
     const input = g.ui && g.ui.input;
 
@@ -1793,6 +2053,26 @@ export function createCombat(g) {
     updateViewmodel(input, dt);
     updateProjectiles(dt);
     updateFrostSlows();
+    updateBurns(dt);
+    // Rites of Mending: lingering 4 hp/s regen with soft green motes
+    if (regenLeft > 0 && g.player && g.player.stats.hp > 0) {
+      regenLeft -= dt;
+      regenAcc += 4 * dt;
+      if (regenAcc >= 1) {
+        const n = Math.floor(regenAcc);
+        regenAcc -= n;
+        g.player.heal(n);
+      }
+      regenFxT += dt;
+      if (regenFxT > 0.3) {
+        regenFxT = 0;
+        const pp = g.player.position;
+        spawnDirected(FX.heal,
+          pp.x + (Math.random() - 0.5) * 0.8, pp.y + 0.4 + Math.random(), pp.z + (Math.random() - 0.5) * 0.8,
+          (Math.random() - 0.5) * 0.3, 1.0 + Math.random() * 0.5, (Math.random() - 0.5) * 0.3);
+      }
+      if (regenLeft <= 0) { regenLeft = 0; regenAcc = 0; }
+    }
     updateLoot(dt);
     updateAmbientFX(dt);
     updateParticles(dt);
@@ -1814,6 +2094,7 @@ export function createCombat(g) {
     tryBlock,
     useTorch,
     usePotion,
+    refreshWeaponLook,
     current,
     WEAPONS,
     HOTBAR,

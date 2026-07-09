@@ -22,6 +22,8 @@ import { createVoice } from './voice.js';
 import { createDetails } from './details.js';
 import { createAssets } from './assets.js';
 import { createPhysics } from './physics.js';
+import { createEconomy } from './economy.js';
+import { createForge } from './forge.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -144,6 +146,8 @@ function boot(loadSave) {
       g.voice = createVoice(g);
       g.details = createDetails(g);
       g.physics = createPhysics(g);
+      g.economy = createEconomy(g);
+      g.forge = createForge(g);
       if (loadSave) g.save.load();
       titleEl.classList.add('hidden');
       setTimeout(() => titleEl.remove(), 1400);
@@ -203,6 +207,8 @@ function tick(now) {
     g.voice.update(dt);
     g.details.update(dt);
     g.physics.update(dt);
+    g.economy.update(dt);
+    g.forge.update(dt);
     g.ui.input.endFrame();
   } catch (err) {
     if (DEBUG) showErr('TICK: ' + (err.stack || err));

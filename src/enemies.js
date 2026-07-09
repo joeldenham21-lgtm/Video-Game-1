@@ -326,6 +326,75 @@ export function createEnemies(g) {
   }
 
   // -------------------------------------------------------------------------
+  // Wave-3 looks: elite emissive eyes + ghost-blue echo materials.
+  // buildRig re-applies both for rigs that resolve after the request
+  // (h.eliteGlowOn / h.ghosted flags); releaseHolder undoes them so pooled
+  // holders return to their plain look.
+  // -------------------------------------------------------------------------
+  const eliteEyeMat = new THREE.MeshBasicMaterial({
+    color: 0xff4a18, transparent: true, opacity: 0.95,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  function attachEliteEyes(h) {
+    h.eliteGlowOn = true;
+    if (h.eliteEyes) { h.eliteEyes.visible = true; return; }
+    if (!h.rig) return; // GLB still streaming — buildRig calls us again
+    let head = null;
+    h.rig.traverse((o) => { if (!head && o.isBone && /head/i.test(o.name)) head = o; });
+    const inv = 1 / Math.max(h.rig.scale.x, 0.0001); // world-size compensation
+    const grp = new THREE.Group();
+    const sc = 0.42 * inv;                            // ~0.06u world radius
+    for (let s = -1; s <= 1; s += 2) {
+      const eye = new THREE.Mesh(GEO.orb, eliteEyeMat);
+      eye.scale.setScalar(sc);
+      eye.position.set(s * 0.07 * inv, 0.06 * inv, 0.14 * inv);
+      eye.castShadow = false;
+      grp.add(eye);
+    }
+    if (head) head.add(grp);
+    else { // no head bone (clipless rigs): hang the glow at head height
+      grp.position.set(0, (h.spec ? h.spec.h * 0.88 : 1.5) * inv, 0.12 * inv);
+      h.rig.add(grp);
+    }
+    h.eliteEyes = grp;
+  }
+  function setEliteEyes(h, on) {
+    if (on) { attachEliteEyes(h); return; }
+    h.eliteGlowOn = false;
+    if (h.eliteEyes) h.eliteEyes.visible = false;
+  }
+
+  // Ghost material for Trial-of-Echoes bosses: one shared translucent blue.
+  // applyGhost swaps every mesh material under the holder root and remembers
+  // the originals; clearGhost gives the body back.
+  const ghostMat = new THREE.MeshLambertMaterial({
+    color: 0x86c8ff, emissive: 0x2f7fd0, emissiveIntensity: 0.8,
+    transparent: true, opacity: 0.6, flatShading: true,
+    side: THREE.DoubleSide, depthWrite: false,
+  });
+  function applyGhost(h) {
+    h.ghosted = true;
+    if (!h.rig && !h.parts) return; // async rig: buildRig re-applies
+    const saved = h.ghostSaved || (h.ghostSaved = []);
+    if (saved.length) return;       // already ghosted
+    h.root.traverse((o) => {
+      if ((o.isMesh || o.isSkinnedMesh) && o.material !== ghostMat) {
+        saved.push({ o, m: o.material });
+        o.material = ghostMat;
+      }
+    });
+  }
+  function clearGhost(h) {
+    h.ghosted = false;
+    if (h.ghostSaved) {
+      for (let i = 0; i < h.ghostSaved.length; i++) {
+        h.ghostSaved[i].o.material = h.ghostSaved[i].m;
+      }
+      h.ghostSaved.length = 0;
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Drake Vhastrix — rebuilt menacing procedural body (kept boneless: its
   // flight/pose code is bespoke). Sleek tapered neck/tail, bat-wing membranes,
   // dorsal spikes, swept horns, emissive eyes + throat glow before fire.
@@ -436,6 +505,8 @@ export function createEnemies(g) {
       spec: SPEC[type] || null, spine: null, spineBase: 0, vargrWins: -1,
       deathPlayed: false,
       shadow: null, bar: null, barFill: null, barW: 1.1,
+      // wave-3 looks
+      eliteEyes: null, eliteGlowOn: false, ghosted: false, ghostSaved: null,
     };
     if (type === 'drake') {
       const d = buildDrake();
@@ -911,7 +982,7 @@ export function createEnemies(g) {
       baseScale: eSize,
       bloodMoon: !!(mods && mods.bloodMoon),
       huntTarget: !!(mods && mods.huntTarget),
-      echo: false, echoDef: null, pactProvoked: false,
+      echo: !!(mods && mods.echo), echoDef: null, pactProvoked: false,
       holder,
       // animation bookkeeping
       animState: '', atkIdx: -1, hitTog: false, blockHit: false,
@@ -1179,7 +1250,9 @@ export function createEnemies(g) {
   // Morvane and his thralls honor the blood pact while it stands — until the
   // player draws blood first (damage() marks pactProvoked for that fight).
   function pactPassive(e) {
+    // Shrine echoes and Blood Moon raiders honor no truce
     return (e.type === 'morvane' || e.type === 'thrall') && !e.pactProvoked &&
+      !e.echo && !e.bloodMoon &&
       !!g.flags.morvanePact && !g.flags.morvaneDead;
   }
   function canSightAggro(e) {
@@ -2209,6 +2282,372 @@ export function createEnemies(g) {
     }
   }
 
+  // ===========================================================================
+  // WAVE-3 ENDGAME (FORGE-ECON.md, revised player-scaled open world)
+  // ===========================================================================
+  function notify(text, sub) { events.emit('notify', { text, sub: sub || '' }); }
+  const goldFindMult = () => (g.rpg && g.rpg.mult) ? g.rpg.mult('goldFind') : 1;
+
+  // --- Player scaling + encounter profiles -----------------------------------
+  // Everything non-boss scales WITH the player: ×(1 + 0.05×(lvl−1)), knee at
+  // ×2.2 into a ×2.6 soft cap. Difficulty between areas comes from encounter
+  // DESIGN (pack size, elite odds, mixed comps), never stat walls — flat
+  // modifiers stay ≤ +15%.
+  function playerScale() {
+    const lvl = (g.player && g.player.stats) ? (g.player.stats.level | 0) : 1;
+    const raw = 1 + 0.05 * Math.max(0, lvl - 1);
+    return raw <= 2.2 ? raw : Math.min(2.6, 2.2 + (raw - 2.2) * 0.5);
+  }
+  const ENC_BASE   = { mod: 1.0,  elite: 0.08 }; // village fields, open meadow
+  const ENC_MID    = { mod: 1.08, elite: 0.12 }; // haunted ground by day
+  const ENC_DANGER = { mod: 1.15, elite: 0.15 }; // the places folk warn about
+  function encounterAt(x, z) {
+    const dark = isNightFrac(g.time.dayFrac);
+    if (dist2d(x, z, POI.camp.x, POI.camp.z) < POI.camp.r + 34) return ENC_DANGER;   // Redfang Camp
+    if (z < -880 || dist2d(x, z, POI.peak.x, POI.peak.z) < 320) return ENC_DANGER;   // Drakespire approach
+    if (dark && dist2d(x, z, CEMETERY.x, CEMETERY.z) < 70) return ENC_DANGER;        // cemetery after dark
+    if (dist2d(x, z, POI.ruins.x, POI.ruins.z) < POI.ruins.r + 40) return dark ? ENC_DANGER : ENC_MID;
+    if (dark && dist2d(x, z, 0, 0) > 280 && biomeAt(x, z) === BIOME.FOREST) return ENC_DANGER; // deep forest night
+    return ENC_BASE;
+  }
+
+  // --- Elites: prefix names (non-boss types only) -----------------------------
+  const ELITE_NAMES = {
+    wolf: 'Dire Wolf', goblin: 'Goblin Chief', bandit: 'Bandit Reaver',
+    skeleton: 'Gravebound Skeleton', skelarcher: 'Gravebound Archer',
+    wraith: 'Elder Wraith', thrall: 'Blooded Thrall', werewolf: 'Alpha Werewolf',
+  };
+
+  // --- Material drop table: type → [economy itemId, chance] -------------------
+  // (ids coordinated with economy.js MATERIALS; elites always roll — see
+  // dropLoot. Drake scales ×3 are emitted separately there.)
+  const MAT_DROPS = {
+    skeleton:   ['ancient_bone', 0.6],
+    skelarcher: ['ancient_bone', 0.6],
+    barrowlord: ['ancient_bone', 1.0],
+    wraith:     ['frost_shard', 0.4],
+    thrall:     ['blood_gem', 0.45],
+    morvane:    ['blood_gem', 1.0],
+    troll:      ['troll_heart', 1.0],
+    goblin:     ['iron_ore', 0.25],
+    bandit:     ['old_goblet', 0.15],
+    werewolf:   ['pelt', 0.35],
+  };
+
+  // --- Game-day counter (dayFrac wraps at midnight) ---------------------------
+  // Drives daily hunt rotation, deterministic elite rolls and Blood Moon
+  // cadence. Persists in g.flags (save.js stores flags wholesale).
+  let prevDayFrac = -1;
+  function trackDay(f) {
+    if (g.flags.dayCount === undefined) g.flags.dayCount = 0;
+    if (prevDayFrac >= 0 && prevDayFrac > 0.9 && f < 0.1) g.flags.dayCount++;
+    prevDayFrac = f;
+  }
+
+  // ---------------------------------------------------------------------------
+  // THE HUNT BOARD — a notice board by the tavern door. 3 named-elite bounties
+  // per game-day, forever: the endless midgame loop. State in g.flags.hunts.
+  // ---------------------------------------------------------------------------
+  const HUNT_TYPES = ['wolf', 'goblin', 'bandit', 'skeleton', 'wraith', 'werewolf', 'thrall'];
+  const HUNT_NAMES = {
+    wolf:     ['Greymaw', 'Winterfang', 'The Gorecrag Wolf'],
+    goblin:   ['Knuckle-King Zag', 'Sootgrin', 'Vekk Nine-Teeth'],
+    bandit:   ['Red Osric', 'Halla Knife-Smile', 'The Toll-Taker'],
+    skeleton: ['The Unburied King', 'Rattlejaw', 'Sir Coldmarrow'],
+    wraith:   ['The Pale Keening', 'Mistcaller', 'The Hollow Bride'],
+    werewolf: ['Old Shagback', 'The Moonflayed', 'Hartsbane'],
+    thrall:   ['The Thirsting Man', 'Vessel Nine', 'The Red Cellarman'],
+  };
+  const HUNT_MATS = ['ember_crystal', 'frost_shard', 'storm_core', 'blood_gem', 'wardstone_dust'];
+  let huntEnemy = null;
+
+  function genHunts(day) {
+    const out = [];
+    for (let i = 0; i < 3; i++) {
+      const type = HUNT_TYPES[(hash2(day * 5 + i, 11 + i, WORLD_SEED + 3301) * HUNT_TYPES.length) | 0];
+      const pool = HUNT_NAMES[type];
+      const name = pool[(hash2(day * 7 + i, 23, WORLD_SEED + 3307) * pool.length) | 0];
+      // seeded wilderness spot on a 260-460u ring, nudged onto dry open land
+      let x = 200, z = 200;
+      for (let tries = 0; tries < 8; tries++) {
+        const a = hash2(day * 3 + i, 41 + tries, WORLD_SEED + 3313) * Math.PI * 2;
+        const r = 260 + hash2(day + i * 9, 57 + tries, WORLD_SEED + 3319) * 200;
+        const px = Math.sin(a) * r, pz = Math.cos(a) * r;
+        const hgt = terrainHeight(px, pz);
+        if (hgt > WATER_LEVEL + 2 && hgt < 120 && farFromPOIs(px, pz, 30)) { x = px; z = pz; break; }
+      }
+      const gold = 150 + Math.round(hash2(day * 11 + i, 71, WORLD_SEED + 3323) * 250);
+      const mat = HUNT_MATS[(hash2(day * 13 + i, 83, WORLD_SEED + 3329) * HUNT_MATS.length) | 0];
+      out.push({ type, name, x: Math.round(x), z: Math.round(z), gold, mat, done: false });
+    }
+    return out;
+  }
+
+  function huntDirText(hx, hz) {
+    const p = g.player.position;
+    const dx = hx - p.x, dz = hz - p.z;
+    const d = Math.round(Math.hypot(dx, dz));
+    const dirs = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+    const a = Math.atan2(dx, -dz); // -z is north (Drakespire on the horizon)
+    const ix = ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8;
+    return d + ' paces ' + dirs[ix];
+  }
+
+  // Board prop: two posts, a plank panel, pinned parchments — by the inn door.
+  const boardWood = lam(0x5d4327);
+  const boardPaper = lam(0xd8c9a3, 0x171310);
+  const BOARD = { x: 16.4, z: 2.7, ry: Math.atan2(-17, -10) };
+  {
+    const grp = new THREE.Group();
+    const by = terrainHeight(BOARD.x, BOARD.z);
+    grp.position.set(BOARD.x, by, BOARD.z);
+    grp.rotation.y = BOARD.ry;
+    part(grp, GEO.box, boardWood, -0.65, 0.95, 0, 0.12, 1.9, 0.12);
+    part(grp, GEO.box, boardWood, 0.65, 0.95, 0, 0.12, 1.9, 0.12);
+    part(grp, GEO.box, boardWood, 0, 1.45, 0, 1.7, 1.0, 0.08);
+    part(grp, GEO.box, boardWood, 0, 2.02, 0.03, 1.9, 0.1, 0.34, 0.1);
+    for (let i = 0; i < 3; i++) {
+      const n = part(grp, GEO.plane, boardPaper, -0.5 + i * 0.5, 1.42 + (i % 2) * 0.1, 0.055, 0.28, 0.36, 1, 0, 0, (i - 1) * 0.08);
+      n.castShadow = false;
+    }
+    g.scene.add(grp);
+    g.colliders.push({ x: BOARD.x, z: BOARD.z, r: 0.55 });
+  }
+  g.interactables.push({
+    pos: new THREE.Vector3(BOARD.x, terrainHeight(BOARD.x, BOARD.z) + 1.4, BOARD.z),
+    radius: 3,
+    label: '⚔ Hunt Board',
+    onInteract: () => {
+      const day = g.flags.dayCount | 0;
+      let H = g.flags.hunts;
+      if (!H || H.day !== day || !Array.isArray(H.list)) {
+        // fresh marks each dawn; an accepted, unfinished hunt carries over
+        const carry = (H && Array.isArray(H.list) && H.active >= 0 && H.list[H.active] && !H.list[H.active].done)
+          ? H.list[H.active] : null;
+        H = g.flags.hunts = { day, list: genHunts(day), active: -1 };
+        if (carry) { H.list[0] = carry; H.active = 0; }
+      }
+      if (H.active >= 0 && H.list[H.active] && !H.list[H.active].done) {
+        const b = H.list[H.active];
+        notify('The hunt stands: ' + b.name, 'Last seen ' + huntDirText(b.x, b.z) + '. ' + b.gold + ' gold on delivery.');
+        return;
+      }
+      let ix = -1;
+      for (let i = 0; i < H.list.length; i++) if (!H.list[i].done) { ix = i; break; }
+      if (ix < 0) { notify('The board is bare', 'Fresh marks are posted at dawn.'); return; }
+      H.active = ix;
+      const b = H.list[ix];
+      api.activeHunt = { name: b.name, x: b.x, z: b.z };
+      huntEnemy = null;
+      sfx('questStart');
+      notify('Hunt accepted: ' + b.name, ELITE_NAMES[b.type] + ' — ' + huntDirText(b.x, b.z) + '. ' + b.gold + ' gold on delivery.');
+    },
+    enabled: () => !g.paused && !!g.flags.beaconLit, // opens with the main story (act 2+)
+  });
+
+  // Throttled (1Hz): keep activeHunt in sync with flags (survives load) and
+  // spawn the mark when the hunter draws near.
+  function updateHunt() {
+    const H = g.flags.hunts;
+    const b = (H && Array.isArray(H.list) && H.active >= 0) ? H.list[H.active] : null;
+    if (!b || b.done) {
+      if (api.activeHunt) api.activeHunt = null;
+      return;
+    }
+    if (!api.activeHunt) api.activeHunt = { name: b.name, x: b.x, z: b.z };
+    if (huntEnemy && (huntEnemy.dead || list.indexOf(huntEnemy) < 0)) huntEnemy = null;
+    if (!huntEnemy) {
+      const p = g.player.position;
+      if (dist2d(p.x, p.z, b.x, b.z) < 150 && TYPES[b.type]) {
+        huntEnemy = spawnEnemy(b.type, b.x, b.z, null, { elite: true, name: b.name, huntTarget: true });
+        huntEnemy.sightR = Math.max(huntEnemy.sightR, 34); // the mark hunts you back
+      }
+    }
+  }
+
+  function completeHunt(e) {
+    const H = g.flags.hunts;
+    if (!H || !Array.isArray(H.list) || H.active < 0) return;
+    const b = H.list[H.active];
+    if (!b || b.done || b.name !== e.name) return;
+    b.done = true;
+    H.active = -1;
+    api.activeHunt = null;
+    huntEnemy = null;
+    const gold = Math.round(b.gold * goldFindMult());
+    if (g.player) {
+      if (g.player.addGold) g.player.addGold(gold);
+      if (g.player.addXP) g.player.addXP(Math.round(45 * playerScale()));
+    }
+    let matName = 'a rare prize';
+    if (g.economy && g.economy.give) {
+      g.economy.give(b.mat, 1);
+      if (g.economy.MATERIALS && g.economy.MATERIALS[b.mat]) matName = g.economy.MATERIALS[b.mat].name;
+    } else {
+      events.emit('spawnLoot', { pos: { x: e.pos.x, y: e.pos.y + 0.8, z: e.pos.z }, kind: 'item', amount: 1, itemId: b.mat });
+    }
+    sfx('questDone');
+    notify('Bounty claimed: ' + b.name, '+' + gold + ' gold and ' + matName + '. The board will have more.');
+  }
+
+  // ---------------------------------------------------------------------------
+  // BLOOD MOON — after the drake falls: every ~3rd night, 22:00-04:00, the
+  // dead press the village edge (never past the inner ward, r 40). ×2 loot,
+  // dawn bonus per kill. Progress in g.flags.bloodMoon; active state is
+  // recomputed from flags + clock, so it survives save/load for free.
+  // ---------------------------------------------------------------------------
+  let moonActive = false;
+  let moonWaveT = 0;
+  const MOON_TYPES = ['skeleton', 'skeleton', 'thrall', 'werewolf'];
+  function updateBloodMoon(dt) {
+    const f = g.time.dayFrac;
+    const inWindow = f > 22 / 24 || f < 4 / 24;
+    const nightIx = f > 0.5 ? (g.flags.dayCount | 0) : (g.flags.dayCount | 0) - 1;
+    const due = !!(g.flags.drakeDead || g.flags.vhastrixDead) && inWindow &&
+      ((nightIx % 3) + 3) % 3 === 2;
+    if (due && !moonActive) {
+      moonActive = true;
+      moonWaveT = 4; // first wave gathers fast
+      let BM = g.flags.bloodMoon;
+      if (!BM || BM.night !== nightIx) BM = g.flags.bloodMoon = { night: nightIx, kills: 0 };
+      notify('The Blood Moon rises', 'They come for Emberhollow. Hold the village edge until dawn.');
+      sfx('thunder');
+      sfx('wolfHowl');
+    } else if (!due && moonActive) {
+      moonActive = false;
+      const BM = g.flags.bloodMoon;
+      for (let i = list.length - 1; i >= 0; i--) {
+        const e = list[i];
+        if (e.bloodMoon && e.alive) despawn(e); // dawn scatters the horde
+      }
+      const kills = BM ? (BM.kills | 0) : 0;
+      const bonus = Math.round(kills * 10 * goldFindMult());
+      notify('The village endures', kills > 0
+        ? 'Dawn breaks the horde — ' + kills + ' slain. The grateful pass a purse: +' + bonus + ' gold.'
+        : 'Dawn breaks the horde.');
+      if (bonus > 0 && g.player && g.player.addGold) g.player.addGold(bonus);
+      g.flags.bloodMoon = null;
+    }
+    if (!moonActive) return;
+    moonWaveT -= dt;
+    if (moonWaveT > 0) return;
+    moonWaveT = 22 + Math.random() * 10;
+    const p = g.player.position;
+    if (p.y <= -100 || dist2d(p.x, p.z, 0, 0) > 220) return; // nobody to witness — the guards hold
+    let aliveBM = 0;
+    for (let i = 0; i < list.length; i++) if (list[i].bloodMoon && list[i].alive) aliveBM++;
+    if (aliveBM >= 9) return;
+    const n = Math.min(4 + ((Math.random() * 3) | 0), 12 - aliveBM);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 62 + Math.random() * 16;
+      const sx = Math.sin(a) * r, sz = Math.cos(a) * r;
+      if (terrainHeight(sx, sz) < WATER_LEVEL + 1) continue;
+      const type = MOON_TYPES[(Math.random() * MOON_TYPES.length) | 0];
+      const e = spawnEnemy(type, sx, sz, null, { bloodMoon: true, eliteChance: 0.35 });
+      startAggro(e, true);
+    }
+    sfx('wolfHowl');
+  }
+
+  // ---------------------------------------------------------------------------
+  // TRIAL OF ECHOES — five ghost-stones at the Shrine of Aldric (post-drake).
+  // Each challenges an empowered spirit of a fallen great foe: ×1.6 stats,
+  // +20% per clear (g.flags.echoClears), 500g and a title on the kill.
+  // Echoes never touch world flags, quests or boss persistence.
+  // ---------------------------------------------------------------------------
+  const ECHO_DEFS = [
+    { type: 'barrowlord', title: 'Twice-Buried' },
+    { type: 'vargr',      title: 'Red Memory' },
+    { type: 'troll',      title: 'Bridgebreaker' },
+    { type: 'morvane',    title: 'Dawn Against the Blood' },
+    { type: 'drake',      title: 'Echoslayer of Drakespire' },
+  ];
+  const echoStoneMat = lam(0x6f7e92, 0x101d2c);
+  const echoGlowMat = new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.9 });
+  const echoGroup = new THREE.Group();
+  echoGroup.visible = false; // shown once the drake is dead (1Hz tick)
+  {
+    const P = POI.shrine;
+    for (let i = 0; i < ECHO_DEFS.length; i++) {
+      const def = ECHO_DEFS[i];
+      const a = (i - 2) * 0.5; // southern arc, clear of altar and statue
+      const sx = P.x + Math.sin(a) * 9;
+      const sz = P.z + Math.cos(a) * 9;
+      const sy = terrainHeight(sx, sz);
+      const stone = part(echoGroup, GEO.box, echoStoneMat, sx, sy + 0.7, sz, 0.5, 1.5, 0.38, 0, a, (hash2(i, 9, 5) - 0.5) * 0.12);
+      const orb = part(echoGroup, GEO.orb, echoGlowMat, sx, sy + 1.62, sz, 1.5, 1.5, 1.5);
+      orb.castShadow = false;
+      stone.castShadow = true;
+      g.colliders.push({ x: sx, z: sz, r: 0.45 });
+      g.interactables.push({
+        pos: new THREE.Vector3(sx, sy + 1.2, sz),
+        radius: 2.6,
+        label: '✦ Challenge: Echo of ' + TYPES[def.type].name,
+        onInteract: () => spawnEcho(def),
+        enabled: () => !g.paused && !!g.flags.drakeDead && !echoAlive(),
+      });
+    }
+    g.scene.add(echoGroup);
+  }
+
+  function echoAlive() {
+    for (let i = 0; i < list.length; i++) if (list[i].echo && list[i].alive) return true;
+    return false;
+  }
+
+  function spawnEcho(def) {
+    if (echoAlive()) return;
+    const clears = (g.flags.echoClears && g.flags.echoClears[def.type]) | 0;
+    const mul = 1.6 * (1 + 0.2 * clears);
+    const P = POI.shrine;
+    const ex = P.x, ez = P.z + 15; // the clearing south of the altar
+    const e = spawnEnemy(def.type, ex, ez, null, { echo: true, noElite: true, name: 'Echo of ' + TYPES[def.type].name });
+    e.echoDef = def;
+    e.hp = Math.max(1, Math.round(e.hp * mul));
+    e.maxHp = Math.max(1, Math.round(e.maxHp * mul));
+    e.dmg = Math.max(1, Math.round(e.dmg * mul));
+    e.xp = Math.max(1, Math.round(e.xp * 1.6));
+    e.home.x = ex; e.home.z = ez;
+    applyGhost(e.holder);
+    emitBurst(ex, e.pos.y + 1.4, ez, 18, 0.45, 0.75, 1.0, 1);
+    sfx('fireCast');
+    startAggro(e, true);
+    notify('The Trial of Echoes', 'Something of ' + TYPES[def.type].name + ' takes shape in ghost-light' +
+      (clears > 0 ? ' — stronger than before.' : '.'));
+  }
+
+  function finishEcho(e) {
+    const ec = g.flags.echoClears || (g.flags.echoClears = {});
+    ec[e.type] = (ec[e.type] | 0) + 1;
+    const gold = Math.round(500 * goldFindMult());
+    if (g.player) {
+      if (g.player.addGold) g.player.addGold(gold);
+      if (g.player.addXP) g.player.addXP(e.xp);
+    }
+    emitBurst(e.pos.x, e.pos.y + 1.2, e.pos.z, 22, 0.45, 0.75, 1.0, 1);
+    sfx('questDone');
+    notify(e.echoDef ? e.echoDef.title : 'The echo scatters',
+      '+' + gold + ' gold. The shrine hums — it will remember, and return stronger.');
+  }
+
+  // Abandoned echoes dissolve once the challenger walks away (or falls)
+  function echoTick() {
+    echoGroup.visible = !!g.flags.drakeDead;
+    if (!g.flags.drakeDead) return;
+    const p = g.player.position;
+    const far = dist2d(p.x, p.z, POI.shrine.x, POI.shrine.z) > 90;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const e = list[i];
+      if (e.echo && e.alive && !e.aggro && far) {
+        emitBurst(e.pos.x, e.pos.y + 1.2, e.pos.z, 10, 0.45, 0.75, 1.0, 1);
+        despawn(e);
+      }
+    }
+  }
+
+  let endTick = 0; // 1Hz endgame housekeeping accumulator
+
   // -------------------------------------------------------------------------
   // Main update
   // -------------------------------------------------------------------------
@@ -2284,6 +2723,16 @@ export function createEnemies(g) {
     updateBurst(dt);
     updateBolts(dt);
     updateGlobalState(t);
+
+    // wave-3 endgame systems
+    trackDay(g.time.dayFrac);
+    updateBloodMoon(dt);
+    endTick -= dt;
+    if (endTick <= 0) {
+      endTick = 1.0;
+      updateHunt();
+      echoTick();
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -2295,10 +2744,23 @@ export function createEnemies(g) {
       drake: { dead: bossState.drake.dead, hp: Math.round(bossState.drake.hp) },
       barrowlord: { dead: bossState.barrowlord.dead, hp: Math.round(bossState.barrowlord.hp) },
       // vargrDead / vargrWins / morvaneDead / trollDead / witchDead live in
-      // g.flags (saved by save.js)
+      // g.flags (saved by save.js). Wave-3 endgame state does too, per
+      // FORGE-ECON: dayCount, hunts, bloodMoon, echoClears, bossLock.
     };
   }
   function deserialize(o) {
+    // Wave-3 transients never survive a load: hunt marks, shrine echoes and
+    // blood-moon raiders despawn; their durable state (g.flags.hunts /
+    // bloodMoon / echoClears / dayCount) was already restored by save.js and
+    // is re-derived on the next endgame tick.
+    for (let i = list.length - 1; i >= 0; i--) {
+      const e = list[i];
+      if (e.huntTarget || e.echo || e.bloodMoon) despawn(e);
+    }
+    huntEnemy = null;
+    api.activeHunt = null;
+    moonActive = false;       // recomputed from flags + clock next update
+    prevDayFrac = -1;         // don't count a phantom midnight on time jumps
     if (!o) return;
     if (o.drake) {
       bossState.drake.dead = !!o.drake.dead;
@@ -2323,8 +2785,10 @@ export function createEnemies(g) {
     }
   }
 
-  return {
+  const api = {
     update, list, spawnAt, queryHit, queryPoint, damage,
     countAlive, bossAlive, serialize, deserialize,
+    activeHunt: null, // {name, x, z} while a Hunt Board bounty is accepted
   };
+  return api;
 }

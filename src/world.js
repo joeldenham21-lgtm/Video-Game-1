@@ -1174,6 +1174,13 @@ export function createWorld(g) {
   const grass = makePool(buildGrassGeom(), grassMat, 8000, false);
   const allPools = [...TREE_POOLS, ...BUSH_POOLS, ...FLORA_POOLS, ...ROCK_POOLS, ...DEBRIS_POOLS, grass];
   // = 50 InstancedMeshes total → 50 vegetation draw calls, worst case.
+  // Name meshes by category (init-time only; used by debug tooling / QA).
+  for (const p of TREE_POOLS) p.mesh.name = 'veg:tree';
+  for (const p of BUSH_POOLS) p.mesh.name = 'veg:bush';
+  for (const p of FLORA_POOLS) p.mesh.name = 'veg:flora';
+  for (const p of ROCK_POOLS) p.mesh.name = 'veg:rock';
+  for (const p of DEBRIS_POOLS) p.mesh.name = 'veg:debris';
+  grass.mesh.name = 'veg:grass';
 
   function put(pool, x, y, z, rotY, sx, sy, cr, cg, cb) {
     if (pool.n >= pool.cap) return;

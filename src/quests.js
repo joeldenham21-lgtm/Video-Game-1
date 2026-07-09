@@ -1111,6 +1111,12 @@ export function createQuests(g) {
   function sylvaTree() {
     const N = {};
     let start = 'idle';
+    // Vendor hook (economy.js): leather and pelts, hunter's rates.
+    const trade = {
+      label: 'Trade — leathers and pelts.',
+      next: null,
+      do: () => { if (g.economy && g.economy.openShop) g.economy.openShop('sylva'); },
+    };
 
     if (state.fold === 0) {
       start = 's1';
@@ -1126,6 +1132,7 @@ export function createQuests(g) {
         choices: [
           { label: 'What do you need?', next: 's2' },
           { label: 'Wolves are just hungry.', next: 's3' },
+          trade,
         ],
       };
       N.s2 = {
@@ -1154,7 +1161,7 @@ export function createQuests(g) {
       N.idle = {
         text: 'Count again: ' + state.pelts + ' of five. The pack won\'t mourn the ones you ' +
           'took, but the fold might live out the week. Dusk, forest edge. Go.',
-        choices: [{ label: 'Farewell.', next: null }],
+        choices: [trade, { label: 'Farewell.', next: null }],
       };
     } else if (state.fold === 1) {
       start = 'p1';
@@ -1204,7 +1211,7 @@ export function createQuests(g) {
             'lying around the valley. Best coin I never spent.'
           : 'Spent that gold yet? Wool\'s back on the hills either way. The fold sleeps, so ' +
             'I sleep. Simple ledger.',
-        choices: [{ label: 'Farewell.', next: null }],
+        choices: [trade, { label: 'Farewell.', next: null }],
       };
     }
 
@@ -1752,12 +1759,19 @@ export function createQuests(g) {
           notify('Pine-bitter draught', 'Potions: ' + g.player.stats.potions);
         },
       };
+      // Vendor hook (economy.js): reagents — dust, embers and frost.
+      const trade = {
+        label: 'Trade — show me the shelves, old mother.',
+        next: null,
+        do: () => { if (g.economy && g.economy.openShop) g.economy.openShop('grimhilde'); },
+      };
       N.v1 = {
         text: 'The kettle knows your step now. Sit, or don\'t — you strike me as a don\'t. ' +
           'The village sends its sick to me openly again. Wendel brought honey. HONEY. Fifty ' +
           'years in these pines and it took a stranger with well-rot on their boots.',
         choices: [
           buy,
+          trade,
           { label: 'What\'s in the draughts?', next: 'v2' },
           { label: 'Farewell, Grimhilde.', next: null },
         ],

@@ -327,6 +327,24 @@ export function createRPG(g) {
     uiOnPointsChanged();
     if (treeOpen) { refreshAllTabs(); refreshTree(); }
   });
+  // Wave-3 (FORGE-ECON): craft mastery — working the forge hones the hand
+  // that will swing the result; the enchanting ritual is applied sorcery.
+  g.events.on('weaponForged', (e) => {
+    addSkillXP(e && e.id === 'bow' ? 'marksman' : 'blade', 60);
+  });
+  g.events.on('weaponEnchanted', () => addSkillXP('sorcery', 80));
+  // Wave-3 balance: soften the character xp curve from ×1.35 to ×1.32 per
+  // level so the new xp sources (hunts, echoes, blood moons, crafting) land
+  // a full clear around level 16-20. player.js owns the level-up mechanism
+  // (and multiplies ×1.35); we re-seat xpNext onto the 1.32 curve right after
+  // each level and after loads, which also corrects saves from the old curve.
+  function reseatXpCurve() {
+    const st = g.player && g.player.stats;
+    if (!st || !(st.level >= 1)) return;
+    st.xpNext = Math.round(100 * Math.pow(1.32, st.level - 1));
+  }
+  g.events.on('levelUp', reseatXpCurve);
+  g.events.on('gameLoaded', reseatXpCurve);
 
   // --------------------------------------------------------------------------
   // Polled XP sources (athletics / shadow / blocked hits) — throttled
