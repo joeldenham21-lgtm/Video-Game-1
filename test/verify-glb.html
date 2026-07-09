@@ -1,0 +1,20 @@
+<!DOCTYPE html><html><head><script type="importmap">{"imports":{"three":"/vendor/three.module.js"}}</script></head><body style="margin:0">
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from '/vendor/GLTFLoader.js';
+import { MeshoptDecoder } from '/vendor/meshopt_decoder.module.js';
+const r = new THREE.WebGLRenderer(); r.setSize(400,400); document.body.appendChild(r.domElement);
+const s = new THREE.Scene(); s.background = new THREE.Color(0x334455);
+const c = new THREE.PerspectiveCamera(50,1,0.1,100); c.position.set(0,1.5,3.2); c.lookAt(0,1,0);
+s.add(new THREE.HemisphereLight(0xffffff,0x445566,1.4));
+const dl = new THREE.DirectionalLight(0xffffff,2); dl.position.set(2,4,3); s.add(dl);
+const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
+loader.load('/test/K3.glb', (g)=>{
+  s.add(g.scene);
+  const mixer = new THREE.AnimationMixer(g.scene);
+  const clip = g.animations.find(a=>a.name==='Running_A') || g.animations[0];
+  console.log('clips:', g.animations.length, 'playing:', clip.name);
+  mixer.clipAction(clip).play();
+  let t=0; r.setAnimationLoop(()=>{ mixer.update(1/60); t+=1/60; r.render(s,c); });
+}, undefined, (e)=>console.log('LOADFAIL', e.message||e));
+</script></body></html>

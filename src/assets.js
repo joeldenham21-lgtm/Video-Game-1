@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from '../vendor/GLTFLoader.js';
 import * as SkeletonUtils from '../vendor/SkeletonUtils.js';
+import { MeshoptDecoder } from '../vendor/meshopt_decoder.module.js';
 
 const CHAR_URLS = {
   knight: 'assets/chars/Knight.glb',
@@ -64,6 +65,7 @@ function applyGear(scene, name, opts) {
 
 export function createAssets(g) {
   const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
   const cache = new Map();      // url -> Promise<gltf>
   const tintCache = new Map();  // matUuid|colorKey -> material
   let loadedCount = 0;

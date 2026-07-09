@@ -1,0 +1,16 @@
+import http from 'http';
+import { readFile } from 'fs/promises';
+import { extname, join } from 'path';
+import { chromium } from 'playwright-core';
+const ROOT = '/home/user/Video-Game-1';
+const MIME = { '.html':'text/html', '.js':'text/javascript', '.glb':'model/gltf-binary' };
+const server = http.createServer(async (req,res)=>{ try{ let p=req.url.split('?')[0]; if(p==='/')p='/test/verify-glb.html'; const d=await readFile(join(ROOT,p)); res.writeHead(200,{'Content-Type':MIME[extname(p)]||'application/octet-stream'}); res.end(d);}catch{res.writeHead(404);res.end();}});
+await new Promise(r=>server.listen(8933,r));
+const b = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium', headless:true, args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
+const page = await b.newPage({viewport:{width:400,height:400}});
+page.on('console', m=>console.log('[pg]', m.text().slice(0,200)));
+page.on('pageerror', e=>console.log('[err]', String(e).slice(0,200)));
+await page.goto('http://localhost:8933/');
+await page.waitForTimeout(4000);
+await page.screenshot({path:'test/shots/glb-verify.png'});
+await b.close(); server.close();
