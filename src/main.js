@@ -20,6 +20,7 @@ import { createBooks } from './books.js';
 import { createFauna } from './fauna.js';
 import { createVoice } from './voice.js';
 import { createDetails } from './details.js';
+import { createAssets } from './assets.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -123,6 +124,8 @@ function boot(loadSave) {
   // Give the browser one frame to paint the loading state, then build the world.
   requestAnimationFrame(() => requestAnimationFrame(() => {
     try {
+      g.assets = createAssets(g);
+      g.assets.preload();
       g.audio = createAudio(g);
       g.audio.unlock(); // we are inside a user gesture chain
       g.world = createWorld(g);
