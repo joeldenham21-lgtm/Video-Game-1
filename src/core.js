@@ -120,9 +120,9 @@ export const POIS = [
   { id: 'ruins',   name: 'Barrowdeep Ruins',  x: 620,  z: -420,  r: 55,  flatten: 0.9 },
   { id: 'stones',  name: 'The Wardstones',    x: -540, z: -620,  r: 42,  flatten: 0.9 },
   { id: 'tower',   name: 'Greywatch Tower',   x: 380,  z: 520,   r: 34,  flatten: 0.9 },
-  { id: 'camp',    name: 'Redfang Camp',      x: -620, z: 180,   r: 46,  flatten: 0.85 },
+  { id: 'camp',    name: 'Redfang Camp',      x: -620, z: 180,   r: 46,  flatten: 0.85, flatH: 6 },
   { id: 'lake',    name: 'Mirrormere',        x: -350, z: 520,   r: 0 },
-  { id: 'shrine',  name: 'Shrine of Aldric',  x: 260,  z: -180,  r: 16,  flatten: 0.9 },
+  { id: 'shrine',  name: 'Shrine of Aldric',  x: 260,  z: -180,  r: 16,  flatten: 0.9, flatH: 5 },
   { id: 'peak',    name: 'Drakespire',        x: 150,  z: -1250, r: 60,  flatten: 0.75 },
 ];
 export const POI = Object.fromEntries(POIS.map(p => [p.id, p]));
