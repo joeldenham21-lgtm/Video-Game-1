@@ -140,14 +140,17 @@ export function createPlayer(g) {
     if (dead || !(amount > 0)) return;
     stats.hp -= amount;
     addShake(clamp(0.22 + amount * 0.014, 0, 0.65));
+    // Death is decided BEFORE any event fires: listeners (rpg XP -> level-up
+    // full restore) must never be able to cancel a lethal hit.
+    const lethal = stats.hp <= 0;
+    if (lethal) {
+      stats.hp = 0;
+      dead = true; // emit playerDied exactly once; ui shows death screen
+    }
     damagedEvt.amount = amount;
     damagedEvt.fromPos = fromPos || null;
     g.events.emit('playerDamaged', damagedEvt);
-    if (stats.hp <= 0) {
-      stats.hp = 0;
-      dead = true; // emit playerDied exactly once; ui shows death screen
-      g.events.emit('playerDied', diedEvt);
-    }
+    if (lethal) g.events.emit('playerDied', diedEvt);
   }
 
   function heal(n) {
@@ -165,11 +168,15 @@ export function createPlayer(g) {
       stats.maxHp += 10;
       stats.maxStamina += 8;
       stats.maxMana += 6;
-      // Full restore on level-up
-      stats.hp = effMaxHp();
-      stats.stamina = stats.maxStamina;
-      stats.mana = stats.maxMana;
-      exhausted = false;
+      // Full restore on level-up — but never resurrect a corpse (post-mortem
+      // XP from in-flight kills/quests must not refill the bar under the
+      // death screen; respawn() handles revival).
+      if (!dead) {
+        stats.hp = effMaxHp();
+        stats.stamina = stats.maxStamina;
+        stats.mana = stats.maxMana;
+        exhausted = false;
+      }
       levelEvt.level = stats.level;
       g.events.emit('levelUp', levelEvt);
     }

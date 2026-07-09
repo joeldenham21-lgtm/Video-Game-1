@@ -931,12 +931,22 @@ export function createCombat(g) {
       if (a.life <= 0) { a.active = false; a.obj.visible = false; continue; }
       if (a.stuck > 0) continue; // resting in terrain, just age out
       a.vel.y -= 16 * dt;
-      a.obj.position.addScaledVector(a.vel, dt);
+      // Swept collision: at low frame rates an arrow can cross a whole enemy
+      // in one step, so sample the movement segment instead of the endpoint.
+      const stepLen = a.vel.length() * dt;
+      const subSteps = Math.min(6, Math.max(1, Math.ceil(stepLen / 0.6)));
+      let hits = null;
+      for (let ss = 1; ss <= subSteps; ss++) {
+        a.obj.position.addScaledVector(a.vel, dt / subSteps);
+        if (g.enemies && g.enemies.queryPoint) {
+          hits = g.enemies.queryPoint(a.obj.position, 0.7);
+          if (hits && hits.length) break;
+        }
+      }
       _v1.copy(a.obj.position).add(a.vel);
       a.obj.lookAt(_v1);
       const p = a.obj.position;
       if (g.enemies && g.enemies.queryPoint) {
-        const hits = g.enemies.queryPoint(p, 0.7);
         if (hits && hits.length) {
           const e = hits[0];
           enemyPos(e, _v3);
