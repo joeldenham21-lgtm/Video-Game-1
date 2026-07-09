@@ -1,12 +1,18 @@
 // ============================================================================
-// ELDERFALL — enemies.js
-// Enemy AI, procedural low-poly models & animation, seeded spawn system,
-// the drake boss (Vhastrix), the barrowlord mini-boss, and the nemesis
-// bandit lord Vargr Redfang. Owns `enemyKilled`, `spawnLoot`, `combatState`
-// and `bossBar` events.
+// ELDERFALL — enemies.js  (art overhaul wave 2)
+// Enemy AI, animated KayKit character rigs (AnimationMixer state machines,
+// crossfades, speed-matched locomotion, distance-LOD), seeded spawn system,
+// the drake boss (Vhastrix, rebuilt menacing procedural), the barrowlord,
+// nemesis bandit lord Vargr Redfang, and the wave-2 roster: wraiths, vampire
+// thralls + Lord Morvane, witch Grimhilde, the Stonebridge troll, night
+// werewolves, skeleton archers and atmospheric village guards.
+// Owns `enemyKilled`, `spawnLoot`, `combatState` and `bossBar` events.
 //
-// Contract §5. Only imports: three + core.js. Zero per-frame allocations in
-// update() — all temps are preallocated; query results reuse module arrays.
+// Contract §5 + ASSETS-ART.md. Only imports: three + core.js. Zero per-frame
+// allocations in update() — all temps are preallocated; query results reuse
+// module arrays. Assets stream in async: every enemy is an empty logic Group
+// immediately (colliders/AI/blob shadow/hp bar work), the skinned mesh
+// attaches when its GLB resolves.
 // ============================================================================
 import * as THREE from 'three';
 import {
@@ -15,29 +21,52 @@ import {
 } from './core.js';
 
 // ---------------------------------------------------------------------------
-// Type stat table (hp / dmg / speed / xp per contract)
+// Type stat table (hp / dmg / speed / xp per contract; wave-2 additions)
 // ---------------------------------------------------------------------------
 const TYPES = {
   wolf:       { hp: 30,  dmg: 8,  speed: 6.2, xp: 20,  reach: 1.6, bodyR: 0.60, height: 1.05, sightR: 20, atkCd: 1.4, mass: 1.00, name: 'Wolf' },
   goblin:     { hp: 40,  dmg: 10, speed: 4.4, xp: 25,  reach: 1.7, bodyR: 0.50, height: 1.25, sightR: 16, atkCd: 1.6, mass: 1.00, name: 'Goblin' },
   bandit:     { hp: 70,  dmg: 14, speed: 4.8, xp: 40,  reach: 2.0, bodyR: 0.60, height: 1.85, sightR: 18, atkCd: 1.8, mass: 0.80, name: 'Bandit' },
   skeleton:   { hp: 55,  dmg: 12, speed: 3.6, xp: 35,  reach: 1.9, bodyR: 0.55, height: 1.80, sightR: 15, atkCd: 1.9, mass: 1.00, name: 'Skeleton' },
-  barrowlord: { hp: 260, dmg: 22, speed: 3.2, xp: 150, reach: 2.7, bodyR: 1.00, height: 2.75, sightR: 20, atkCd: 2.3, mass: 0.30, name: 'Barrow Lord' },
+  skelarcher: { hp: 45,  dmg: 11, speed: 3.4, xp: 40,  reach: 1.9, bodyR: 0.52, height: 1.75, sightR: 20, atkCd: 2.4, mass: 1.00, teleT: 0.7, name: 'Skeleton Archer' },
+  barrowlord: { hp: 260, dmg: 22, speed: 3.2, xp: 150, reach: 2.7, bodyR: 1.00, height: 2.85, sightR: 20, atkCd: 2.3, mass: 0.30, name: 'Barrow Lord' },
   drake:      { hp: 700, dmg: 28, speed: 8.0, xp: 500, reach: 3.4, bodyR: 2.40, height: 3.20, sightR: 90, atkCd: 2.2, mass: 0.10, name: 'Vhastrix' },
   // Nemesis: bandit ×2.2 (per-win +15% applied at spawn)
-  vargr:      { hp: 154, dmg: 31, speed: 5.2, xp: 200, reach: 2.1, bodyR: 0.65, height: 1.95, sightR: 22, atkCd: 1.5, mass: 0.60, name: 'Vargr Redfang' },
+  vargr:      { hp: 154, dmg: 31, speed: 5.2, xp: 200, reach: 2.1, bodyR: 0.65, height: 2.05, sightR: 22, atkCd: 1.5, mass: 0.60, name: 'Vargr Redfang' },
+  // --- wave 2 roster ---
+  wraith:     { hp: 60,  dmg: 13, speed: 3.6, xp: 55,  reach: 2.0, bodyR: 0.55, height: 1.90, sightR: 22, atkCd: 2.6, mass: 0.90, teleT: 0.8, name: 'Wraith', dawnFade: true },
+  thrall:     { hp: 55,  dmg: 12, speed: 5.6, xp: 45,  reach: 1.8, bodyR: 0.55, height: 1.80, sightR: 20, atkCd: 1.5, mass: 0.90, name: 'Vampire Thrall', dawnFade: true },
+  morvane:    { hp: 240, dmg: 20, speed: 5.2, xp: 260, reach: 2.1, bodyR: 0.60, height: 2.02, sightR: 24, atkCd: 1.7, mass: 0.45, teleT: 0.5, name: 'Lord Morvane', dawnFade: true },
+  witch:      { hp: 120, dmg: 15, speed: 3.8, xp: 90,  reach: 2.0, bodyR: 0.55, height: 1.75, sightR: 20, atkCd: 2.4, mass: 0.80, teleT: 0.9, name: 'Grimhilde' },
+  troll:      { hp: 400, dmg: 40, speed: 3.4, xp: 300, reach: 3.0, bodyR: 1.10, height: 4.15, sightR: 20, atkCd: 2.6, mass: 0.15, teleT: 1.0, strikeT: 0.6, name: 'Stonebridge Troll' },
+  werewolf:   { hp: 90,  dmg: 18, speed: 7.2, xp: 80,  reach: 1.9, bodyR: 0.62, height: 2.25, sightR: 26, atkCd: 1.1, mass: 0.85, teleT: 0.45, name: 'Werewolf' },
 };
 const GOLD = {
   wolf: [3, 8], goblin: [4, 12], bandit: [8, 18], skeleton: [5, 14],
-  barrowlord: [50, 90], drake: [120, 200], vargr: [60, 100],
+  skelarcher: [6, 15], barrowlord: [50, 90], drake: [120, 200], vargr: [60, 100],
+  wraith: [10, 20], thrall: [12, 22], morvane: [80, 140], witch: [30, 60],
+  troll: [90, 150], werewolf: [15, 30],
 };
 
-const TELEGRAPH_T = 0.55;   // readable windup — contract
+// Ranged casters/shooters: preferred distance band + bolt kind
+const RANGED = {
+  wraith:     { min: 5, max: 14, bolt: 'wraith' },
+  witch:      { min: 6, max: 16, bolt: 'witch' },
+  skelarcher: { min: 5, max: 16, bolt: 'arrow' },
+};
+
+// New POI coordinates (ASSETS-ART.md; structures.js builds the scenery)
+const WITCH_HUT   = { x: -260, z: -520 };
+const STONEBRIDGE = { x: 330,  z: -260 };
+
+const TELEGRAPH_T = 0.55;   // readable windup — contract (per-type teleT overrides)
 const STRIKE_T    = 0.30;   // lunge duration; hit lands at STRIKE_HIT_T
 const STRIKE_HIT_T = 0.12;
 const FLINCH_T    = 0.24;
 const STAGGER_T   = 1.2;
 const GUARD_T     = 0.9;
+const DODGE_T     = 0.4;    // thrall sidestep
+const BLINK_T     = 0.55;   // Morvane teleport-blink
 const SINK_AFTER  = 6.0;    // corpse sits, then sinks
 const SINK_T      = 1.4;
 const ACTIVE_CAP  = 10;     // non-boss actives within range
@@ -48,6 +77,10 @@ const DRAKE_DEAGGRO_R = 160;
 const RESPAWN_T   = 180;
 const NIGHT_RESPAWN_T = 60; // skeletons at ruins respawn fast at night
 
+// Locomotion clip reference speeds (KayKit clips as authored)
+const REF_WALK = 2.2;
+const REF_RUN  = 5.5;
+
 // ---------------------------------------------------------------------------
 // Preallocated temps (no per-frame allocations)
 // ---------------------------------------------------------------------------
@@ -56,6 +89,8 @@ const _pts = [];
 const _bb = { name: '', hp: 0, maxHp: 0 };
 const CS_ON = { inCombat: true };
 const CS_OFF = { inCombat: false };
+const _box = new THREE.Box3();
+const _tv = new THREE.Vector3();
 
 function isNightFrac(f) { return f < 0.23 || f > 0.77; }
 
@@ -64,27 +99,77 @@ export function createEnemies(g) {
   const events = g.events;
 
   // -------------------------------------------------------------------------
+  // Character rig specs — which KayKit char, target world height, tint, clips
+  // -------------------------------------------------------------------------
+  const SPEC = {
+    wolf:       { char: 'fox', h: 1.25, tint: '#9a938a', simple: true,
+                  locoIdle: 'Survey', locoWalk: 'Walk', locoRun: 'Run' },
+    goblin:     { char: 'skeleton_minion', h: 1.30, tint: '#7fae5a',
+                  attacks: ['1H_Melee_Attack_Slice_Diagonal', '1H_Melee_Attack_Chop'] },
+    bandit:     { char: 'rogue', h: 1.80, tint: '#cdb69a',
+                  attacks: ['1H_Melee_Attack_Slice_Horizontal', '1H_Melee_Attack_Stab'] },
+    skeleton:   { char: 'skeleton_warrior', h: 1.80,
+                  attacks: ['1H_Melee_Attack_Slice_Diagonal', '1H_Melee_Attack_Chop'] },
+    skelarcher: { char: 'skeleton_rogue', h: 1.75, cast: '1H_Ranged_Shoot' },
+    barrowlord: { char: 'skeleton_warrior', h: 2.85, tint: '#d8b860',
+                  tintOpts: { emissive: '#3a2a08', emissiveIntensity: 0.35 },
+                  locoIdle: '2H_Melee_Idle',
+                  attacks: ['2H_Melee_Attack_Chop', '2H_Melee_Attack_Slice', '2H_Melee_Attack_Spin'] },
+    vargr:      { char: 'rogue', h: 2.05, tint: '#d9a8a0', isVargr: true,
+                  attacks: ['1H_Melee_Attack_Chop', '1H_Melee_Attack_Slice_Horizontal', '1H_Melee_Attack_Stab'] },
+    wraith:     { char: 'skeleton_mage', h: 1.90, tint: '#9fd8ff',
+                  tintOpts: { emissive: '#66ccff', emissiveIntensity: 0.7, opacity: 0.55 },
+                  loco: 'Spellcasting', cast: 'Spellcast_Shoot' },
+    thrall:     { char: 'rogue_hooded', h: 1.80, tint: '#cfd4e6',
+                  tintOpts: { emissive: '#3a0910', emissiveIntensity: 0.35 },
+                  attacks: ['1H_Melee_Attack_Stab', '1H_Melee_Attack_Slice_Diagonal'] },
+    morvane:    { char: 'rogue_hooded', h: 2.02, tint: '#d8dcec',
+                  tintOpts: { emissive: '#58101c', emissiveIntensity: 0.55 },
+                  attacks: ['1H_Melee_Attack_Slice_Horizontal', '1H_Melee_Attack_Chop', '1H_Melee_Attack_Stab'] },
+    witch:      { char: 'mage', h: 1.75, tint: '#8a6aae',
+                  tintOpts: { emissive: '#1e3a14', emissiveIntensity: 0.4 },
+                  cast: 'Spellcast_Shoot', handGlow: true },
+    troll:      { char: 'barbarian', h: 4.15, tint: '#8a9086',
+                  locoIdle: '2H_Melee_Idle',
+                  attacks: ['2H_Melee_Attack_Chop', '2H_Melee_Attack_Spin'] },
+    werewolf:   { char: 'barbarian', h: 2.25, tint: '#5a4636', hunch: true, runTs: 1.2,
+                  attacks: ['Unarmed_Melee_Attack_Punch_A', 'Unarmed_Melee_Attack_Punch_B', 'Unarmed_Melee_Attack_Kick'] },
+    guard:      { char: 'knight', h: 1.85 },
+  };
+  for (const k in SPEC) {
+    const s = SPEC[k];
+    if (!s.locoIdle) s.locoIdle = 'Idle';
+    if (!s.locoWalk) s.locoWalk = 'Walking_A';
+    if (!s.locoRun) s.locoRun = 'Running_A';
+  }
+
+  // -------------------------------------------------------------------------
   // SHARED geometry / material library — built exactly once
   // -------------------------------------------------------------------------
   const GEO = {
     box: new THREE.BoxGeometry(1, 1, 1),
     cone: new THREE.ConeGeometry(0.5, 1, 6),
     plane: new THREE.PlaneGeometry(1, 1),
+    orb: new THREE.SphereGeometry(0.14, 6, 5),
   };
   function lam(color, emissive = 0x000000) {
     return new THREE.MeshLambertMaterial({ color, emissive, flatShading: true });
   }
   const M = {
-    fur: lam(0x7d746a), furDark: lam(0x4e463f),
-    goblin: lam(0x7a9c4e), rag: lam(0x8a5a2e),
-    skin: lam(0xc49a76), cloth: lam(0x5a4636), armor: lam(0x70747c),
-    bone: lam(0xddd3b8), boneDark: lam(0xa99e85),
-    steel: lam(0xaab2bc), wood: lam(0x6b4a2c),
-    red: lam(0xa82a22, 0x2a0402), coat: lam(0x46262a),
-    drake: lam(0x6e2430, 0x140404),
-    drakeWing: new THREE.MeshLambertMaterial({ color: 0x8c4a3a, flatShading: true, side: THREE.DoubleSide }),
-    horn: lam(0xd8cfb6),
+    // drake palette (single boss — dedicated materials are fine)
+    drake: lam(0x571d26, 0x0d0304),
+    drakeBelly: lam(0x3a2b30, 0x060202),
+    drakeHorn: lam(0x2c2622),
+    drakeWing: new THREE.MeshLambertMaterial({
+      color: 0x8c3424, emissive: 0x1c0505, flatShading: true,
+      side: THREE.DoubleSide, transparent: true, opacity: 0.94,
+    }),
+    drakeEye: lam(0x100804, 0xffa020),
+    drakeThroat: lam(0x30161a, 0xff4408),
+    witchHand: new THREE.MeshBasicMaterial({ color: 0x55ff44, transparent: true, opacity: 0.85 }),
   };
+  M.drakeEye.emissiveIntensity = 2.0;
+  M.drakeThroat.emissiveIntensity = 0.0;
 
   // Blob shadow: shared radial-gradient CanvasTexture quad ---------------------
   const shadowTex = (() => {
@@ -120,14 +205,124 @@ export function createEnemies(g) {
   const barFillMat = new THREE.MeshBasicMaterial({ color: 0xc03828, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false });
 
   // -------------------------------------------------------------------------
-  // Model builders — ≤7 meshes per enemy, pivots (Groups) carry the animation
+  // Skinned rig loading + animation controller
+  // -------------------------------------------------------------------------
+  const nativeH = {}; // char name -> measured native height (Box3, once)
+
+  function buildRig(h, spec, res) {
+    if (h.rig) return; // already built (pool re-entry safety)
+    const scene = res.scene;
+    let nh = nativeH[spec.char];
+    if (!nh) {
+      _box.setFromObject(scene);
+      nh = Math.max(0.01, _box.max.y - _box.min.y);
+      nativeH[spec.char] = nh;
+    }
+    scene.scale.setScalar(spec.h / nh);
+    if (spec.tint) g.assets.tint(scene, spec.tint, spec.tintOpts || undefined);
+    h.rig = scene;
+    h.root.add(scene);
+    h.mixer = new THREE.AnimationMixer(scene);
+    h.clips = {};
+    for (let i = 0; i < res.animations.length; i++) h.clips[res.animations[i].name] = res.animations[i];
+    h.actions = {};
+    h.cur = null; h.curName = '';
+    if (spec.hunch) {
+      let sp = null;
+      scene.traverse((o) => { if (!sp && o.isBone && /spine/i.test(o.name)) sp = o; });
+      h.spine = sp;
+      h.spineBase = sp ? sp.rotation.x : 0;
+    }
+    if (spec.handGlow) {
+      let n = 0;
+      scene.traverse((o) => {
+        if (n < 2 && o.isBone && /hand/i.test(o.name)) {
+          const orb = new THREE.Mesh(GEO.orb, M.witchHand);
+          orb.scale.setScalar(0.55 / scene.scale.x);
+          orb.castShadow = false;
+          o.add(orb);
+          n++;
+        }
+      });
+    }
+    if (spec.isVargr) applyVargrLook(h, Math.min(g.flags.vargrWins | 0, 3));
+  }
+
+  function requestRig(h, specKey) {
+    const spec = SPEC[specKey];
+    if (!spec) return;
+    h.spec = spec;
+    const got = g.assets.charSync(spec.char);
+    if (got) { buildRig(h, spec, got); return; }
+    g.assets.char(spec.char)
+      .then((res) => { buildRig(h, spec, res); })
+      .catch(() => {});
+  }
+
+  // Play a looping clip (no-op if already current; updates timeScale)
+  function play(h, name, fade, ts) {
+    const clip = h.clips[name];
+    if (!clip) return null;
+    let a = h.actions[name];
+    if (!a) { a = h.mixer.clipAction(clip); h.actions[name] = a; }
+    if (h.curName === name) { a.timeScale = ts; return a; }
+    a.reset();
+    a.timeScale = ts;
+    a.setLoop(THREE.LoopRepeat, Infinity);
+    a.clampWhenFinished = false;
+    if (h.cur && h.cur !== a) h.cur.fadeOut(fade);
+    a.fadeIn(fade);
+    a.play();
+    h.cur = a; h.curName = name;
+    return a;
+  }
+
+  // Restart a one-shot clip (always retriggers)
+  function playOnce(h, name, fade, ts) {
+    const clip = h.clips[name];
+    if (!clip) return null;
+    let a = h.actions[name];
+    if (!a) { a = h.mixer.clipAction(clip); h.actions[name] = a; }
+    if (h.cur && h.cur !== a) h.cur.fadeOut(fade);
+    a.reset();
+    a.timeScale = ts;
+    a.setLoop(THREE.LoopOnce, 1);
+    a.clampWhenFinished = true;
+    a.fadeIn(fade);
+    a.play();
+    h.cur = a; h.curName = name;
+    return a;
+  }
+
+  function clipDur(h, name) {
+    const c = h.clips[name];
+    return c ? c.duration : 1;
+  }
+
+  // Vargr's scars: red tint + emissive stripes deepen per nemesis win
+  const VARGR_EMISS = ['#000000', '#6a0e0e', '#9a1414', '#c81a1a'];
+  function applyVargrLook(h, wins) {
+    if (!h.rig || h.vargrWins === wins) return;
+    h.vargrWins = wins;
+    if (wins > 0) {
+      g.assets.tint(h.rig, '#e6bcb2', {
+        emissive: VARGR_EMISS[Math.min(wins, 3)],
+        emissiveIntensity: 0.12 + 0.16 * Math.min(wins, 3),
+      });
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Drake Vhastrix — rebuilt menacing procedural body (kept boneless: its
+  // flight/pose code is bespoke). Sleek tapered neck/tail, bat-wing membranes,
+  // dorsal spikes, swept horns, emissive eyes + throat glow before fire.
   // -------------------------------------------------------------------------
   function part(parent, geo, mat, px, py, pz, sx, sy, sz, rx = 0, ry = 0, rz = 0) {
     const m = new THREE.Mesh(geo, mat);
     m.position.set(px, py, pz);
     m.scale.set(sx, sy, sz);
     m.rotation.set(rx, ry, rz);
-    m.castShadow = true; // flagship target: shadows often on
+    m.castShadow = true;
     parent.add(m);
     return m;
   }
@@ -139,126 +334,116 @@ export function createEnemies(g) {
     return p;
   }
 
-  // Models face +Z (yaw = atan2(dx, dz)).
-  function buildWolf() {
-    const group = new THREE.Group();
-    const body = pivot(group, 0, 0.62, 0);
-    part(body, GEO.box, M.fur, 0, 0, 0, 0.48, 0.5, 1.15);
-    const head = pivot(group, 0, 0.86, 0.62);
-    part(head, GEO.box, M.furDark, 0, 0.02, 0.14, 0.3, 0.3, 0.5);
-    const tail = pivot(group, 0, 0.76, -0.6);
-    part(tail, GEO.box, M.furDark, 0, 0.1, -0.26, 0.12, 0.12, 0.52, -0.45);
-    const legs = [];
-    const lp = [[-0.17, 0.36], [0.17, 0.36], [-0.17, -0.38], [0.17, -0.38]];
-    for (let i = 0; i < 4; i++) {
-      const L = pivot(group, lp[i][0], 0.56, lp[i][1]);
-      part(L, GEO.box, M.fur, 0, -0.28, 0, 0.13, 0.56, 0.14);
-      legs.push(L);
-    }
-    return { group, parts: { body, head, tail, legFL: legs[0], legFR: legs[1], legBL: legs[2], legBR: legs[3] }, kind: 'quad' };
-  }
-
-  function buildBiped(o) {
-    // Shared humanoid recipe: 2 legs, torso, head, 2 arms, weapon = 7 meshes
-    const group = new THREE.Group();
-    const s = o.scale;
-    const legL = pivot(group, -0.13 * s, 0.78 * s, 0);
-    part(legL, GEO.box, o.legMat, 0, -0.39 * s, 0, o.thin * s, 0.78 * s, o.thin * 1.06 * s);
-    const legR = pivot(group, 0.13 * s, 0.78 * s, 0);
-    part(legR, GEO.box, o.legMat, 0, -0.39 * s, 0, o.thin * s, 0.78 * s, o.thin * 1.06 * s);
-    const body = pivot(group, 0, 1.12 * s, 0);
-    part(body, GEO.box, o.bodyMat, 0, 0, 0, 0.5 * s * o.bulk, 0.62 * s, 0.28 * s * o.bulk);
-    const head = pivot(group, 0, 1.58 * s, 0);
-    part(head, GEO.box, o.headMat, 0, 0.1 * s, 0, 0.27 * s * o.headS, 0.28 * s * o.headS, 0.27 * s * o.headS);
-    const armL = pivot(group, -0.33 * s * o.bulk, 1.38 * s, 0);
-    part(armL, GEO.box, o.armMat, 0, -0.27 * s, 0, o.thin * 0.85 * s, 0.56 * s, o.thin * 0.9 * s);
-    const armR = pivot(group, 0.33 * s * o.bulk, 1.38 * s, 0);
-    part(armR, GEO.box, o.armMat, 0, -0.27 * s, 0, o.thin * 0.85 * s, 0.56 * s, o.thin * 0.9 * s);
-    let weapon = null;
-    if (o.weapon === 'club') {
-      weapon = part(armR, GEO.box, M.wood, 0.02, -0.52 * s, 0.16 * s, 0.1 * s, 0.44 * s, 0.1 * s, 0.9);
-    } else if (o.weapon === 'sword') {
-      weapon = part(armR, GEO.box, M.steel, 0.02, -0.5 * s, 0.34 * s, 0.05 * s, 0.06 * s, 0.85 * s);
-    } else if (o.weapon === 'axe') {
-      weapon = part(armR, GEO.box, M.steel, 0.02, -0.62 * s, 0.3 * s, 0.2 * s, 0.09 * s, 0.62 * s);
-    }
-    return { group, parts: { legL, legR, body, head, armL, armR, weapon }, kind: 'biped' };
-  }
-
-  function buildGoblin() {
-    return buildBiped({ scale: 0.68, thin: 0.2, bulk: 1.08, headS: 1.5, legMat: M.goblin, bodyMat: M.rag, headMat: M.goblin, armMat: M.goblin, weapon: 'club' });
-  }
-  function buildBandit() {
-    return buildBiped({ scale: 1.0, thin: 0.17, bulk: 1.0, headS: 1.0, legMat: M.cloth, bodyMat: M.armor, headMat: M.skin, armMat: M.cloth, weapon: 'sword' });
-  }
-  function buildSkeleton() {
-    return buildBiped({ scale: 0.98, thin: 0.11, bulk: 0.92, headS: 1.0, legMat: M.bone, bodyMat: M.boneDark, headMat: M.bone, armMat: M.bone, weapon: 'sword' });
-  }
-  function buildBarrowlord() {
-    return buildBiped({ scale: 1.5, thin: 0.16, bulk: 1.25, headS: 1.15, legMat: M.boneDark, bodyMat: M.boneDark, headMat: M.bone, armMat: M.boneDark, weapon: 'axe' });
-  }
-
-  function buildVargr() {
-    // 7 meshes: coat cone, torso, head, red plume, 2 arms, sword.
-    // Scar stripes (one per nemesis win, ≤3) are added dynamically.
-    const group = new THREE.Group();
-    const legL = pivot(group, 0, 0.55, 0); // coat sways in place of legs
-    part(legL, GEO.cone, M.coat, 0, 0, 0, 1.3, 1.14, 1.1);
-    const body = pivot(group, 0, 1.28, 0);
-    const bodyMesh = part(body, GEO.box, M.armor, 0, 0, 0, 0.58, 0.62, 0.34);
-    const head = pivot(group, 0, 1.74, 0);
-    part(head, GEO.box, M.skin, 0, 0.1, 0, 0.29, 0.3, 0.29);
-    part(head, GEO.cone, M.red, 0, 0.36, -0.04, 0.34, 0.44, 0.34); // red plume
-    const armL = pivot(group, -0.38, 1.52, 0);
-    part(armL, GEO.box, M.coat, 0, -0.28, 0, 0.16, 0.58, 0.17);
-    const armR = pivot(group, 0.38, 1.52, 0);
-    part(armR, GEO.box, M.coat, 0, -0.28, 0, 0.16, 0.58, 0.17);
-    const weapon = part(armR, GEO.box, M.steel, 0.02, -0.52, 0.4, 0.06, 0.07, 1.0);
-    return { group, parts: { legL, legR: null, body, head, armL, armR, weapon, bodyMesh, scars: [] }, kind: 'biped' };
-  }
+  const wingGeo = (() => {
+    // Bat-wing membrane: fan of triangles, scalloped trailing edge (local -X out)
+    const v = new Float32Array([
+      0.0, 0.0, 0.3,      // 0 shoulder
+      -1.7, 0.25, 0.45,   // 1 elbow
+      -4.1, -0.05, 0.0,   // 2 wing tip
+      -3.3, -0.5, -1.35,  // 3 scallop 1
+      -2.0, -0.42, -1.85, // 4 scallop 2
+      -0.7, -0.2, -1.55,  // 5 scallop 3
+      0.0, -0.1, -1.05,   // 6 root trailing
+    ]);
+    const idx = [0, 1, 5, 1, 4, 5, 1, 3, 4, 1, 2, 3, 0, 5, 6];
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(v, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    return geo;
+  })();
 
   function buildDrake() {
-    // 7 meshes: body, neck, head, horn, tail, 2 wings.
     const group = new THREE.Group();
-    const body = pivot(group, 0, 1.3, 0);
-    part(body, GEO.box, M.drake, 0, 0, 0, 1.5, 1.25, 3.6);
-    const neck = pivot(group, 0, 1.9, 1.7);
-    part(neck, GEO.box, M.drake, 0, 0.5, 0.5, 0.6, 0.55, 1.5, -0.55);
-    const head = pivot(neck, 0, 1.05, 1.05);
-    part(head, GEO.box, M.drake, 0, 0.05, 0.35, 0.72, 0.55, 1.15);
-    part(head, GEO.cone, M.horn, 0, 0.45, -0.1, 0.4, 0.6, 0.4, -0.5);
-    const tail = pivot(group, 0, 1.4, -1.8);
-    part(tail, GEO.cone, M.drake, 0, 0, -1.5, 0.9, 3.0, 0.9, -Math.PI / 2);
-    const wingL = pivot(group, -0.7, 2.15, 0.3);
-    part(wingL, GEO.box, M.drakeWing, -2.0, 0, 0, 3.9, 0.09, 1.7);
-    const wingR = pivot(group, 0.7, 2.15, 0.3);
-    part(wingR, GEO.box, M.drakeWing, 2.0, 0, 0, 3.9, 0.09, 1.7);
-    return { group, parts: { body, neck, head, tail, wingL, wingR }, kind: 'drake' };
+    // Body: deep chest tapering to hips + pale belly + dorsal spikes
+    const body = pivot(group, 0, 1.45, 0);
+    part(body, GEO.box, M.drake, 0, 0.1, 0.7, 1.5, 1.3, 2.0);          // chest
+    part(body, GEO.box, M.drake, 0, 0.0, -1.0, 1.1, 1.0, 1.7);         // hips
+    part(body, GEO.box, M.drakeBelly, 0, -0.55, 0.3, 1.05, 0.5, 2.6);  // belly plates
+    for (let i = 0; i < 5; i++) {
+      const s = 0.55 - i * 0.07;
+      part(body, GEO.cone, M.drakeHorn, 0, 0.75 - i * 0.06, 1.0 - i * 0.62, s, s * 1.6, s * 0.55, -0.35);
+    }
+    part(body, GEO.box, M.drake, -0.85, -0.65, -0.7, 0.55, 0.9, 0.85, 0.25);  // haunch L
+    part(body, GEO.box, M.drake, 0.85, -0.65, -0.7, 0.55, 0.9, 0.85, 0.25);   // haunch R
+    // Neck: three tapering segments arcing up to the skull
+    const neck = pivot(group, 0, 2.0, 1.55);
+    part(neck, GEO.box, M.drake, 0, 0.18, 0.28, 0.78, 0.68, 0.95, -0.35);
+    part(neck, GEO.box, M.drake, 0, 0.62, 0.72, 0.62, 0.56, 0.85, -0.55);
+    part(neck, GEO.box, M.drake, 0, 1.06, 1.06, 0.5, 0.46, 0.75, -0.7);
+    const throat = part(neck, GEO.box, M.drakeThroat, 0, 0.5, 0.85, 0.34, 0.9, 0.55, -0.6);
+    throat.castShadow = false;
+    const head = pivot(neck, 0, 1.42, 1.38);
+    part(head, GEO.box, M.drake, 0, 0.08, 0.15, 0.6, 0.42, 0.7);              // skull
+    part(head, GEO.box, M.drake, 0, 0.0, 0.68, 0.38, 0.26, 0.62);             // snout
+    const jaw = pivot(head, 0, -0.1, 0.15);
+    part(jaw, GEO.box, M.drake, 0, -0.06, 0.42, 0.32, 0.12, 0.72);
+    part(head, GEO.cone, M.drakeHorn, -0.22, 0.3, -0.18, 0.16, 0.85, 0.16, -2.3, 0, 0.25);  // horn L
+    part(head, GEO.cone, M.drakeHorn, 0.22, 0.3, -0.18, 0.16, 0.85, 0.16, -2.3, 0, -0.25);  // horn R
+    part(head, GEO.cone, M.drakeHorn, -0.13, 0.34, 0.18, 0.09, 0.4, 0.09, -2.0);            // brow spike L
+    part(head, GEO.cone, M.drakeHorn, 0.13, 0.34, 0.18, 0.09, 0.4, 0.09, -2.0);             // brow spike R
+    const eyeL = part(head, GEO.box, M.drakeEye, -0.26, 0.14, 0.34, 0.1, 0.07, 0.12);
+    const eyeR = part(head, GEO.box, M.drakeEye, 0.26, 0.14, 0.34, 0.1, 0.07, 0.12);
+    eyeL.castShadow = eyeR.castShadow = false;
+    // Tail: tapering whip with a fin
+    const tail = pivot(group, 0, 1.4, -1.75);
+    part(tail, GEO.box, M.drake, 0, 0, -0.7, 0.62, 0.5, 1.5);
+    part(tail, GEO.box, M.drake, 0, 0.04, -1.95, 0.4, 0.32, 1.35);
+    part(tail, GEO.box, M.drake, 0, 0.08, -3.0, 0.24, 0.2, 1.1);
+    part(tail, GEO.cone, M.drakeWing, 0, 0.1, -3.7, 0.7, 1.2, 0.08, -Math.PI / 2);  // tail fin
+    // Wings: bone leading edge + membrane fan
+    const wingL = pivot(group, -0.75, 2.35, 0.55);
+    part(wingL, GEO.box, M.drake, -0.9, 0.12, 0.35, 1.9, 0.16, 0.2, 0, -0.08);      // arm bone
+    part(wingL, GEO.box, M.drake, -2.9, 0.08, 0.2, 2.4, 0.11, 0.13, 0, -0.06);      // finger bone
+    const memL = new THREE.Mesh(wingGeo, M.drakeWing);
+    memL.castShadow = true;
+    wingL.add(memL);
+    const wingR = pivot(group, 0.75, 2.35, 0.55);
+    const wr = new THREE.Group();
+    wr.scale.x = -1;
+    wingR.add(wr);
+    part(wr, GEO.box, M.drake, -0.9, 0.12, 0.35, 1.9, 0.16, 0.2, 0, -0.08);
+    part(wr, GEO.box, M.drake, -2.9, 0.08, 0.2, 2.4, 0.11, 0.13, 0, -0.06);
+    const memR = new THREE.Mesh(wingGeo, M.drakeWing);
+    memR.castShadow = true;
+    wr.add(memR);
+    return { group, parts: { body, neck, head, jaw, tail, wingL, wingR } };
   }
 
-  const BUILDERS = {
-    wolf: buildWolf, goblin: buildGoblin, bandit: buildBandit,
-    skeleton: buildSkeleton, barrowlord: buildBarrowlord,
-    vargr: buildVargr, drake: buildDrake,
-  };
-
   // -------------------------------------------------------------------------
-  // Holders (model + shadow + hp bar) — pooled per type, kept in scene
+  // Holders (rig root + shadow + hp bar) — pooled per type, kept in scene
   // -------------------------------------------------------------------------
-  const pools = { wolf: [], goblin: [], bandit: [], skeleton: [], barrowlord: [], vargr: [], drake: [] };
+  const pools = {};
+  for (const k in TYPES) pools[k] = [];
 
   function makeHolder(type) {
-    const model = BUILDERS[type]();
-    model.group.visible = false;
-    g.scene.add(model.group);
+    const holder = {
+      type, root: null, parts: null,
+      rig: null, mixer: null, clips: null, actions: null, cur: null, curName: '',
+      spec: SPEC[type] || null, spine: null, spineBase: 0, vargrWins: -1,
+      deathPlayed: false,
+      shadow: null, bar: null, barFill: null, barW: 1.1,
+    };
+    if (type === 'drake') {
+      const d = buildDrake();
+      holder.root = d.group;
+      holder.parts = d.parts;
+    } else {
+      holder.root = new THREE.Group(); // logic-first: empty until GLB resolves
+      requestRig(holder, type);
+    }
+    holder.root.visible = false;
+    g.scene.add(holder.root);
 
     const shadow = new THREE.Mesh(GEO.plane, shadowMat);
     shadow.rotation.x = -Math.PI / 2;
     shadow.renderOrder = 2;
     shadow.visible = false;
     g.scene.add(shadow);
+    holder.shadow = shadow;
 
-    const barW = type === 'drake' ? 3.0 : type === 'barrowlord' ? 1.8 : 1.1;
+    const barW = type === 'drake' ? 3.0 : type === 'barrowlord' ? 1.8 :
+      type === 'troll' ? 2.2 : type === 'morvane' ? 1.7 : 1.1;
     const bar = new THREE.Group();
     const barBg = new THREE.Mesh(GEO.plane, barBgMat);
     barBg.scale.set(barW, 0.13, 1);
@@ -270,16 +455,19 @@ export function createEnemies(g) {
     bar.add(barBg); bar.add(barFill);
     bar.visible = false;
     g.scene.add(bar);
+    holder.bar = bar; holder.barFill = barFill; holder.barW = barW;
 
-    return { type, model, shadow, bar, barFill, barW };
+    return holder;
   }
   function acquireHolder(type) {
     return pools[type].length ? pools[type].pop() : makeHolder(type);
   }
   function releaseHolder(h) {
-    h.model.group.visible = false;
+    h.root.visible = false;
     h.shadow.visible = false;
     h.bar.visible = false;
+    if (h.mixer) { h.mixer.stopAllAction(); h.cur = null; h.curName = ''; }
+    h.deathPlayed = false;
     pools[h.type].push(h);
   }
 
@@ -296,6 +484,7 @@ export function createEnemies(g) {
       isVargr: !!(opts && opts.isVargr),
       nightOnly: !!(opts && opts.nightOnly),
       nightRespawn: !!(opts && opts.nightRespawn),
+      deadFlag: (opts && opts.deadFlag) || null,
       enemy: null, respawnAt: -1, permaDead: false,
     };
     spawners.push(s);
@@ -362,6 +551,9 @@ export function createEnemies(g) {
     const rad = 14 + hash2(i, 3, WORLD_SEED + 5) * 24;
     addSpawner('skeleton', POI.ruins.x + Math.cos(a) * rad, POI.ruins.z + Math.sin(a) * rad, { nightRespawn: true });
   }
+  // Skeleton archers on the ruin walls' line (night respawn like their kin)
+  addSpawner('skelarcher', POI.ruins.x - 12, POI.ruins.z - 30, { nightRespawn: true });
+  addSpawner('skelarcher', POI.ruins.x + 26, POI.ruins.z - 4, { nightRespawn: true });
   // Bandits ×4 + Vargr Redfang at Redfang Camp
   for (let i = 0; i < 4; i++) {
     const a = i * 1.57 + 0.4;
@@ -372,8 +564,25 @@ export function createEnemies(g) {
   // Barrowlord in the ruins crypt area; drake at Drakespire peak
   addSpawner('barrowlord', POI.ruins.x + 8, POI.ruins.z - 16, { boss: true });
   addSpawner('drake', POI.peak.x, POI.peak.z, { boss: true });
+  // Wraiths: night-only, ruins + wardstones (spirits of the old barrows)
+  addSpawner('wraith', POI.ruins.x - 22, POI.ruins.z + 26, { nightOnly: true });
+  addSpawner('wraith', POI.ruins.x + 32, POI.ruins.z + 10, { nightOnly: true });
+  addSpawner('wraith', POI.stones.x + 14, POI.stones.z - 10, { nightOnly: true });
+  addSpawner('wraith', POI.stones.x - 15, POI.stones.z + 13, { nightOnly: true });
+  // Cemetery ring by the ruins (structures.js dresses it) — vampire territory
+  const CEMETERY = { x: POI.ruins.x - 58, z: POI.ruins.z + 42 };
+  addSpawner('thrall', CEMETERY.x + 8, CEMETERY.z - 6, { nightOnly: true });
+  addSpawner('thrall', CEMETERY.x - 9, CEMETERY.z + 4, { nightOnly: true });
+  addSpawner('thrall', CEMETERY.x + 2, CEMETERY.z + 12, { nightOnly: true });
+  // Vampire lord Morvane in the cemetery crypt, night mini-boss
+  addSpawner('morvane', CEMETERY.x, CEMETERY.z, { boss: true, nightOnly: true, deadFlag: 'morvaneDead' });
+  // Witch Grimhilde at her hut (neutral until provoked / quest-flagged)
+  addSpawner('witch', WITCH_HUT.x + 6, WITCH_HUT.z + 5, { deadFlag: 'witchDead' });
+  // The Stonebridge troll, living under the bridge on the ruins road
+  addSpawner('troll', STONEBRIDGE.x + 3, STONEBRIDGE.z + 4, { boss: true, deadFlag: 'trollDead' });
 
-  // Persistent boss state (serialized)
+  // Persistent boss state (serialized — format unchanged; new minibosses
+  // persist through g.flags which save.js already stores)
   const bossState = {
     drake: { dead: false, hp: TYPES.drake.hp },
     barrowlord: { dead: false, hp: TYPES.barrowlord.hp },
@@ -421,6 +630,158 @@ export function createEnemies(g) {
   }
 
   // -------------------------------------------------------------------------
+  // Generic colored burst particles (troll slam ring, Morvane blink, bolt
+  // impacts) — one pooled vertex-colored Points system
+  // -------------------------------------------------------------------------
+  const BURST_N = 96;
+  const burstPos = new Float32Array(BURST_N * 3);
+  const burstVel = new Float32Array(BURST_N * 3);
+  const burstLife = new Float32Array(BURST_N);
+  const burstCol = new Float32Array(BURST_N * 3);
+  for (let i = 0; i < BURST_N; i++) { burstPos[i * 3 + 1] = -9999; burstLife[i] = 0; }
+  const burstGeo = new THREE.BufferGeometry();
+  const burstPosAttr = new THREE.BufferAttribute(burstPos, 3);
+  burstPosAttr.setUsage(THREE.DynamicDrawUsage);
+  const burstColAttr = new THREE.BufferAttribute(burstCol, 3);
+  burstColAttr.setUsage(THREE.DynamicDrawUsage);
+  burstGeo.setAttribute('position', burstPosAttr);
+  burstGeo.setAttribute('color', burstColAttr);
+  const burstPoints = new THREE.Points(burstGeo, new THREE.PointsMaterial({
+    size: 0.5, vertexColors: true, transparent: true, opacity: 0.9,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+  }));
+  burstPoints.frustumCulled = false;
+  g.scene.add(burstPoints);
+  let burstAlive = 0;
+  let burstCursor = 0;
+  // style: 0 = radial ground ring (slam dust), 1 = spherical puff (magic)
+  function emitBurst(x, y, z, n, r, gr, b, style) {
+    for (let k = 0; k < n; k++) {
+      const i = burstCursor; burstCursor = (burstCursor + 1) % BURST_N;
+      burstPos[i * 3] = x; burstPos[i * 3 + 1] = y; burstPos[i * 3 + 2] = z;
+      if (style === 0) {
+        const a = (k / n) * Math.PI * 2 + Math.random() * 0.4;
+        const s = 7 + Math.random() * 4;
+        burstVel[i * 3] = Math.cos(a) * s;
+        burstVel[i * 3 + 1] = 1.5 + Math.random() * 2;
+        burstVel[i * 3 + 2] = Math.sin(a) * s;
+      } else {
+        burstVel[i * 3] = (Math.random() - 0.5) * 6;
+        burstVel[i * 3 + 1] = (Math.random() - 0.3) * 6;
+        burstVel[i * 3 + 2] = (Math.random() - 0.5) * 6;
+      }
+      burstCol[i * 3] = r; burstCol[i * 3 + 1] = gr; burstCol[i * 3 + 2] = b;
+      if (burstLife[i] <= 0) burstAlive++;
+      burstLife[i] = 0.4 + Math.random() * 0.35;
+    }
+    burstColAttr.needsUpdate = true;
+  }
+  function updateBurst(dt) {
+    if (burstAlive === 0) return;
+    for (let i = 0; i < BURST_N; i++) {
+      if (burstLife[i] <= 0) continue;
+      burstLife[i] -= dt;
+      if (burstLife[i] <= 0) { burstPos[i * 3 + 1] = -9999; burstAlive--; continue; }
+      burstPos[i * 3] += burstVel[i * 3] * dt;
+      burstPos[i * 3 + 1] += burstVel[i * 3 + 1] * dt;
+      burstPos[i * 3 + 2] += burstVel[i * 3 + 2] * dt;
+      burstVel[i * 3 + 1] -= 4.5 * dt;
+    }
+    burstPosAttr.needsUpdate = true;
+  }
+
+  // -------------------------------------------------------------------------
+  // Enemy bolt projectiles (wraith spirit bolts, witch arcing hexes,
+  // skeleton archer arrows) — pooled meshes, owned here
+  // -------------------------------------------------------------------------
+  const BOLT_KINDS = {
+    wraith: { mat: new THREE.MeshBasicMaterial({ color: 0x88ddff, transparent: true, opacity: 0.95 }), spd: 15, grav: 0, scale: 1.4, long: 1.6, trail: [0.5, 0.8, 1.0] },
+    witch:  { mat: new THREE.MeshBasicMaterial({ color: 0x66ff55, transparent: true, opacity: 0.95 }), spd: 13, grav: 9, scale: 1.5, long: 1.2, trail: [0.35, 1.0, 0.3] },
+    arrow:  { mat: new THREE.MeshBasicMaterial({ color: 0xd8c8a0, transparent: true, opacity: 0.95 }), spd: 27, grav: 4, scale: 0.8, long: 4.5, trail: null },
+  };
+  const BOLT_N = 14;
+  const bolts = [];
+  for (let i = 0; i < BOLT_N; i++) {
+    const mesh = new THREE.Mesh(GEO.orb, BOLT_KINDS.arrow.mat);
+    mesh.castShadow = false;
+    mesh.visible = false;
+    g.scene.add(mesh);
+    bolts.push({ mesh, vel: new THREE.Vector3(), active: false, life: 0, dmg: 0, grav: 0, kind: null, trailT: 0 });
+  }
+  let boltCursor = 0;
+
+  function fireBolt(e, R) {
+    const K = BOLT_KINDS[R.bolt];
+    const b = bolts[boltCursor]; boltCursor = (boltCursor + 1) % BOLT_N;
+    const p = g.player;
+    const ox = e.pos.x + Math.sin(e.yaw) * 0.6;
+    const oy = e.pos.y + e.height * 0.72;
+    const oz = e.pos.z + Math.cos(e.yaw) * 0.6;
+    // lead the target slightly with player velocity
+    const lead = p.velocity ? 0.35 : 0;
+    const tx = p.position.x + (lead ? p.velocity.x * lead : 0);
+    const ty = p.position.y + 1.1;
+    const tz = p.position.z + (lead ? p.velocity.z * lead : 0);
+    const dx = tx - ox, dy = ty - oy, dz = tz - oz;
+    const dh = Math.max(Math.hypot(dx, dz), 0.01);
+    if (K.grav > 0) {
+      // ballistic arc onto the target
+      const tArr = dh / K.spd;
+      b.vel.set((dx / dh) * K.spd, dy / tArr + 0.5 * K.grav * tArr, (dz / dh) * K.spd);
+    } else {
+      const d3 = Math.max(Math.hypot(dx, dy, dz), 0.01);
+      b.vel.set((dx / d3) * K.spd, (dy / d3) * K.spd, (dz / d3) * K.spd);
+    }
+    b.active = true; b.life = 5; b.dmg = e.dmg; b.grav = K.grav; b.kind = K; b.trailT = 0;
+    b.mesh.material = K.mat;
+    b.mesh.scale.set(K.scale, K.scale, K.scale * K.long);
+    b.mesh.position.set(ox, oy, oz);
+    _tv.set(ox + b.vel.x, oy + b.vel.y, oz + b.vel.z);
+    b.mesh.lookAt(_tv);
+    b.mesh.visible = true;
+    sfx(R.bolt === 'arrow' ? 'bowShoot' : 'fireCast');
+  }
+
+  function updateBolts(dt) {
+    const p = g.player;
+    for (let i = 0; i < BOLT_N; i++) {
+      const b = bolts[i];
+      if (!b.active) continue;
+      b.life -= dt;
+      if (b.life <= 0) { b.active = false; b.mesh.visible = false; continue; }
+      b.vel.y -= b.grav * dt;
+      const m = b.mesh.position;
+      m.x += b.vel.x * dt; m.y += b.vel.y * dt; m.z += b.vel.z * dt;
+      _tv.set(m.x + b.vel.x, m.y + b.vel.y, m.z + b.vel.z);
+      b.mesh.lookAt(_tv);
+      if (b.kind.trail) {
+        b.trailT -= dt;
+        if (b.trailT <= 0) {
+          b.trailT = 0.05;
+          emitBurst(m.x, m.y, m.z, 1, b.kind.trail[0], b.kind.trail[1], b.kind.trail[2], 1);
+        }
+      }
+      // player hit
+      if (p && p.stats.hp > 0) {
+        const px = p.position.x - m.x, py = (p.position.y + 1.0) - m.y, pz = p.position.z - m.z;
+        if (px * px + py * py + pz * pz < 1.25) {
+          let res = null;
+          if (g.combat && g.combat.tryBlock) res = g.combat.tryBlock(b.dmg);
+          if (!res || (!res.blocked && !res.parried)) p.damage(b.dmg, m);
+          if (b.kind.trail) emitBurst(m.x, m.y, m.z, 6, b.kind.trail[0], b.kind.trail[1], b.kind.trail[2], 1);
+          b.active = false; b.mesh.visible = false;
+          continue;
+        }
+      }
+      // terrain hit
+      if (m.y <= terrainHeight(m.x, m.z) + 0.1) {
+        if (b.kind.trail) emitBurst(m.x, m.y + 0.2, m.z, 5, b.kind.trail[0], b.kind.trail[1], b.kind.trail[2], 1);
+        b.active = false; b.mesh.visible = false;
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Enemy lifecycle
   // -------------------------------------------------------------------------
   const list = []; // exposed active enemy list
@@ -445,6 +806,7 @@ export function createEnemies(g) {
       dmg: Math.round(T.dmg * dmgMul), speed: T.speed, xp: T.xp,
       reach: T.reach, bodyR: T.bodyR, height: T.height,
       sightR: T.sightR, atkCd: T.atkCd, mass: T.mass,
+      teleT: T.teleT || TELEGRAPH_T, strikeT: T.strikeT || STRIKE_T,
       pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(),
       yaw: hash2(x | 0, z | 0, 3) * Math.PI * 2,
       home: { x, z },
@@ -457,11 +819,23 @@ export function createEnemies(g) {
       packId: spawner ? spawner.packId : -1,
       orbitA: Math.random() * Math.PI * 2,
       orbitDir: (spawner && spawner.id % 2 === 0) ? 1 : -1,
-      boss: !!(spawner && spawner.boss) || type === 'drake' || type === 'barrowlord',
+      boss: !!(spawner && spawner.boss) || type === 'drake' || type === 'barrowlord' ||
+            type === 'morvane' || type === 'troll',
       isVargr: type === 'vargr',
       spawner: spawner || null,
       summoned: false, taunted: false,
       holder,
+      // animation bookkeeping
+      animState: '', atkIdx: -1, hitTog: false, blockHit: false,
+      lodAcc: 0, frameC: (Math.random() * 4) | 0,
+      // wave-2 behaviors
+      ranged: RANGED[type] || null,
+      hover: type === 'wraith', hoverPh: Math.random() * 6.28,
+      drains: type === 'thrall' || type === 'morvane',
+      dawnFade: !!T.dawnFade,
+      castMove: type === 'witch',
+      dodgeT: 1.2 + Math.random() * 2, dodgeDir: 1,
+      blinkT: 3 + Math.random() * 3, blinkDone: false,
       // drake:
       fly: false, dstate: '', atkT: 0, phaseT: 0, breathTick: 0, roared: false,
       swoopA: null, swoopB: null, swoopC: null, breathTarget: null,
@@ -473,11 +847,15 @@ export function createEnemies(g) {
       e.breathTarget = new THREE.Vector3();
     }
     if (type === 'vargr') refreshVargrScars(e);
-    const gp = holder.model.group;
+    const gp = holder.root;
     gp.position.set(x, y, z);
     gp.rotation.set(0, e.yaw, 0);
+    gp.scale.setScalar(1);
     gp.visible = true;
-    const shadowD = type === 'drake' ? 7 : type === 'barrowlord' ? 3 : e.bodyR * 2.6;
+    holder.deathPlayed = false;
+    if (holder.mixer) { holder.mixer.stopAllAction(); holder.cur = null; holder.curName = ''; }
+    const shadowD = type === 'drake' ? 8 : type === 'troll' ? 3.4 :
+      type === 'barrowlord' ? 3 : e.bodyR * 2.6;
     holder.shadow.scale.set(shadowD, shadowD, 1);
     holder.shadow.visible = true;
     e.shadowD = shadowD;
@@ -487,20 +865,8 @@ export function createEnemies(g) {
   }
 
   function refreshVargrScars(e) {
-    // One red scar stripe per nemesis win (capped at 3) across the chest.
-    const wins = Math.min(g.flags.vargrWins | 0, 3);
-    const P = e.holder.model.parts;
-    while (P.scars.length < wins) {
-      const i = P.scars.length;
-      const m = new THREE.Mesh(GEO.box, M.red);
-      m.castShadow = false;
-      m.position.set(-0.1 + i * 0.12, 0.05 - i * 0.1, 0.19);
-      m.scale.set(0.06, 0.5, 0.02);
-      m.rotation.z = 0.5 - i * 0.25;
-      P.body.add(m);
-      P.scars.push(m);
-    }
-    for (let i = 0; i < P.scars.length; i++) P.scars[i].visible = i < wins;
+    // Deepening red scar-glow per nemesis win (capped at 3) on the rig
+    applyVargrLook(e.holder, Math.min(g.flags.vargrWins | 0, 3));
   }
 
   function despawn(e) {
@@ -520,6 +886,12 @@ export function createEnemies(g) {
     if (e.type === 'wolf') {
       events.emit('spawnLoot', { pos: { x: p.x - 0.4, y: p.y, z: p.z - 0.3 }, kind: 'item', amount: 1, itemId: 'pelt' });
     }
+    if (e.type === 'morvane') {
+      events.emit('spawnLoot', { pos: { x: p.x - 0.4, y: p.y, z: p.z - 0.3 }, kind: 'item', amount: 1, itemId: 'bloodseal' });
+    }
+    if (e.type === 'troll') {
+      events.emit('spawnLoot', { pos: { x: p.x - 0.5, y: p.y, z: p.z - 0.4 }, kind: 'item', amount: 1, itemId: 'trollheart' });
+    }
   }
 
   function kill(e) {
@@ -528,11 +900,14 @@ export function createEnemies(g) {
     if (e.spawner) {
       const night = isNightFrac(g.time.dayFrac);
       e.spawner.respawnAt = g.time.elapsed + (e.spawner.nightRespawn && night ? NIGHT_RESPAWN_T : RESPAWN_T);
-      if (e.boss || e.isVargr) e.spawner.permaDead = true; // bosses & Vargr stay dead
+      if (e.boss || e.isVargr || e.spawner.deadFlag) e.spawner.permaDead = true; // bosses & flagged uniques stay dead
     }
     if (e.type === 'drake') { bossState.drake.dead = true; bossState.drake.hp = 0; sfx('drakeRoar'); }
     if (e.type === 'barrowlord') { bossState.barrowlord.dead = true; bossState.barrowlord.hp = 0; }
     if (e.isVargr) g.flags.vargrDead = true;
+    if (e.type === 'morvane') g.flags.morvaneDead = true;
+    if (e.type === 'troll') g.flags.trollDead = true;
+    if (e.type === 'witch') g.flags.witchDead = true;
     events.emit('enemyKilled', { type: e.type, name: e.name, pos: { x: e.pos.x, y: e.pos.y, z: e.pos.z }, xp: e.xp });
     if (g.player && g.player.addXP) g.player.addXP(e.xp);
     dropLoot(e);
@@ -567,6 +942,9 @@ export function createEnemies(g) {
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
       if (!e.alive) continue;
+      // wraiths are incorporeal to projectile-sized point tests: arrows and
+      // fireball bodies (r ≤ 1.2) sail straight through — AoE still connects
+      if (e.hover && r <= 1.2) continue;
       const cx = e.pos.x - pos.x;
       const cy = e.pos.y + e.height * 0.5 - pos.y;
       const cz = e.pos.z - pos.z;
@@ -577,7 +955,18 @@ export function createEnemies(g) {
 
   function damage(e, amount, dir, opts) {
     if (!e || e.dead || !e.alive) return;
-    if (e.state === 'guard') { amount *= 0.35; sfx('block'); }
+    // Wraith: arrow-immune, fire-weak
+    if (e.type === 'wraith') {
+      if (opts && opts.kind === 'arrow') {
+        if (!g.flags.wraithHint) {
+          g.flags.wraithHint = true;
+          events.emit('notify', { text: 'Arrows pass through the wraith', sub: 'Fire will burn what steel cannot touch.' });
+        }
+        return;
+      }
+      if (opts && (opts.kind === 'fire' || opts.heavy)) amount *= 1.6; // flame (and committed blows) rend spirit
+    }
+    if (e.state === 'guard') { amount *= 0.35; e.blockHit = true; sfx('block'); }
     e.hp -= amount;
     if (e.type === 'drake') bossState.drake.hp = Math.max(0, e.hp);
     if (e.type === 'barrowlord') bossState.barrowlord.hp = Math.max(0, e.hp);
@@ -594,13 +983,28 @@ export function createEnemies(g) {
       startAggro(spawnEnemy('skeleton', e.pos.x - 2.2, e.pos.z - 1.4, null), true);
       sfx('skeletonRattle');
     }
+    // Morvane calls his thralls from the graves at half hp
+    if (e.type === 'morvane' && !e.summoned && e.hp <= e.maxHp * 0.5 && e.hp > 0) {
+      e.summoned = true;
+      startAggro(spawnEnemy('thrall', e.pos.x + 2.4, e.pos.z + 1.2, null), true);
+      startAggro(spawnEnemy('thrall', e.pos.x - 2.4, e.pos.z - 1.2, null), true);
+      emitBurst(e.pos.x, e.pos.y + 1.2, e.pos.z, 14, 0.8, 0.1, 0.2, 1);
+      sfx('fireCast');
+      events.emit('notify', { text: 'Morvane calls to the graves', sub: 'His thralls rise.' });
+    }
     if (e.hp <= 0) { kill(e); return; }
+    // Morvane blinks away from punishment sometimes
+    if (e.type === 'morvane' && e.aggro && e.blinkT < 2 && Math.random() < 0.3 &&
+        e.state !== 'blink' && e.state !== 'telegraph' && e.state !== 'strike') {
+      beginBlink(e);
+    }
     // Getting hit always aggros (pack too), even without LOS
     if (!e.aggro && e.state !== 'flee') startAggro(e, true);
     // Flinch — a heavy hit or parry interrupts the windup, light hits don't
     if (e.state === 'telegraph') {
       if ((opts && opts.heavy) || (opts && opts.parried)) { e.state = 'flinch'; e.stateT = 0; }
-    } else if (e.state !== 'strike' && e.state !== 'stagger' && e.state !== 'dead' && !e.fly) {
+    } else if (e.state !== 'strike' && e.state !== 'stagger' && e.state !== 'dead' &&
+               e.state !== 'blink' && !e.fly) {
       e.state = 'flinch'; e.stateT = 0;
     }
     // Wolves break and flee below 25% hp
@@ -653,18 +1057,39 @@ export function createEnemies(g) {
     return true;
   }
 
+  // Sight-based aggro gates: the witch stays neutral until the quest turns
+  // her hostile (damage always provokes); the troll stands down once paid.
+  function canSightAggro(e) {
+    if (e.type === 'witch') return !!g.flags.witchHostile;
+    if (e.type === 'troll') return !g.flags.trollPaid;
+    return true;
+  }
+
+  // Effective sight radius: night bonus ×1.6, sneaking shrinks it via the
+  // shadow skill (g.rpg mult 'sneakDetect')
+  function sightOf(e) {
+    let s = e.sightR * (night ? 1.6 : 1);
+    if (g.player.sneaking) s *= 0.6 * (g.rpg && g.rpg.mult ? g.rpg.mult('sneakDetect') : 1);
+    return s;
+  }
+
   function startAggro(e, silent) {
     if (e.aggro || e.dead) return;
     e.aggro = true;
     if (e.state !== 'flinch' && e.state !== 'stagger') { e.state = 'chase'; e.stateT = 0; }
     const t = g.time.elapsed;
-    if (e.type === 'wolf' && t - lastHowl > 4) { lastHowl = t; sfx('wolfHowl'); }
-    else if (e.type === 'goblin' && t - lastCackle > 3) { lastCackle = t; sfx('goblinCackle'); }
-    else if (e.type === 'skeleton') sfx('skeletonRattle');
+    if ((e.type === 'wolf' || e.type === 'werewolf') && t - lastHowl > 4) { lastHowl = t; sfx('wolfHowl'); }
+    else if ((e.type === 'goblin' || e.type === 'witch') && t - lastCackle > 3) { lastCackle = t; sfx('goblinCackle'); }
+    else if (e.type === 'skeleton' || e.type === 'skelarcher') sfx('skeletonRattle');
     else if (e.type === 'drake' && !e.roared) { e.roared = true; sfx('drakeRoar'); }
+    else if (e.type === 'troll') sfx('swingHeavy');
     if (e.isVargr && !e.taunted && (g.flags.vargrWins | 0) > 0) {
       e.taunted = true;
       events.emit('notify', { text: 'Vargr Redfang remembers you', sub: 'His scars have made him stronger.' });
+    }
+    if (e.type === 'wraith' && !g.flags.wraithHint) {
+      g.flags.wraithHint = true;
+      events.emit('notify', { text: 'The wraith shimmers between worlds', sub: 'Arrows pass through it — fire burns spirit.' });
     }
     // Pack aggro: wolves hunt together
     if (e.packId >= 0) {
@@ -713,7 +1138,10 @@ export function createEnemies(g) {
   function integrate(e, dt) {
     // velocity damping (knockback bleeds off)
     const damp = Math.min(1, 4 * dt);
-    if (e.state === 'idle' || e.state === 'dead' || e.state === 'telegraph' || e.state === 'stagger' || e.state === 'flinch' || e.state === 'guard') {
+    const anchored = e.state === 'idle' || e.state === 'dead' ||
+      (e.state === 'telegraph' && !e.castMove) ||
+      e.state === 'stagger' || e.state === 'flinch' || e.state === 'guard' || e.state === 'blink';
+    if (anchored) {
       e.vel.x -= e.vel.x * Math.min(1, 8 * dt);
       e.vel.z -= e.vel.z * Math.min(1, 8 * dt);
     } else {
@@ -725,7 +1153,14 @@ export function createEnemies(g) {
     if (!e.fly) {
       const gh = terrainHeight(e.pos.x, e.pos.z);
       e.groundY = gh;
-      e.pos.y = gh; // terrain-following
+      if (e.hover) {
+        // wraiths drift above the ground on a slow sine — never clamped
+        e.hoverPh += dt * 1.7;
+        const ty = gh + 0.85 + Math.sin(e.hoverPh) * 0.4;
+        e.pos.y += (ty - e.pos.y) * Math.min(1, 5 * dt);
+      } else {
+        e.pos.y = gh; // terrain-following
+      }
     } else {
       e.groundY = terrainHeight(e.pos.x, e.pos.z);
     }
@@ -759,8 +1194,65 @@ export function createEnemies(g) {
     if (res && res.parried) { stagger(e); return; }
     if (res && res.blocked) return; // combat handled stamina cost, no hp
     p.damage(e.dmg, e.pos);
+    // Vampires drain: a landed bite feeds them
+    if (e.drains) e.hp = Math.min(e.maxHp, e.hp + e.dmg * 0.7);
     lastHitter = e;
     lastHitT = g.time.elapsed;
+  }
+
+  // Troll ground-slam: radial dust ring + AoE damage + heavy knockback
+  function doSlam(e) {
+    const p = g.player;
+    const ix = e.pos.x + Math.sin(e.yaw) * 2.0;
+    const iz = e.pos.z + Math.cos(e.yaw) * 2.0;
+    const iy = terrainHeight(ix, iz);
+    emitBurst(ix, iy + 0.4, iz, 26, 0.62, 0.55, 0.44, 0);
+    sfx('thunder');
+    if (g.player.addShake) g.player.addShake(0.5);
+    if (p.stats.hp <= 0) return;
+    const d = Math.hypot(p.position.x - ix, p.position.z - iz);
+    if (d > 5.2) return;
+    let res = null;
+    if (g.combat && g.combat.tryBlock) res = g.combat.tryBlock(e.dmg);
+    if (res && res.parried) { stagger(e); return; }
+    // knockback lands even through a block — the mountain does not care
+    const nx = d > 0.01 ? (p.position.x - ix) / d : Math.sin(e.yaw);
+    const nz = d > 0.01 ? (p.position.z - iz) / d : Math.cos(e.yaw);
+    if (p.velocity) {
+      p.velocity.x += nx * 13;
+      p.velocity.z += nz * 13;
+      p.velocity.y = Math.max(p.velocity.y, 5.5);
+    }
+    if (!(res && res.blocked)) {
+      p.damage(e.dmg, e.pos);
+      lastHitter = e;
+      lastHitT = g.time.elapsed;
+    }
+    if (g.player.addShake) g.player.addShake(0.75);
+  }
+
+  // Morvane's teleport-blink: collapse in crimson mist, reappear 6u away
+  function beginBlink(e) {
+    e.state = 'blink'; e.stateT = 0;
+    e.blinkDone = false;
+    e.blinkT = 5 + Math.random() * 3;
+    emitBurst(e.pos.x, e.pos.y + 1.1, e.pos.z, 10, 0.8, 0.1, 0.2, 1);
+    sfx('fireCast');
+  }
+  function doBlinkJump(e) {
+    const p = g.player.position;
+    for (let tries = 0; tries < 4; tries++) {
+      const a = Math.random() * Math.PI * 2;
+      const nx = p.x + Math.sin(a) * 6;
+      const nz = p.z + Math.cos(a) * 6;
+      const nh = terrainHeight(nx, nz);
+      if (nh > WATER_LEVEL - 0.5) {
+        e.pos.set(nx, nh, nz);
+        e.vel.set(0, 0, 0);
+        break;
+      }
+    }
+    emitBurst(e.pos.x, e.pos.y + 1.1, e.pos.z, 14, 0.8, 0.1, 0.2, 1);
   }
 
   // -------------------------------------------------------------------------
@@ -768,9 +1260,10 @@ export function createEnemies(g) {
   // -------------------------------------------------------------------------
   function updateGrounded(e, dt, t, pd) {
     const p = g.player;
-    const sight = e.sightR * (night ? 1.6 : 1);
+    const sight = sightOf(e);
     e.cooldown -= dt;
     e.stateT += dt;
+    const R = e.ranged;
 
     switch (e.state) {
       case 'idle': {
@@ -784,7 +1277,7 @@ export function createEnemies(g) {
           e.wanderT = 3 + hash2((t * 3) | 0, e.seed * 100 | 0, 11) * 4;
           e.state = 'wander'; e.stateT = 0;
         }
-        if (pd < sight && losClear(e)) startAggro(e, false);
+        if (pd < sight && canSightAggro(e) && losClear(e)) startAggro(e, false);
         break;
       }
       case 'wander': {
@@ -792,12 +1285,32 @@ export function createEnemies(g) {
         if (Math.hypot(e.wanderX - e.pos.x, e.wanderZ - e.pos.z) < 1.2 || e.stateT > 6) {
           e.state = 'idle'; e.stateT = 0; e.wanderT = 1.5 + e.seed * 4;
         }
-        if (pd < sight && losClear(e)) startAggro(e, false);
+        if (pd < sight && canSightAggro(e) && losClear(e)) startAggro(e, false);
         break;
       }
       case 'chase': {
         const dr = e.type === 'drake' ? DRAKE_DEAGGRO_R : DEAGGRO_R;
         if (pd > dr || p.stats.hp <= 0) { e.aggro = false; e.state = 'return'; e.stateT = 0; break; }
+        if (R) {
+          // ranged: hold the band, back off when crowded, fire when clear
+          if (pd < R.min) {
+            const ax = e.pos.x + (e.pos.x - p.position.x);
+            const az = e.pos.z + (e.pos.z - p.position.z);
+            moveToward(e, ax, az, e.speed, dt, false);
+          } else if (pd > R.max) {
+            moveToward(e, p.position.x, p.position.z, e.speed, dt, false);
+          } else {
+            // slow strafing drift while holding range
+            e.orbitA += dt * 0.5 * e.orbitDir;
+            moveToward(e, p.position.x + Math.cos(e.orbitA) * pd, p.position.z + Math.sin(e.orbitA) * pd, e.speed * 0.4, dt, false);
+          }
+          turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 7, dt);
+          if (e.cooldown <= 0 && pd > R.min * 0.5 && pd < R.max + 3 && losClear(e)) {
+            e.state = 'telegraph'; e.stateT = 0;
+            sfx(e.type === 'skelarcher' ? 'bowDraw' : 'fireCast');
+          }
+          break;
+        }
         let tx = p.position.x, tz = p.position.z;
         if (e.type === 'wolf' && e.cooldown > 0.35 && pd < 9) {
           // wolves circle their prey between bites, offset per pack member
@@ -813,6 +1326,24 @@ export function createEnemies(g) {
         }
         moveToward(e, tx, tz, e.speed, dt, true);
         turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 6, dt);
+        // vampire thralls sidestep in a blur between closes
+        if (e.type === 'thrall' && pd < 8 && pd > 2.2) {
+          e.dodgeT -= dt;
+          if (e.dodgeT <= 0) {
+            e.dodgeT = 1.6 + e.seed * 2.2;
+            e.dodgeDir = Math.random() < 0.5 ? 1 : -1;
+            e.state = 'dodge'; e.stateT = 0;
+            const inv = 1 / Math.max(pd, 0.01);
+            e.vel.x += -(p.position.z - e.pos.z) * inv * 10 * e.dodgeDir;
+            e.vel.z += (p.position.x - e.pos.x) * inv * 10 * e.dodgeDir;
+            break;
+          }
+        }
+        // Morvane blinks through the fight
+        if (e.type === 'morvane') {
+          e.blinkT -= dt;
+          if (e.blinkT <= 0 && pd < 16) { beginBlink(e); break; }
+        }
         // bandits (and Vargr) raise their blade sometimes
         if ((e.type === 'bandit' || e.isVargr) && e.cooldown > 0.4 && pd < 5 &&
             hash2((t * 10) | 0, e.spawner ? e.spawner.id : 5, 23) < (e.isVargr ? 0.09 : 0.06)) {
@@ -821,14 +1352,16 @@ export function createEnemies(g) {
         }
         if (pd < e.reach + 0.4 && e.cooldown <= 0) {
           e.state = 'telegraph'; e.stateT = 0;
-          sfx(e.type === 'barrowlord' || e.type === 'drake' ? 'swingHeavy' : 'swing'); // audible windup cue
+          sfx(e.type === 'barrowlord' || e.type === 'drake' || e.type === 'troll' ? 'swingHeavy' : 'swing'); // audible windup cue
         }
         // combat vocals
         e.vocalT -= dt;
         if (e.vocalT <= 0) {
           e.vocalT = 5 + e.seed * 6;
           if (e.type === 'goblin') sfx('goblinCackle');
-          else if (e.type === 'skeleton') sfx('skeletonRattle');
+          else if (e.type === 'skeleton' || e.type === 'skelarcher') sfx('skeletonRattle');
+          else if (e.type === 'werewolf') sfx('wolfHowl');
+          else if (e.type === 'witch') sfx('goblinCackle');
         }
         break;
       }
@@ -838,12 +1371,38 @@ export function createEnemies(g) {
         break;
       }
       case 'telegraph': {
-        // 0.55s readable windup: lean back / raise weapon, no movement
+        // readable windup (0.55s default, 1.0s troll): weapon rises, no closing
         turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 5, dt);
-        if (e.stateT >= TELEGRAPH_T) { e.state = 'strike'; e.stateT = 0; e.hitApplied = false; }
+        if (e.castMove) {
+          // Grimhilde drifts backwards while her hex gathers
+          const ax = e.pos.x + (e.pos.x - p.position.x);
+          const az = e.pos.z + (e.pos.z - p.position.z);
+          moveToward(e, ax, az, e.speed * 0.55, dt, false);
+        }
+        if (e.stateT >= e.teleT) { e.state = 'strike'; e.stateT = 0; e.hitApplied = false; }
         break;
       }
       case 'strike': {
+        if (e.ranged) {
+          if (!e.hitApplied && e.stateT >= STRIKE_HIT_T) {
+            e.hitApplied = true;
+            fireBolt(e, e.ranged);
+          }
+          if (e.stateT >= e.strikeT) {
+            e.state = 'chase'; e.stateT = 0;
+            e.cooldown = e.atkCd * (0.85 + e.seed * 0.4);
+          }
+          break;
+        }
+        if (e.type === 'troll') {
+          // the slam: no lunge, the earth answers instead
+          if (!e.hitApplied && e.stateT >= 0.18) { e.hitApplied = true; doSlam(e); }
+          if (e.stateT >= e.strikeT) {
+            e.state = 'chase'; e.stateT = 0;
+            e.cooldown = e.atkCd * (0.85 + e.seed * 0.4);
+          }
+          break;
+        }
         if (e.stateT < 0.16) { // lunge
           e.pos.x += Math.sin(e.yaw) * e.speed * 1.9 * dt;
           e.pos.z += Math.cos(e.yaw) * e.speed * 1.9 * dt;
@@ -852,10 +1411,24 @@ export function createEnemies(g) {
           e.hitApplied = true;
           tryStrikeHit(e);
         }
-        if (e.stateT >= STRIKE_T) {
+        if (e.stateT >= e.strikeT) {
           e.state = 'chase'; e.stateT = 0;
           e.cooldown = e.atkCd * (0.85 + e.seed * 0.4);
         }
+        break;
+      }
+      case 'dodge': {
+        // thrall blur-step: brief burst of lateral velocity, then re-engage
+        turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 6, dt);
+        if (e.stateT >= DODGE_T) { e.state = e.aggro ? 'chase' : 'idle'; e.stateT = 0; }
+        break;
+      }
+      case 'blink': {
+        if (!e.blinkDone && e.stateT >= BLINK_T * 0.45) {
+          e.blinkDone = true;
+          doBlinkJump(e);
+        }
+        if (e.stateT >= BLINK_T) { e.state = e.aggro ? 'chase' : 'idle'; e.stateT = 0; }
         break;
       }
       case 'flinch': {
@@ -878,7 +1451,7 @@ export function createEnemies(g) {
         moveToward(e, e.home.x, e.home.z, e.speed * 0.6, dt, true);
         if (e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.04 * dt);
         if (Math.hypot(e.home.x - e.pos.x, e.home.z - e.pos.z) < 2) { e.state = 'idle'; e.stateT = 0; }
-        if (pd < sight * 0.8 && e.type !== 'wolf' && losClear(e)) startAggro(e, true);
+        if (pd < sight * 0.8 && e.type !== 'wolf' && canSightAggro(e) && losClear(e)) startAggro(e, true);
         break;
       }
     }
@@ -1043,78 +1616,210 @@ export function createEnemies(g) {
   }
 
   // -------------------------------------------------------------------------
-  // Procedural animation — pose is recomputed from state each frame (no drift)
+  // Animation clip selection — mixer state machine driven by e.state.
+  // Attack/cast clips are time-stretched so the clip's windup occupies the
+  // telegraph and the swing lands at the strike moment (feet don't slide:
+  // locomotion clips run at actualSpeed/referenceSpeed).
   // -------------------------------------------------------------------------
-  function animate(e, dt, t) {
-    const P = e.holder.model.parts;
-    const gp = e.holder.model.group;
+  function driveAnim(e, h) {
+    const spec = h.spec;
+    const entered = e.state !== e.animState;
+    if (entered) e.animState = e.state;
+    switch (e.state) {
+      case 'telegraph':
+      case 'strike': {
+        const total = e.teleT + e.strikeT;
+        if (spec.cast) {
+          if (entered && e.state === 'telegraph') {
+            playOnce(h, spec.cast, 0.12, clipDur(h, spec.cast) / Math.max(total, 0.3));
+          }
+          break;
+        }
+        if (spec.attacks) {
+          if (entered && e.state === 'telegraph') {
+            e.atkIdx = (e.atkIdx + 1) % spec.attacks.length;
+            const nm = spec.attacks[e.atkIdx];
+            playOnce(h, nm, 0.1, clipDur(h, nm) / Math.max(total, 0.3));
+          }
+          break;
+        }
+        // fox pounce: crouch (root tilt) through telegraph, burst of Run on strike
+        if (e.state === 'telegraph') play(h, spec.locoIdle, 0.15, 1);
+        else play(h, spec.locoRun, 0.08, 2.0);
+        break;
+      }
+      case 'guard': {
+        if (e.blockHit && h.clips.Block_Hit) {
+          e.blockHit = false;
+          playOnce(h, 'Block_Hit', 0.06, clipDur(h, 'Block_Hit') / 0.4);
+        } else if (h.curName !== 'Block_Hit' || !h.cur || !h.cur.isRunning()) {
+          play(h, 'Blocking', 0.15, 1);
+        }
+        break;
+      }
+      case 'flinch': {
+        if (entered) {
+          e.hitTog = !e.hitTog;
+          const nm = e.hitTog && h.clips.Hit_B ? 'Hit_B' : 'Hit_A';
+          if (h.clips[nm]) playOnce(h, nm, 0.08, clipDur(h, nm) / 0.38);
+          else play(h, spec.locoIdle, 0.1, 1);
+        }
+        break;
+      }
+      case 'stagger': {
+        if (entered && h.clips.Hit_B) playOnce(h, 'Hit_B', 0.1, clipDur(h, 'Hit_B') / 0.85);
+        else if (!entered && h.cur && !h.cur.isRunning()) play(h, spec.locoIdle, 0.25, 1);
+        break;
+      }
+      case 'dodge': {
+        if (entered) {
+          const nm = e.dodgeDir > 0 ? 'Dodge_Right' : 'Dodge_Left';
+          if (h.clips[nm]) playOnce(h, nm, 0.06, clipDur(h, nm) / (DODGE_T + 0.05));
+        }
+        break;
+      }
+      case 'blink': {
+        if (entered && h.clips.Spellcast_Raise) {
+          playOnce(h, 'Spellcast_Raise', 0.06, clipDur(h, 'Spellcast_Raise') / (BLINK_T + 0.1));
+        }
+        break;
+      }
+      case 'dead': {
+        if (!h.deathPlayed) {
+          const nm = e.seed > 0.5 && h.clips.Death_B ? 'Death_B' : 'Death_A';
+          if (h.clips[nm]) { playOnce(h, nm, 0.1, clipDur(h, nm) / 1.1); h.deathPlayed = true; }
+        }
+        break;
+      }
+      default: {
+        // locomotion: idle / wander / chase / flee / return / guard-walk
+        if (spec.loco) { // wraith: perpetual eerie weaving, drifting on the hover
+          play(h, spec.loco, 0.3, 0.85);
+          break;
+        }
+        const spd = e.animSpd;
+        if (spd > 0.35) {
+          if (spd > 3.1 && h.clips[spec.locoRun]) {
+            play(h, spec.locoRun, 0.2, clamp(spd / REF_RUN, 0.5, 2.2) * (spec.runTs || 1));
+          } else {
+            play(h, spec.locoWalk, 0.2, clamp(spd / REF_WALK, 0.4, 2.4));
+          }
+        } else {
+          play(h, spec.locoIdle, 0.3, 1);
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Per-frame visual update: root transform, mixer (with distance LOD),
+  // special tilts (fox pounce, werewolf hunch fallback), drake procedural pose
+  // -------------------------------------------------------------------------
+  function animate(e, dt, t, pd) {
+    const h = e.holder;
+    const gp = h.root;
     const spd = Math.hypot(e.vel.x, e.vel.z);
     e.animSpd += (spd - e.animSpd) * Math.min(1, 10 * dt);
-    const walk = clamp(e.animSpd / Math.max(e.speed, 0.01), 0, 1.3);
-    e.walkPhase += e.animSpd * dt * 2.3;
-    const ph = e.walkPhase;
-    const breathe = Math.sin(t * 2.2 + e.seed * 9) * 0.03;
 
     gp.position.copy(e.pos);
     let tiltX = 0, tiltZ = 0;
+
+    if (e.type === 'drake') { animateDrake(e, dt, t); return; }
+
+    if (e.state === 'dead') {
+      // rigged chars fall via Death clip; clipless (fox) tip over procedurally
+      if (h.mixer) {
+        driveAnim(e, h);
+        h.mixer.update(dt);
+      }
+      const noClip = !h.clips || (!h.clips.Death_A && !h.clips.Death_B);
+      if (noClip) {
+        const f = Math.min(1, e.deadT / 0.5);
+        tiltZ = e.fallDir * f * 1.5;
+      }
+      if (e.hover && e.pos.y > e.groundY) e.pos.y = Math.max(e.groundY, e.pos.y - 3 * dt); // wraith settles
+      gp.rotation.set(0, e.yaw, tiltZ);
+      if (e.deadT > SINK_AFTER) gp.position.y -= (e.deadT - SINK_AFTER) / SINK_T * (e.height + 0.6);
+      if (gp.scale.x !== 1) gp.scale.setScalar(1);
+      return;
+    }
+
+    // fox pounce telegraph reads through the root (no attack clips on the fox)
+    if (h.spec && h.spec.simple) {
+      if (e.state === 'telegraph') tiltX = -0.3 * (e.stateT / e.teleT);
+      else if (e.state === 'strike') tiltX = 0.4 * (1 - e.stateT / e.strikeT);
+      else if (e.state === 'flinch') tiltX = -0.3 * (1 - e.stateT / FLINCH_T);
+      else if (e.state === 'stagger') tiltZ = Math.sin(e.stateT * 9) * 0.28 * (1 - e.stateT / STAGGER_T);
+    }
+    // werewolf hunch fallback when no spine bone was found
+    if (h.spec && h.spec.hunch && h.rig && !h.spine) tiltX += 0.35;
+
+    // Morvane blink: collapse to mist and re-form
+    if (e.state === 'blink') {
+      const f = e.stateT / BLINK_T;
+      const s = f < 0.4 ? 1 - (f / 0.4) * 0.96 : f < 0.55 ? 0.04 : 0.04 + ((f - 0.55) / 0.45) * 0.96;
+      gp.scale.setScalar(clamp(s, 0.04, 1));
+    } else if (gp.scale.x !== 1) {
+      gp.scale.setScalar(1);
+    }
+
+    gp.rotation.set(tiltX, e.yaw, tiltZ);
+
+    if (h.mixer) {
+      driveAnim(e, h);
+      // LOD: full rate <40u, half to 80u, quarter beyond — time accumulates
+      e.lodAcc += dt;
+      e.frameC++;
+      const step = pd > 80 ? 4 : pd > 40 ? 2 : 1;
+      if (step === 1 || (e.frameC % step) === 0) {
+        h.mixer.update(e.lodAcc);
+        e.lodAcc = 0;
+        if (h.spine) h.spine.rotation.x = h.spineBase + 0.55; // hunched lope (post-mixer)
+      }
+    }
+  }
+
+  // Drake procedural pose: wing flaps, neck/tail sway, jaw + throat glow
+  function animateDrake(e, dt, t) {
+    const h = e.holder;
+    const P = h.parts;
+    const gp = h.root;
+    const breathe = Math.sin(t * 2.2 + e.seed * 9) * 0.03;
+    gp.position.copy(e.pos);
 
     if (e.state === 'dead') {
       const f = Math.min(1, e.deadT / 0.5);
       gp.rotation.set(0, e.yaw, e.fallDir * f * 1.5);
       if (e.deadT > SINK_AFTER) gp.position.y -= (e.deadT - SINK_AFTER) / SINK_T * (e.height + 0.6);
+      M.drakeThroat.emissiveIntensity = 0;
       return;
     }
 
-    if (e.state === 'telegraph') {
-      const f = e.stateT / TELEGRAPH_T;
-      tiltX = -0.4 * f; // lean back — the readable tell
-    } else if (e.state === 'strike') {
-      tiltX = 0.45 * (1 - e.stateT / STRIKE_T);
-    } else if (e.state === 'flinch') {
-      tiltX = -0.3 * (1 - e.stateT / FLINCH_T);
-    } else if (e.state === 'stagger') {
-      tiltZ = Math.sin(e.stateT * 9) * 0.28 * (1 - e.stateT / STAGGER_T);
-    }
+    let tiltX = 0, tiltZ = 0;
+    if (e.state === 'telegraph') tiltX = -0.4 * (e.stateT / e.teleT);
+    else if (e.state === 'strike') tiltX = 0.45 * (1 - e.stateT / e.strikeT);
+    else if (e.state === 'stagger') tiltZ = Math.sin(e.stateT * 9) * 0.28 * (1 - e.stateT / STAGGER_T);
 
-    const kind = e.holder.model.kind;
-
-    if (kind === 'quad') {
-      const s = Math.sin(ph) * 0.7 * walk;
-      P.legFL.rotation.x = s; P.legBR.rotation.x = s;
-      P.legFR.rotation.x = -s; P.legBL.rotation.x = -s;
-      P.body.position.y = P.body.userData.by + Math.abs(Math.sin(ph)) * 0.05 * walk + breathe;
-      P.tail.rotation.y = Math.sin(t * 3 + e.seed * 5) * 0.3;
-      P.head.rotation.x = e.state === 'telegraph' ? -0.5 * (e.stateT / TELEGRAPH_T)
-        : e.state === 'strike' ? 0.4 : Math.sin(t * 1.5 + e.seed * 3) * 0.06;
-      if (e.state === 'telegraph') P.body.position.y -= 0.16 * (e.stateT / TELEGRAPH_T); // crouch before pounce
-    } else if (kind === 'biped') {
-      const s = Math.sin(ph) * 0.55 * walk;
-      if (P.legL) P.legL.rotation.x = s;
-      if (P.legR) P.legR.rotation.x = -s;
-      P.armL.rotation.x = -s * 0.8;
-      let armR = s * 0.8;
-      if (e.state === 'telegraph') armR = -2.1 * (e.stateT / TELEGRAPH_T);        // raise weapon high
-      else if (e.state === 'strike') armR = -2.1 + 3.1 * Math.min(1, e.stateT / 0.18); // chop down
-      else if (e.state === 'guard') armR = -1.3;                                   // blade across
-      P.armR.rotation.x = armR;
-      P.armR.rotation.z = e.state === 'guard' ? -0.7 : 0;
-      P.body.position.y = P.body.userData.by + Math.abs(Math.sin(ph)) * 0.04 * walk + breathe;
-      P.head.rotation.y = Math.sin(t * 0.9 + e.seed * 7) * 0.12 * (e.aggro ? 0 : 1);
-      if (e.type === 'skeleton') P.body.rotation.z = Math.sin(t * 8 + e.seed * 4) * 0.02; // bone rattle jitter
-      if (e.isVargr && P.legL) P.legL.rotation.z = Math.sin(ph) * 0.06 * walk;     // coat sway
-    } else { // drake
-      const flap = e.fly ? (e.dstate === 'breath' ? 4.5 : 6.5) : 1.2;
-      const amp = e.fly ? 0.55 : 0.1;
-      const w = Math.sin(t * flap) * amp;
-      P.wingL.rotation.z = w + (e.fly ? 0.15 : 1.15);
-      P.wingR.rotation.z = -w - (e.fly ? 0.15 : 1.15);
-      P.tail.rotation.y = Math.sin(t * 2.1) * 0.25;
-      P.neck.rotation.x = e.dstate === 'breath' ? 0.35 :
-        e.state === 'telegraph' ? -0.5 * (e.stateT / TELEGRAPH_T) :
-        e.state === 'strike' ? 0.5 : Math.sin(t * 1.3) * 0.06;
-      P.body.position.y = P.body.userData.by + breathe * 2;
-      if (e.fly) tiltX = clamp(-e.vel.y * 0.04, -0.45, 0.45);
-    }
+    const breath = e.fly && e.dstate === 'breath';
+    const flap = e.fly ? (breath ? 4.5 : 6.5) : 1.2;
+    const amp = e.fly ? 0.55 : 0.1;
+    const w = Math.sin(t * flap) * amp;
+    P.wingL.rotation.z = w + (e.fly ? 0.15 : 1.05);
+    P.wingR.rotation.z = -w - (e.fly ? 0.15 : 1.05);
+    P.tail.rotation.y = Math.sin(t * 2.1) * 0.25;
+    P.tail.rotation.x = Math.sin(t * 1.4 + 2) * 0.08;
+    P.neck.rotation.x = breath ? 0.35 :
+      e.state === 'telegraph' ? -0.5 * (e.stateT / e.teleT) :
+      e.state === 'strike' ? 0.5 : Math.sin(t * 1.3) * 0.06;
+    P.body.position.y = P.body.userData.by + breathe * 2;
+    // jaw gapes for fire and grounded strikes
+    const jawT = (breath || e.state === 'strike') ? 0.55 : e.state === 'telegraph' ? 0.35 : 0.06;
+    P.jaw.rotation.x += (jawT - P.jaw.rotation.x) * Math.min(1, 8 * dt);
+    // throat ignites before/through the flame; eyes smolder harder in combat
+    const glowT = breath ? 2.4 : (e.state === 'telegraph' ? 1.0 : 0.0);
+    M.drakeThroat.emissiveIntensity += (glowT - M.drakeThroat.emissiveIntensity) * Math.min(1, 6 * dt);
+    M.drakeEye.emissiveIntensity = e.aggro ? 2.6 + Math.sin(t * 11) * 0.5 : 1.6;
+    if (e.fly) tiltX = clamp(-e.vel.y * 0.04, -0.45, 0.45);
 
     gp.rotation.set(tiltX, e.yaw, tiltZ);
   }
@@ -1145,9 +1850,89 @@ export function createEnemies(g) {
   }
 
   // -------------------------------------------------------------------------
-  // Spawn scan (throttled)
+  // Village guards — 2 knights at the gates, purely atmospheric (no combat AI,
+  // not in the enemy list): Idle/Walking_A patrol along the road mouths
+  // -------------------------------------------------------------------------
+  const guards = [];
+  function addGuard(ax, az, bx, bz) {
+    const holder = {
+      type: 'guard', root: new THREE.Group(), rig: null, mixer: null, clips: null,
+      actions: null, cur: null, curName: '', spec: SPEC.guard, spine: null,
+    };
+    g.scene.add(holder.root);
+    requestRig(holder, 'guard');
+    const shadow = new THREE.Mesh(GEO.plane, shadowMat);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.renderOrder = 2;
+    shadow.scale.set(1.5, 1.5, 1);
+    g.scene.add(shadow);
+    const gd = {
+      holder, shadow, ax, az, bx, bz, dir: 1,
+      x: ax, z: az, yaw: 0, pauseT: 1 + Math.random() * 2, frameC: (Math.random() * 4) | 0, lodAcc: 0,
+    };
+    holder.root.position.set(ax, terrainHeight(ax, az), az);
+    shadow.position.set(ax, terrainHeight(ax, az) + 0.06, az);
+    guards.push(gd);
+    return gd;
+  }
+  // South gate (spawn approach) + north road mouth
+  addGuard(-3, 60, 3, 63);
+  addGuard(-7, -54, -3, -62);
+
+  const GUARD_SPD = 1.5;
+  function updateGuards(dt) {
+    const p = g.player.position;
+    for (let i = 0; i < guards.length; i++) {
+      const gd = guards[i];
+      const h = gd.holder;
+      const pd = Math.hypot(p.x - gd.x, p.z - gd.z);
+      if (pd > 140) continue; // out of sight, skip entirely
+      let walking = false;
+      if (gd.pauseT > 0) {
+        gd.pauseT -= dt;
+      } else {
+        const tx = gd.dir > 0 ? gd.bx : gd.ax;
+        const tz = gd.dir > 0 ? gd.bz : gd.az;
+        let dx = tx - gd.x, dz = tz - gd.z;
+        const d = Math.hypot(dx, dz);
+        if (d < 0.15) {
+          gd.dir = -gd.dir;
+          gd.pauseT = 2.5 + Math.random() * 4;
+        } else {
+          dx /= d; dz /= d;
+          gd.x += dx * GUARD_SPD * dt;
+          gd.z += dz * GUARD_SPD * dt;
+          const want = Math.atan2(dx, dz);
+          let dy = want - gd.yaw;
+          dy = ((dy + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+          gd.yaw += dy * Math.min(1, 6 * dt);
+          walking = true;
+        }
+      }
+      const y = terrainHeight(gd.x, gd.z);
+      h.root.position.set(gd.x, y, gd.z);
+      h.root.rotation.set(0, gd.yaw, 0);
+      gd.shadow.position.set(gd.x, y + 0.06, gd.z);
+      if (h.mixer) {
+        if (walking) play(h, 'Walking_A', 0.25, GUARD_SPD / REF_WALK);
+        else play(h, 'Idle', 0.3, 1);
+        gd.lodAcc += dt;
+        gd.frameC++;
+        const step = pd > 80 ? 4 : pd > 40 ? 2 : 1;
+        if (step === 1 || (gd.frameC % step) === 0) {
+          h.mixer.update(gd.lodAcc);
+          gd.lodAcc = 0;
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Spawn scan (throttled) + dynamic night-forest werewolves
   // -------------------------------------------------------------------------
   let scanT = 0;
+  let wwNextT = 30;       // next werewolf spawn attempt time
+  let dawnNotified = false;
   function scanSpawners(t) {
     const p = g.player.position;
     let active = 0;
@@ -1160,6 +1945,7 @@ export function createEnemies(g) {
       if (s.enemy || s.permaDead) continue;
       if (s.isVargr && g.flags.vargrDead) { s.permaDead = true; continue; }
       if (s.boss && bossState[s.type] && bossState[s.type].dead) { s.permaDead = true; continue; }
+      if (s.deadFlag && g.flags[s.deadFlag]) { s.permaDead = true; continue; }
       if (s.nightOnly && !night) continue;
       if (t < s.respawnAt) continue;
       const d = dist2d(s.x, s.z, p.x, p.z);
@@ -1168,6 +1954,42 @@ export function createEnemies(g) {
       if (!s.boss && !s.isVargr && active >= ACTIVE_CAP) continue;
       spawnEnemy(s.type, s.x, s.z, s);
       if (!s.boss && !s.isVargr) active++;
+    }
+    // Werewolves stalk the night forest (2 max, spawned around the player)
+    if (night) {
+      dawnNotified = false;
+      if (t >= wwNextT && active < ACTIVE_CAP && countAlive('werewolf') < 2) {
+        const ph = terrainHeight(p.x, p.z);
+        if (biomeAt(p.x, p.z, ph) === BIOME.FOREST && dist2d(p.x, p.z, 0, 0) > 110) {
+          const a = Math.random() * Math.PI * 2;
+          const r = 40 + Math.random() * 18;
+          const wx = p.x + Math.sin(a) * r, wz = p.z + Math.cos(a) * r;
+          if (terrainHeight(wx, wz) > WATER_LEVEL + 1) {
+            spawnEnemy('werewolf', wx, wz, null);
+            sfx('wolfHowl');
+            wwNextT = t + 24 + Math.random() * 20;
+          } else {
+            wwNextT = t + 4;
+          }
+        } else {
+          wwNextT = t + 6;
+        }
+      }
+    } else {
+      // dawn: the beasts escape
+      for (let i = list.length - 1; i >= 0; i--) {
+        const e = list[i];
+        if (e.type === 'werewolf' && e.alive) {
+          despawn(e);
+          if (!dawnNotified) {
+            dawnNotified = true;
+            events.emit('notify', { text: 'The beast escapes into the dawn...', sub: '' });
+          }
+        } else if (e.dawnFade && e.alive && !e.aggro) {
+          despawn(e); // wraiths & vampires quietly fade with the night
+        }
+      }
+      wwNextT = t + 10;
     }
   }
 
@@ -1213,7 +2035,8 @@ export function createEnemies(g) {
       inCombat = false; events.emit('combatState', CS_OFF);
     }
 
-    // Boss bar: drake within 120u takes priority, then an aggroed barrowlord
+    // Boss bar: drake within 120u takes priority, then aggroed minibosses
+    // (barrowlord, Morvane, the Stonebridge troll)
     let bbe = null;
     const p = g.player.position;
     for (let i = 0; i < list.length; i++) {
@@ -1221,6 +2044,7 @@ export function createEnemies(g) {
       if (!e.alive) continue;
       if (e.type === 'drake' && dist2d(e.pos.x, e.pos.z, p.x, p.z) < 120) { bbe = e; break; }
       if (e.type === 'barrowlord' && e.aggro) bbe = e;
+      if ((e.type === 'morvane' || e.type === 'troll') && e.aggro && !bbe) bbe = e;
     }
     if (bbe) {
       bossBarT -= g.time.dt;
@@ -1277,7 +2101,7 @@ export function createEnemies(g) {
           if (e.pos.y <= e.groundY) { e.pos.y = e.groundY; e.fly = false; }
           e.deadT = Math.min(e.deadT, 0.4);
         }
-        animate(e, dt, t);
+        animate(e, dt, t, pd);
         updateBillboards(e, pd);
         if (e.deadT > SINK_AFTER + SINK_T) despawn(e);
         continue;
@@ -1289,7 +2113,7 @@ export function createEnemies(g) {
       if (e.type === 'drake') updateDrake(e, dt, t, pd);
       else updateGrounded(e, dt, t, pd);
 
-      animate(e, dt, t);
+      animate(e, dt, t, pd);
       updateBillboards(e, pd);
     }
 
@@ -1298,25 +2122,31 @@ export function createEnemies(g) {
       nextRattle = t + 6 + Math.random() * 8;
       for (let i = 0; i < list.length; i++) {
         const e = list[i];
-        if (e.alive && e.type === 'skeleton' && dist2d(e.pos.x, e.pos.z, p.x, p.z) < 28) {
+        if (e.alive && (e.type === 'skeleton' || e.type === 'skelarcher') &&
+            dist2d(e.pos.x, e.pos.z, p.x, p.z) < 28) {
           sfx('skeletonRattle');
           break;
         }
       }
     }
 
+    updateGuards(dt);
     updateFire(dt);
+    updateBurst(dt);
+    updateBolts(dt);
     updateGlobalState(t);
   }
 
   // -------------------------------------------------------------------------
-  // Save / load: bosses + nemesis persistence
+  // Save / load: bosses + nemesis persistence (format unchanged; wave-2
+  // uniques persist through g.flags, which save.js stores)
   // -------------------------------------------------------------------------
   function serialize() {
     return {
       drake: { dead: bossState.drake.dead, hp: Math.round(bossState.drake.hp) },
       barrowlord: { dead: bossState.barrowlord.dead, hp: Math.round(bossState.barrowlord.hp) },
-      // vargrDead / vargrWins live in g.flags (saved by save.js)
+      // vargrDead / vargrWins / morvaneDead / trollDead / witchDead live in
+      // g.flags (saved by save.js)
     };
   }
   function deserialize(o) {
@@ -1333,11 +2163,12 @@ export function createEnemies(g) {
         bossState.barrowlord.hp = clamp(o.barrowlord.hp, 1, TYPES.barrowlord.hp);
       }
     }
-    // Despawn any live bosses that the save says are dead
+    // Despawn any live uniques that the loaded state says are dead
     for (let i = list.length - 1; i >= 0; i--) {
       const e = list[i];
       if ((e.type === 'drake' && bossState.drake.dead) ||
-          (e.type === 'barrowlord' && bossState.barrowlord.dead)) {
+          (e.type === 'barrowlord' && bossState.barrowlord.dead) ||
+          (e.spawner && e.spawner.deadFlag && g.flags[e.spawner.deadFlag])) {
         despawn(e);
       }
     }

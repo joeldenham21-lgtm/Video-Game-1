@@ -1,12 +1,15 @@
 // ============================================================================
-// ELDERFALL — structures.js
-// Emberhollow village, Barrowdeep ruins + crypt, the Wardstones, Greywatch
-// tower, Redfang camp, Shrine of Aldric, ~18 seeded breadcrumb POIs, ~10
-// one-time chests. All placement samples core.terrainHeight so nothing
-// floats. Geometry merges per-POI into a handful of vertex-colored meshes
-// (shared materials, flat shaded); fires/smoke are two pooled Points systems
-// (NO real lights — emissive + fake ground-glow discs); window/lantern glow
-// is one shared emissive material updated at most once per second.
+// ELDERFALL — structures.js  (wave 2: real KayKit buildings)
+// Emberhollow village (hexagon-pack tavern/blacksmith/chapel/well/markets/
+// homes/spinning windmill), Barrowdeep ruins rebuilt from dungeon pieces with
+// a real enclosed crypt + NEW cemetery ring (vampire territory), NEW Witch
+// Hut POI, NEW Stonebridge POI, Greywatch tower (tower_B asset, climb
+// teleports kept), Redfang camp, Shrine of Aldric, breadcrumb POIs, chests.
+// Async asset pattern: colliders/interactables register immediately at final
+// positions; meshes attach when g.assets resolves. Repeated props use
+// InstancedMesh (shared geo/mats → 1 draw call per prop type per POI).
+// Fires/smoke/bubbles are pooled Points systems (NO real lights — emissive +
+// fake ground-glow discs); window glow is shared emissive material ≤1 Hz.
 // ============================================================================
 import * as THREE from 'three';
 import {
@@ -69,13 +72,28 @@ const MAT = {
     color: 0x000000, emissive: 0xff8630, emissiveIntensity: 0.55, flatShading: true,
     transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false,
   }),
+  greenGlow: new THREE.MeshLambertMaterial({
+    color: 0x0d1a10, emissive: 0x5aff7e, emissiveIntensity: 0.9, flatShading: true,
+  }),
+  greenDisc: new THREE.MeshLambertMaterial({
+    color: 0x000000, emissive: 0x3fe86a, emissiveIntensity: 0.5, flatShading: true,
+    transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false,
+  }),
 };
+
+// ---------------------------------------------------------------------------
+// NEW POIs added this wave (exported so quests/enemies can reference them)
+// ---------------------------------------------------------------------------
+export const WITCH_HUT = { id: 'witchhut', name: 'The Witch Hut', x: -260, z: -520, r: 26 };
+export const STONEBRIDGE = { id: 'stonebridge', name: 'Stonebridge', x: 330, z: -260, r: 24 };
+export const CEMETERY = { id: 'cemetery', name: 'Barrowdeep Cemetery', x: 620, z: -449, r: 30 };
 
 // ---------------------------------------------------------------------------
 // Builder: bakes transformed template geometry + per-triangle jittered vertex
 // colors into one big BufferGeometry (→ one draw call per POI).
 // ---------------------------------------------------------------------------
 const _m4 = new THREE.Matrix4();
+const _m42 = new THREE.Matrix4();
 const _m3 = new THREE.Matrix3();
 const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
@@ -165,8 +183,98 @@ export function createStructures(g) {
   }
   const notify = (text, sub) => g.events.emit('notify', sub ? { text, sub } : { text });
 
-  // ---- fire / smoke particle pools (2 draw calls, global) ------------------
-  const FLAME_N = 120, SMOKE_N = 84;
+  // ---- real-asset placement (async: logic now, meshes on load) --------------
+  // Everything gameplay-relevant (colliders, interactables, chest logic) is
+  // registered synchronously at final world positions; only visuals stream in.
+  const PRELOADED = new Set([
+    'hexagon/building_blacksmith_red.gltf', 'hexagon/building_home_A_red.gltf',
+    'hexagon/building_home_B_red.gltf', 'hexagon/building_tavern_red.gltf',
+    'hexagon/building_church_red.gltf', 'hexagon/building_well_red.gltf',
+    'hexagon/building_windmill_red.gltf', 'hexagon/building_market_red.gltf',
+    'dungeon/chest.glb',
+  ]);
+  const seenRel = new Set();
+  function trackLoad(rel) {
+    if (seenRel.has(rel)) return;
+    seenRel.add(rel);
+    if (!PRELOADED.has(rel)) g.assets.expect(1);
+  }
+  // One-off placement: returns a Group at its final transform immediately;
+  // the prop clone attaches whenever it finishes loading.
+  function place(rel, x, y, z, ry, s, onLoad) {
+    trackLoad(rel);
+    const grp = new THREE.Group();
+    grp.position.set(x, y, z);
+    grp.rotation.y = ry;
+    if (Array.isArray(s)) grp.scale.set(s[0], s[1], s[2]);
+    else grp.scale.setScalar(s);
+    root.add(grp);
+    g.assets.prop(rel).then((obj) => {
+      if (onLoad) onLoad(obj);
+      grp.add(obj);
+    }).catch(() => {});
+    return grp;
+  }
+  // Repeated props → InstancedMesh per source mesh (1 draw call per type),
+  // sharing the pack's geometry + atlas material via the assets cache.
+  // items: [{x, y, z, ry?, rx?, rz?, s?: number|[sx,sy,sz]}]
+  function placeInstances(rel, items) {
+    if (!items.length) return;
+    trackLoad(rel);
+    g.assets.prop(rel).then((src) => {
+      src.updateMatrixWorld(true);
+      const meshes = [];
+      src.traverse((o) => { if (o.isMesh) meshes.push(o); });
+      for (const m of meshes) {
+        const im = new THREE.InstancedMesh(m.geometry, m.material, items.length);
+        im.castShadow = true;
+        im.receiveShadow = true;
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i];
+          _e.set(it.rx || 0, it.ry || 0, it.rz || 0, 'YXZ');
+          _q.setFromEuler(_e);
+          _vA.set(it.x, it.y, it.z);
+          const s = it.s === undefined ? 1 : it.s;
+          if (Array.isArray(s)) _vB.set(s[0], s[1], s[2]);
+          else _vB.setScalar(s);
+          _m4.compose(_vA, _q, _vB);
+          _m42.multiplyMatrices(_m4, m.matrixWorld);
+          im.setMatrixAt(i, _m42);
+        }
+        im.instanceMatrix.needsUpdate = true;
+        if (im.computeBoundingSphere) im.computeBoundingSphere();
+        root.add(im);
+      }
+    }).catch(() => {});
+  }
+  // Terrain-following run of halloween fence pieces (4u span pre-scale).
+  // Pushes whole pieces into `items`; returns the "broken" entries (every
+  // brokenEvery-th piece) for a separate fence_broken instance set.
+  function fenceRun(items, x1, z1, x2, z2, s, withColliders, brokenEvery) {
+    const dx = x2 - x1, dz = z2 - z1, len = Math.hypot(dx, dz);
+    const span = 4 * s;
+    const n = Math.max(1, Math.round(len / span));
+    const ux = dx / len, uz = dz / len;
+    const ry = Math.atan2(-uz, ux); // local +x runs along the segment
+    const broken = [];
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n;
+      const x = x1 + dx * t, z = z1 + dz * t;
+      const y = terrainHeight(x, z) - 0.08;
+      const entry = { x, y, z, ry, s };
+      if (brokenEvery && i % brokenEvery === brokenEvery - 1) broken.push(entry);
+      else items.push(entry);
+      if (withColliders) {
+        addCol(x, z, 0.55);
+        addCol(x - ux * span * 0.33, z - uz * span * 0.33, 0.55);
+        addCol(x + ux * span * 0.33, z + uz * span * 0.33, 0.55);
+      }
+    }
+    return broken;
+  }
+
+  // ---- fire / smoke / bubble particle pools (3 draw calls, global) ---------
+  const FLAME_N = 120, SMOKE_N = 84, BUBBLE_N = 16;
   function makePool(n, size, opacity) {
     const pos = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);
@@ -192,6 +300,7 @@ export function createStructures(g) {
   }
   const flames = makePool(FLAME_N, 0.6, 0.9);
   const smoke = makePool(SMOKE_N, 1.1, 0.3);
+  const bubbles = makePool(BUBBLE_N, 0.32, 0.85);
 
   const emitters = [];
   function addEmitter(pool, x, y, z, count, scale, rise, lifeBase, lifeVar) {
@@ -218,6 +327,7 @@ export function createStructures(g) {
       if (near) {
         e.wasOn = true;
         const isFlame = P === flames;
+        const isBubble = P === bubbles;
         for (let i = e.start, end = e.start + e.count; i < end; i++) {
           let a = P.age[i] + dt;
           if (a >= P.life[i]) {
@@ -238,6 +348,16 @@ export function createStructures(g) {
             P.col[i3] = (0.95 * f + 0.2) * fin;
             P.col[i3 + 1] = (0.58 * f * f + 0.02) * fin;
             P.col[i3 + 2] = 0.1 * f * f * f * fin;
+          } else if (isBubble) {
+            // lazy green cauldron bubbles: drift up, wobble, wink out
+            const spread = 0.3 * e.scale;
+            P.pos[i3] = e.x + Math.cos(P.seed[i] * 7) * P.rad[i] * spread + Math.sin(a * 3 + P.seed[i]) * 0.06;
+            P.pos[i3 + 1] = e.y + tN * e.rise;
+            P.pos[i3 + 2] = e.z + Math.sin(P.seed[i] * 5) * P.rad[i] * spread + Math.cos(a * 2.6 + P.seed[i]) * 0.06;
+            const f = (1 - tN) * Math.min(1, tN * 10);
+            P.col[i3] = 0.22 * f;
+            P.col[i3 + 1] = 0.95 * f;
+            P.col[i3 + 2] = 0.34 * f;
           } else {
             const spread = (0.25 + tN * 0.95) * e.scale;
             P.pos[i3] = e.x + Math.cos(P.seed[i] * 5) * P.rad[i] * spread
@@ -257,12 +377,15 @@ export function createStructures(g) {
     }
     if (flames.dirty) { flames.pa.needsUpdate = true; flames.ca.needsUpdate = true; flames.dirty = false; }
     if (smoke.dirty) { smoke.pa.needsUpdate = true; smoke.ca.needsUpdate = true; smoke.dirty = false; }
+    if (bubbles.dirty) { bubbles.pa.needsUpdate = true; bubbles.ca.needsUpdate = true; bubbles.dirty = false; }
   }
 
   // ---- cross-POI merged builders (1 draw call each, world-spanning) --------
-  const glowB = new Builder(51);  // windows / lanterns / candles  → MAT.glow
-  const fireB = new Builder(52);  // coal beds / embers            → MAT.fire
-  const discB = new Builder(53);  // fake ground-glow discs        → MAT.glowDisc
+  const glowB = new Builder(51);   // windows / lanterns / candles → MAT.glow
+  const fireB = new Builder(52);   // coal beds / embers           → MAT.fire
+  const discB = new Builder(53);   // fake ground-glow discs       → MAT.glowDisc
+  const greenB = new Builder(55);  // witch-green window quads     → MAT.greenGlow
+  const greenDiscB = new Builder(56); // cauldron brew / fairy glow → MAT.greenDisc
 
   // ---- chests ---------------------------------------------------------------
   let chestBaseGeo = null, chestLidGeo = null;
@@ -316,6 +439,7 @@ export function createStructures(g) {
 
   // ---- shared prop builders --------------------------------------------------
   const chimneys = []; // smoke emitters toggled by time of day
+  let windmillFan = null; // windmill blade node, spun in update()
 
   function campfire(b, x, z, scale) {
     const gy = terrainHeight(x, z);
@@ -343,78 +467,8 @@ export function createStructures(g) {
   }
 
   // ==========================================================================
-  // EMBERHOLLOW VILLAGE — the cozy heart of the game
+  // EMBERHOLLOW VILLAGE — the cozy heart of the game (real KayKit buildings)
   // ==========================================================================
-  function house(b, x, z, ry, w, d, h, seed, big) {
-    const gy = terrainHeight(x, z);
-    const cos = Math.cos(ry), sin = Math.sin(ry);
-    const W = (lx, lz) => [x + lx * cos + lz * sin, z - lx * sin + lz * cos];
-    const plaster = C_PLASTER[Math.floor(srand(seed, 1, 811) * C_PLASTER.length)];
-    const thatch = C_THATCH[Math.floor(srand(seed, 2, 811) * C_THATCH.length)];
-    const roofH = 1.5 + srand(seed, 3, 811) * 0.9;
-    b.add(TPL.box, x, gy + 0.3, z, w + 0.3, 0.6, d + 0.3, 0, ry, 0, C_STONE, 0.11);
-    b.add(TPL.box, x, gy + 0.55 + h / 2, z, w, h, d, 0, ry, 0, plaster, 0.05);
-    b.add(TPL.prism, x, gy + 0.55 + h, z, w + 1.0, roofH, d + 1.0, 0, ry, 0, thatch, 0.09);
-    for (let cx = -1; cx <= 1; cx += 2) for (let cz = -1; cz <= 1; cz += 2) {
-      const [wx, wz] = W(cx * w / 2, cz * d / 2);
-      b.add(TPL.box, wx, gy + 0.55 + h / 2, wz, 0.26, h, 0.26, 0, ry, 0, C_TIMBER, 0.05);
-    }
-    let [bx, bz] = W(0, d / 2 + 0.03);
-    b.add(TPL.box, bx, gy + 0.55 + h * 0.62, bz, w, 0.18, 0.14, 0, ry, 0, C_TIMBER, 0.05);
-    [bx, bz] = W(big ? -w * 0.24 : 0, d / 2 + 0.1);
-    b.add(TPL.box, bx, gy + 1.42, bz, 1.0, 1.75, 0.15, 0, ry, 0, 0x4c3620, 0.04);
-    // warm windows — the emotional beacon at night
-    const wxs = big ? [w * 0.02, w * 0.3, -w * 0.42] : [-w * 0.28, w * 0.28];
-    for (const lx of wxs) {
-      const [qx, qz] = W(lx, d / 2 + 0.08);
-      glowB.add(TPL.quad, qx, gy + 1.9, qz, 0.6, 0.72, 1, 0, ry, 0, 0xffcf7a, 0);
-    }
-    { const [qx, qz] = W(w * 0.18, -d / 2 - 0.08);
-      glowB.add(TPL.quad, qx, gy + 1.9, qz, 0.6, 0.72, 1, 0, ry + Math.PI, 0, 0xffcf7a, 0); }
-    // chimney + smoke
-    const [cx, cz] = W(w * 0.3, 0);
-    const cTop = gy + 0.55 + h + roofH * 0.55 + 1.0;
-    b.add(TPL.box, cx, cTop - 0.75, cz, 0.6, 1.7, 0.6, 0, ry, 0, C_DARKSTONE, 0.09);
-    b.add(TPL.box, cx, cTop, cz, 0.82, 0.22, 0.82, 0, ry, 0, C_DARKSTONE, 0.09);
-    chimneys.push(addEmitter(smoke, cx, cTop + 0.2, cz, 6, 0.9, 3.8, 2.6, 1.2));
-    // colliders: 2 cylinders along the long axis
-    const cr = d / 2 + 0.45, off = Math.max(0, w / 2 - d / 2);
-    for (let s = -1; s <= 1; s += 2) {
-      const [ox, oz] = W(s * off, 0);
-      addCol(ox, oz, cr);
-    }
-    return { x, z, gy, ry, W };
-  }
-
-  function stall(b, x, z, ry, canvas, seed) {
-    const gy = terrainHeight(x, z);
-    const cos = Math.cos(ry), sin = Math.sin(ry);
-    const W = (lx, lz) => [x + lx * cos + lz * sin, z - lx * sin + lz * cos];
-    for (let cx = -1; cx <= 1; cx += 2) for (let cz = -1; cz <= 1; cz += 2) {
-      const [wx, wz] = W(cx * 1.35, cz * 1.0);
-      b.add(TPL.box, wx, gy + 1.1, wz, 0.16, 2.2, 0.16, 0, ry, 0, C_TIMBER, 0.06);
-    }
-    b.add(TPL.box, x, gy + 2.28, z, 3.2, 0.12, 2.6, 0.2, ry, 0, canvas, 0.05);
-    const [fx, fz] = W(0, 0.75);
-    b.add(TPL.box, fx, gy + 0.5, fz, 2.7, 1.0, 0.8, 0, ry, 0, C_WOOD, 0.08);
-    // goods on the counter
-    for (let i = 0; i < 3; i++) {
-      const [gx2, gz2] = W(-0.8 + i * 0.8, 0.75);
-      if (srand(seed, i, 812) < 0.5) b.add(TPL.box, gx2, gy + 1.15, gz2, 0.4, 0.3, 0.4, 0, ry + i, 0, 0xd9b46a, 0.1);
-      else b.add(TPL.sphere, gx2, gy + 1.14, gz2, 0.32, 0.28, 0.32, 0, 0, 0, 0xc23b2c, 0.12);
-    }
-    addCol(x, z, 1.6);
-  }
-
-  function lantern(b, x, z) {
-    const gy = terrainHeight(x, z);
-    b.add(TPL.cyl6, x, gy + 1.3, z, 0.2, 2.6, 0.2, 0, 0, 0, C_TIMBER, 0.06);
-    b.add(TPL.box, x, gy + 2.72, z, 0.4, 0.12, 0.4, 0, 0.5, 0, 0x3a3a40, 0.03);
-    glowB.add(TPL.box, x, gy + 2.5, z, 0.24, 0.3, 0.24, 0, 0.4, 0, 0xffd27f, 0);
-    b.add(TPL.cone, x, gy + 2.86, z, 0.42, 0.22, 0.42, 0, 0, 0, 0x3a3a40, 0.03);
-    addCol(x, z, 0.3);
-  }
-
   function path(b, x1, z1, x2, z2, wdt) {
     const dx = x2 - x1, dz = z2 - z1, len = Math.hypot(dx, dz);
     const n = Math.max(1, Math.round(len / 7));
@@ -430,24 +484,9 @@ export function createStructures(g) {
     }
   }
 
-  function fence(b, x1, z1, x2, z2) {
-    const dx = x2 - x1, dz = z2 - z1, len = Math.hypot(dx, dz);
-    const n = Math.max(1, Math.round(len / 2.4));
-    const yaw = Math.atan2(dx, dz);
-    let px = x1, pz = z1, ph = terrainHeight(x1, z1);
-    b.add(TPL.box, px, ph + 0.55, pz, 0.16, 1.1, 0.16, 0, yaw, 0, C_WOOD, 0.12);
-    for (let i = 1; i <= n; i++) {
-      const nx = x1 + dx * i / n, nz = z1 + dz * i / n, nh = terrainHeight(nx, nz);
-      b.add(TPL.box, nx, nh + 0.55, nz, 0.16, 1.1, 0.16, 0, yaw, 0, C_WOOD, 0.12);
-      const seg = len / n, pitch = Math.atan2(ph - nh, seg);
-      b.add(TPL.box, (px + nx) / 2, (ph + nh) / 2 + 0.85, (pz + nz) / 2, 0.09, 0.13, seg, pitch, yaw, 0, C_WOOD, 0.1);
-      b.add(TPL.box, (px + nx) / 2, (ph + nh) / 2 + 0.45, (pz + nz) / 2, 0.09, 0.13, seg, pitch, yaw, 0, C_WOOD, 0.1);
-      px = nx; pz = nz; ph = nh;
-    }
-  }
-
   function buildVillage() {
     const b = new Builder(101);
+    const furnTables = [], furnChairs = [], benches = [], hexBarrels = [];
     // plaza + dirt paths
     const py = terrainHeight(0, 0);
     b.add(TPL.disc, 0, py + 0.05, 0, 21, 21, 1, -Math.PI / 2, 0, 0, C_DIRT, 0.14);
@@ -458,82 +497,178 @@ export function createStructures(g) {
     path(b, 9, -6, 26, -13, 2.2);
     path(b, -9, -6, -28, -17, 2.2);
     path(b, 6, -10, 7, -30, 2.2);
-    // houses ringing the plaza
-    const HP = [
-      [26, -13, 6.4, 4.6, 2.7], [-27, -17, 6.0, 4.4, 2.6], [7, -32, 6.8, 4.8, 2.8],
-      [-11, 27, 6.2, 4.4, 2.7], [-33, 3, 5.8, 4.2, 2.6], [27, 22, 6.6, 4.6, 2.8],
-      [-20, -33, 5.6, 4.2, 2.5], [38, 5, 6.2, 4.6, 2.7],
+    // --- homes ringing the plaza: hexagon buildings, mixed colors -----------
+    // (tile base sunk 0.35u per art contract; doors read ~2.2u at these scales)
+    const HOMES = [
+      [26, -13, 'A', 'red'], [-27, -17, 'B', 'green'], [7, -32, 'A', 'blue'],
+      [-11, 27, 'B', 'red'], [-33, 3, 'A', 'yellow'], [27, 22, 'B', 'blue'],
     ];
-    for (let i = 0; i < HP.length; i++) {
-      const [hx, hz, w, d, h] = HP[i];
-      house(b, hx, hz, Math.atan2(-hx, -hz), w, d, h, i + 1, false);
+    for (let i = 0; i < HOMES.length; i++) {
+      const [hx, hz, type, colr] = HOMES[i];
+      const ry = Math.atan2(-hx, -hz); // door faces the plaza
+      const s = type === 'A' ? 7.5 : 6.5;
+      const gy = terrainHeight(hx, hz);
+      place('hexagon/building_home_' + type + '_' + colr + '.gltf', hx, gy - 0.35, hz, ry, s);
+      addCol(hx, hz, type === 'A' ? 2.4 : 2.7);
+      const fx = Math.sin(ry), fz = Math.cos(ry);
+      const sxd = Math.cos(ry), szd = -Math.sin(ry);
+      const wd = 0.31 * s;
+      for (let k = -1; k <= 1; k += 2)
+        glowB.add(TPL.quad, hx + fx * wd + sxd * k, gy + 2.05, hz + fz * wd + szd * k,
+          0.55, 0.66, 1, 0, ry, 0, 0xffcf7a, 0);
+      const topH = (type === 'A' ? 0.93 : 1.28) * s - 0.5;
+      chimneys.push(addEmitter(smoke, hx - fx * 0.6, gy + topH, hz - fz * 0.6, 6, 0.8, 3.6, 2.6, 1.2));
     }
-    // the inn — big, warm, near spawn — with a hanging sign
-    const inn = house(b, 17, 10, Math.atan2(-17, -10), 9.5, 6, 3.3, 99, true);
+    // --- the tavern (inn) — big, warm, near spawn — with its hanging sign ---
     {
-      const [sx, sz] = inn.W(4.4, 3.6);
-      const sy = terrainHeight(sx, sz);
-      b.add(TPL.box, sx, sy + 1.6, sz, 0.18, 3.2, 0.18, 0, inn.ry, 0, C_TIMBER, 0.05);
-      b.add(TPL.box, sx, sy + 3.1, sz, 1.1, 0.14, 0.14, 0, inn.ry + Math.PI / 2, 0, C_TIMBER, 0.05);
-      const [qx, qz] = inn.W(4.4, 4.35);
-      b.add(TPL.quad, qx, sy + 2.55, qz, 0.95, 0.75, 1, 0, inn.ry, 0, 0x8a4a2c, 0.05);
-      b.add(TPL.quad, qx, sy + 2.55, qz, 0.95, 0.75, 1, 0, inn.ry + Math.PI, 0, 0x8a4a2c, 0.05);
-    }
-    // the forge — open smithy with awning, hearth coals, anvil
-    {
-      const fx = -17, fz = 12, ry = Math.atan2(17, -12);
-      const gy = terrainHeight(fx, fz);
+      const tx = 17, tz = 10, ry = Math.atan2(-tx, -tz), s = 7.5;
+      const gy = terrainHeight(tx, tz);
+      place('hexagon/building_tavern_red.gltf', tx, gy - 0.35, tz, ry, s);
+      const fx = Math.sin(ry), fz = Math.cos(ry);
+      const sxd = Math.cos(ry), szd = -Math.sin(ry);
+      addCol(tx + sxd * 1.4, tz + szd * 1.4, 3.0);
+      addCol(tx - sxd * 1.4, tz - szd * 1.4, 3.0);
+      const wd = 0.34 * s;
+      for (const k of [-1.5, 0, 1.5])
+        glowB.add(TPL.quad, tx + fx * wd + sxd * k, gy + 2.3, tz + fz * wd + szd * k,
+          0.62, 0.75, 1, 0, ry, 0, 0xffcf7a, 0);
+      chimneys.push(addEmitter(smoke, tx - sxd * 1.2, gy + 1.40 * s - 0.6, tz - szd * 1.2, 6, 0.9, 3.8, 2.6, 1.2));
+      // hanging sign on a post out front (the inn sign — quests reference it)
       const cos = Math.cos(ry), sin = Math.sin(ry);
-      const W = (lx, lz) => [fx + lx * cos + lz * sin, fz - lx * sin + lz * cos];
-      for (let cx = -1; cx <= 1; cx += 2) for (let cz = -1; cz <= 1; cz += 2) {
-        const [wx, wz] = W(cx * 2.4, cz * 1.9);
-        b.add(TPL.box, wx, gy + 1.35, wz, 0.28, 2.7, 0.28, 0, ry, 0, C_TIMBER, 0.06);
+      const W = (lx, lz) => [tx + lx * cos + lz * sin, tz - lx * sin + lz * cos];
+      const [sX, sZ] = W(4.6, 3.8);
+      const sy = terrainHeight(sX, sZ);
+      b.add(TPL.box, sX, sy + 1.6, sZ, 0.18, 3.2, 0.18, 0, ry, 0, C_TIMBER, 0.05);
+      b.add(TPL.box, sX, sy + 3.1, sZ, 1.1, 0.14, 0.14, 0, ry + Math.PI / 2, 0, C_TIMBER, 0.05);
+      const [qx, qz] = W(4.6, 4.55);
+      b.add(TPL.quad, qx, sy + 2.55, qz, 0.95, 0.75, 1, 0, ry, 0, 0x8a4a2c, 0.05);
+      b.add(TPL.quad, qx, sy + 2.55, qz, 0.95, 0.75, 1, 0, ry + Math.PI, 0, 0x8a4a2c, 0.05);
+      // outdoor dressing: drinking tables + chairs by the door
+      const [t1x, t1z] = W(-2.8, 4.8);
+      const [t2x, t2z] = W(0.9, 5.4);
+      furnTables.push({ x: t1x, y: terrainHeight(t1x, t1z), z: t1z, ry: ry + 0.4, s: 0.8 });
+      furnTables.push({ x: t2x, y: terrainHeight(t2x, t2z), z: t2z, ry: ry - 0.3, s: 0.8 });
+      for (const [clx, clz, cro] of [[-4.2, 4.6, 1.9], [-1.5, 5.3, -1.2], [2.2, 5.9, 1.5], [0.0, 4.3, 3.2]]) {
+        const [ax, az] = W(clx, clz);
+        furnChairs.push({ x: ax, y: terrainHeight(ax, az), z: az, ry: ry + cro, s: 0.9 });
       }
-      b.add(TPL.box, fx, gy + 2.85, fz, 6.0, 0.16, 4.8, 0.15, ry, 0, 0x6b4a2a, 0.09);
-      const [hx, hz] = W(-1.3, -0.7);
-      b.add(TPL.box, hx, gy + 0.5, hz, 1.7, 1.0, 1.3, 0, ry, 0, C_DARKSTONE, 0.1);
-      fireB.add(TPL.box, hx, gy + 1.04, hz, 0.95, 0.14, 0.72, 0, ry, 0, 0xff8226, 0.05);
-      discB.add(TPL.disc, hx, gy + 1.12, hz, 2.4, 2.4, 1, -Math.PI / 2, 0, 0, 0xff8630, 0);
-      const [ax, az] = W(0.7, 0.4);
-      b.add(TPL.box, ax, gy + 0.35, az, 0.5, 0.7, 0.5, 0, ry, 0, 0x5a4632, 0.06);
-      b.add(TPL.box, ax, gy + 0.8, az, 1.05, 0.24, 0.36, 0, ry, 0, 0x62666e, 0.04);
-      const [ux, uz] = W(2.0, -1.0);
-      barrel(b, ux, uz);
-      const [mx, mz] = W(-1.3, -1.85);
-      b.add(TPL.box, mx, gy + 2.2, mz, 0.7, 4.4, 0.7, 0, ry, 0, C_DARKSTONE, 0.09);
-      chimneys.push(addEmitter(smoke, mx, gy + 4.5, mz, 6, 0.9, 3.6, 2.4, 1.0));
-      addEmitter(flames, hx, gy + 1.1, hz, 6, 0.55, 0.7, 0.5, 0.3);
-      addCol(fx, fz, 2.7);
+      addCol(t1x, t1z, 0.8);
+      addCol(t2x, t2z, 0.8);
+      // village chest tucked behind the inn
+      addChest('village', 23.5, 16.5, Math.atan2(-23.5, -16.5) + Math.PI, {});
     }
-    // market stalls around the plaza
-    stall(b, 12, 3, Math.atan2(-12, -3), C_CANVAS[0], 1);
-    stall(b, -11, 7, Math.atan2(11, -7), C_CANVAS[1], 2);
-    stall(b, 4, -13, Math.atan2(-4, 13), C_CANVAS[2], 3);
-    // the stone well (Elder Maera's spot)
+    // --- the blacksmith — hearth glow + smoke out front ----------------------
+    {
+      const bx = -17, bz = 12, ry = Math.atan2(17, -12), s = 7.0;
+      const gy = terrainHeight(bx, bz);
+      place('hexagon/building_blacksmith_red.gltf', bx, gy - 0.35, bz, ry, s);
+      addCol(bx, bz, 3.0);
+      const fx = Math.sin(ry), fz = Math.cos(ry);
+      const hx = bx + fx * 3.4, hz = bz + fz * 3.4; // ember bed in the yard
+      fireB.add(TPL.box, hx, gy + 0.5, hz, 0.95, 0.14, 0.72, 0, ry, 0, 0xff8226, 0.05);
+      discB.add(TPL.disc, hx, gy + 0.58, hz, 2.4, 2.4, 1, -Math.PI / 2, 0, 0, 0xff8630, 0);
+      addEmitter(flames, hx, gy + 0.55, hz, 6, 0.55, 0.7, 0.5, 0.3);
+      chimneys.push(addEmitter(smoke, bx - fx * 0.8, gy + 0.98 * s - 0.6, bz - fz * 0.8, 6, 0.9, 3.6, 2.4, 1.0));
+      hexBarrels.push({ x: bx + fx * 4.6 + 1.0, y: terrainHeight(bx + fx * 4.6 + 1.0, bz + fz * 4.6), z: bz + fz * 4.6, ry: 0.5, s: 5 });
+    }
+    // --- the chapel — stained glow, alcove bookshelf, bench -----------------
+    {
+      const cx = -20, cz = -33, ry = Math.atan2(20, 33), s = 7.0;
+      const gy = terrainHeight(cx, cz);
+      place('hexagon/building_church_red.gltf', cx, gy - 0.35, cz, ry, s);
+      const fx = Math.sin(ry), fz = Math.cos(ry);
+      const sxd = Math.cos(ry), szd = -Math.sin(ry);
+      addCol(cx + fx * 1.4, cz + fz * 1.4, 2.5);
+      addCol(cx - fx * 1.4, cz - fz * 1.4, 2.5);
+      const wd = 0.30 * s;
+      glowB.add(TPL.quad, cx + fx * wd + sxd * 1.2, gy + 3.1, cz + fz * wd + szd * 1.2, 0.5, 1.1, 1, 0, ry, 0, 0xffdf9a, 0);
+      glowB.add(TPL.quad, cx + fx * wd - sxd * 1.2, gy + 3.1, cz + fz * wd - szd * 1.2, 0.5, 1.1, 1, 0, ry, 0, 0xffdf9a, 0);
+      // bookshelf in the doorway alcove (clear of the books module's lecterns)
+      const shx = cx + fx * (wd + 0.9) + sxd * 1.9, shz = cz + fz * (wd + 0.9) + szd * 1.9;
+      place('dungeon/shelves.gltf.glb', shx, terrainHeight(shx, shz) - 0.7, shz, ry + Math.PI, 0.85);
+      const bnx = cx + fx * 6.0, bnz = cz + fz * 6.0;
+      benches.push({ x: bnx, y: terrainHeight(bnx, bnz), z: bnz, ry: ry + Math.PI / 2, s: 0.9 });
+    }
+    // --- the stone well (Elder Maera's spot) --------------------------------
     {
       const wy = terrainHeight(0, -2);
-      b.add(TPL.cyl12, 0, wy + 0.45, -2, 2.4, 0.9, 2.4, 0, 0, 0, C_STONE, 0.12);
-      b.add(TPL.disc, 0, wy + 0.72, -2, 1.8, 1.8, 1, -Math.PI / 2, 0, 0, 0x21445a, 0.05);
-      b.add(TPL.box, -1.05, wy + 1.55, -2, 0.16, 1.7, 0.16, 0, 0, 0, C_TIMBER, 0.06);
-      b.add(TPL.box, 1.05, wy + 1.55, -2, 0.16, 1.7, 0.16, 0, 0, 0, C_TIMBER, 0.06);
-      b.add(TPL.cyl, 0, wy + 2.15, -2, 0.22, 2.3, 0.22, 0, 0, Math.PI / 2, C_WOOD, 0.06);
-      b.add(TPL.box, 0, wy + 1.35, -2, 0.34, 0.42, 0.34, 0, 0.4, 0, 0x6a5232, 0.08);
-      b.add(TPL.prism, 0, wy + 2.35, -2, 2.7, 0.8, 1.7, 0, Math.PI / 2, 0, C_THATCH[0], 0.08);
+      place('hexagon/building_well_red.gltf', 0, wy - 0.35, -2, 0.8, 5);
       addCol(0, -2, 1.5);
+      benches.push({ x: 2.8, y: terrainHeight(2.8, -3.4), z: -3.4, ry: -2.2, s: 0.9 });
     }
-    // lantern posts — amber at night, strung along the paths
+    // --- market stalls (hexagon market buildings) ---------------------------
+    for (const [mx, mz, rel] of [
+      [12, 3, 'hexagon/building_market_red.gltf'],
+      [-11, 7, 'hexagon/building_market_green.gltf'],
+    ]) {
+      const ry = Math.atan2(-mx, -mz);
+      const gy = terrainHeight(mx, mz);
+      place(rel, mx, gy - 0.35, mz, ry, 4.5);
+      const sxd = Math.cos(ry), szd = -Math.sin(ry);
+      addCol(mx + sxd * 1.7, mz + szd * 1.7, 2.0);
+      addCol(mx - sxd * 1.7, mz - szd * 1.7, 2.0);
+    }
+    // --- the windmill on the east hill edge, sails turning ------------------
+    {
+      const wx = 42, wz = 6, wry = Math.atan2(-42, -6);
+      const gy = terrainHeight(wx, wz);
+      place('hexagon/building_windmill_red.gltf', wx, gy - 0.35, wz, wry, 8, (obj) => {
+        obj.traverse((o) => { if (o.name && o.name.indexOf('fan') !== -1) windmillFan = o; });
+      });
+      addCol(wx, wz, 2.7);
+    }
+    // --- lantern posts — amber at night, strung along the paths -------------
     const LP = [[8, 9], [-8, 9], [9, -9], [-9, -9], [2, 26], [-2, 42], [14, -17], [-16, -2], [1, -24]];
-    for (const [lx, lz] of LP) lantern(b, lx, lz);
-    // fenced field, hay, clutter (south-east)
-    fence(b, 31, -6, 44, -13);
-    fence(b, 44, -13, 48, -26);
-    fence(b, 48, -26, 36, -31);
+    const lampI = [];
+    for (const [lx, lz] of LP) {
+      const gy = terrainHeight(lx, lz);
+      const ry = Math.atan2(-lx, -lz); // arm reaches over the path
+      lampI.push({ x: lx, y: gy - 0.05, z: lz, ry, s: 0.85 });
+      glowB.add(TPL.box, lx + Math.sin(ry) * 1.0, gy + 2.0, lz + Math.cos(ry) * 1.0, 0.26, 0.3, 0.26, 0, ry, 0, 0xffd27f, 0);
+      addCol(lx, lz, 0.3);
+    }
+    placeInstances('halloween/post_lantern.gltf', lampI);
+    // standing lanterns by the tavern tables and the market
+    placeInstances('halloween/lantern_standing.gltf', [
+      { x: 13.6, y: terrainHeight(13.6, 6.4), z: 6.4, ry: 0.3, s: 1.0 },
+      { x: -9.2, y: terrainHeight(-9.2, 4.6), z: 4.6, ry: 2.1, s: 1.0 },
+    ]);
+    glowB.add(TPL.box, 13.6, terrainHeight(13.6, 6.4) + 0.55, 6.4, 0.2, 0.24, 0.2, 0, 0.3, 0, 0xffd27f, 0);
+    glowB.add(TPL.box, -9.2, terrainHeight(-9.2, 4.6) + 0.55, 4.6, 0.2, 0.24, 0.2, 0, 2.1, 0, 0xffd27f, 0);
+    // --- fenced field (halloween fence pieces), hay, clutter (south-east) ---
+    {
+      const fenceI = [], brokenI = [];
+      for (const [x1, z1, x2, z2] of [[31, -6, 44, -13], [44, -13, 48, -26], [48, -26, 36, -31]])
+        brokenI.push(...fenceRun(fenceI, x1, z1, x2, z2, 0.75, false, 4));
+      placeInstances('halloween/fence.gltf', fenceI);
+      placeInstances('halloween/fence_broken.gltf', brokenI);
+    }
     b.add(TPL.box, 40, terrainHeight(40, -20) + 0.5, -20, 1.6, 1.0, 1.2, 0, 0.5, 0, 0xc2a24d, 0.12);
     b.add(TPL.box, 42.5, terrainHeight(42.5, -22) + 0.4, -22, 1.3, 0.8, 1.1, 0, 1.2, 0, 0xb59440, 0.12);
-    barrel(b, 20.5, 14.5);
-    crate(b, 21.8, 13.4, 0.8, 0.4);
-    // village chest tucked behind the inn
-    addChest('village', 23.5, 16.5, Math.atan2(-23.5, -16.5) + Math.PI, {});
+    // --- crates / barrels / sacks (hexagon props, scaled up ~5×) ------------
+    placeInstances('hexagon/decoration/props/crate_A_big.gltf', [
+      { x: 20.5, y: terrainHeight(20.5, 14.5), z: 14.5, ry: 0.4, s: 5 },
+      { x: 21.9, y: terrainHeight(21.9, 13.3), z: 13.3, ry: 1.1, s: 4.2 },
+      { x: 4.2, y: terrainHeight(4.2, -13.2), z: -13.2, ry: 0.7, s: 5 },
+      { x: 5.4, y: terrainHeight(5.4, -12.1), z: -12.1, ry: 1.9, s: 4.0 },
+      { x: 13.9, y: terrainHeight(13.9, 1.4), z: 1.4, ry: 2.6, s: 4.4 },
+    ]);
+    hexBarrels.push(
+      { x: 22.8, y: terrainHeight(22.8, 15.1), z: 15.1, ry: 0, s: 5 },
+      { x: -9.6, y: terrainHeight(-9.6, 8.9), z: 8.9, ry: 0, s: 4.5 },
+      { x: 5.0, y: terrainHeight(5.0, -14.4), z: -14.4, ry: 0, s: 4.6 },
+    );
+    placeInstances('hexagon/decoration/props/barrel.gltf', hexBarrels);
+    placeInstances('hexagon/decoration/props/sack.gltf', [
+      { x: 12.6, y: terrainHeight(12.6, 1.6), z: 1.6, ry: 0.9, s: 6 },
+      { x: -10.1, y: terrainHeight(-10.1, 5.3), z: 5.3, ry: 2.2, s: 6 },
+    ]);
+    addCol(21.2, 14.2, 0.9);
+    addCol(4.7, -12.8, 0.8);
+    // --- outdoor furniture flush --------------------------------------------
+    placeInstances('furniture/table_medium.gltf', furnTables);
+    placeInstances('furniture/chair_A_wood.gltf', furnChairs);
+    placeInstances('halloween/bench.gltf', benches);
     root.add(b.build(MAT.static));
   }
 
@@ -549,6 +684,7 @@ export function createStructures(g) {
     const P = POI.ruins;
     const b = new Builder(201);
     const ccx = P.x, ccz = P.z + 10; // column circle north of the crypt
+    const pillarI = [], wallBrokenI = [];
     for (let i = 0; i < 10; i++) {
       const a = i / 10 * Math.PI * 2;
       const x = ccx + Math.cos(a) * 15, z = ccz + Math.sin(a) * 15;
@@ -556,10 +692,8 @@ export function createStructures(g) {
       const full = i < 2 || srand(i, 4, 821) < 0.22;
       const h = full ? 5.6 + srand(i, 5, 821) * 0.8 : 1.4 + srand(i, 6, 821) * 2.4;
       const tilt = full ? 0 : (srand(i, 7, 821) - 0.5) * 0.18;
-      const col = i % 2 ? 0x7e8379 : C_MOSS;
-      b.add(TPL.box, x, gy + 0.2, z, 2.2, 0.45, 2.2, 0, a, 0, 0x767b71, 0.12);       // plinth
-      b.add(TPL.cyl, x, gy + 0.4 + h / 2, z, 1.5, h, 1.5, tilt, a, tilt * 0.7, col, 0.13);
-      if (full) b.add(TPL.box, x, gy + 0.65 + h, z, 2.1, 0.5, 2.1, 0, a, 0, 0x787d73, 0.1);
+      b.add(TPL.box, x, gy + 0.2, z, 2.2, 0.45, 2.2, 0, a, 0, 0x767b71, 0.12); // plinth
+      pillarI.push({ x, y: gy + 0.35, z, ry: a, rx: tilt, rz: tilt * 0.7, s: [1.45, h / 4, 1.45] });
       addCol(x, z, 1.1);
     }
     // lintel arch across the two full columns (i = 0, 1)
@@ -568,38 +702,60 @@ export function createStructures(g) {
       const a1 = Math.PI * 2 / 10;
       const x1 = ccx + Math.cos(a1) * 15, z1 = ccz + Math.sin(a1) * 15;
       const h0 = terrainHeight(x0, z0), h1 = terrainHeight(x1, z1);
-      b.add(TPL.box, (x0 + x1) / 2, Math.max(h0, h1) + 6.9, (z0 + z1) / 2,
+      b.add(TPL.box, (x0 + x1) / 2, Math.max(h0, h1) + 6.5, (z0 + z1) / 2,
         1.3, 0.7, Math.hypot(x1 - x0, z1 - z0) + 1.6, 0, Math.atan2(x1 - x0, z1 - z0), 0, 0x7a7f75, 0.1);
     }
-    // fallen column drums + collapsed walls + rubble
-    b.add(TPL.cyl, ccx + 6, terrainHeight(ccx + 6, ccz + 3) + 0.7, ccz + 3, 1.4, 3.6, 1.4, Math.PI / 2, 0.7, 0, 0x788070, 0.13);
-    b.add(TPL.cyl, ccx - 8, terrainHeight(ccx - 8, ccz - 4) + 0.6, ccz - 4, 1.3, 2.6, 1.3, Math.PI / 2, 2.2, 0, 0x748068, 0.13);
+    // fallen columns (toppled dungeon pillars)
+    pillarI.push(
+      { x: ccx + 6, y: terrainHeight(ccx + 6, ccz + 3) + 0.85, z: ccz + 3, rx: Math.PI / 2, ry: 0.7, s: [0.95, 0.9, 0.95] },
+      { x: ccx - 8, y: terrainHeight(ccx - 8, ccz - 4) + 0.8, z: ccz - 4, rx: Math.PI / 2, ry: 2.2, s: [0.9, 0.65, 0.9] },
+    );
+    placeInstances('dungeon/pillar.gltf.glb', pillarI);
+    // collapsed walls + rubble heaps
     for (let i = 0; i < 4; i++) {
       const a = 0.8 + i * 1.5;
       const wx = ccx + Math.cos(a) * 22, wz = ccz + Math.sin(a) * 22;
       const wy = terrainHeight(wx, wz);
-      b.add(TPL.box, wx, wy + 0.65, wz, 5.5, 1.3 + srand(i, 8, 822) * 1.1, 0.9, 0, -a - Math.PI / 2, 0.04, C_MOSS, 0.14);
+      wallBrokenI.push({ x: wx, y: wy - 0.15, z: wz, ry: -a - Math.PI / 2, rz: 0.04, s: [1.35, 0.5 + srand(i, 8, 822) * 0.3, 1.0] });
     }
-    for (let i = 0; i < 8; i++) {
-      const rx3 = ccx + (srand(i, 9, 823) - 0.5) * 34, rz3 = ccz + (srand(i, 10, 823) - 0.5) * 34;
-      b.add(TPL.sphere, rx3, terrainHeight(rx3, rz3) + 0.2, rz3, 0.9, 0.55, 0.8, 0, i * 2.1, 0, 0x757a6d, 0.14);
+    placeInstances('dungeon/wall_broken.gltf.glb', wallBrokenI);
+    {
+      const rubHalf = [], rubLarge = [];
+      for (let i = 0; i < 4; i++) {
+        const rx3 = ccx + (srand(i, 9, 823) - 0.5) * 34, rz3 = ccz + (srand(i, 10, 823) - 0.5) * 34;
+        const e = { x: rx3, y: terrainHeight(rx3, rz3) - 0.1, z: rz3, ry: i * 2.1, s: i === 3 ? 0.55 : 0.6 };
+        (i === 3 ? rubLarge : rubHalf).push(e);
+      }
+      placeInstances('dungeon/rubble_half.gltf.glb', rubHalf);
+      placeInstances('dungeon/rubble_large.gltf.glb', rubLarge);
     }
 
-    // ---- the crypt: enclosed barrow chamber, door gap facing north ----
+    // ---- the crypt: REAL enclosed chamber from dungeon pieces --------------
+    // 8×8 interior, 4u-tall walls, tiled floor AND roof, door gap facing north
+    // (collider layout identical to v1 — quests/enemies rely on it).
     const cx = P.x, cz = P.z - 16;
     const gy = terrainHeight(cx, cz);
-    b.add(TPL.box, cx, gy + 0.06, cz, 8, 0.12, 8, 0, 0, 0, 0x60635c, 0.09);            // floor
-    b.add(TPL.box, cx, gy + 1.7, cz + 4.05, 8.8, 3.4, 0.7, 0, 0, 0, C_MOSS, 0.13);     // back (south)
-    b.add(TPL.box, cx - 4.05, gy + 1.7, cz, 0.7, 3.4, 8.8, 0, 0, 0, C_MOSS, 0.13);     // west
-    b.add(TPL.box, cx + 4.05, gy + 1.7, cz, 0.7, 3.4, 8.8, 0, 0, 0, C_MOSS, 0.13);     // east
-    b.add(TPL.box, cx - 2.75, gy + 1.7, cz - 4.05, 3.1, 3.4, 0.7, 0, 0, 0, C_MOSS, 0.13); // front L
-    b.add(TPL.box, cx + 2.75, gy + 1.7, cz - 4.05, 3.1, 3.4, 0.7, 0, 0, 0, C_MOSS, 0.13); // front R
-    b.add(TPL.box, cx, gy + 3.3, cz - 4.05, 2.8, 0.7, 1.0, 0, 0, 0, C_DARKSTONE, 0.08);   // door lintel
-    // stepped stone roof (barrow silhouette, no clipping into the chamber)
-    b.add(TPL.box, cx, gy + 3.7, cz, 9.8, 0.6, 9.8, 0, 0, 0, C_DARKSTONE, 0.11);
-    b.add(TPL.box, cx, gy + 4.25, cz, 7.4, 0.55, 7.4, 0, 0.05, 0, 0x676c62, 0.11);
-    b.add(TPL.box, cx, gy + 4.75, cz, 4.8, 0.5, 4.8, 0, -0.04, 0, 0x606656, 0.11);
-    b.add(TPL.box, cx, gy + 5.2, cz, 2.4, 0.5, 2.4, 0, 0.08, 0, 0x5a604f, 0.11);
+    {
+      const tileI = [];
+      for (let ix = -1; ix <= 1; ix += 2) for (let iz = -1; iz <= 1; iz += 2) {
+        tileI.push({ x: cx + ix * 2, y: gy + 0.08, z: cz + iz * 2, s: 1 });  // floor
+        tileI.push({ x: cx + ix * 2, y: gy + 4.02, z: cz + iz * 2, s: 1 });  // roof slab
+      }
+      placeInstances('dungeon/floor_tile_large.gltf.glb', tileI);
+      placeInstances('dungeon/wall.gltf.glb', [
+        { x: cx - 2, y: gy, z: cz + 4.05, ry: 0 }, { x: cx + 2, y: gy, z: cz + 4.05, ry: 0 },             // back (south)
+        { x: cx - 4.05, y: gy, z: cz - 2, ry: Math.PI / 2 }, { x: cx - 4.05, y: gy, z: cz + 2, ry: Math.PI / 2 }, // west
+        { x: cx + 4.05, y: gy, z: cz - 2, ry: Math.PI / 2 }, { x: cx + 4.05, y: gy, z: cz + 2, ry: Math.PI / 2 }, // east
+      ]);
+      placeInstances('dungeon/wall_half.gltf.glb', [
+        { x: cx - 4, y: gy, z: cz - 4.05, ry: 0 }, { x: cx + 2, y: gy, z: cz - 4.05, ry: 0 },             // front flanks
+      ]);
+      placeInstances('dungeon/wall_doorway.glb', [{ x: cx, y: gy, z: cz - 4.05, ry: 0 }]);                 // the door
+    }
+    // barrow cap above the roof slabs (stepped silhouette)
+    b.add(TPL.box, cx, gy + 4.45, cz, 8.6, 0.55, 8.6, 0, 0.03, 0, C_DARKSTONE, 0.11);
+    b.add(TPL.box, cx, gy + 4.95, cz, 5.6, 0.5, 5.6, 0, -0.04, 0, 0x676c62, 0.11);
+    b.add(TPL.box, cx, gy + 5.35, cz, 2.6, 0.45, 2.6, 0, 0.08, 0, 0x606656, 0.11);
     // earth berms leaning on the outer walls → "dug into the hill" read
     b.add(TPL.box, cx - 5.4, gy + 0.9, cz, 2.6, 2.6, 9.6, 0, 0, 0.5, 0x5e5a46, 0.12);
     b.add(TPL.box, cx + 5.4, gy + 0.9, cz, 2.6, 2.6, 9.6, 0, 0, -0.5, 0x5e5a46, 0.12);
@@ -607,11 +763,25 @@ export function createStructures(g) {
     // sunken entrance corridor (walls rise toward the door)
     b.add(TPL.box, cx - 1.8, gy + 0.95, cz - 7.2, 0.6, 1.9, 6.4, 0.09, 0, 0, C_MOSS, 0.13);
     b.add(TPL.box, cx + 1.8, gy + 0.95, cz - 7.2, 0.6, 1.9, 6.4, 0.09, 0, 0, C_MOSS, 0.13);
-    // interior: sarcophagus, skulls, ember bowls in the back corners
-    b.add(TPL.box, cx - 2.4, gy + 0.55, cz + 1.2, 1.1, 0.9, 2.3, 0, 0.06, 0, 0x6b7062, 0.1);
-    b.add(TPL.box, cx - 2.4, gy + 1.05, cz + 1.2, 1.25, 0.2, 2.45, 0, 0.06, 0, 0x757a6b, 0.1);
-    b.add(TPL.sphere, cx + 2.6, gy + 0.2, cz + 0.6, 0.32, 0.3, 0.32, 0, 1, 0, 0xcfc8b4, 0.08);
-    b.add(TPL.sphere, cx + 2.2, gy + 0.17, cz + 1.1, 0.28, 0.26, 0.28, 0, 2, 0, 0xc5bea9, 0.08);
+    // interior: coffin, bones, wall torches, ember bowls in the back corners
+    placeInstances('halloween/coffin.gltf', [{ x: cx - 2.4, y: gy + 0.12, z: cz + 1.2, ry: 0.06, s: 0.8 }]);
+    const skullI = [
+      { x: cx + 2.6, y: gy + 0.12, z: cz + 0.6, ry: 1, s: 0.6 },
+      { x: cx + 2.2, y: gy + 0.12, z: cz + 1.1, ry: 2.4, s: 0.5 },
+    ];
+    const boneI = [
+      { x: cx + 2.9, y: gy + 0.26, z: cz - 0.4, ry: 0.7, s: 1.2 },
+      { x: cx - 1.1, y: gy + 0.24, z: cz - 2.2, ry: 2.4, s: 1.2 },
+    ];
+    const ribI = [{ x: cx + 3.0, y: gy + 0.5, z: cz - 1.4, ry: 1.8, s: 0.9 }];
+    {
+      const torchI = [
+        { x: cx - 2.6, y: gy + 1.9, z: cz + 3.45, s: 1 }, { x: cx + 2.6, y: gy + 1.9, z: cz + 3.45, s: 1 },
+        { x: cx - 1.9, y: gy + 1.9, z: cz - 4.75, s: 1 }, { x: cx + 1.9, y: gy + 1.9, z: cz - 4.75, s: 1 },
+      ];
+      placeInstances('dungeon/torch_lit.gltf.glb', torchI);
+      for (const t of torchI) addEmitter(flames, t.x, t.y + 0.6, t.z, 3, 0.3, 0.55, 0.45, 0.25);
+    }
     fireB.add(TPL.sphere, cx - 3.1, gy + 0.25, cz + 3.1, 0.55, 0.25, 0.55, 0, 0, 0, 0xff8226, 0.05);
     fireB.add(TPL.sphere, cx + 3.1, gy + 0.25, cz + 3.1, 0.55, 0.25, 0.55, 0, 0, 0, 0xff8226, 0.05);
     discB.add(TPL.disc, cx - 3.1, gy + 0.34, cz + 3.1, 2.0, 2.0, 1, -Math.PI / 2, 0, 0, 0xff8630, 0);
@@ -624,12 +794,111 @@ export function createStructures(g) {
     addCol(cx + 2.7, cz - 3.95, 1.0); addCol(cx + 1.65, cz - 3.95, 0.85);
     colRow(cx - 1.85, cz - 10, cx - 1.85, cz - 4.6, 0.7, 1.4);
     colRow(cx + 1.85, cz - 10, cx + 1.85, cz - 4.6, 0.7, 1.4);
-    addCol(cx - 2.4, cz + 1.2, 1.2); // sarcophagus
+    addCol(cx - 2.4, cz + 1.2, 1.2); // coffin (was: sarcophagus)
     // Aldric's sword chest at the back of the chamber, facing the door
     addChest('aldric', cx + 0.6, cz + 2.6, Math.PI, {
       label: 'Open Ancient Chest', itemId: 'aldricSword', scale: 1.25,
       onOpen: () => { g.flags.aldricChestOpened = true; },
     });
+
+    // ---- NEW: the cemetery — fenced vampire ground south of the crypt ------
+    const KZ = CEMETERY.z; // ring center (620, -449); south fence at z = -464
+    path(b, cx, cz - 5, cx, KZ - 16, 2.2); // grave path from the crypt door
+    {
+      const cemFence = [], cemBroken = [];
+      cemBroken.push(...fenceRun(cemFence, 600, KZ - 15, 617.2, KZ - 15, 0.8, true, 5));
+      cemBroken.push(...fenceRun(cemFence, 622.8, KZ - 15, 640, KZ - 15, 0.8, true, 4));
+      cemBroken.push(...fenceRun(cemFence, 598, KZ - 13, 598, cz - 5, 0.8, true, 3));
+      cemBroken.push(...fenceRun(cemFence, 642, KZ - 13, 642, cz - 5, 0.8, true, 4));
+      placeInstances('halloween/fence.gltf', cemFence);
+      placeInstances('halloween/fence_broken.gltf', cemBroken);
+      placeInstances('halloween/fence_gate.gltf', [
+        { x: 620, y: terrainHeight(620, KZ - 15) - 0.08, z: KZ - 15, ry: 0, s: 0.8 },
+      ]);
+      // skull posts glare at whoever enters by the gate
+      placeInstances('halloween/post_skull.gltf', [
+        { x: 616.6, y: terrainHeight(616.6, KZ - 15.6), z: KZ - 15.6, ry: Math.PI, s: 0.95 },
+        { x: 623.4, y: terrainHeight(623.4, KZ - 15.6), z: KZ - 15.6, ry: Math.PI, s: 0.95 },
+      ]);
+      addCol(616.6, KZ - 15.6, 0.3);
+      addCol(623.4, KZ - 15.6, 0.3);
+    }
+    // grave rows
+    {
+      const graveAI = [], graveBI = [];
+      for (let i = 0; i < 8; i++) {
+        const gxp = 604 + (i % 4) * 8 + (i > 3 ? 4 : 0);
+        const gzp = i > 3 ? KZ - 10 : KZ - 3;
+        const gyp = terrainHeight(gxp, gzp);
+        (i % 2 ? graveBI : graveAI).push({ x: gxp, y: gyp, z: gzp, ry: (srand(i, 3, 851) - 0.5) * 0.4, s: 0.85 });
+        addCol(gxp, gzp, 0.8);
+      }
+      placeInstances('halloween/grave_A.gltf', graveAI);
+      placeInstances('halloween/grave_B.gltf', graveBI);
+      placeInstances('halloween/gravestone.gltf', [
+        { x: 601.5, y: terrainHeight(601.5, KZ - 6), z: KZ - 6, ry: 0.3, s: 1 },
+        { x: 638.5, y: terrainHeight(638.5, KZ - 8), z: KZ - 8, ry: -0.4, s: 1 },
+        { x: 611, y: terrainHeight(611, KZ - 13), z: KZ - 13, ry: 0.15, s: 1 },
+      ]);
+      placeInstances('halloween/gravemarker_A.gltf', [
+        { x: 606, y: terrainHeight(606, KZ - 12.5), z: KZ - 12.5, ry: 0.6, s: 1 },
+        { x: 633, y: terrainHeight(633, KZ - 2), z: KZ - 2, ry: -0.5, s: 1 },
+      ]);
+      placeInstances('halloween/gravemarker_B.gltf', [
+        { x: 626, y: terrainHeight(626, KZ - 13.5), z: KZ - 13.5, ry: 0.2, s: 1 },
+        { x: 599.5, y: terrainHeight(599.5, KZ + 2), z: KZ + 2, ry: 1.1, s: 1 },
+      ]);
+      // grave lanterns, faintly burning even for the forgotten
+      placeInstances('halloween/lantern_standing.gltf', [
+        { x: 613.4, y: terrainHeight(613.4, KZ - 3.8), z: KZ - 3.8, ry: 0.8, s: 1 },
+        { x: 628.6, y: terrainHeight(628.6, KZ - 10.8), z: KZ - 10.8, ry: 2.4, s: 1 },
+      ]);
+      glowB.add(TPL.box, 613.4, terrainHeight(613.4, KZ - 3.8) + 0.55, KZ - 3.8, 0.2, 0.24, 0.2, 0, 0.8, 0, 0xffd27f, 0);
+      glowB.add(TPL.box, 628.6, terrainHeight(628.6, KZ - 10.8) + 0.55, KZ - 10.8, 0.2, 0.24, 0.2, 0, 2.4, 0, 0xffd27f, 0);
+    }
+    // the crypt house — a proper vampire address (halloween crypt building)
+    {
+      const bx = 636, bz = -446;
+      const by = terrainHeight(bx, bz);
+      const bry = Math.atan2(620 - bx, (KZ - 6) - bz); // door looks over the graves
+      place('halloween/crypt.gltf', bx, by - 0.1, bz, bry, 0.8);
+      const fx = Math.sin(bry), fz = Math.cos(bry);
+      addCol(bx - fx * 1.2, bz - fz * 1.2, 2.6);
+      addCol(bx + fx * 1.2, bz + fz * 1.2, 2.6);
+      const jx = bx + fx * 3.6, jz = bz + fz * 3.6;
+      placeInstances('halloween/pumpkin_orange_jackolantern.gltf', [
+        { x: jx, y: terrainHeight(jx, jz), z: jz, ry: bry, s: 0.8 },
+      ]);
+      glowB.add(TPL.box, jx, terrainHeight(jx, jz) + 0.45, jz, 0.32, 0.32, 0.32, 0, bry, 0, 0xffb04a, 0);
+    }
+    // dead trees claw at the sky
+    {
+      const treeL = [
+        { x: 601, y: terrainHeight(601, -461) + 0.15, z: -461, ry: 0.8, s: 1.4 },
+        { x: 640, y: terrainHeight(640, -462) + 0.15, z: -462, ry: 2.3, s: 1.3 },
+      ];
+      const treeM = [
+        { x: 600, y: terrainHeight(600, -444) + 0.15, z: -444, ry: 4.0, s: 1.4 },
+        { x: 629, y: terrainHeight(629, -463) + 0.15, z: -463, ry: 1.4, s: 1.5 },
+      ];
+      placeInstances('halloween/tree_dead_large.gltf', treeL);
+      placeInstances('halloween/tree_dead_medium.gltf', treeM);
+      for (const t of treeL) addCol(t.x, t.z, 0.6);
+      for (const t of treeM) addCol(t.x, t.z, 0.45);
+    }
+    // scattered remains
+    skullI.push(
+      { x: 609, y: terrainHeight(609, KZ - 7), z: KZ - 7, ry: 2.8, s: 0.6 },
+      { x: 631, y: terrainHeight(631, KZ - 5.5), z: KZ - 5.5, ry: 0.9, s: 0.55 },
+    );
+    boneI.push(
+      { x: 617, y: terrainHeight(617, KZ - 8) + 0.1, z: KZ - 8, ry: 1.9, s: 1.2 },
+      { x: 624, y: terrainHeight(624, KZ - 6) + 0.1, z: KZ - 6, ry: 4.2, s: 1.1 },
+    );
+    ribI.push({ x: 621.5, y: terrainHeight(621.5, KZ - 12) + 0.4, z: KZ - 12, ry: 0.5, s: 1 });
+    placeInstances('halloween/skull.gltf', skullI);
+    placeInstances('halloween/bone_A.gltf', boneI);
+    placeInstances('halloween/ribcage.gltf', ribI);
     root.add(b.build(MAT.static));
   }
 
@@ -683,29 +952,24 @@ export function createStructures(g) {
     const gy = terrainHeight(x, z);
     const topY = gy + 14.3;
     TW.topY = topY;
+    const da = Math.atan2(-x, -z); // door faces Emberhollow
     const b = new Builder(401);
-    b.add(TPL.cyl12, x, gy + 1.0, z, 8.6, 2.2, 8.6, 0, 0, 0, C_DARKSTONE, 0.1);
-    b.add(TPL.cyl12, x, gy + 7.0, z, 6.6, 14.0, 6.6, 0, 0.13, 0, 0x84868a, 0.09);
-    b.add(TPL.cyl12, x, gy + 5.2, z, 7.0, 0.5, 7.0, 0, 0, 0, C_DARKSTONE, 0.07);
-    b.add(TPL.cyl12, x, gy + 10.2, z, 7.0, 0.5, 7.0, 0, 0, 0, C_DARKSTONE, 0.07);
-    b.add(TPL.cyl12, x, gy + 14.0, z, 7.8, 0.6, 7.8, 0, 0.13, 0, 0x7b7d80, 0.08); // platform, top = +14.3
+    // real tower body (hexagon tower_B, roof cap hidden → open watch platform)
+    place('hexagon/building_tower_B_red.gltf', x, gy - 0.35, z, da, [7.5, 9.2, 7.5], (obj) => {
+      obj.traverse((o) => { if (o.name && o.name.indexOf('_top_') !== -1) o.visible = false; });
+    });
+    b.add(TPL.cyl12, x, gy + 1.0, z, 8.6, 2.2, 8.6, 0, 0, 0, C_DARKSTONE, 0.1);    // foundation skirt
+    b.add(TPL.cyl12, x, gy + 13.2, z, 7.0, 1.6, 7.0, 0, 0.13, 0, 0x84868a, 0.09);  // platform support ring
+    b.add(TPL.cyl12, x, gy + 14.0, z, 7.8, 0.6, 7.8, 0, 0.13, 0, 0x7b7d80, 0.08);  // platform, top = +14.3
     for (let i = 0; i < 10; i++) {
       const a = i / 10 * Math.PI * 2;
       const mx = x + Math.cos(a) * 3.55, mz = z + Math.sin(a) * 3.55;
       b.add(TPL.box, mx, topY + 0.55, mz, 1.05, 1.1, 0.6, 0, -a - Math.PI / 2, 0, 0x85878b, 0.09);
       addCol(mx, mz, 0.72, gy + 12.8, gy + 17.5); // parapet keeps you from strolling off
     }
-    for (let i = 0; i < 14; i++) { // decorative spiral stair hugging the wall
-      const a = 0.6 + i * 0.52, sy = gy + 1.3 + i * 0.82;
-      b.add(TPL.box, x + Math.cos(a) * 3.72, sy, z + Math.sin(a) * 3.72,
-        1.7, 0.22, 0.85, 0, -a - Math.PI / 2, 0, 0x76787c, 0.08);
-    }
-    const da = Math.atan2(-x, -z); // door faces Emberhollow
     const dx = x + Math.sin(da) * 3.28, dz = z + Math.cos(da) * 3.28;
-    b.add(TPL.box, dx, gy + 1.55, dz, 1.5, 2.5, 0.4, 0, da, 0, 0x42301c, 0.05);
-    b.add(TPL.box, dx, gy + 2.95, dz, 2.3, 0.55, 0.55, 0, da, 0, C_DARKSTONE, 0.06);
-    glowB.add(TPL.quad, x + Math.sin(da) * 3.38, gy + 7.5, z + Math.cos(da) * 3.38, 0.28, 0.9, 1, 0, da, 0, 0xffcf7a, 0);
-    glowB.add(TPL.quad, x + Math.sin(da + 2.1) * 3.38, gy + 10.4, z + Math.cos(da + 2.1) * 3.38, 0.28, 0.9, 1, 0, da + 2.1, 0, 0xffcf7a, 0);
+    glowB.add(TPL.quad, x + Math.sin(da) * 3.95, gy + 7.5, z + Math.cos(da) * 3.95, 0.28, 0.9, 1, 0, da, 0, 0xffcf7a, 0);
+    glowB.add(TPL.quad, x + Math.sin(da + 2.1) * 3.95, gy + 10.4, z + Math.cos(da + 2.1) * 3.95, 0.28, 0.9, 1, 0, da + 2.1, 0, 0xffcf7a, 0);
     // beacon brazier
     const bx2 = x + 1.3, bz2 = z;
     b.add(TPL.cyl, bx2, topY + 0.45, bz2, 1.0, 0.9, 1.0, 0, 0, 0, 0x4a4a50, 0.05);
@@ -846,6 +1110,22 @@ export function createStructures(g) {
     }
     crate(b, P.x + 3.5, P.z - 4.5, 0.85, 0.4);
     barrel(b, P.x + 4.6, P.z - 3.6);
+    // plundered supplies (real dungeon props) + a war flag by the approach
+    placeInstances('dungeon/box_small.gltf.glb', [
+      { x: P.x + 3.3, y: terrainHeight(P.x + 3.3, P.z - 5.6), z: P.z - 5.6, ry: 0.7, s: 0.95 },
+      { x: P.x + 7.6, y: terrainHeight(P.x + 7.6, P.z + 1.8), z: P.z + 1.8, ry: 1.8, s: 0.85 },
+    ]);
+    placeInstances('dungeon/crates_stacked.gltf.glb', [
+      { x: P.x + 6.0, y: terrainHeight(P.x + 6.0, P.z - 1.6), z: P.z - 1.6, ry: 2.4, s: 0.9 },
+    ]);
+    placeInstances('dungeon/barrel_small.gltf.glb', [
+      { x: P.x + 4.9, y: terrainHeight(P.x + 4.9, P.z - 4.6), z: P.z - 4.6, ry: 0, s: 1 },
+      { x: P.x - 6.4, y: terrainHeight(P.x - 6.4, P.z - 3.4), z: P.z - 3.4, ry: 0, s: 0.9 },
+    ]);
+    placeInstances('hexagon/decoration/props/flag_red.gltf', [
+      { x: P.x + Math.sin(va) * 12, y: terrainHeight(P.x + Math.sin(va) * 12, P.z + Math.cos(va) * 12), z: P.z + Math.cos(va) * 12, ry: va, s: 10 },
+    ]);
+    addCol(P.x + 6.0, P.z - 1.6, 1.1);
     root.add(b.build(MAT.static));
   }
 
@@ -896,6 +1176,102 @@ export function createStructures(g) {
       blessTimer = 300;
       notify("Aldric's warmth steels your limbs", '+20 stamina, for a while');
     });
+  }
+
+  // ==========================================================================
+  // NEW POI: THE WITCH HUT — crooked green cottage, cauldron, fairy ring
+  // ==========================================================================
+  function buildWitchHut() {
+    const P = WITCH_HUT;
+    const b = new Builder(651);
+    const gy = terrainHeight(P.x, P.z);
+    const ry = 0.7;
+    const fx = Math.sin(ry), fz = Math.cos(ry);       // hut facing
+    const sxd = Math.cos(ry), szd = -Math.sin(ry);    // lateral
+    // the hut: home_B_green sunk deep and skewed 0.06 rad → properly crooked
+    const hut = place('hexagon/building_home_B_green.gltf', P.x, gy - 0.55, P.z, ry, 6.5);
+    hut.rotation.z = 0.06;
+    addCol(P.x + fx * 1.0, P.z + fz * 1.0, 2.7);
+    addCol(P.x - fx * 1.0, P.z - fz * 1.0, 2.7);
+    // sickly green window light (always-lit — someone is home)
+    greenB.add(TPL.quad, P.x + fx * 2.0 + sxd * 1.0, gy + 2.1, P.z + fz * 2.0 + szd * 1.0, 0.55, 0.66, 1, 0, ry, 0, 0x9fffb4, 0);
+    greenB.add(TPL.quad, P.x - fx * 2.05 - sxd * 0.8, gy + 2.4, P.z - fz * 2.05 - szd * 0.8, 0.5, 0.6, 1, 0, ry + Math.PI, 0, 0x9fffb4, 0);
+    chimneys.push(addEmitter(smoke, P.x - fx * 0.5, gy + 1.28 * 6.5 - 0.7, P.z - fz * 0.5, 6, 0.8, 3.4, 2.6, 1.2));
+    // the cauldron: soot-black barrel, glowing green brew, lazy bubbles
+    const cX = P.x + fx * 6.2 + sxd * 1.6, cZ = P.z + fz * 6.2 + szd * 1.6;
+    const cy = terrainHeight(cX, cZ);
+    place('dungeon/barrel_large.gltf.glb', cX, cy, cZ, 0.4, 0.75, (obj) => g.assets.tint(obj, '#4a4f52'));
+    greenDiscB.add(TPL.disc, cX, cy + 1.56, cZ, 1.1, 1.1, 1, -Math.PI / 2, 0, 0, 0x6cff8e, 0); // brew surface
+    greenDiscB.add(TPL.disc, cX, cy + 0.07, cZ, 4.6, 4.6, 1, -Math.PI / 2, 0, 0, 0x3fd465, 0); // ground glow
+    addEmitter(bubbles, cX, cy + 1.55, cZ, 12, 0.55, 1.5, 1.2, 0.9);
+    fireB.add(TPL.sphere, cX, cy + 0.14, cZ, 0.9, 0.24, 0.9, 0, 0, 0, 0xff8226, 0.05);
+    addEmitter(flames, cX, cy + 0.2, cZ, 4, 0.5, 0.5, 0.45, 0.3);
+    addCol(cX, cZ, 0.85);
+    // the mushroom circle — step in at your peril
+    const mx = P.x - sxd * 8 + fx * 2.5, mz = P.z - szd * 8 + fz * 2.5;
+    for (let i = 0; i < 9; i++) {
+      const a = i / 9 * Math.PI * 2;
+      const px = mx + Math.cos(a) * 3.6, pz = mz + Math.sin(a) * 3.6;
+      const py2 = terrainHeight(px, pz);
+      const cap = srand(i, 5, 861) < 0.4 ? 0xc23b2c : 0xd8cfae;
+      const hgt = 0.28 + srand(i, 6, 861) * 0.3;
+      b.add(TPL.cyl6, px, py2 + hgt / 2, pz, 0.16, hgt, 0.16, 0, a, 0.06, 0xe8e2cf, 0.08);
+      b.add(TPL.sphere, px, py2 + hgt + 0.05, pz, 0.5, 0.28, 0.5, 0, a, 0, cap, 0.1);
+    }
+    greenDiscB.add(TPL.disc, mx, terrainHeight(mx, mz) + 0.06, mz, 8.4, 8.4, 1, -Math.PI / 2, 0, 0, 0x2e9c4e, 0);
+    // hanging bones on a crooked frame by the door
+    const hx = P.x + fx * 4.6 - sxd * 2.6, hz = P.z + fz * 4.6 - szd * 2.6;
+    const hy = terrainHeight(hx, hz);
+    b.add(TPL.cyl6, hx, hy + 1.3, hz, 0.14, 2.6, 0.14, 0.08, ry, 0.05, 0x4e3a24, 0.08);
+    b.add(TPL.box, hx, hy + 2.5, hz, 2.4, 0.1, 0.1, 0, ry, 0, 0x4e3a24, 0.08);
+    {
+      const boneH = [];
+      for (let i = -1; i <= 1; i++)
+        boneH.push({ x: hx + sxd * i * 0.85, y: hy + 1.78, z: hz + szd * i * 0.85, ry: srand(i + 2, 7, 862) * 6.28, rz: Math.PI / 2, s: 1.1 });
+      placeInstances('halloween/bone_A.gltf', boneH);
+      placeInstances('halloween/skull.gltf', [{ x: hx + sxd * 0.05, y: hy + 1.1, z: hz, ry, s: 0.7 }]);
+    }
+    // a skull post marks the way in; dead trees crowd the clearing
+    const pkx = P.x + fx * 11, pkz = P.z + fz * 11;
+    placeInstances('halloween/post_skull.gltf', [
+      { x: pkx, y: terrainHeight(pkx, pkz), z: pkz, ry: ry + Math.PI, s: 0.9 },
+    ]);
+    addCol(pkx, pkz, 0.3);
+    placeInstances('halloween/tree_dead_medium.gltf', [
+      { x: P.x - fx * 6.5, y: terrainHeight(P.x - fx * 6.5, P.z - fz * 6.5) + 0.15, z: P.z - fz * 6.5, ry: 1.2, s: 1.5 },
+      { x: P.x + sxd * 7.5, y: terrainHeight(P.x + sxd * 7.5, P.z + szd * 7.5) + 0.15, z: P.z + szd * 7.5, ry: 3.6, s: 1.3 },
+    ]);
+    addCol(P.x - fx * 6.5, P.z - fz * 6.5, 0.45);
+    addCol(P.x + sxd * 7.5, P.z + szd * 7.5, 0.45);
+    root.add(b.build(MAT.static));
+  }
+
+  // ==========================================================================
+  // NEW POI: STONEBRIDGE — bridge_A spans the flooded dip on the ruins road
+  // (troll country beneath; enemies.js has the same coordinates)
+  // ==========================================================================
+  const BR = {
+    x: STONEBRIDGE.x, z: STONEBRIDGE.z,
+    ry: Math.atan2(POI.ruins.x, POI.ruins.z), // deck runs along the ruins road
+    deckY: -1.1,                              // deck top (above the waterline)
+    s: 0, c: 0,
+  };
+  BR.s = Math.sin(BR.ry);
+  BR.c = Math.cos(BR.ry);
+
+  function buildStonebridge() {
+    // model deck top is +0.25 pre-scale; supports reach −1.0 → sunk ends
+    place('hexagon/building_bridge_A.gltf', BR.x, BR.deckY - 0.25 * 6.5, BR.z, BR.ry, 6.5);
+    // central pier blocks swimmers below, never the deck above
+    addCol(BR.x, BR.z, 1.5, undefined, BR.deckY - 1.2);
+    // lanterns at both deck ends so the crossing reads at night
+    const fx = Math.sin(BR.ry), fz = Math.cos(BR.ry);
+    const sxd = Math.cos(BR.ry), szd = -Math.sin(BR.ry);
+    const L1 = { x: BR.x + fx * 5.4 + sxd * 3.2, y: BR.deckY, z: BR.z + fz * 5.4 + szd * 3.2, ry: BR.ry, s: 1.1 };
+    const L2 = { x: BR.x - fx * 5.4 - sxd * 3.2, y: BR.deckY, z: BR.z - fz * 5.4 - szd * 3.2, ry: BR.ry + Math.PI, s: 1.1 };
+    placeInstances('halloween/lantern_standing.gltf', [L1, L2]);
+    glowB.add(TPL.box, L1.x, L1.y + 0.6, L1.z, 0.2, 0.24, 0.2, 0, BR.ry, 0, 0xffd27f, 0);
+    glowB.add(TPL.box, L2.x, L2.y + 0.6, L2.z, 0.2, 0.24, 0.2, 0, BR.ry, 0, 0xffd27f, 0);
   }
 
   // ==========================================================================
@@ -973,13 +1349,18 @@ export function createStructures(g) {
     cand.sort((a, b) => (a.r - b.r) || (a.gx - b.gx) || (a.gz - b.gz));
     if (cand.length > 16) cand.length = 16;
     let idx = 0, chestsLeft = 5;
+    const bcBoxI = [], bcBarrelI = []; // spilled cargo at cart wrecks (real props)
     {
       for (let ci = 0; ci < cand.length; ci++) {
         const { gx, gz, x, z } = cand[ci];
         const ry = srand(gx, gz, 505) * 6.283;
         const kindR = srand(gx, gz, 504);
         const b = new Builder(900 + idx);
-        if (kindR < 0.3) buildCart(b, x, z, ry);
+        if (kindR < 0.3) {
+          buildCart(b, x, z, ry);
+          bcBoxI.push({ x: x + 2.6, y: terrainHeight(x + 2.6, z + 1.9), z: z + 1.9, ry, s: 0.85 });
+          bcBarrelI.push({ x: x - 2.6, y: terrainHeight(x - 2.6, z + 0.6) + 0.42, z: z + 0.6, ry: ry + 0.9, rz: Math.PI / 2, s: 0.9 });
+        }
         else if (kindR < 0.55) buildLoneCamp(b, x, z, ry);
         else if (kindR < 0.8) buildCairn(b, x, z);
         else buildHunterStand(b, x, z, ry);
@@ -1012,6 +1393,8 @@ export function createStructures(g) {
         idx++;
       }
     }
+    placeInstances('dungeon/box_small.gltf.glb', bcBoxI);
+    placeInstances('dungeon/barrel_small.gltf.glb', bcBarrelI);
   }
 
   // fishing docks on the Mirrormere shore (one hides Wendel's amulet chest)
@@ -1065,6 +1448,8 @@ export function createStructures(g) {
     const night = clamp((1 - smoothstep(0.22, 0.3, df)) + smoothstep(0.72, 0.8, df), 0, 1);
     MAT.glow.emissiveIntensity = 0.12 + night * 1.25;
     MAT.rune.emissiveIntensity = g.flags.stonesCleansed ? 1.5 : 0.06;
+    MAT.greenGlow.emissiveIntensity = 0.5 + night * 0.9;   // witch windows breathe at night
+    MAT.greenDisc.emissiveIntensity = 0.4 + night * 0.3;
     syncBeacon();
     const chimOn = df > 0.27 && df < 0.86; // day + evening only
     for (let i = 0; i < chimneys.length; i++) chimneys[i].active = chimOn;
