@@ -123,10 +123,17 @@ valuables to ~40% of chests (listen `chestOpened`).
 
 ## ENDGAME agent — src/enemies.js + src/rpg.js
 **enemies.js**:
-- **Zoned scaling**: enemy hp/dmg ×= zone(level): zones = safe fields
-  (village r<250: ×1 flat), mid (default: ×(1+0.04×(playerLevel−1)) cap
-  ×1.8), north mountains + cemetery at night (×1.25 floor, scale cap ×2.4),
-  post-drake everywhere +15%. XP rewards scale with the multiplier.
+- **Player-scaled open world** (REVISED per user direction — no level-gated
+  zones): ALL non-boss enemies scale with the player: base stats ×
+  (1 + 0.05×(playerLevel−1)), soft cap ~×2.6; XP/loot scale along. Every
+  region is viable at level 1 and relevant at 20. Area difficulty comes from
+  ENCOUNTER PROFILES, not stat walls: danger areas (cemetery at night,
+  Drakespire approach, deep forest at night, bandit camp) = larger packs
+  (+1-2), elite chance ~15% (vs 8% baseline), mixed compositions (ranged on
+  high ground + melee flankers), terrain-aware ambush placement, inherently
+  tougher TYPES; village fields = sparse weak types. Flat area modifier
+  allowed only ≤ +15%. Bosses scale to player at first engagement with a
+  challenge floor; post-drake +15% world bump stays.
 - **Elites**: 8% of non-boss spawns (deterministic roll): prefix name (Dire
   Wolf, Goblin Chief, Gravebound Skeleton...), ×2.5 hp ×1.5 dmg ×1.15 size,
   emissive eye glow, guaranteed material drop + ×3 gold + bonus xp; show
