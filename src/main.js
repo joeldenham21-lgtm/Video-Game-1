@@ -19,6 +19,7 @@ import { createRPG } from './rpg.js';
 import { createBooks } from './books.js';
 import { createFauna } from './fauna.js';
 import { createVoice } from './voice.js';
+import { createDetails } from './details.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -137,6 +138,7 @@ function boot(loadSave) {
       g.books = createBooks(g);
       g.fauna = createFauna(g);
       g.voice = createVoice(g);
+      g.details = createDetails(g);
       if (loadSave) g.save.load();
       titleEl.classList.add('hidden');
       setTimeout(() => titleEl.remove(), 1400);
@@ -193,6 +195,7 @@ function tick(now) {
     g.books.update(dt);
     g.fauna.update(dt);
     g.voice.update(dt);
+    g.details.update(dt);
     g.ui.input.endFrame();
   } catch (err) {
     if (DEBUG) showErr('TICK: ' + (err.stack || err));
