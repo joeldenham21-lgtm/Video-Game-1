@@ -1255,10 +1255,23 @@ export function createEnemies(g) {
       !e.echo && !e.bloodMoon &&
       !!g.flags.morvanePact && !g.flags.morvaneDead;
   }
+  function setHuntMarker(b) {
+    if (!g.compassMarkers) g.compassMarkers = [];
+    clearHuntMarker();
+    g.compassMarkers.push({ id: 'hunt', x: b.x, z: b.z, icon: '☠', label: b.name });
+  }
+  function clearHuntMarker() {
+    if (!g.compassMarkers) return;
+    const i = g.compassMarkers.findIndex((m) => m.id === 'hunt');
+    if (i >= 0) g.compassMarkers.splice(i, 1);
+  }
+
   function canSightAggro(e) {
     if (e.type === 'witch') return !!g.flags.witchHostile;
     if (e.type === 'troll') return !g.flags.trollPaid;
     if (pactPassive(e)) return false;
+    // Bought peace with the camp: bandits and Vargr hold unless struck first
+    if (g.flags.campPeaceful && (e.type === 'bandit' || e.type === 'vargr') && !e.bloodMoon && !e.echo) return false;
     return true;
   }
 
@@ -2438,6 +2451,7 @@ export function createEnemies(g) {
       H.active = ix;
       const b = H.list[ix];
       api.activeHunt = { name: b.name, x: b.x, z: b.z };
+      setHuntMarker(b);
       huntEnemy = null;
       sfx('questStart');
       notify('Hunt accepted: ' + b.name, ELITE_NAMES[b.type] + ' — ' + huntDirText(b.x, b.z) + '. ' + b.gold + ' gold on delivery.');
@@ -2451,10 +2465,10 @@ export function createEnemies(g) {
     const H = g.flags.hunts;
     const b = (H && Array.isArray(H.list) && H.active >= 0) ? H.list[H.active] : null;
     if (!b || b.done) {
-      if (api.activeHunt) api.activeHunt = null;
+      if (api.activeHunt) { api.activeHunt = null; clearHuntMarker(); }
       return;
     }
-    if (!api.activeHunt) api.activeHunt = { name: b.name, x: b.x, z: b.z };
+    if (!api.activeHunt) { api.activeHunt = { name: b.name, x: b.x, z: b.z }; setHuntMarker(b); }
     if (huntEnemy && (huntEnemy.dead || list.indexOf(huntEnemy) < 0)) huntEnemy = null;
     if (!huntEnemy) {
       const p = g.player.position;
@@ -2473,6 +2487,7 @@ export function createEnemies(g) {
     b.done = true;
     H.active = -1;
     api.activeHunt = null;
+    clearHuntMarker();
     huntEnemy = null;
     const gold = Math.round(b.gold * goldFindMult());
     if (g.player) {
@@ -2759,6 +2774,7 @@ export function createEnemies(g) {
     }
     huntEnemy = null;
     api.activeHunt = null;
+    clearHuntMarker();
     moonActive = false;       // recomputed from flags + clock next update
     prevDayFrac = -1;         // don't count a phantom midnight on time jumps
     if (!o) return;

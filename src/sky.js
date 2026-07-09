@@ -256,7 +256,7 @@ export function createSky(g) {
   g.scene.add(hemi);
 
   // ---- shadows (optional 1024 PCF bubble following the camera) --------------
-  const SHADOW_EXTENT = 45;
+  const SHADOW_EXTENT = 36; // tighter box: crisper shadows + fewer casters in the pass
   const SHADOW_TEXEL = (SHADOW_EXTENT * 2) / 1024;
   if (g.quality.shadows) {
     sunLight.castShadow = true;
@@ -336,6 +336,8 @@ export function createSky(g) {
     else lightCol.copy(MOON_BLUE);
     sunLight.color.copy(lightCol);
     sunLight.intensity = cur.si * dayW * overcastDim + 0.52 * moonW; // readable nights
+    // Moonlight casts no shadows: halves night draw calls, and moon shadows read as noise anyway
+    if (sunLight.castShadow !== undefined && g.quality.shadows) sunLight.castShadow = dayW > 0.08;
 
     // --- position the light (and snap the shadow bubble to texels) -----------
     if (g.quality.shadows) {

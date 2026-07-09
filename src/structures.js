@@ -1158,7 +1158,7 @@ export function createStructures(g) {
         g.flags.cageOpened = true;
         notify('The cage swings open', 'The captive whispers thanks and bolts for Emberhollow');
         g.events.emit('spawnLoot', { pos: { x: cx, y: gy + 0.8, z: cz + 2.2 }, kind: 'gold', amount: 10 });
-      }, () => !g.flags.cageOpened && !!(g.flags.vargrDead || g.flags.redfangPeace || g.flags.cageUnlocked));
+      }, () => !g.flags.cageOpened && !!(g.flags.vargrDead || g.flags.campPeaceful));
     }
     // skull totems flank the approach from Emberhollow
     const va = Math.atan2(0 - P.x, 0 - P.z);

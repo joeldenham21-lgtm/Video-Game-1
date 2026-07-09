@@ -486,6 +486,7 @@ export function createUI(g) {
   <div class="ef-mrow"><span>Quality</span><button class="ef-sbtn" id="ef-p-q">HIGH</button></div>
   <div class="ef-mrow"><span>Look Sensitivity</span><input type="range" id="ef-p-sens" min="0.3" max="2.5" step="0.05"></div>
   <div class="ef-mrow"><span>Invert Y</span><button class="ef-sbtn" id="ef-p-inv">OFF</button></div>
+  <div class="ef-mrow"><span>Voiced Dialogue</span><button class="ef-sbtn" id="ef-p-voice">ON</button></div>
   <button class="ef-mbtn" id="ef-p-fs">Fullscreen</button>
   <div id="ef-p-note"></div>
 </div>
@@ -995,6 +996,17 @@ export function createUI(g) {
   const markDistEl = markEl.querySelector('.d');
   markEl.style.opacity = '0';
   elCItems.appendChild(markEl);
+  // Generic compass markers (tome hints, hunt targets): g.compassMarkers = [{id,x,z,icon,label}]
+  if (!g.compassMarkers) g.compassMarkers = [];
+  const xtraEls = [];
+  for (let i = 0; i < 3; i++) {
+    const el = document.createElement('div');
+    el.className = 'ef-c mark';
+    el.style.opacity = '0';
+    el.style.color = '#9fd8ff';
+    elCItems.appendChild(el);
+    xtraEls.push(el);
+  }
 
   let compassW = 300, pxPerDeg = 2;
   function measureCompass() {
@@ -1056,9 +1068,16 @@ export function createUI(g) {
         lastMarkDist = dist;
         markDistEl.textContent = dist + 'm';
       }
-    } else {
-      markEl.style.opacity = '0';
     }
+    // extra markers
+    for (let i = 0; i < xtraEls.length; i++) {
+      const m = g.compassMarkers[i];
+      if (!m) { xtraEls[i].style.opacity = '0'; continue; }
+      if (xtraEls[i]._icon !== m.icon) { xtraEls[i]._icon = m.icon; xtraEls[i].textContent = m.icon || '✦'; }
+      const b2 = Math.atan2(m.x - px, -(m.z - pz)) * 180 / Math.PI;
+      placeCompassItem(xtraEls[i], angDiff(b2, heading), true);
+    }
+    if (!mpos) markEl.style.opacity = '0';
   }
 
   // ==========================================================================
@@ -1416,12 +1435,19 @@ export function createUI(g) {
   // Pause menu
   // ==========================================================================
   const elPQ = $('ef-p-q'), elPInv = $('ef-p-inv'), elPSens = $('ef-p-sens');
+  const elPVoice = $('ef-p-voice');
+  if (elPVoice) elPVoice.addEventListener('click', () => {
+    g.flags.voiceOff = !g.flags.voiceOff;
+    elPVoice.textContent = g.flags.voiceOff ? 'OFF' : 'ON';
+    click();
+  });
   const elPNote = $('ef-p-note'), elPLoad = $('ef-p-load'), elPNew = $('ef-p-new'), elPFs = $('ef-p-fs');
   let newConfirm = 0;
 
   function syncPauseUI() {
     elPQ.textContent = g.quality.tier === 'low' ? 'LOW' : 'HIGH';
     elPInv.textContent = invertY ? 'ON' : 'OFF';
+    if (elPVoice) elPVoice.textContent = g.flags.voiceOff ? 'OFF' : 'ON';
     elPSens.value = String(userSens);
     elPLoad.disabled = !(g.save && g.save.hasSave && g.save.hasSave());
     elPNew.textContent = 'New Game';
@@ -1487,6 +1513,7 @@ export function createUI(g) {
     invertY = !invertY;
     localStorage.setItem('elderfall_invy', invertY ? '1' : '0');
     elPInv.textContent = invertY ? 'ON' : 'OFF';
+    if (elPVoice) elPVoice.textContent = g.flags.voiceOff ? 'OFF' : 'ON';
   });
   elPFs.addEventListener('click', () => {
     click();

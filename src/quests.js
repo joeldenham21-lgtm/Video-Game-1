@@ -534,6 +534,10 @@ export function createQuests(g) {
       notify("Aldric's Ember", 'Cold in the hand. Waiting.');
       qUpdate(QUESTS.main3, 'Bring the blade to Torvald the smith');
     }
+    if (d.itemId === 'amulet' && !g.flags.amuletFound) {
+      g.flags.amuletFound = true;
+      notify('A Silver Amulet', 'Etched inside: “Enna”. Wendel should see this.');
+    }
     // Morvane's drop (destroyed-him path): the seal works for the living too.
     if (d.itemId === 'bloodseal') {
       notify('The Bloodseal', 'A cold sigil, taken not given. Your blade drinks deeper after dark: +15% night damage.');

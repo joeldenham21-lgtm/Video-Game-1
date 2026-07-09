@@ -250,6 +250,13 @@ export function createEconomy(g) {
     addGold(-price);
     g.flags['tomeHint_' + note.key] = true;
     g.flags.fenNoteDay = day(); // the pack holds one map a day
+    // Pin the location on the compass until the tome is claimed
+    const TOME_POS = { fire2: { x: 620, z: -420 }, frost2: { x: 380, z: 520 }, lightning2: { x: 150, z: -1250 }, heal2: { x: -260, z: -520 } };
+    const tp = TOME_POS[note.key];
+    if (tp) {
+      if (!g.compassMarkers) g.compassMarkers = [];
+      g.compassMarkers.push({ id: 'tome_' + note.key, x: tp.x, z: tp.z, icon: '✦', label: 'Tome: ' + note.name });
+    }
     notify('Map note — ' + note.name, 'Fenwick taps the page: “Look to ' + note.hint + '.”');
     return true;
   }
@@ -930,6 +937,12 @@ export function createEconomy(g) {
   let veinT = 0;
 
   function update(dt) {
+    if (g.compassMarkers && g.compassMarkers.length) {
+      for (let i = g.compassMarkers.length - 1; i >= 0; i--) {
+        const mk = g.compassMarkers[i];
+        if (mk.id && mk.id.startsWith('tome_') && g.flags[mk.id]) g.compassMarkers.splice(i, 1);
+      }
+    }
     const t = g.time.elapsed;
     // Sparkle: crystal emissive breathes (shared materials, all veins)
     ironCrysMat.emissiveIntensity = 0.5 + 0.32 * Math.sin(t * 2.6);

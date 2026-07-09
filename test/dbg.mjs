@@ -9,7 +9,7 @@ await new Promise(r=>server.listen(8932,r));
 const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium', headless:true, args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] });
 const page = await browser.newPage({ viewport:{width:844,height:390} });
 page.on('console', m=>{ if(m.type()==='error') console.log('CONSOLE:', m.text().slice(0,300)); });
-page.on('pageerror', e=>console.log('PAGEERROR:', String(e).slice(0,400)));
+page.on('pageerror', e=>console.log('PAGEERROR:', (e.stack||String(e)).slice(0,600)));
 page.on('requestfailed', r=>console.log('REQFAIL:', r.url().slice(-80)));
 page.on('response', r=>{ if(r.status()>=400) console.log('HTTP'+r.status()+':', r.url().slice(-90)); });
 await page.goto('http://localhost:8932/?debug', { waitUntil:'load' });
