@@ -30,7 +30,6 @@ const BUBBLE = 120;             // hard ambient-life radius (u)
 
 // ---- module-scope scratch (zero per-frame allocations) ---------------------
 const _v1 = new THREE.Vector3();
-const _v2 = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
@@ -243,8 +242,8 @@ export function createFauna(g) {
       mode: 'fly',                      // fly | seek | perch
       homeX: 0, homeZ: 0,
       ang: Math.random() * TAU,
-      angV: (0.10 + Math.random() * 0.08) * (f & 1 ? -1 : 1),
-      rad: 18 + Math.random() * 14,
+      angV: (0.18 + Math.random() * 0.12) * (f & 1 ? -1 : 1), // rad/s → ~5 u/s tangential
+      rad: 14 + Math.random() * 12,
       height: 13 + Math.random() * 9,
       anchor: new THREE.Vector3(0, 20, 0),
       groundY: 0,
@@ -256,9 +255,9 @@ export function createFauna(g) {
   }
 
   function rehomeFlock(fl, px, pz, awayX, awayZ) {
-    // New loop center 45–90u out; if fleeing, biased away from the player.
+    // New loop center 40–80u out; if fleeing, biased away from the player.
     let a = Math.random() * TAU;
-    const d = 45 + Math.random() * 45;
+    const d = 40 + Math.random() * 40;
     if (awayX !== 0 || awayZ !== 0) a = Math.atan2(awayZ, awayX) + (Math.random() - 0.5) * 1.2;
     fl.homeX = px + Math.cos(a) * d;
     fl.homeZ = pz + Math.sin(a) * d;
@@ -292,7 +291,7 @@ export function createFauna(g) {
     const scared = t - scareT < 0.6;
     for (let f = 0; f < FLOCK_N; f++) {
       const fl = flocks[f];
-      if (dist2d(fl.homeX, fl.homeZ, px, pz) > BUBBLE - 8) rehomeFlock(fl, px, pz, 0, 0);
+      if (dist2d(fl.homeX, fl.homeZ, px, pz) > 95) rehomeFlock(fl, px, pz, 0, 0);
 
       // Dawn/dusk: hunt for a real tree near the loop and settle onto it.
       if (perchWin && !fl.hasTree && fl.mode === 'fly') {
@@ -301,7 +300,8 @@ export function createFauna(g) {
         while (fl.scan < TREE_SCAN.length && looked < 30) {
           const o = TREE_SCAN[fl.scan++]; looked++;
           if (treeAtCell(ccx + o[0], ccz + o[1], _tree)) {
-            if (dist2d(_tree.x, _tree.z, px, pz) > 14) {
+            const td = dist2d(_tree.x, _tree.z, px, pz);
+            if (td > 14 && td < BUBBLE - 20) { // reachable, inside the bubble
               fl.tree.x = _tree.x; fl.tree.z = _tree.z;
               fl.tree.top = _tree.top; fl.tree.r = _tree.r;
               fl.hasTree = true;
@@ -323,7 +323,7 @@ export function createFauna(g) {
       if (!perchWin && fl.mode !== 'fly') { fl.mode = 'fly'; fl.hasTree = false; }
 
       if (fl.mode === 'fly') {
-        fl.ang += fl.angV * AI_DT * 10; // angV tuned per-second below via *AI_DT
+        fl.ang += fl.angV * AI_DT;
         fl.anchor.x = fl.homeX + Math.cos(fl.ang) * fl.rad;
         fl.anchor.z = fl.homeZ + Math.sin(fl.ang * 0.9) * fl.rad;
         fl.groundY = terrainHeight(fl.anchor.x, fl.anchor.z);
@@ -448,7 +448,6 @@ export function createFauna(g) {
     [0.95, 0.95, 1.0], [1.0, 0.45, 0.35], [0.55, 0.75, 1.0],
   ];
   for (let i = 0; i < BFLY_N; i++) {
-    birdMesh.getMatrixAt(0, _m); // noop read keeps linters honest about _m reuse
     bflyMesh.setMatrixAt(i, ZERO_M);
     const tt = BFLY_TINTS[i % BFLY_TINTS.length];
     _c.setRGB(tt[0], tt[1], tt[2]);

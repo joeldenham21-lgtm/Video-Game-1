@@ -488,7 +488,9 @@ export function createRPG(g) {
   font-style:italic;font-size:12.5px;letter-spacing:.18em;color:rgba(203,185,143,.75);
   text-shadow:0 1px 3px #000;transition:opacity .3s ease;}
 #ef-rpg-svg{width:100%;height:100%;max-width:640px;display:block;
-  filter:drop-shadow(0 0 22px rgba(30,40,90,.5));}
+  filter:drop-shadow(0 0 22px rgba(30,40,90,.5));
+  transition:transform .32s cubic-bezier(.2,.9,.25,1);}
+#ef-rpg-view.carded #ef-rpg-svg{transform:translateY(-9%) scale(.92);}
 .ef-rpg-tree{opacity:0;pointer-events:none;transition:opacity .32s ease,transform .32s ease;
   transform:translateY(3px);}
 .ef-rpg-tree.on{opacity:1;pointer-events:auto;transform:none;}
@@ -503,7 +505,10 @@ export function createRPG(g) {
 .ef-rpg-node .lbl{fill:#5d688c;font-size:3.4px;text-anchor:middle;
   font-family:Georgia,'Times New Roman',serif;letter-spacing:.08em;pointer-events:none;
   transition:fill .3s ease;}
-.ef-rpg-node .hit{fill:transparent;stroke:none;pointer-events:all;}
+/* hit targets only active in the visible tree — pointer-events on children
+   would otherwise override the hidden groups' pointer-events:none */
+.ef-rpg-node .hit{fill:transparent;stroke:none;pointer-events:none;}
+.ef-rpg-tree.on .ef-rpg-node .hit{pointer-events:all;}
 .ef-rpg-node.avail .star{fill:#dfe8ff;transform:scale(1);stroke:rgba(255,255,255,.5);}
 .ef-rpg-node.avail .lbl{fill:#c6d0ec;}
 .ef-rpg-node.avail .halo{opacity:.5;animation:ef-rpg-np 2.2s ease-in-out infinite;}
@@ -797,12 +802,14 @@ export function createRPG(g) {
       elUnlockTxt.textContent = state.points <= 0 && lvlOk && preOk ? 'No perk points' : 'Locked';
     }
     elCard.classList.add('on');
+    elCard.parentElement.classList.add('carded'); // shift constellation up
     refreshTree();
   }
   function closeCard() {
     selPerk = null;
     cancelHold();
     elCard.classList.remove('on');
+    elCard.parentElement.classList.remove('carded');
     refreshTree();
   }
 
@@ -823,8 +830,6 @@ export function createRPG(g) {
     cancelHold();
     if (!selPerk || !unlock(selPerk)) return;
     const n = nodeEls[selPerk.id];
-    n.classList.remove('burst');
-    void n.getBBox; // no-op touch; class retrigger handled below
     n.classList.add('burst');
     setTimeout(() => n.classList.remove('burst'), 850);
     openCard(selPerk); // refresh card into "Unlocked" state
@@ -847,7 +852,9 @@ export function createRPG(g) {
   function openTree() {
     if (treeOpen) return;
     // never open on top of another modal (dialogue / pause / journal / book)
+    // or the death screen
     if (g.paused) return;
+    if (g.player && g.player.stats && g.player.stats.hp <= 0) return;
     treeOpen = true;
     wasPausedByUs = true;
     g.paused = true;
@@ -872,8 +879,12 @@ export function createRPG(g) {
   }
 
   if (elBtn) {
-    elBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); });
-    elBtn.addEventListener('click', (e) => { e.stopPropagation(); openTree(); });
+    // open on pointerdown — snappy on touch, and immune to suppressed clicks
+    elBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openTree();
+    });
   }
   $('ef-rpg-x').addEventListener('click', closeTree);
 
