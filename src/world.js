@@ -4,14 +4,20 @@
 //  - Chunked vertex-colored terrain (5×5 hi-res + 7×7 lo-res ring), pooled,
 //    max one chunk (re)build per frame.
 //  - One static 4400u far shell so Drakespire always reads on the horizon.
-//  - Global InstancedMesh vegetation pools (pines, oaks, rocks, grass, bushes,
-//    flowers) refilled incrementally (≤1ms/frame) on 32u boundary crossings.
+//  - FOLIAGE MEGAPASS: 50 global InstancedMesh pools (15 tree archetypes,
+//    12 undergrowth, 8 flower/mushroom, 10 rock, 4 debris, 1 grass) with
+//    per-instance color/scale variation, seeded grove-noise species clumping,
+//    biome logic (willows ring Mirrormere, dead/burned trees near Barrowdeep
+//    + marsh, snow pines above h=75, glowing mushrooms near the witch's
+//    forest). Refilled incrementally (≤1.5ms/frame) on 32u boundary crossings.
 //  - Fresnel water plane with 3-sine displacement + sun sparkle.
 // Only imports: three + core.js. No textures, no addons, no per-frame allocs.
+// Art direction: dark-fantasy muted palette (moss/olive/sage, umber bark,
+// cold grey rock, muted ochres) — warmth comes from lighting, not albedo.
 // ============================================================================
 import * as THREE from 'three';
 import {
-  WATER_LEVEL, POIS, BIOME, biomeAt, terrainHeight, hash2, snoise,
+  WATER_LEVEL, POIS, POI, BIOME, biomeAt, terrainHeight, hash2, snoise,
   clamp, lerp, smoothstep, dist2d,
 } from './core.js';
 
@@ -30,21 +36,62 @@ const _m = new THREE.Matrix4();
 const _p = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
+const _e = new THREE.Euler();
 const _c = new THREE.Color();
 const _white = new THREE.Color(1, 1, 1);
 const UP = new THREE.Vector3(0, 1, 0);
 const ZERO_M = new THREE.Matrix4().makeScale(0, 0, 0);
-const _hs = new Float32Array(129 * 129); // height scratch, sized for far shell
+const _hs = new Float32Array(225 * 225); // height scratch, sized for far shell
+
+// Landmark anchors used by biome-aware scatter (values mirror the fixed,
+// seeded world: Mirrormere lake, Barrowdeep ruins, the witch's forest hut).
+const LAKE_X = -350, LAKE_Z = 520;
+const RUINS_X = POI.ruins.x, RUINS_Z = POI.ruins.z;
+const WITCH_X = -260, WITCH_Z = -520;
 
 // POIs that flatten terrain — no trees/grass/rocks placed inside these.
 const FLAT_POIS = POIS.filter((p) => p.flatten && p.r > 0);
+// Extra clearings for expansion structures not present in core.POIS
+// (the witch's hut and Stonebridge) so vegetation never clips buildings.
+const EXTRA_CLEAR = [
+  { x: WITCH_X, z: WITCH_Z, r: 15 },
+  { x: 330, z: -260, r: 21 },
+];
 
+// Hard exclusion for trees / rocks / debris: structures stay clear (~80% of
+// the POI radius) but the forest edge no longer stops at a giant lawn line.
 function insidePOI(wx, wz) {
   for (let i = 0; i < FLAT_POIS.length; i++) {
     const p = FLAT_POIS[i];
-    if (dist2d(wx, wz, p.x, p.z) < p.r + 4) return true;
+    if (dist2d(wx, wz, p.x, p.z) < p.r * 0.8 + 4) return true;
+  }
+  for (let i = 0; i < EXTRA_CLEAR.length; i++) {
+    const p = EXTRA_CLEAR[i];
+    if (dist2d(wx, wz, p.x, p.z) < p.r) return true;
   }
   return false;
+}
+
+// Soft density multiplier for grass / flowers / bushes: only the inner ~45%
+// of each POI is bare; density ramps back up toward the rim so villages sit
+// in worn ground that feathers into meadow instead of a clear-cut disc.
+function poiGroundScale(wx, wz) {
+  let m = 1;
+  for (let i = 0; i < FLAT_POIS.length; i++) {
+    const p = FLAT_POIS[i];
+    const d = dist2d(wx, wz, p.x, p.z);
+    if (d >= p.r) continue;
+    if (d < p.r * 0.45) return 0;
+    const t = smoothstep(p.r * 0.45, p.r * 0.95, d);
+    if (t < m) m = t;
+  }
+  for (let i = 0; i < EXTRA_CLEAR.length; i++) {
+    const p = EXTRA_CLEAR[i];
+    const d = dist2d(wx, wz, p.x, p.z);
+    if (d < p.r * 0.6) return 0;
+    if (d < p.r) { const t = smoothstep(p.r * 0.6, p.r, d); if (t < m) m = t; }
+  }
+  return m;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,12 +119,12 @@ function terrainColor(wx, wz, h, slope, arr, o) {
   const bio = biomeAt(wx, wz, h);
 
   if (bio === BIOME.MEADOW) {
-    // Warm meadow: fresh spring green drifting into sun-dried golden swathes,
+    // Muted meadow: mossy sage green drifting into dried olive-gold swathes,
     // with darker clover mottling so the flats never read as one flat green.
     const t = patch * patch;
-    r = lerp(0.30, 0.51, t) + j2 * 0.05;
-    g = lerp(0.46, 0.43, t) + j1 * 0.06;
-    b = lerp(0.155, 0.13, t) + j1 * 0.02;
+    r = lerp(0.29, 0.46, t) + j2 * 0.05;
+    g = lerp(0.41, 0.39, t) + j1 * 0.06;
+    b = lerp(0.16, 0.14, t) + j1 * 0.02;
     const clover = smoothstep(0.62, 0.95, micro) * 0.22;
     r *= 1 - clover; g *= 1 - clover * 0.5; b *= 1 - clover * 0.35;
   } else if (bio === BIOME.FOREST) {
@@ -180,7 +227,9 @@ function paintTerrainGeometry(geo, originX, originZ, segs) {
 // ---------------------------------------------------------------------------
 // Merge transformed geometries into one non-indexed BufferGeometry with a
 // vertical c0→c1 color gradient per part (+ small deterministic jitter).
-// Parts that already carry a color attribute keep it.
+// Parts that already carry a color attribute keep it. An optional per-part
+// `face(cx, cy, cz, ny, f)` callback may override whole-face colors — used
+// for birch bark bands, moss tops, lichen speckles, mushroom dots, cut rings.
 function mergeColored(parts) {
   let total = 0;
   const items = [];
@@ -201,6 +250,7 @@ function mergeColored(parts) {
     const y0 = geo.boundingBox.min.y;
     const y1 = Math.max(geo.boundingBox.max.y, y0 + 1e-6);
     const c1 = p.c1 || p.c0;
+    const partStart = o; // float offset of this part's first vertex
     for (let i = 0; i < pa.count; i++) {
       const y = pa.getY(i);
       pos[o] = pa.getX(i); pos[o + 1] = y; pos[o + 2] = pa.getZ(i);
@@ -217,6 +267,23 @@ function mergeColored(parts) {
       }
       o += 3;
     }
+    if (p.face) {
+      const faces = (pa.count / 3) | 0;
+      for (let f = 0; f < faces; f++) {
+        const v = f * 3;
+        const fcx = (pa.getX(v) + pa.getX(v + 1) + pa.getX(v + 2)) / 3;
+        const fcy = (pa.getY(v) + pa.getY(v + 1) + pa.getY(v + 2)) / 3;
+        const fcz = (pa.getZ(v) + pa.getZ(v + 1) + pa.getZ(v + 2)) / 3;
+        const ny = na ? na.getY(v) : 1;
+        const fc = p.face(fcx, fcy, fcz, ny, f);
+        if (fc) {
+          for (let k = 0; k < 3; k++) {
+            const oo = partStart + v * 3 + k * 3;
+            col[oo] = fc[0]; col[oo + 1] = fc[1]; col[oo + 2] = fc[2];
+          }
+        }
+      }
+    }
     pi++;
   }
   const out = new THREE.BufferGeometry();
@@ -226,20 +293,17 @@ function mergeColored(parts) {
   return out;
 }
 
-const mat4At = (x, y, z, sx = 1, sy = 1, sz = 1) =>
-  new THREE.Matrix4().makeTranslation(x, y, z)
-    .multiply(new THREE.Matrix4().makeScale(sx, sy, sz));
-
-function buildPineGeom() {
-  return mergeColored([
-    { geo: new THREE.CylinderGeometry(0.13, 0.24, 1.4, 5, 1, true), matrix: mat4At(0, 0.7, 0), c0: [0.20, 0.14, 0.09], c1: [0.30, 0.21, 0.13] },
-    { geo: new THREE.ConeGeometry(1.5, 2.4, 6, 1, true), matrix: mat4At(0, 2.5, 0), c0: [0.06, 0.15, 0.08], c1: [0.12, 0.25, 0.12] },
-    { geo: new THREE.ConeGeometry(1.12, 2.0, 6, 1, true), matrix: mat4At(0, 3.9, 0), c0: [0.08, 0.18, 0.09], c1: [0.15, 0.29, 0.14] },
-    { geo: new THREE.ConeGeometry(0.68, 1.6, 6, 1, true), matrix: mat4At(0, 5.05, 0), c0: [0.10, 0.21, 0.11], c1: [0.19, 0.34, 0.17] },
-  ]);
+// Init-time TRS matrix helper (rotation in XYZ euler order).
+function matTRS(x, y, z, rx = 0, ry = 0, rz = 0, s = 1, sy) {
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3(x, y, z),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)),
+    new THREE.Vector3(s, sy === undefined ? s : sy, s));
 }
 
-// Deterministically lumpen icosahedron (shared corners hash identically).
+const mixC = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+
+// Deterministically lumpen geometry (shared corners hash identically).
 function lumpy(geo, amt, seed, squashY) {
   const pa = geo.attributes.position;
   for (let i = 0; i < pa.count; i++) {
@@ -251,31 +315,539 @@ function lumpy(geo, amt, seed, squashY) {
   return geo;
 }
 
-function buildOakGeom() {
+// -- shared palette (muted / dark-fantasy) ----------------------------------
+const BARK = [[0.155, 0.115, 0.075], [0.27, 0.205, 0.13]];   // umber bark
+const BARK_DK = [[0.11, 0.085, 0.06], [0.20, 0.155, 0.10]];  // darker gnarled bark
+const SNOW_C = [[0.66, 0.71, 0.82], [0.88, 0.91, 1.00]];     // laden snow
+const MOSS_C = [0.14, 0.21, 0.075];                          // moss overlay
+const ROCK_C = [[0.195, 0.195, 0.185], [0.44, 0.44, 0.42]];  // cold grey rock
+
+// -- conifer factory: trunk + stacked open cones. tiers: [radius, coneH, y] --
+function conifer({ trunkR = 0.22, trunkH = 1.6, bark = BARK, lean = 0, radial = 6, tiers, grad, snow = false }) {
+  const parts = [{
+    geo: new THREE.CylinderGeometry(trunkR * 0.5, trunkR, trunkH + 0.5, 5, 1, true),
+    matrix: matTRS(0, (trunkH + 0.5) * 0.5, 0, 0, 0, lean),
+    c0: bark[0], c1: bark[1],
+  }];
+  const n = tiers.length;
+  for (let i = 0; i < n; i++) {
+    const [r, ch, y] = tiers[i];
+    const t = n > 1 ? i / (n - 1) : 0;
+    const lx = -Math.sin(lean) * y; // canopy follows the leaning trunk
+    parts.push({
+      geo: new THREE.ConeGeometry(r, ch, radial, 1, true),
+      matrix: matTRS(lx, y, 0, 0, i * 1.9, lean * 0.55),
+      c0: mixC(grad[0], grad[1], t * 0.55), c1: mixC(grad[0], grad[1], t * 0.55 + 0.45),
+    });
+    if (snow) parts.push({
+      geo: new THREE.ConeGeometry(r * 0.74, ch * 0.34, radial, 1, true),
+      matrix: matTRS(lx, y + ch * 0.40, 0, 0, i * 1.9, lean * 0.55),
+      c0: SNOW_C[0], c1: SNOW_C[1],
+    });
+  }
+  return mergeColored(parts);
+}
+
+// -- broadleaf factory: trunk (+branch sticks) + lumpy canopy blobs ----------
+function canopy({ trunkR = 0.30, trunkH = 1.9, bark = BARK, lean = 0, face = null, blobs, sticks = [] }) {
+  const parts = [{
+    geo: new THREE.CylinderGeometry(trunkR * 0.62, trunkR, trunkH + 0.4, 5, 1, true),
+    matrix: matTRS(0, (trunkH + 0.4) * 0.5, 0, 0, 0, lean),
+    c0: bark[0], c1: bark[1], face,
+  }];
+  for (const s of sticks) parts.push({
+    geo: new THREE.CylinderGeometry(s.r * 0.45, s.r, s.len, 4, 1, true),
+    matrix: matTRS(s.x, s.y, s.z, s.rx || 0, 0, s.rz || 0),
+    c0: bark[0], c1: bark[1],
+  });
+  let bi = 0;
+  for (const b of blobs) {
+    parts.push({
+      geo: lumpy(new THREE.IcosahedronGeometry(b.r, 0), b.amt || 0.35, 21 + bi * 3, 1),
+      matrix: matTRS(b.x, b.y, b.z, 0, bi * 2.1, 0, 1, b.sy || 0.85),
+      c0: b.c0, c1: b.c1,
+    });
+    bi++;
+  }
+  return mergeColored(parts);
+}
+
+// Birch/aspen bark: pale trunk broken by dark horizontal band scars.
+function barkBands(seed) {
+  return (cx, cy, cz, ny, f) => {
+    if (Math.abs(ny) > 0.7) return null; // skip caps
+    const band = hash2(Math.round(cy * 6.5), 0, seed);
+    if (band < 0.30 && hash2(f, 1, seed) < 0.75) return [0.10, 0.09, 0.08];
+    return null;
+  };
+}
+
+// ---- 15 TREE ARCHETYPES ----------------------------------------------------
+const PINE_G = [[0.045, 0.105, 0.062], [0.125, 0.215, 0.115]];  // deep pine
+const FIR_G = [[0.038, 0.092, 0.068], [0.10, 0.185, 0.125]];    // blue-dark fir
+const SPRUCE_G = [[0.05, 0.10, 0.085], [0.115, 0.20, 0.15]];    // grey-blue spruce
+const SCRAG_G = [[0.055, 0.095, 0.055], [0.13, 0.185, 0.10]];   // scraggly olive
+
+function buildPineGeom() { // 1. classic layered pine
+  return conifer({
+    trunkR: 0.24, trunkH: 1.5, grad: PINE_G,
+    tiers: [[1.45, 2.2, 2.4], [1.05, 1.9, 3.85], [0.62, 1.55, 5.0]],
+  });
+}
+function buildFirGeom() { // 2. dense many-tiered fir
+  return conifer({
+    trunkR: 0.20, trunkH: 1.2, grad: FIR_G,
+    tiers: [[1.18, 1.5, 1.95], [1.00, 1.4, 2.85], [0.82, 1.3, 3.7], [0.60, 1.2, 4.55], [0.36, 1.1, 5.35]],
+  });
+}
+function buildDroopGeom() { // 3. droop-skirted spruce (wide flat tiers)
+  return conifer({
+    trunkR: 0.23, trunkH: 1.3, grad: SPRUCE_G,
+    tiers: [[1.75, 1.35, 2.0], [1.45, 1.25, 2.85], [1.12, 1.15, 3.65], [0.78, 1.05, 4.4], [0.42, 1.0, 5.1]],
+  });
+}
+function buildSpruceTallGeom() { // 4. tall narrow spire spruce
+  return conifer({
+    trunkR: 0.24, trunkH: 2.2, grad: SPRUCE_G,
+    tiers: [[1.02, 1.9, 2.7], [0.82, 1.7, 4.1], [0.62, 1.55, 5.4], [0.42, 1.4, 6.55], [0.24, 1.25, 7.5]],
+  });
+}
+function buildCrookedGeom() { // 5. crooked wind-bent pine
+  return conifer({
+    trunkR: 0.26, trunkH: 1.7, lean: 0.19, bark: BARK_DK, grad: SCRAG_G, radial: 5,
+    tiers: [[1.28, 1.7, 2.25], [0.92, 1.45, 3.4], [0.52, 1.25, 4.35]],
+  });
+}
+function buildPineSnowGeom() { // 6. snow-laden high-altitude pine
+  return conifer({
+    trunkR: 0.24, trunkH: 1.4, grad: FIR_G, snow: true,
+    tiers: [[1.4, 2.0, 2.25], [1.0, 1.7, 3.6], [0.58, 1.4, 4.7]],
+  });
+}
+function buildSaplingGeom() { // 7. young pine sapling (understory)
+  return conifer({
+    trunkR: 0.09, trunkH: 0.55, grad: PINE_G, radial: 5,
+    tiers: [[0.58, 1.05, 1.0], [0.34, 0.85, 1.75]],
+  });
+}
+function buildOakGeom() { // 8. broadleaf oak, multi-blob canopy
+  return canopy({
+    trunkR: 0.33, trunkH: 1.9,
+    blobs: [
+      { x: 0, y: 2.75, z: 0, r: 1.55, sy: 0.82, c0: [0.085, 0.155, 0.055], c1: [0.225, 0.29, 0.10] },
+      { x: 0.92, y: 2.15, z: 0.42, r: 1.0, c0: [0.095, 0.17, 0.06], c1: [0.24, 0.30, 0.11] },
+      { x: -0.78, y: 2.3, z: -0.45, r: 0.86, c0: [0.08, 0.145, 0.055], c1: [0.21, 0.27, 0.095] },
+    ],
+  });
+}
+function buildElmGeom() { // 9. tall vase-shaped elm
+  return canopy({
+    trunkR: 0.25, trunkH: 2.7,
+    blobs: [
+      { x: 0, y: 3.55, z: 0, r: 1.4, sy: 0.9, c0: [0.09, 0.16, 0.06], c1: [0.235, 0.30, 0.115] },
+      { x: 0.85, y: 3.0, z: 0.3, r: 0.9, c0: [0.10, 0.175, 0.065], c1: [0.25, 0.315, 0.12] },
+      { x: -0.75, y: 3.15, z: -0.35, r: 0.85, c0: [0.085, 0.15, 0.055], c1: [0.22, 0.28, 0.10] },
+    ],
+  });
+}
+function buildGnarlyGeom() { // 10. gnarled squat oak (thick trunk, low crown)
+  return canopy({
+    trunkR: 0.48, trunkH: 1.25, lean: 0.12, bark: BARK_DK,
+    sticks: [
+      { x: 0.55, y: 1.7, z: 0.2, rz: -0.85, r: 0.11, len: 1.3 },
+      { x: -0.5, y: 1.55, z: -0.25, rz: 0.95, rx: 0.3, r: 0.10, len: 1.2 },
+    ],
+    blobs: [
+      { x: 0.35, y: 2.25, z: 0.1, r: 1.5, sy: 0.66, amt: 0.45, c0: [0.07, 0.13, 0.05], c1: [0.185, 0.245, 0.09] },
+      { x: -0.85, y: 1.95, z: -0.4, r: 0.95, sy: 0.7, amt: 0.45, c0: [0.075, 0.14, 0.05], c1: [0.20, 0.26, 0.095] },
+    ],
+  });
+}
+function buildBirchGeom() { // 11. slim pale birch, small sage crown
+  return canopy({
+    trunkR: 0.145, trunkH: 2.9, lean: 0.04,
+    bark: [[0.60, 0.61, 0.575], [0.80, 0.81, 0.775]], face: barkBands(407),
+    blobs: [
+      { x: 0.1, y: 3.45, z: 0, r: 0.95, sy: 1.15, c0: [0.115, 0.17, 0.07], c1: [0.27, 0.325, 0.13] },
+      { x: -0.4, y: 2.8, z: 0.25, r: 0.55, c0: [0.125, 0.185, 0.075], c1: [0.29, 0.34, 0.14] },
+    ],
+  });
+}
+function buildAspenGeom() { // 12. slim aspen, rounder gold-green crown
+  return canopy({
+    trunkR: 0.125, trunkH: 2.6, lean: 0.02,
+    bark: [[0.55, 0.55, 0.48], [0.76, 0.76, 0.68]], face: barkBands(409),
+    blobs: [
+      { x: 0, y: 3.2, z: 0, r: 1.05, sy: 1.3, c0: [0.15, 0.175, 0.06], c1: [0.315, 0.31, 0.11] },
+    ],
+  });
+}
+function buildWillowGeom() { // 13. lakeside willow with drooping fronds
+  const parts = [{
+    geo: new THREE.CylinderGeometry(0.19, 0.32, 2.1, 5, 1, true),
+    matrix: matTRS(0, 1.05, 0, 0, 0, 0.10), c0: BARK_DK[0], c1: BARK_DK[1],
+  }, {
+    geo: lumpy(new THREE.IcosahedronGeometry(1.55, 0), 0.32, 61, 1),
+    matrix: matTRS(-0.15, 2.9, 0, 0, 0, 0, 1, 0.72),
+    c0: [0.10, 0.155, 0.085], c1: [0.215, 0.285, 0.15],
+  }];
+  for (let i = 0; i < 6; i++) { // hanging frond cones around the dome rim
+    const a = i * (TAU / 6) + 0.4;
+    parts.push({
+      geo: new THREE.ConeGeometry(0.30, 1.95, 5, 1, true),
+      matrix: matTRS(Math.cos(a) * 1.30 - 0.15, 2.15, Math.sin(a) * 1.30, Math.PI, a, 0),
+      c0: [0.085, 0.13, 0.07], c1: [0.19, 0.26, 0.13],
+    });
+  }
+  return mergeColored(parts);
+}
+function buildDeadGeom() { // 14. gnarled dead tree, bare branches
+  const B = [[0.16, 0.135, 0.105], [0.315, 0.275, 0.225]];
   return mergeColored([
-    { geo: new THREE.CylinderGeometry(0.18, 0.34, 1.9, 5, 1, true), matrix: mat4At(0, 0.95, 0), c0: [0.22, 0.17, 0.12], c1: [0.33, 0.27, 0.19] },
-    { geo: lumpy(new THREE.IcosahedronGeometry(1.55, 0), 0.35, 21, 1), matrix: mat4At(0, 2.7, 0, 1.15, 0.85, 1.15), c0: [0.12, 0.25, 0.08], c1: [0.29, 0.42, 0.13] },
-    { geo: lumpy(new THREE.IcosahedronGeometry(1.0, 0), 0.35, 22, 1), matrix: mat4At(0.9, 2.15, 0.4), c0: [0.13, 0.27, 0.09], c1: [0.32, 0.44, 0.15] },
-    { geo: lumpy(new THREE.IcosahedronGeometry(0.85, 0), 0.35, 23, 1), matrix: mat4At(-0.75, 2.3, -0.45), c0: [0.11, 0.23, 0.08], c1: [0.27, 0.40, 0.13] },
+    { geo: new THREE.CylinderGeometry(0.09, 0.30, 2.9, 5, 1, true), matrix: matTRS(0, 1.45, 0, 0, 0, 0.07), c0: B[0], c1: B[1] },
+    { geo: new THREE.CylinderGeometry(0.015, 0.075, 1.5, 4, 1, true), matrix: matTRS(0.45, 2.35, 0.1, 0.2, 0, -0.95), c0: B[0], c1: B[1] },
+    { geo: new THREE.CylinderGeometry(0.015, 0.065, 1.3, 4, 1, true), matrix: matTRS(-0.4, 2.0, -0.15, -0.3, 0, 1.05), c0: B[0], c1: B[1] },
+    { geo: new THREE.CylinderGeometry(0.012, 0.05, 1.1, 4, 1, true), matrix: matTRS(0.15, 2.85, -0.3, -0.85, 0, -0.3), c0: B[0], c1: B[1] },
+    { geo: new THREE.CylinderGeometry(0.012, 0.05, 0.9, 4, 1, true), matrix: matTRS(-0.2, 2.7, 0.3, 0.9, 0, 0.45), c0: B[0], c1: B[1] },
+  ]);
+}
+function buildSnagGeom() { // 15. burned snag — charred broken trunk
+  const C = [[0.035, 0.032, 0.030], [0.135, 0.125, 0.12]];
+  return mergeColored([
+    { geo: new THREE.CylinderGeometry(0.13, 0.36, 2.1, 5, 1, true), matrix: matTRS(0, 1.05, 0, 0, 0, 0.05), c0: C[0], c1: C[1] },
+    { geo: new THREE.ConeGeometry(0.13, 0.55, 5, 1, true), matrix: matTRS(0, 2.35, 0, 0.18, 0, 0.12), c0: C[1], c1: C[0] },
+    { geo: new THREE.CylinderGeometry(0.015, 0.06, 0.9, 4, 1, true), matrix: matTRS(0.3, 1.6, 0.1, 0.1, 0, -1.0), c0: C[0], c1: C[1] },
   ]);
 }
 
-function buildRockGeom() {
+// ---- undergrowth helpers ----------------------------------------------------
+// Radial frond clump (ferns): one elongated triangle per frond, tips droop.
+function frondClump({ fronds, len, tipH, baseW, baseH, c0, c1, seed }) {
+  const P = [], N = [], C = [];
+  for (let k = 0; k < fronds; k++) {
+    const a = k * (TAU / fronds) + hash2(k, 1, seed) * 0.8;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const L = len * (0.8 + hash2(k, 2, seed) * 0.4);
+    const th = tipH * (0.75 + hash2(k, 3, seed) * 0.5);
+    // base edge perpendicular to frond direction
+    P.push(-sa * baseW, baseH, ca * baseW, sa * baseW, baseH, -ca * baseW, ca * L, th, sa * L);
+    for (let v = 0; v < 3; v++) { N.push(ca * 0.35, 0.9, sa * 0.35); }
+    C.push(c0[0], c0[1], c0[2], c0[0], c0[1], c0[2], c1[0], c1[1], c1[2]);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(P), 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(N), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(C), 3));
+  return geo;
+}
+
+// Vertical blade clump (reeds / tall grass): triangles pointing up.
+function bladeClump({ blades, height, w, spread, c0, c1, seed }) {
+  const P = [], N = [], C = [];
+  for (let k = 0; k < blades; k++) {
+    const a = k * (TAU / blades) + hash2(k, 4, seed);
+    const bx = Math.cos(a) * spread * hash2(k, 5, seed);
+    const bz = Math.sin(a) * spread * hash2(k, 6, seed);
+    const hgt = height * (0.75 + hash2(k, 7, seed) * 0.5);
+    const lean = (hash2(k, 8, seed) - 0.5) * 0.45;
+    P.push(bx - w, 0, bz, bx + w, 0, bz, bx + lean, hgt, bz + lean * 0.6);
+    for (let v = 0; v < 3; v++) N.push(0, 0.5, 1);
+    C.push(c0[0], c0[1], c0[2], c0[0], c0[1], c0[2], c1[0], c1[1], c1[2]);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(P), 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(N), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(C), 3));
+  return geo;
+}
+
+// ---- 12 UNDERGROWTH ARCHETYPES ----------------------------------------------
+function buildFernGeom() {
+  return frondClump({ fronds: 9, len: 0.78, tipH: 0.36, baseW: 0.10, baseH: 0.05, seed: 71, c0: [0.05, 0.11, 0.045], c1: [0.19, 0.28, 0.095] });
+}
+function buildFernBigGeom() {
+  return frondClump({ fronds: 12, len: 1.2, tipH: 0.55, baseW: 0.13, baseH: 0.07, seed: 73, c0: [0.045, 0.10, 0.04], c1: [0.165, 0.255, 0.085] });
+}
+function buildBushRoundGeom() {
   return mergeColored([
-    { geo: lumpy(new THREE.IcosahedronGeometry(1, 0), 0.55, 53, 0.72), c0: [0.22, 0.20, 0.18], c1: [0.50, 0.48, 0.44] },
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.85, 0), 0.4, 57, 0.62), matrix: matTRS(0, 0.40, 0), c0: [0.075, 0.145, 0.06], c1: [0.195, 0.285, 0.10] },
+  ]);
+}
+function buildBushWideGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.85, 0), 0.42, 58, 0.55), matrix: matTRS(-0.45, 0.35, 0.1), c0: [0.07, 0.135, 0.055], c1: [0.185, 0.27, 0.095] },
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.68, 0), 0.42, 59, 0.6), matrix: matTRS(0.5, 0.3, -0.15), c0: [0.08, 0.15, 0.06], c1: [0.21, 0.29, 0.105] },
+  ]);
+}
+function buildBrambleGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.9, 0), 0.55, 63, 0.5), matrix: matTRS(-0.3, 0.33, 0), c0: [0.06, 0.075, 0.045], c1: [0.155, 0.165, 0.085] },
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.65, 0), 0.55, 64, 0.55), matrix: matTRS(0.55, 0.28, 0.2), c0: [0.07, 0.08, 0.05], c1: [0.17, 0.175, 0.09] },
+    { geo: new THREE.ConeGeometry(0.035, 0.5, 4, 1, true), matrix: matTRS(0.1, 0.75, 0.1, 0.3, 0, 0.25), c0: [0.10, 0.09, 0.06], c1: [0.16, 0.15, 0.10] },
+    { geo: new THREE.ConeGeometry(0.03, 0.45, 4, 1, true), matrix: matTRS(-0.5, 0.65, -0.2, -0.25, 0, -0.4), c0: [0.10, 0.09, 0.06], c1: [0.16, 0.15, 0.10] },
+  ]);
+}
+function buildBerryGeom() {
+  const parts = [
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.78, 0), 0.4, 66, 0.68), matrix: matTRS(0, 0.42, 0), c0: [0.075, 0.135, 0.055], c1: [0.185, 0.26, 0.095] },
+  ];
+  for (let i = 0; i < 5; i++) {
+    const a = i * 1.35 + 0.5;
+    parts.push({
+      geo: new THREE.OctahedronGeometry(0.065, 0),
+      matrix: matTRS(Math.cos(a) * 0.62, 0.5 + hash2(i, 9, 67) * 0.35, Math.sin(a) * 0.62),
+      c0: [0.42, 0.06, 0.05], c1: [0.55, 0.10, 0.08],
+    });
+  }
+  return mergeColored(parts);
+}
+function buildHeatherGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.85, 0), 0.5, 68, 0.42), matrix: matTRS(0, 0.26, 0), c0: [0.115, 0.13, 0.07], c1: [0.30, 0.20, 0.29] },
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.55, 0), 0.5, 69, 0.5), matrix: matTRS(0.6, 0.2, 0.35), c0: [0.11, 0.125, 0.065], c1: [0.27, 0.185, 0.27] },
+  ]);
+}
+function buildThicketGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.75, 0), 0.42, 76, 0.6), matrix: matTRS(-0.75, 0.35, -0.1), c0: [0.065, 0.125, 0.05], c1: [0.175, 0.25, 0.09] },
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.95, 0), 0.42, 77, 0.58), matrix: matTRS(0.15, 0.42, 0.15), c0: [0.075, 0.14, 0.055], c1: [0.19, 0.27, 0.10] },
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.6, 0), 0.42, 78, 0.62), matrix: matTRS(0.95, 0.28, -0.2), c0: [0.07, 0.13, 0.05], c1: [0.18, 0.255, 0.09] },
+  ]);
+}
+function buildShrubDryGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.7, 0), 0.55, 81, 0.6), matrix: matTRS(0, 0.32, 0), c0: [0.16, 0.13, 0.07], c1: [0.335, 0.28, 0.14] },
+  ]);
+}
+function buildReedsGeom() {
+  const parts = [
+    { geo: bladeClump({ blades: 7, height: 1.85, w: 0.045, spread: 0.4, seed: 83, c0: [0.10, 0.135, 0.06], c1: [0.26, 0.30, 0.13] }), c0: [0, 0, 0] },
+    { geo: new THREE.CylinderGeometry(0.05, 0.05, 0.30, 4, 1), matrix: matTRS(0.14, 1.55, 0.1), c0: [0.19, 0.115, 0.06], c1: [0.245, 0.15, 0.08] },
+    { geo: new THREE.CylinderGeometry(0.045, 0.045, 0.26, 4, 1), matrix: matTRS(-0.2, 1.35, -0.12), c0: [0.19, 0.115, 0.06], c1: [0.245, 0.15, 0.08] },
+  ];
+  return mergeColored(parts);
+}
+function buildMossClumpGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.8, 0), 0.45, 86, 0.30), matrix: matTRS(0, 0.14, 0), c0: [0.10, 0.16, 0.055], c1: [0.235, 0.33, 0.115] },
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.5, 0), 0.45, 87, 0.36), matrix: matTRS(0.6, 0.11, 0.3), c0: [0.11, 0.17, 0.06], c1: [0.25, 0.35, 0.12] },
+  ]);
+}
+function buildDeadBushGeom() {
+  const parts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = i * (TAU / 6) + 0.3;
+    parts.push({
+      geo: new THREE.ConeGeometry(0.035, 0.85, 4, 1, true),
+      matrix: matTRS(Math.cos(a) * 0.12, 0.38, Math.sin(a) * 0.12, Math.cos(a) * 0.55, 0, Math.sin(a) * 0.55),
+      c0: [0.12, 0.10, 0.075], c1: [0.235, 0.20, 0.15],
+    });
+  }
+  return mergeColored(parts);
+}
+
+// ---- 8 FLOWER / MUSHROOM CLUSTER ARCHETYPES ---------------------------------
+function stemPart(x, z, h, lean) {
+  return {
+    geo: new THREE.CylinderGeometry(0.014, 0.028, h, 3, 1, true),
+    matrix: matTRS(x, h * 0.5, z, lean, 0, lean * 0.7),
+    c0: [0.10, 0.17, 0.06], c1: [0.16, 0.24, 0.09],
+  };
+}
+function buildFlowerGeom() { // simple meadow flower (tinted per instance)
+  return mergeColored([
+    stemPart(0, 0, 0.55, 0.05),
+    { geo: new THREE.OctahedronGeometry(0.15, 0), matrix: matTRS(0.02, 0.60, 0.02, 0, 0, 0, 1, 0.7), c0: [0.62, 0.60, 0.55], c1: [0.85, 0.83, 0.78] },
+  ]);
+}
+function buildFlowerClusterGeom() { // patch of 5 small heads
+  const parts = [];
+  for (let i = 0; i < 5; i++) {
+    const a = i * 1.26 + 0.4, rr = 0.16 + hash2(i, 2, 91) * 0.26;
+    const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+    const h = 0.28 + hash2(i, 3, 91) * 0.28;
+    parts.push(stemPart(x, z, h, 0.1));
+    parts.push({ geo: new THREE.OctahedronGeometry(0.085, 0), matrix: matTRS(x, h + 0.04, z, 0, 0, 0, 1, 0.75), c0: [0.60, 0.58, 0.52], c1: [0.82, 0.80, 0.75] });
+  }
+  return mergeColored(parts);
+}
+function buildFoxgloveGeom() { // tall spike of mauve bells
+  const parts = [{
+    geo: new THREE.CylinderGeometry(0.016, 0.034, 0.95, 3, 1, true),
+    matrix: matTRS(0, 0.48, 0, 0.04, 0, 0.05), c0: [0.09, 0.15, 0.055], c1: [0.15, 0.22, 0.085],
+  }];
+  for (let i = 0; i < 6; i++) {
+    const t = i / 5;
+    const side = (i & 1) ? 1 : -1;
+    parts.push({
+      geo: new THREE.OctahedronGeometry(lerp(0.085, 0.045, t), 0),
+      matrix: matTRS(side * 0.06, 0.38 + t * 0.52, side * 0.03, 0, 0, 0, 1, 1.3),
+      c0: [0.38, 0.19, 0.30], c1: [0.55, 0.30, 0.44],
+    });
+  }
+  return mergeColored(parts);
+}
+function buildLupineGeom() { // violet spire
+  return mergeColored([
+    stemPart(0, 0, 0.45, 0.04),
+    { geo: new THREE.ConeGeometry(0.09, 0.55, 5, 1), matrix: matTRS(0, 0.68, 0), c0: [0.24, 0.185, 0.40], c1: [0.38, 0.30, 0.56] },
+    stemPart(0.16, 0.1, 0.35, 0.12),
+    { geo: new THREE.ConeGeometry(0.07, 0.42, 5, 1), matrix: matTRS(0.18, 0.52, 0.11), c0: [0.22, 0.17, 0.37], c1: [0.34, 0.27, 0.52] },
+  ]);
+}
+function buildSeedheadGeom() { // dry wheat-like seed heads
+  return mergeColored([
+    stemPart(0, 0, 0.7, 0.08),
+    { geo: new THREE.OctahedronGeometry(0.07, 0), matrix: matTRS(0.04, 0.78, 0.03, 0, 0, 0.2, 1, 2.1), c0: [0.34, 0.27, 0.12], c1: [0.47, 0.385, 0.18] },
+    stemPart(0.2, -0.12, 0.55, 0.14),
+    { geo: new THREE.OctahedronGeometry(0.06, 0), matrix: matTRS(0.25, 0.62, -0.14, 0, 0, 0.25, 1, 2.0), c0: [0.33, 0.26, 0.115], c1: [0.45, 0.37, 0.17] },
+  ]);
+}
+function mushroomPart(x, z, capR, capH, stemH, capC0, capC1, dots) {
+  const face = dots ? (cx, cy, cz, ny, f) => (hash2(f, 3, 217) < 0.22 ? [0.78, 0.74, 0.66] : null) : null;
+  return [
+    { geo: new THREE.CylinderGeometry(0.028, 0.05, stemH, 4, 1, true), matrix: matTRS(x, stemH * 0.5, z), c0: [0.50, 0.46, 0.38], c1: [0.66, 0.62, 0.53] },
+    { geo: new THREE.ConeGeometry(capR, capH, 6, 1), matrix: matTRS(x, stemH + capH * 0.35, z), c0: capC0, c1: capC1, face },
+  ];
+}
+function buildMushRedGeom() { // red-cap cluster (speckled)
+  return mergeColored([
+    ...mushroomPart(0, 0, 0.17, 0.13, 0.26, [0.42, 0.075, 0.05], [0.56, 0.12, 0.07], true),
+    ...mushroomPart(0.24, 0.12, 0.12, 0.10, 0.18, [0.40, 0.07, 0.05], [0.52, 0.11, 0.065], true),
+    ...mushroomPart(-0.18, 0.16, 0.09, 0.08, 0.13, [0.44, 0.08, 0.055], [0.58, 0.13, 0.075], true),
+  ]);
+}
+function buildMushBrownGeom() { // squat brown toadstools
+  return mergeColored([
+    ...mushroomPart(0, 0, 0.16, 0.09, 0.16, [0.24, 0.165, 0.09], [0.36, 0.26, 0.15], false),
+    ...mushroomPart(0.22, -0.1, 0.11, 0.07, 0.11, [0.22, 0.15, 0.08], [0.33, 0.235, 0.135], false),
+  ]);
+}
+function buildMushGlowGeom() { // glowing witch-forest mushrooms (emissive mat)
+  const parts = [];
+  const spots = [[0, 0, 1.0], [0.22, 0.14, 0.7], [-0.2, 0.1, 0.8], [0.05, -0.22, 0.55]];
+  for (const [x, z, s] of spots) {
+    parts.push({ geo: new THREE.CylinderGeometry(0.02, 0.038, 0.30 * s, 4, 1, true), matrix: matTRS(x, 0.15 * s, z), c0: [0.28, 0.42, 0.36], c1: [0.42, 0.62, 0.52] });
+    parts.push({ geo: new THREE.ConeGeometry(0.13 * s, 0.11 * s, 6, 1), matrix: matTRS(x, 0.31 * s, z), c0: [0.14, 0.55, 0.42], c1: [0.30, 0.85, 0.62] });
+  }
+  return mergeColored(parts);
+}
+
+// ---- 10 ROCK ARCHETYPES -----------------------------------------------------
+const mossFace = (seed) => (cx, cy, cz, ny, f) =>
+  (ny > 0.42 && hash2(f, 5, seed) < 0.85)
+    ? [MOSS_C[0] + hash2(f, 6, seed) * 0.07, MOSS_C[1] + hash2(f, 7, seed) * 0.09, MOSS_C[2]]
+    : null;
+const lichenFace = (seed) => (cx, cy, cz, ny, f) =>
+  (hash2(f, 8, seed) < 0.20) ? [0.44, 0.48, 0.40] : null;
+
+function buildBoulderGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.IcosahedronGeometry(1, 0), 0.55, 53, 0.72), c0: ROCK_C[0], c1: ROCK_C[1] },
+  ]);
+}
+function buildMossBoulderGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.IcosahedronGeometry(1, 0), 0.5, 54, 0.66), c0: [0.17, 0.17, 0.16], c1: [0.38, 0.38, 0.36], face: mossFace(311) },
+  ]);
+}
+function buildSplitRockGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.85, 0), 0.45, 55, 0.9), matrix: matTRS(-0.52, 0.3, 0, 0, 0, 0.28), c0: ROCK_C[0], c1: ROCK_C[1] },
+    { geo: lumpy(new THREE.IcosahedronGeometry(0.75, 0), 0.45, 56, 0.95), matrix: matTRS(0.55, 0.22, 0.1, 0, 0.7, -0.32), c0: [0.175, 0.175, 0.165], c1: [0.40, 0.40, 0.38] },
+  ]);
+}
+function buildSlabStackGeom() {
+  return mergeColored([
+    { geo: new THREE.BoxGeometry(1.7, 0.38, 1.25), matrix: matTRS(0, 0.18, 0, 0, 0.15, 0.03), c0: [0.185, 0.185, 0.175], c1: [0.33, 0.33, 0.31] },
+    { geo: new THREE.BoxGeometry(1.35, 0.34, 1.0), matrix: matTRS(0.1, 0.53, -0.05, 0, -0.35, -0.04), c0: [0.20, 0.20, 0.19], c1: [0.37, 0.37, 0.35] },
+    { geo: new THREE.BoxGeometry(0.95, 0.30, 0.75), matrix: matTRS(-0.08, 0.84, 0.06, 0.05, 0.55, 0), c0: [0.22, 0.22, 0.21], c1: [0.42, 0.42, 0.40] },
+  ]);
+}
+function buildShardGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.ConeGeometry(0.55, 2.3, 5, 1), 0.35, 57, 1), matrix: matTRS(0, 1.0, 0, 0.10, 0, 0.14), c0: [0.16, 0.16, 0.155], c1: [0.42, 0.42, 0.40] },
+  ]);
+}
+function buildShardClusterGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.ConeGeometry(0.48, 1.9, 5, 1), 0.35, 58, 1), matrix: matTRS(0, 0.82, 0, 0.08, 0, 0.1), c0: [0.16, 0.16, 0.155], c1: [0.41, 0.41, 0.39] },
+    { geo: lumpy(new THREE.ConeGeometry(0.36, 1.2, 5, 1), 0.35, 59, 1), matrix: matTRS(0.62, 0.48, 0.25, -0.1, 0.9, 0.3), c0: [0.17, 0.17, 0.16], c1: [0.38, 0.38, 0.36] },
+    { geo: lumpy(new THREE.ConeGeometry(0.28, 0.85, 4, 1), 0.35, 60, 1), matrix: matTRS(-0.5, 0.32, -0.3, 0.12, 0.4, -0.35), c0: [0.18, 0.18, 0.17], c1: [0.40, 0.40, 0.38] },
+  ]);
+}
+function buildFlatSlabGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.IcosahedronGeometry(1.1, 0), 0.4, 62, 0.26), matrix: matTRS(0, 0.12, 0), c0: [0.19, 0.19, 0.18], c1: [0.40, 0.40, 0.38], face: lichenFace(313) },
+  ]);
+}
+function buildPebblesGeom() {
+  const parts = [];
+  for (let i = 0; i < 4; i++) {
+    const a = i * 1.7 + 0.6, rr = 0.25 + hash2(i, 4, 95) * 0.45;
+    parts.push({
+      geo: lumpy(new THREE.IcosahedronGeometry(0.22 + hash2(i, 5, 95) * 0.16, 0), 0.4, 63 + i, 0.7),
+      matrix: matTRS(Math.cos(a) * rr, 0.08, Math.sin(a) * rr),
+      c0: [0.20, 0.20, 0.19], c1: [0.42, 0.42, 0.40],
+    });
+  }
+  return mergeColored(parts);
+}
+function buildLichenRockGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.IcosahedronGeometry(1, 0), 0.5, 65, 0.78), c0: [0.185, 0.185, 0.18], c1: [0.43, 0.43, 0.41], face: lichenFace(317) },
+  ]);
+}
+function buildCliffChunkGeom() {
+  return mergeColored([
+    { geo: lumpy(new THREE.DodecahedronGeometry(1.15, 0), 0.4, 67, 0.85), matrix: matTRS(0, 0.35, 0, 0, 0, 0.12), c0: [0.145, 0.145, 0.14], c1: [0.36, 0.36, 0.345] },
   ]);
 }
 
-function buildBushGeom() {
+// ---- 4 DEBRIS ARCHETYPES (logs authored lying along X; rotY spins them) ----
+const cutRings = (cx, cy, cz, ny, f) => null; // (rings via nx below)
+function logFace(mossy, seed) {
+  return (cx, cy, cz, ny, f) => {
+    if (Math.abs(cx) > 1.18) return [0.40, 0.315, 0.20]; // pale cut ends
+    if (mossy && ny > 0.5 && hash2(f, 9, seed) < 0.8) return [MOSS_C[0] + hash2(f, 10, seed) * 0.06, MOSS_C[1] + hash2(f, 11, seed) * 0.08, MOSS_C[2]];
+    return null;
+  };
+}
+function buildLogGeom() {
   return mergeColored([
-    { geo: lumpy(new THREE.IcosahedronGeometry(0.85, 0), 0.4, 57, 0.62), matrix: mat4At(0, 0.42, 0), c0: [0.09, 0.18, 0.07], c1: [0.23, 0.35, 0.11] },
+    { geo: new THREE.CylinderGeometry(0.24, 0.29, 2.5, 6, 1), matrix: matTRS(0, 0.24, 0, 0, 0, Math.PI / 2), c0: [0.14, 0.105, 0.07], c1: [0.26, 0.20, 0.13], face: logFace(false, 331) },
+    { geo: new THREE.CylinderGeometry(0.02, 0.07, 0.7, 4, 1, true), matrix: matTRS(0.4, 0.5, 0.1, 0.4, 0, -0.5), c0: [0.13, 0.10, 0.065], c1: [0.22, 0.17, 0.11] },
   ]);
 }
+function buildLogMossyGeom() {
+  return mergeColored([
+    { geo: new THREE.CylinderGeometry(0.27, 0.31, 2.4, 6, 1), matrix: matTRS(0, 0.26, 0, 0, 0, Math.PI / 2), c0: [0.125, 0.095, 0.065], c1: [0.235, 0.18, 0.12], face: logFace(true, 333) },
+  ]);
+}
+function buildStumpGeom() {
+  return mergeColored([
+    { geo: new THREE.CylinderGeometry(0.34, 0.44, 0.6, 6, 1), matrix: matTRS(0, 0.3, 0), c0: [0.145, 0.11, 0.075], c1: [0.25, 0.19, 0.125], face: (cx, cy, cz, ny, f) => (ny > 0.9 ? [0.38, 0.30, 0.185] : null) },
+    { geo: new THREE.ConeGeometry(0.18, 0.5, 4, 1, true), matrix: matTRS(0.42, 0.16, 0.1, 0, 0, -1.15), c0: [0.13, 0.10, 0.07], c1: [0.20, 0.155, 0.10] },
+    { geo: new THREE.ConeGeometry(0.15, 0.45, 4, 1, true), matrix: matTRS(-0.38, 0.14, -0.15, 0, 0, 1.2), c0: [0.13, 0.10, 0.07], c1: [0.20, 0.155, 0.10] },
+  ]);
+}
+function buildRootSnagGeom() {
+  const parts = [{ geo: lumpy(new THREE.IcosahedronGeometry(0.4, 0), 0.5, 97, 0.55), matrix: matTRS(0, 0.16, 0), c0: [0.10, 0.08, 0.055], c1: [0.19, 0.15, 0.10] }];
+  for (let i = 0; i < 4; i++) {
+    const a = i * (TAU / 4) + 0.5;
+    parts.push({
+      geo: new THREE.ConeGeometry(0.09, 1.0, 4, 1, true),
+      matrix: matTRS(Math.cos(a) * 0.35, 0.42, Math.sin(a) * 0.35, Math.cos(a) * (0.5 + i * 0.12), 0, Math.sin(a) * (0.5 + i * 0.12)),
+      c0: [0.115, 0.09, 0.06], c1: [0.215, 0.17, 0.115],
+    });
+  }
+  return mergeColored(parts);
+}
 
-// Grass tuft: cross of 3 low triangles (dark base → pale tip), opaque.
+// Grass tuft: cross of 3 low triangles (dark base → muted sage tip), opaque.
 function buildGrassGeom() {
   const P = [], N = [], C = [];
-  const base = [0.10, 0.17, 0.05], tip = [0.50, 0.55, 0.18];
+  const base = [0.085, 0.135, 0.05], tip = [0.37, 0.40, 0.155];
   for (let k = 0; k < 3; k++) {
     const a = k * (Math.PI / 3) + 0.35;
     const ca = Math.cos(a), sa = Math.sin(a);
@@ -294,30 +866,13 @@ function buildGrassGeom() {
   return geo;
 }
 
-// Flower: green stem triangle + near-white head (tinted per instance).
-function buildFlowerGeom() {
-  const stem = new THREE.BufferGeometry();
-  stem.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
-    -0.05, 0, 0, 0.05, 0, 0, 0.01, 0.55, 0,
-  ]), 3));
-  stem.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([
-    0, 0.3, 1, 0, 0.3, 1, 0, 0.3, 1,
-  ]), 3));
-  stem.setAttribute('color', new THREE.BufferAttribute(new Float32Array([
-    0.14, 0.28, 0.09, 0.14, 0.28, 0.09, 0.20, 0.34, 0.11,
-  ]), 3));
-  return mergeColored([
-    { geo: stem, c0: [0, 0, 0] },
-    { geo: new THREE.OctahedronGeometry(0.16, 0), matrix: mat4At(0.01, 0.62, 0, 1, 0.75, 1), c0: [0.80, 0.78, 0.74], c1: [1, 1, 1] },
-  ]);
-}
-
+// Muted flower tints (multiplied per instance onto the pale head geometry).
 const FLOWER_TINTS = [
-  [1.00, 0.97, 0.90], // white
-  [1.25, 0.95, 0.35], // gold
-  [0.85, 0.60, 1.25], // violet
-  [1.30, 0.50, 0.45], // poppy red
-  [1.15, 0.75, 0.95], // pink
+  [0.95, 0.92, 0.85], // bone white
+  [1.12, 0.90, 0.42], // muted gold
+  [0.72, 0.58, 0.95], // dusk violet
+  [1.05, 0.52, 0.40], // faded poppy
+  [0.98, 0.72, 0.82], // ashen pink
 ];
 
 // Ring of cell offsets sorted nearest-first, so refill grows outward.
@@ -364,6 +919,7 @@ uniform vec3 uHorizon;
 uniform vec3 uDeep;
 uniform vec3 uShallow;
 uniform float uOpacity;
+uniform float uDay;
 varying vec3 vWorld;
 varying float vWave;
 float whash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -380,13 +936,18 @@ void main() {
   // Deep/shallow gradient rides the wave crests.
   vec3 col = mix(uDeep, uShallow, clamp(vWave * 0.75 + 0.55, 0.0, 1.0));
   col = mix(col, uHorizon, fres * 0.78);
+  // Night grade: sink base + fresnel toward deep indigo (#0a1626) as uDay→0.
+  vec3 night = vec3(0.024, 0.052, 0.10) + fres * vec3(0.018, 0.042, 0.088);
+  col = mix(night, col, uDay);
   float sunUp = clamp(uSunDir.y * 2.4, 0.0, 1.0);
   vec3 H = normalize(V + normalize(uSunDir + vec3(0.0, 1e-4, 0.0)));
   float spec = pow(max(dot(N, H), 0.0), 120.0) * sunUp;
-  // Drifting sparkle noise.
+  // Drifting sparkle noise (warm by day, faint cool glints at night).
   vec2 sp = floor(vWorld.xz * 2.1 + vec2(t * 1.4, -t * 1.1));
-  float sparkle = step(0.986, whash(sp)) * sunUp * (0.35 + fres);
+  float spk = step(0.986, whash(sp));
+  float sparkle = spk * sunUp * (0.35 + fres);
   col += (spec * 1.2 + sparkle * 0.55) * vec3(1.0, 0.93, 0.78);
+  col += spk * (1.0 - uDay) * 0.08 * vec3(0.65, 0.78, 1.0);
   gl_FragColor = vec4(col, uOpacity + fres * 0.10);
   #include <fog_fragment>
 }`;
@@ -406,14 +967,29 @@ export function createWorld(g) {
   });
   const vegMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   const grassMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide });
+  const glowMat = new THREE.MeshLambertMaterial({
+    vertexColors: true, flatShading: true,
+    emissive: new THREE.Color(0.05, 0.30, 0.20), // reads at night in deep forest
+  });
 
-  // ---- far shell (built once; ~100ms is fine at load) ---------------------
+  // ---- far shell (built once; ~100-200ms is fine at load) ------------------
   {
-    const segs = 128;
+    const segs = 224; // sculpted distant mountains, not faceted
     const geo = new THREE.PlaneGeometry(4400, 4400, segs, segs);
     geo.rotateX(-Math.PI / 2);
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
     paintTerrainGeometry(geo, 0, 0, segs);
+    // Regrade vs near chunks: distance haze makes the shell read chalky, so
+    // darken ~15% and push saturation up so far terrain matches the palette.
+    {
+      const ca = geo.attributes.color.array;
+      for (let i = 0; i < ca.length; i += 3) {
+        const lum = ca[i] * 0.30 + ca[i + 1] * 0.55 + ca[i + 2] * 0.15;
+        ca[i] = clamp((lum + (ca[i] - lum) * 1.15) * 0.86, 0, 1);
+        ca[i + 1] = clamp((lum + (ca[i + 1] - lum) * 1.15) * 0.86, 0, 1);
+        ca[i + 2] = clamp((lum + (ca[i + 2] - lum) * 1.15) * 0.86, 0, 1);
+      }
+    }
     geo.computeBoundingSphere();
     const shell = new THREE.Mesh(geo, shellMat);
     shell.receiveShadow = true; // free when shadow maps are off
@@ -516,7 +1092,7 @@ export function createWorld(g) {
     }
   }
 
-  // ---- vegetation: global instanced pools ----------------------------------
+  // ---- vegetation: 50 global instanced pools (one draw call each) ----------
   function makePool(geom, mat, cap, cast) {
     const mesh = new THREE.InstancedMesh(geom, mat, cap);
     mesh.frustumCulled = false;
@@ -532,16 +1108,73 @@ export function createWorld(g) {
     return { mesh, cap, n: 0, maxWritten: 0 };
   }
 
-  // Capacities at the generous end of the contract budgets (primary target is
-  // a flagship phone). Cells are filled nearest-first, so hitting a cap only
-  // ever drops the FARTHEST instances.
-  const pine = makePool(buildPineGeom(), vegMat, 460, shadows);
-  const oak = makePool(buildOakGeom(), vegMat, 260, shadows);
-  const rock = makePool(buildRockGeom(), vegMat, 500, false);
-  const grass = makePool(buildGrassGeom(), grassMat, 4200, false);
-  const bush = makePool(buildBushGeom(), vegMat, 300, false);
-  const flower = makePool(buildFlowerGeom(), grassMat, 260, false);
-  const allPools = [pine, oak, rock, grass, bush, flower];
+  // Capacities target a flagship phone (S25-class). Cells are filled
+  // nearest-first, so hitting a cap only ever drops the FARTHEST instances.
+  // 15 tree archetypes:
+  const pine = makePool(buildPineGeom(), vegMat, 340, shadows);
+  const fir = makePool(buildFirGeom(), vegMat, 280, shadows);
+  const droop = makePool(buildDroopGeom(), vegMat, 220, shadows);
+  const spruce = makePool(buildSpruceTallGeom(), vegMat, 170, shadows);
+  const crooked = makePool(buildCrookedGeom(), vegMat, 150, shadows);
+  const pineSnow = makePool(buildPineSnowGeom(), vegMat, 220, shadows);
+  const sapling = makePool(buildSaplingGeom(), vegMat, 180, false);
+  const oak = makePool(buildOakGeom(), vegMat, 120, shadows);
+  const elm = makePool(buildElmGeom(), vegMat, 80, shadows);
+  const gnarly = makePool(buildGnarlyGeom(), vegMat, 60, shadows);
+  const birch = makePool(buildBirchGeom(), vegMat, 170, shadows);
+  const aspen = makePool(buildAspenGeom(), vegMat, 130, shadows);
+  const willow = makePool(buildWillowGeom(), vegMat, 70, shadows);
+  const dead = makePool(buildDeadGeom(), vegMat, 90, shadows);
+  const snag = makePool(buildSnagGeom(), vegMat, 70, false);
+  const TREE_POOLS = [pine, fir, droop, spruce, crooked, pineSnow, sapling,
+    oak, elm, gnarly, birch, aspen, willow, dead, snag];
+  // 12 undergrowth archetypes:
+  const fern = makePool(buildFernGeom(), grassMat, 240, false);
+  const fernBig = makePool(buildFernBigGeom(), grassMat, 110, false);
+  const bushR = makePool(buildBushRoundGeom(), vegMat, 140, false);
+  const bushW = makePool(buildBushWideGeom(), vegMat, 100, false);
+  const bramble = makePool(buildBrambleGeom(), vegMat, 100, false);
+  const berry = makePool(buildBerryGeom(), vegMat, 90, false);
+  const heather = makePool(buildHeatherGeom(), vegMat, 140, false);
+  const thicket = makePool(buildThicketGeom(), vegMat, 90, false);
+  const shrubDry = makePool(buildShrubDryGeom(), vegMat, 90, false);
+  const reeds = makePool(buildReedsGeom(), grassMat, 130, false);
+  const mossC = makePool(buildMossClumpGeom(), vegMat, 90, false);
+  const deadBush = makePool(buildDeadBushGeom(), vegMat, 70, false);
+  const BUSH_POOLS = [fern, fernBig, bushR, bushW, bramble, berry, heather,
+    thicket, shrubDry, reeds, mossC, deadBush];
+  // 8 flower / mushroom archetypes:
+  const flower = makePool(buildFlowerGeom(), grassMat, 160, false);
+  const flowerCl = makePool(buildFlowerClusterGeom(), grassMat, 100, false);
+  const foxglove = makePool(buildFoxgloveGeom(), grassMat, 90, false);
+  const lupine = makePool(buildLupineGeom(), grassMat, 80, false);
+  const seedhead = makePool(buildSeedheadGeom(), grassMat, 70, false);
+  const mushRed = makePool(buildMushRedGeom(), vegMat, 80, false);
+  const mushBrown = makePool(buildMushBrownGeom(), vegMat, 80, false);
+  const mushGlow = makePool(buildMushGlowGeom(), glowMat, 70, false);
+  const FLORA_POOLS = [flower, flowerCl, foxglove, lupine, seedhead, mushRed, mushBrown, mushGlow];
+  // 10 rock archetypes:
+  const boulder = makePool(buildBoulderGeom(), vegMat, 160, false);
+  const mossB = makePool(buildMossBoulderGeom(), vegMat, 140, false);
+  const splitR = makePool(buildSplitRockGeom(), vegMat, 80, false);
+  const slabs = makePool(buildSlabStackGeom(), vegMat, 70, false);
+  const shard = makePool(buildShardGeom(), vegMat, 90, false);
+  const shardCl = makePool(buildShardClusterGeom(), vegMat, 70, false);
+  const flatSlab = makePool(buildFlatSlabGeom(), vegMat, 90, false);
+  const pebbles = makePool(buildPebblesGeom(), vegMat, 110, false);
+  const lichenR = makePool(buildLichenRockGeom(), vegMat, 70, false);
+  const cliffCh = makePool(buildCliffChunkGeom(), vegMat, 50, false);
+  const ROCK_POOLS = [boulder, mossB, splitR, slabs, shard, shardCl, flatSlab, pebbles, lichenR, cliffCh];
+  // 4 debris archetypes:
+  const log = makePool(buildLogGeom(), vegMat, 70, false);
+  const logMossy = makePool(buildLogMossyGeom(), vegMat, 60, false);
+  const stump = makePool(buildStumpGeom(), vegMat, 60, false);
+  const rootSnag = makePool(buildRootSnagGeom(), vegMat, 50, false);
+  const DEBRIS_POOLS = [log, logMossy, stump, rootSnag];
+  // 1 grass pool:
+  const grass = makePool(buildGrassGeom(), grassMat, 8000, false);
+  const allPools = [...TREE_POOLS, ...BUSH_POOLS, ...FLORA_POOLS, ...ROCK_POOLS, ...DEBRIS_POOLS, grass];
+  // = 50 InstancedMeshes total → 50 vegetation draw calls, worst case.
 
   function put(pool, x, y, z, rotY, sx, sy, cr, cg, cb) {
     if (pool.n >= pool.cap) return;
@@ -556,68 +1189,172 @@ export function createWorld(g) {
     if (pool.n > pool.maxWritten) pool.maxWritten = pool.n;
   }
 
+  // Tilted put (fallen logs hugging slopes etc.) — full euler rotation.
+  function putT(pool, x, y, z, rx, ry, rz, sx, sy, cr, cg, cb) {
+    if (pool.n >= pool.cap) return;
+    _p.set(x, y, z);
+    _q.setFromEuler(_e.set(rx, ry, rz));
+    _s.set(sx, sy, sx);
+    _m.compose(_p, _q, _s);
+    pool.mesh.setMatrixAt(pool.n, _m);
+    _c.setRGB(cr, cg, cb);
+    pool.mesh.setColorAt(pool.n, _c);
+    pool.n++;
+    if (pool.n > pool.maxWritten) pool.maxWritten = pool.n;
+  }
+
   // -- per-cell scatter functions (fully deterministic via hash2) -----------
+  const TREE_CELL = 12;
+
   function fillTreeCell(cx, cz) {
-    for (let k = 0; k < 2; k++) { // second attempt only fires in dense forest
-      const s0 = 70 + k * 17;
-      const wx = (cx + hash2(cx, cz, s0 + 1)) * 16;
-      const wz = (cz + hash2(cx, cz, s0 + 2)) * 16;
+    // Up to 3 attempts per 12u cell — attempts 2/3 only fire in dense forest.
+    for (let k = 0; k < 3; k++) {
+      const s0 = 70 + k * 23;
+      const wx = (cx + hash2(cx, cz, s0 + 1)) * TREE_CELL;
+      const wz = (cz + hash2(cx, cz, s0 + 2)) * TREE_CELL;
       const h = terrainHeight(wx, wz);
-      if (h < WATER_LEVEL + 1.2 || h > 104) continue; // shoreline & treeline
+      if (h < WATER_LEVEL + 0.8 || h > 104) continue; // shoreline & treeline
       if (insidePOI(wx, wz)) continue;
       const bio = biomeAt(wx, wz, h);
-      let density = 0, pinePref = 0.5;
-      if (bio === BIOME.FOREST) { density = k === 0 ? 0.93 : 0.55; pinePref = 0.66; }
-      else if (k === 0) {
-        if (bio === BIOME.MEADOW) { density = 0.09; pinePref = 0.2; }
-        else if (bio === BIOME.ROCKY) { density = 0.17; pinePref = 1; }
-        else if (bio === BIOME.SNOW) { density = 0.06; pinePref = 1; }
-        else if (bio === BIOME.MARSH) { density = 0.10; pinePref = 0.1; }
-      }
-      if (density === 0 || hash2(cx, cz, s0 + 3) >= density) continue;
-      if (Math.abs(terrainHeight(wx + 2.4, wz + 2.4) - h) > 2.3) continue; // cliff
-      const hs = hash2(cx, cz, s0 + 4);
+      const r = hash2(cx, cz, s0 + 3);   // species roll
+      const hs = hash2(cx, cz, s0 + 4);  // scale roll
       const rot = hash2(cx, cz, s0 + 5) * TAU;
-      const hj = hash2(cx, cz, s0 + 6);
-      if (hash2(cx, cz, s0 + 7) < pinePref) {
-        const s = 0.75 + hs * 0.85;
-        const dust = smoothstep(78, 98, h); // snow-dusted high pines
-        put(pine, wx, h - 0.25, wz, rot, s, s * (0.9 + hj * 0.35),
-          lerp(0.85 + hj * 0.3, 1.35, dust),
-          lerp(0.90 + hj * 0.25, 1.38, dust),
-          lerp(0.85 + hs * 0.2, 1.50, dust));
-      } else {
-        const s = 0.7 + hs * 0.75;
-        const gold = hash2(cx, cz, s0 + 8) < 0.07; // rare golden-leaf oak
-        put(oak, wx, h - 0.2, wz, rot, s, s * (0.85 + hj * 0.3),
-          gold ? 1.50 : 0.85 + hj * 0.35,
-          gold ? 1.05 : 0.90 + hs * 0.30,
-          gold ? 0.45 : 0.80 + hj * 0.20);
+      const hj = hash2(cx, cz, s0 + 6);  // tint / aspect roll
+      const r2 = hash2(cx, cz, s0 + 7);  // outlier roll
+
+      // Willows ring Mirrormere: low ground near the lake, any biome.
+      const dLake = dist2d(wx, wz, LAKE_X, LAKE_Z);
+      if (dLake < 330 && h < WATER_LEVEL + 5.0 && r < (k === 0 ? 0.5 : 0.18)) {
+        const s = 0.8 + hs * 0.7;
+        put(willow, wx, h - 0.22, wz, rot, s, s * (0.9 + hj * 0.25),
+          0.88 + hj * 0.22, 0.92 + hs * 0.16, 0.85 + hj * 0.14);
+        continue;
       }
+      if (h < WATER_LEVEL + 1.2) continue;
+
+      let density = 0;
+      if (bio === BIOME.FOREST) density = k === 0 ? 0.93 : k === 1 ? 0.78 : 0.50;
+      else if (k > 0) continue; // sparse biomes: single attempt
+      else if (bio === BIOME.MEADOW) density = 0.10;
+      else if (bio === BIOME.ROCKY) density = 0.16;
+      else if (bio === BIOME.SNOW) density = 0.07;
+      else if (bio === BIOME.MARSH) density = 0.15;
+      if (density === 0 || hash2(cx, cz, s0 + 8) >= density) continue;
+      if (Math.abs(terrainHeight(wx + 2.4, wz + 2.4) - h) > 2.4) continue; // cliff
+
+      // Species clumping noises — same-species grove realism.
+      const birchN = snoise(wx * 0.021 + 731.7, wz * 0.021);  // birch/aspen groves
+      const conifN = snoise(wx * 0.012 - 311.2, wz * 0.012);  // conifer stands
+      const deadF = smoothstep(250, 90, dist2d(wx, wz, RUINS_X, RUINS_Z));
+
+      let pool = pine, kind = 0; // kind: 0 conifer, 1 broadleaf, 2 pale, 3 dead, 4 snow
+      const s = 0.7 + hs * 0.9;  // 0.7–1.6× per-instance size
+      let sMul = 1;
+
+      if (bio === BIOME.FOREST) {
+        if (h > 75) { pool = pineSnow; kind = 4; }
+        else if (deadF > 0 && r < deadF * 0.6) { pool = r2 < 0.5 ? dead : snag; kind = 3; }
+        else if (birchN > 0.40) { // pale birch/aspen grove
+          if (r < 0.55) { pool = birch; kind = 2; }
+          else if (r < 0.82) { pool = aspen; kind = 2; }
+          else if (r < 0.92) { pool = fir; }
+          else { pool = sapling; sMul = 0.8; }
+        } else if (r < 0.05) { pool = oak; kind = 1; }
+        else if (r < 0.09) { pool = elm; kind = 1; }
+        else if (r < 0.20) { pool = sapling; sMul = 0.8; }
+        else if (r < 0.29) { pool = crooked; }
+        else { // clumped conifer stands
+          pool = conifN < -0.22 ? fir : conifN < 0.12 ? pine : conifN < 0.42 ? droop : spruce;
+        }
+        // snowline transition band 62..75
+        if (kind !== 4 && kind !== 3 && h > 62 && r2 < smoothstep(62, 78, h)) { pool = pineSnow; kind = 4; }
+      } else if (bio === BIOME.MEADOW) {
+        sMul = 1.15; // lone meadow trees read bigger
+        if (birchN > 0.5 && r < 0.35) { pool = birch; kind = 2; }
+        else if (r < 0.50) { pool = oak; kind = 1; }
+        else if (r < 0.70) { pool = elm; kind = 1; }
+        else if (r < 0.82) { pool = gnarly; kind = 1; }
+        else { pool = pine; }
+      } else if (bio === BIOME.ROCKY) {
+        if (h > 75) { pool = pineSnow; kind = 4; }
+        else if (r < 0.5) { pool = crooked; }
+        else if (r < 0.85) { pool = spruce; }
+        else { pool = snag; kind = 3; }
+      } else if (bio === BIOME.SNOW) {
+        pool = pineSnow; kind = 4;
+      } else { // MARSH: drowned dead wood + scraggle
+        if (r < 0.48) { pool = dead; kind = 3; }
+        else if (r < 0.70) { pool = snag; kind = 3; }
+        else if (r < 0.88) { pool = willow; kind = 1; }
+        else { pool = crooked; }
+      }
+
+      // Per-instance color: seasonal shifts, snow dust, muted autumn outliers.
+      let cr, cg, cb;
+      if (kind === 3) { const t = 0.85 + hj * 0.3; cr = t; cg = t; cb = t; }
+      else if (kind === 4) { cr = 0.95 + hj * 0.15; cg = 0.96 + hs * 0.12; cb = 0.98 + hj * 0.10; }
+      else if (kind === 2) { // pale-barked: keep tint near 1 so bark stays pale
+        if (r2 < 0.18) { cr = 1.22 + hj * 0.15; cg = 0.98; cb = 0.48; }       // muted gold turn
+        else { cr = 0.92 + hj * 0.16; cg = 0.94 + hs * 0.12; cb = 0.90 + hj * 0.10; }
+      } else if (kind === 1) { // broadleaf: rare ochre/rust autumn outliers
+        if (r2 < 0.04) { cr = 1.35 + hj * 0.15; cg = 0.68; cb = 0.40; }        // rust
+        else if (r2 < 0.09) { cr = 1.28 + hj * 0.15; cg = 0.92; cb = 0.42; }   // ochre
+        else { cr = 0.84 + hj * 0.30; cg = 0.88 + hs * 0.26; cb = 0.78 + hj * 0.20; }
+      } else { // conifer: cool seasonal drift + snow dust with altitude
+        const dust = smoothstep(64, 88, h);
+        cr = lerp(0.82 + hj * 0.30, 1.30, dust);
+        cg = lerp(0.86 + hs * 0.26, 1.33, dust);
+        cb = lerp(0.78 + hj * 0.20, 1.45, dust);
+      }
+      const fs = s * sMul;
+      put(pool, wx, h - 0.28 * fs, wz, rot, fs, fs * (0.88 + hj * 0.3), cr, cg, cb);
     }
   }
 
   function fillRockCell(cx, cz) {
-    const wx = (cx + hash2(cx, cz, 141)) * 14;
-    const wz = (cz + hash2(cx, cz, 142)) * 14;
-    const h = terrainHeight(wx, wz);
-    if (h < WATER_LEVEL + 0.5) return;
-    if (insidePOI(wx, wz)) return;
-    const bio = biomeAt(wx, wz, h);
-    let density = 0.10;
-    if (bio === BIOME.ROCKY) density = 0.55;
-    else if (bio === BIOME.SNOW) density = 0.45;
-    else if (bio === BIOME.FOREST) density = 0.14;
-    else if (bio === BIOME.SAND) density = 0.15;
-    if (hash2(cx, cz, 143) >= density) return;
-    const hs = hash2(cx, cz, 144), hj = hash2(cx, cz, 146);
-    const big = bio === BIOME.ROCKY || bio === BIOME.SNOW;
-    const s = big ? 0.7 + hs * 2.0 : 0.4 + hs * 1.1;
-    const mossy = bio === BIOME.FOREST || bio === BIOME.MARSH;
-    put(rock, wx, h - 0.18 * s, wz, hash2(cx, cz, 145) * TAU, s, s * (0.8 + hj * 0.5),
-      mossy ? 0.80 : bio === BIOME.SAND ? 1.10 : 0.92 + hj * 0.18,
-      mossy ? 1.00 : bio === BIOME.SAND ? 1.00 : 0.92 + hj * 0.18,
-      mossy ? 0.78 : bio === BIOME.SAND ? 0.82 : 0.94 + hs * 0.14);
+    const bio0 = biomeAt((cx + 0.5) * 11, (cz + 0.5) * 11);
+    const tries = (bio0 === BIOME.ROCKY || bio0 === BIOME.SNOW) ? 2 : 1;
+    for (let k = 0; k < tries; k++) {
+      const s0 = 140 + k * 19;
+      const wx = (cx + hash2(cx, cz, s0 + 1)) * 11;
+      const wz = (cz + hash2(cx, cz, s0 + 2)) * 11;
+      const h = terrainHeight(wx, wz);
+      if (h < WATER_LEVEL + 0.4) continue;
+      if (insidePOI(wx, wz)) continue;
+      const bio = biomeAt(wx, wz, h);
+      let density = 0.13;
+      if (bio === BIOME.ROCKY) density = 0.60;
+      else if (bio === BIOME.SNOW) density = 0.50;
+      else if (bio === BIOME.FOREST) density = 0.33;
+      else if (bio === BIOME.SAND) density = 0.28;
+      else if (bio === BIOME.MARSH) density = 0.15;
+      if (hash2(cx, cz, s0 + 3) >= density) continue;
+      const r = hash2(cx, cz, s0 + 4);
+      const hs = hash2(cx, cz, s0 + 5), hj = hash2(cx, cz, s0 + 6);
+      const rot = hash2(cx, cz, s0 + 7) * TAU;
+      let pool = boulder;
+      let s = 0.4 + hs * 1.1;
+      let cr = 0.90 + hj * 0.18, cg = 0.90 + hj * 0.18, cb = 0.92 + hs * 0.14; // cold grey
+      if (bio === BIOME.ROCKY || bio === BIOME.SNOW) {
+        s = 0.7 + hs * 2.0;
+        pool = r < 0.20 ? shard : r < 0.36 ? shardCl : r < 0.50 ? cliffCh
+          : r < 0.66 ? slabs : r < 0.86 ? boulder : lichenR;
+        if (bio === BIOME.SNOW) { cr = 1.02 + hj * 0.1; cg = 1.04 + hj * 0.1; cb = 1.12; }
+      } else if (bio === BIOME.FOREST) {
+        pool = r < 0.42 ? mossB : r < 0.58 ? boulder : r < 0.72 ? pebbles
+          : r < 0.86 ? lichenR : flatSlab;
+        cr = 0.80 + hj * 0.18; cg = 0.86 + hs * 0.16; cb = 0.80; // damp, cool
+      } else if (bio === BIOME.SAND) {
+        pool = r < 0.55 ? pebbles : r < 0.85 ? flatSlab : boulder;
+        cr = 1.04; cg = 0.97; cb = 0.84; // sun-bleached
+      } else if (bio === BIOME.MARSH) {
+        pool = r < 0.6 ? mossB : pebbles;
+        cr = 0.78; cg = 0.88; cb = 0.76;
+      } else { // meadow
+        pool = r < 0.38 ? boulder : r < 0.62 ? flatSlab : r < 0.85 ? pebbles : splitR;
+      }
+      put(pool, wx, h - 0.16 * s, wz, rot, s, s * (0.8 + hj * 0.5), cr, cg, cb);
+    }
   }
 
   function fillGrassCell(cx, cz) {
@@ -626,12 +1363,14 @@ export function createWorld(g) {
     if (h0 < WATER_LEVEL + 1.0 || h0 > 88) return;
     const bio = biomeAt(bx, bz, h0);
     let tries = 0, density = 0;
-    if (bio === BIOME.MEADOW) { tries = 3; density = 0.86; }
-    else if (bio === BIOME.FOREST) { tries = 2; density = 0.46; }
-    else if (bio === BIOME.MARSH) { tries = 2; density = 0.66; }
-    else if (bio === BIOME.SAND) { tries = 1; density = 0.10; }
-    else if (bio === BIOME.ROCKY) { tries = 1; density = 0.10; }
-    if (!tries || insidePOI(bx, bz)) return;
+    if (bio === BIOME.MEADOW) { tries = 7; density = 0.80; }
+    else if (bio === BIOME.FOREST) { tries = 6; density = 0.72; }
+    else if (bio === BIOME.MARSH) { tries = 4; density = 0.68; }
+    else if (bio === BIOME.SAND) { tries = 1; density = 0.12; }
+    else if (bio === BIOME.ROCKY) { tries = 2; density = 0.14; }
+    if (!tries) return;
+    density *= poiGroundScale(bx, bz); // soft POI clearing (worn centers only)
+    if (density <= 0) return;
     const dry = smoothstep(0.55, 0.9, hash2(Math.floor(bx * 0.043), Math.floor(bz * 0.043), 931));
     for (let k = 0; k < tries; k++) {
       const s0 = 30 + k * 11;
@@ -644,57 +1383,171 @@ export function createWorld(g) {
       const sx = 0.7 + hs * 0.7;
       let sy = sx * (0.8 + hj * 0.5);
       let cr, cg, cb;
-      if (bio === BIOME.MARSH) { sy *= 1.7; cr = 0.75 + hj * 0.2; cg = 0.85 + hs * 0.2; cb = 0.70; } // reeds
-      else if (bio === BIOME.FOREST) { cr = 0.55 + hj * 0.2; cg = 0.70 + hs * 0.2; cb = 0.62; }       // shade grass
-      else if (bio === BIOME.SAND) { cr = 1.10 + hj * 0.2; cg = 1.00; cb = 0.72; }                    // dune grass
+      if (bio === BIOME.MARSH) { sy *= 1.7; cr = 0.72 + hj * 0.18; cg = 0.82 + hs * 0.18; cb = 0.70; } // reeds
+      else if (bio === BIOME.FOREST) {
+        if (hash2(cx, cz, s0 + 6) < 0.38) { // leaf-litter patches on the forest floor
+          cr = 1.02 + hj * 0.30; cg = 0.60 + hs * 0.16; cb = 0.34;
+          sy *= 0.55;
+        } else { cr = 0.50 + hj * 0.18; cg = 0.62 + hs * 0.18; cb = 0.56; } // deep-shade grass
+      } else if (bio === BIOME.SAND) { cr = 1.02 + hj * 0.16; cg = 0.94; cb = 0.68; }  // dune grass
+      else if (bio === BIOME.ROCKY) { cr = 0.88 + hj * 0.2; cg = 0.78; cb = 0.58; }    // dry alpine
       else {
-        cr = lerp(0.85 + hj * 0.30, 1.30, dry);
-        cg = lerp(0.95 + hs * 0.25, 1.02, dry);
-        cb = lerp(0.85, 0.55, dry);
+        cr = lerp(0.80 + hj * 0.26, 1.16, dry);
+        cg = lerp(0.88 + hs * 0.22, 0.94, dry);
+        cb = lerp(0.80, 0.55, dry);
       }
       put(grass, wx, h - 0.06, wz, hash2(cx, cz, s0 + 5) * TAU, sx, sy, cr, cg, cb);
     }
   }
 
   function fillBushCell(cx, cz) {
-    const wx = (cx + hash2(cx, cz, 161)) * 10;
-    const wz = (cz + hash2(cx, cz, 162)) * 10;
-    const h = terrainHeight(wx, wz);
-    if (h < WATER_LEVEL + 1.0 || h > 70) return;
-    if (insidePOI(wx, wz)) return;
-    const bio = biomeAt(wx, wz, h);
-    let density = 0;
-    if (bio === BIOME.FOREST) density = 0.30;
-    else if (bio === BIOME.MEADOW) density = 0.12;
-    else if (bio === BIOME.MARSH) density = 0.25;
-    if (!density || hash2(cx, cz, 163) >= density) return;
-    const hs = hash2(cx, cz, 164), hj = hash2(cx, cz, 165);
-    const s = 0.7 + hs * 0.9;
-    put(bush, wx, h - 0.05, wz, hash2(cx, cz, 166) * TAU, s, s * (0.8 + hj * 0.4),
-      0.85 + hj * 0.3, 0.9 + hs * 0.25, 0.85);
+    const bio0 = biomeAt((cx + 0.5) * 7, (cz + 0.5) * 7);
+    const tries = (bio0 === BIOME.FOREST || bio0 === BIOME.MARSH) ? 2 : 1;
+    for (let k = 0; k < tries; k++) {
+      const s0 = 160 + k * 17;
+      const wx = (cx + hash2(cx, cz, s0 + 1)) * 7;
+      const wz = (cz + hash2(cx, cz, s0 + 2)) * 7;
+      const h = terrainHeight(wx, wz);
+      if (h < WATER_LEVEL + 0.9 || h > 78) continue;
+      const pm = poiGroundScale(wx, wz); // soft POI clearing
+      if (pm <= 0) continue;
+      const bio = biomeAt(wx, wz, h);
+      let density = 0;
+      if (bio === BIOME.FOREST) density = k === 0 ? 0.80 : 0.50;
+      else if (bio === BIOME.MEADOW) density = 0.40;
+      else if (bio === BIOME.MARSH) density = k === 0 ? 0.70 : 0.40;
+      else if (bio === BIOME.ROCKY) density = 0.22;
+      else if (bio === BIOME.SAND) density = 0.18;
+      density *= pm;
+      if (!density || hash2(cx, cz, s0 + 3) >= density) continue;
+      const r = hash2(cx, cz, s0 + 4);
+      const hs = hash2(cx, cz, s0 + 5), hj = hash2(cx, cz, s0 + 6);
+      const rot = hash2(cx, cz, s0 + 7) * TAU;
+      const deadF = smoothstep(250, 90, dist2d(wx, wz, RUINS_X, RUINS_Z));
+      let pool;
+      let cr = 0.84 + hj * 0.28, cg = 0.88 + hs * 0.24, cb = 0.82 + hj * 0.16;
+      if (bio === BIOME.FOREST) {
+        if (r < deadF * 0.4) pool = r < deadF * 0.2 ? bramble : deadBush;
+        else if (r < 0.36) pool = fern;
+        else if (r < 0.48) pool = fernBig;
+        else if (r < 0.57) pool = bramble;
+        else if (r < 0.66) pool = berry;
+        else if (r < 0.76) pool = thicket;
+        else if (r < 0.88) pool = bushR;
+        else pool = mossC;
+      } else if (bio === BIOME.MEADOW) {
+        const heathN = snoise(wx * 0.03 + 91.4, wz * 0.03); // heather drifts clump
+        if (heathN > 0.22) { pool = heather; cr = 0.9 + hj * 0.25; cg = 0.85; cb = 0.9 + hs * 0.2; }
+        else if (r < 0.30) pool = bushW;
+        else if (r < 0.55) pool = shrubDry;
+        else if (r < 0.80) pool = bushR;
+        else pool = thicket;
+      } else if (bio === BIOME.MARSH) {
+        if (r < 0.58) pool = reeds;
+        else if (r < 0.74) pool = deadBush;
+        else if (r < 0.90) pool = bramble;
+        else pool = mossC;
+      } else if (bio === BIOME.ROCKY) {
+        pool = r < 0.40 ? shrubDry : r < 0.72 ? heather : deadBush;
+        cr = 0.9 + hj * 0.2; cg = 0.84; cb = 0.78;
+      } else { // sand
+        pool = r < 0.5 ? reeds : shrubDry;
+        cr = 1.0 + hj * 0.15; cg = 0.94; cb = 0.72;
+      }
+      const s = 0.7 + hs * 0.9;
+      put(pool, wx, h - 0.05, wz, rot, s, s * (0.8 + hj * 0.4), cr, cg, cb);
+    }
   }
 
-  function fillFlowerCell(cx, cz) {
+  function fillFloraCell(cx, cz) {
     const wx = (cx + hash2(cx, cz, 171)) * 6;
     const wz = (cz + hash2(cx, cz, 172)) * 6;
     const h = terrainHeight(wx, wz);
-    if (h < WATER_LEVEL + 1.2 || h > 60) return;
+    if (h < WATER_LEVEL + 1.0 || h > 70) return;
+    const pm = poiGroundScale(wx, wz); // soft POI clearing
+    if (pm <= 0) return;
     const bio = biomeAt(wx, wz, h);
-    const density = bio === BIOME.MEADOW ? 0.36 : bio === BIOME.FOREST ? 0.07 : 0;
-    if (!density || hash2(cx, cz, 173) >= density) return;
-    if (insidePOI(wx, wz)) return;
-    const tint = FLOWER_TINTS[(hash2(cx, cz, 174) * FLOWER_TINTS.length) | 0];
-    const s = 0.8 + hash2(cx, cz, 175) * 0.6;
-    put(flower, wx, h - 0.02, wz, hash2(cx, cz, 176) * TAU, s, s, tint[0], tint[1], tint[2]);
+    const r = hash2(cx, cz, 174);
+    const hs = hash2(cx, cz, 175), hj = hash2(cx, cz, 177);
+    const rot = hash2(cx, cz, 176) * TAU;
+    const s = 0.8 + hs * 0.7;
+
+    if (bio === BIOME.FOREST) {
+      // Glowing mushrooms: only deep forest around the witch's hollow.
+      const dWitch = dist2d(wx, wz, WITCH_X, WITCH_Z);
+      if (dWitch < 300) {
+        const chance = (0.18 + smoothstep(300, 90, dWitch) * 0.55) * pm;
+        if (r < chance) {
+          const gt = 0.85 + hj * 0.45; // brightness variety
+          put(mushGlow, wx, h - 0.02, wz, rot, s, s, gt * (0.8 + hs * 0.4), gt, gt * (0.9 + hj * 0.3));
+          return;
+        }
+      }
+      if (hash2(cx, cz, 173) >= 0.30 * pm) return;
+      if (r < 0.32) put(mushRed, wx, h - 0.02, wz, rot, s, s, 0.9 + hj * 0.25, 0.92, 0.9);
+      else if (r < 0.60) put(mushBrown, wx, h - 0.02, wz, rot, s, s, 0.85 + hj * 0.3, 0.9 + hs * 0.2, 0.85);
+      else if (r < 0.82) put(foxglove, wx, h - 0.02, wz, rot, s, s, 0.85 + hj * 0.35, 0.85, 0.9 + hs * 0.25);
+      else put(flowerCl, wx, h - 0.02, wz, rot, s, s, 0.72, 0.60, 0.95); // shade blooms
+    } else if (bio === BIOME.MEADOW) {
+      if (hash2(cx, cz, 173) >= 0.45 * pm) return;
+      const tint = FLOWER_TINTS[(hash2(cx, cz, 178) * FLOWER_TINTS.length) | 0];
+      if (r < 0.42) put(flower, wx, h - 0.02, wz, rot, s, s, tint[0], tint[1], tint[2]);
+      else if (r < 0.62) put(flowerCl, wx, h - 0.02, wz, rot, s, s, tint[0], tint[1], tint[2]);
+      else if (r < 0.77) put(lupine, wx, h - 0.02, wz, rot, s, s, 0.9 + hj * 0.3, 0.9, 1.0 + hs * 0.2);
+      else if (r < 0.92) put(seedhead, wx, h - 0.02, wz, rot, s, s, 1.0 + hj * 0.2, 0.95, 0.85);
+      else put(foxglove, wx, h - 0.02, wz, rot, s, s, 1.0 + hj * 0.2, 0.9, 1.0);
+    } else if (bio === BIOME.MARSH) {
+      if (hash2(cx, cz, 173) >= 0.16 * pm) return;
+      if (r < 0.55) put(mushBrown, wx, h - 0.02, wz, rot, s, s, 0.8, 0.85, 0.8);
+      else put(seedhead, wx, h - 0.02, wz, rot, s, s, 0.85, 0.9, 0.8);
+    }
+  }
+
+  function fillDebrisCell(cx, cz) {
+    const bio0 = biomeAt((cx + 0.5) * 15, (cz + 0.5) * 15);
+    const tries = bio0 === BIOME.FOREST ? 2 : 1;
+    for (let k = 0; k < tries; k++) {
+      const s0 = 190 + k * 13;
+      const wx = (cx + hash2(cx, cz, s0 + 1)) * 15;
+      const wz = (cz + hash2(cx, cz, s0 + 2)) * 15;
+      const h = terrainHeight(wx, wz);
+      if (h < WATER_LEVEL + 1.0 || h > 90) continue;
+      if (insidePOI(wx, wz)) continue;
+      const bio = biomeAt(wx, wz, h);
+      let density = 0;
+      if (bio === BIOME.FOREST) density = k === 0 ? 0.55 : 0.35;
+      else if (bio === BIOME.MEADOW) density = 0.06;
+      else if (bio === BIOME.MARSH) density = 0.28;
+      if (!density || hash2(cx, cz, s0 + 3) >= density) continue;
+      if (Math.abs(terrainHeight(wx + 2, wz + 2) - h) > 1.8) continue; // needs flat-ish ground
+      const r = hash2(cx, cz, s0 + 4);
+      const hs = hash2(cx, cz, s0 + 5), hj = hash2(cx, cz, s0 + 6);
+      const rot = hash2(cx, cz, s0 + 7) * TAU;
+      const s = 0.8 + hs * 0.7;
+      const cr = 0.85 + hj * 0.3, cg = 0.88 + hs * 0.24, cb = 0.85 + hj * 0.2;
+      let pool;
+      if (bio === BIOME.MARSH) pool = r < 0.45 ? rootSnag : r < 0.8 ? logMossy : stump;
+      else if (r < 0.30) pool = log;
+      else if (r < 0.55) pool = logMossy;
+      else if (r < 0.80) pool = stump;
+      else pool = rootSnag;
+      if (pool === log || pool === logMossy) {
+        // lie with a slight deterministic tilt so logs hug uneven ground
+        putT(pool, wx, h - 0.05, wz, (hj - 0.5) * 0.18, rot, (hs - 0.5) * 0.14, s, s, cr, cg, cb);
+      } else {
+        put(pool, wx, h - 0.06, wz, rot, s, s * (0.85 + hj * 0.3), cr, cg, cb);
+      }
+    }
   }
 
   // Scan phases: [cellSize(u), nearest-first offsets, fill fn, pools touched]
   const PHASES = [
-    { cell: 16, offsets: ringOffsets(15), fn: fillTreeCell, pools: [pine, oak] }, // trees ≤ 240u
-    { cell: 14, offsets: ringOffsets(14), fn: fillRockCell, pools: [rock] },      // rocks ≤ ~196u
-    { cell: 4, offsets: ringOffsets(18), fn: fillGrassCell, pools: [grass] },     // grass ≤ 72u
-    { cell: 10, offsets: ringOffsets(12), fn: fillBushCell, pools: [bush] },      // bushes ≤ 120u
-    { cell: 6, offsets: ringOffsets(15), fn: fillFlowerCell, pools: [flower] },   // flowers ≤ 90u
+    { cell: TREE_CELL, offsets: ringOffsets(22), fn: fillTreeCell, pools: TREE_POOLS }, // trees ≤ ~264u
+    { cell: 11, offsets: ringOffsets(17), fn: fillRockCell, pools: ROCK_POOLS },        // rocks ≤ ~187u
+    { cell: 4, offsets: ringOffsets(20), fn: fillGrassCell, pools: [grass] },           // grass ≤ 80u
+    { cell: 7, offsets: ringOffsets(16), fn: fillBushCell, pools: BUSH_POOLS },         // undergrowth ≤ ~112u
+    { cell: 6, offsets: ringOffsets(15), fn: fillFloraCell, pools: FLORA_POOLS },       // flowers/mush ≤ 90u
+    { cell: 15, offsets: ringOffsets(11), fn: fillDebrisCell, pools: DEBRIS_POOLS },    // debris ≤ ~165u
   ];
 
   const vegJob = { active: false, phase: 0, idx: 0, wx: 0, wz: 0 };
@@ -730,7 +1583,7 @@ export function createWorld(g) {
         const oi = vegJob.idx++;
         const off = offs[oi];
         ph.fn(ccx + off[0], ccz + off[1]);
-        if ((oi & 15) === 15 && performance.now() - t0 > budgetMs) return;
+        if ((oi & 7) === 7 && performance.now() - t0 > budgetMs) return;
       }
       for (const p of ph.pools) hideLeftovers(p); // phase done → upload
       vegJob.phase++;
@@ -746,6 +1599,7 @@ export function createWorld(g) {
     uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
       uTime: { value: 0 },
       uSunDir: { value: new THREE.Vector3(0.3, 0.8, 0.2) },
+      uDay: { value: 1 },
       uHorizon: { value: new THREE.Color(0.72, 0.82, 0.92) },
       uDeep: { value: new THREE.Color(0.045, 0.16, 0.26) },
       uShallow: { value: new THREE.Color(0.14, 0.40, 0.44) },
@@ -788,7 +1642,7 @@ export function createWorld(g) {
       vegAX = ax; vegAZ = az;
       startVegJob(ax, az);
     }
-    if (vegJob.active) processVegJob(1.0);
+    if (vegJob.active) processVegJob(1.5);
 
     // Water: advance time (rawDt so waves idle through hitstop/menus),
     // follow player snapped to 8u (wave phase is world-space → seamless).
@@ -797,7 +1651,10 @@ export function createWorld(g) {
     water.position.z = Math.round(pp.z / 8) * 8;
     const sky = g.sky; // lazy — sky may not exist during early frames
     if (sky) {
-      if (sky.sunDir) uW.uSunDir.value.copy(sky.sunDir);
+      if (sky.sunDir) {
+        uW.uSunDir.value.copy(sky.sunDir);
+        uW.uDay.value = clamp(sky.sunDir.y * 2.4, 0, 1); // night → indigo water
+      }
       if (sky.horizonColor) uW.uHorizon.value.copy(sky.horizonColor);
     }
   }

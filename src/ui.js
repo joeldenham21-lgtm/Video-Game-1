@@ -83,6 +83,7 @@ export function createUI(g) {
 .ef-c.poi{font-size:11px;color:#cfa85e;}
 .ef-c.mark{font-size:13px;color:var(--goldhi);text-shadow:0 0 7px rgba(255,210,90,.9),0 1px 3px #000;}
 .ef-c.mark .d{font-size:8px;color:rgba(255,216,115,.85);letter-spacing:.04em;margin-top:-2px;}
+.ef-c.ef-clamped .d{display:none;}
 
 /* ---------- boss bar ---------- */
 #ef-boss{position:absolute;top:calc(50px + env(safe-area-inset-top,0px));left:50%;
@@ -132,9 +133,9 @@ export function createUI(g) {
 .ef-bar.hp{height:12px;}
 .ef-bar.hide{opacity:0;transform:translateX(-12px);}
 .ef-fill{position:absolute;inset:0;transform-origin:0 50%;transition:transform .22s ease-out;}
-.ef-bar.hp .ef-fill{background:linear-gradient(180deg,#cf4f3d,#8a2015);}
-.ef-bar.st .ef-fill{background:linear-gradient(180deg,#72b04f,#3c752a);}
-.ef-bar.mn .ef-fill{background:linear-gradient(180deg,#5583d4,#2b4d92);}
+.ef-bar.hp .ef-fill{background:linear-gradient(180deg,#a23b45,#8e2f38 42%,#6c2129);}
+.ef-bar.st .ef-fill{background:linear-gradient(180deg,#6f8c49,#5f7a3d 42%,#485e2d);}
+.ef-bar.mn .ef-fill{background:linear-gradient(180deg,#48688c,#3d5a7a 42%,#2e4560);}
 #ef-xp{height:3px;margin-top:7px;border-radius:2px;overflow:hidden;background:rgba(10,7,4,.65);
   border:1px solid rgba(217,180,106,.25);}
 #ef-xpf{height:100%;transform-origin:0 50%;transition:transform .3s ease;
@@ -1007,8 +1008,18 @@ export function createUI(g) {
   function placeCompassItem(el, rel, clampEdge) {
     let r = rel, op = 1;
     if (clampEdge) {
-      if (r < -COMPASS_RANGE) { r = -COMPASS_RANGE; op = 0.7; }
-      else if (r > COMPASS_RANGE) { r = COMPASS_RANGE; op = 0.7; }
+      // Fade toward 0.25 as the icon nears/passes the strip edge, and drop the
+      // distance label once clamped, so half-clipped glyphs/labels never
+      // collide with the cardinal letters.
+      const over = Math.abs(rel) - COMPASS_RANGE;
+      const clamped = over > 0;
+      if (clamped) {
+        r = rel < 0 ? -COMPASS_RANGE : COMPASS_RANGE;
+        op = 0.25;
+      } else if (over > -10) {
+        op = 0.25 + 0.75 * (-over / 10); // eases 1 -> 0.25 over the last 10deg
+      }
+      el.classList.toggle('ef-clamped', clamped);
     } else if (Math.abs(r) > COMPASS_RANGE + 4) {
       el.style.opacity = '0';
       return;
