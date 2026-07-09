@@ -523,7 +523,8 @@ export function createStructures(g) {
     path(b, 0, 11, 0, 66, 3.2);       // south road (spawn approach)
     path(b, 0, -11, -5, -60, 3.0);    // north road
     // ...which keeps going north-east toward Stonebridge (330,-260), following
-    // the dry ridge until the flooded dip's shore (QA: it ended mid-field)
+    // the dry ridge to the flooded dip's shore (QA: it ended mid-field);
+    // buildRuinsRoad carries it the rest of the way around the marsh
     path(b, -5, -60, 30, -72, 2.8);
     path(b, 30, -72, 62, -96, 2.6);
     path(b, 62, -96, 86, -113, 2.4);
@@ -1250,8 +1251,27 @@ export function createStructures(g) {
     const ry = 0.7;
     const fx = Math.sin(ry), fz = Math.cos(ry);       // hut facing
     const sxd = Math.cos(ry), szd = -Math.sin(ry);    // lateral
-    // the hut: home_B_green sunk deep and skewed 0.06 rad → properly crooked
-    const hut = place('hexagon/building_home_B_green.gltf', P.x, gy - 0.55, P.z, ry, 6.5);
+    // the hut: home_B_green sunk deep and skewed 0.06 rad → properly crooked.
+    // QA: the pack walls read near-black in the swamp gloom — clone the atlas
+    // material (it's shared with the village's green home!) and lift it ~2×,
+    // biased toward a swampy grey-green.
+    const hut = place('hexagon/building_home_B_green.gltf', P.x, gy - 0.55, P.z, ry, 6.5, (obj) => {
+      const lift = new THREE.Color(1.75, 2.05, 1.55); // one-time, not per-frame
+      const seen = new Map();
+      obj.traverse((o) => {
+        if (!o.isMesh) return;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        const out = mats.map((m) => {
+          if (!seen.has(m.uuid)) {
+            const t = m.clone();
+            t.color.multiply(lift);
+            seen.set(m.uuid, t);
+          }
+          return seen.get(m.uuid);
+        });
+        o.material = Array.isArray(o.material) ? out : out[0];
+      });
+    });
     hut.rotation.z = 0.06;
     addCol(P.x + fx * 1.0, P.z + fz * 1.0, 2.7);
     addCol(P.x - fx * 1.0, P.z - fz * 1.0, 2.7);
@@ -1315,25 +1335,96 @@ export function createStructures(g) {
   const BR = {
     x: STONEBRIDGE.x, z: STONEBRIDGE.z,
     ry: Math.atan2(POI.ruins.x, POI.ruins.z), // deck runs along the ruins road
-    deckY: -1.1,                              // deck top (above the waterline)
+    deckY: 2.0,   // deck top — QA: was −1.1, the whole crossing read drowned
     s: 0, c: 0,
+    cws: [],      // causeway ramps off both deck ends (walk-clamped in update)
   };
   BR.s = Math.sin(BR.ry);
   BR.c = Math.cos(BR.ry);
 
   function buildStonebridge() {
-    // model deck top is +0.25 pre-scale; supports reach −1.0 → sunk ends
-    place('hexagon/building_bridge_A.gltf', BR.x, BR.deckY - 0.25 * 6.5, BR.z, BR.ry, 6.5);
-    // central pier blocks swimmers below, never the deck above
-    addCol(BR.x, BR.z, 1.5, undefined, BR.deckY - 1.2);
-    // lanterns at both deck ends so the crossing reads at night
+    const b = new Builder(671);
     const fx = Math.sin(BR.ry), fz = Math.cos(BR.ry);
     const sxd = Math.cos(BR.ry), szd = -Math.sin(BR.ry);
+    // model deck top is +0.25 pre-scale → origin at deckY − 1.625; the deck
+    // now rides ~5u clear of the water plane instead of awash in it
+    place('hexagon/building_bridge_A.gltf', BR.x, BR.deckY - 0.25 * 6.5, BR.z, BR.ry, 6.5);
+    // central stone pier: grounds the span (the model's legs stop short of
+    // the bed) and blocks swimmers below — never the deck above
+    {
+      const bed = terrainHeight(BR.x, BR.z);
+      const ph = BR.deckY - 0.9 - bed + 1.2;
+      b.add(TPL.box, BR.x, BR.deckY - 0.9 - ph / 2, BR.z, 2.7, ph, 3.8, 0, BR.ry, 0, 0x6e7269, 0.1);
+    }
+    addCol(BR.x, BR.z, 1.5, undefined, BR.deckY - 1.2);
+    // stone abutments cap both deck ends...
+    for (let sgn = -1; sgn <= 1; sgn += 2) {
+      const ax = BR.x + fx * sgn * 5.9, az = BR.z + fz * sgn * 5.9;
+      const ah = BR.deckY - 0.05 - terrainHeight(ax, az) + 1.4;
+      b.add(TPL.box, ax, BR.deckY - 0.05 - ah / 2, az, 5.0, ah, 2.8, 0, BR.ry, 0, 0x777b74, 0.08);
+      // squat gate posts where the parapet hands off to the causeway
+      for (let q = -1; q <= 1; q += 2)
+        b.add(TPL.box, BR.x + fx * sgn * 6.6 + sxd * q * 2.15, BR.deckY + 0.4,
+          BR.z + fz * sgn * 6.6 + szd * q * 2.15, 0.72, 0.95, 0.72, 0, BR.ry, 0, 0x6e7269, 0.08);
+      addCol(ax, az, 2.2, undefined, BR.deckY - 1.4);
+    }
+    // ...and stone causeways grade the road up out of the water at each end
+    // (landings probed against terrainHeight: west on the marsh-belt shore at
+    // (305,−271), east on the ruins-road bank 40u out along the deck axis).
+    // The walk surface is the matching ramp clamp in update(); the colliders
+    // only stop swimmers below the stonework.
+    const causeway = (sgn, x1, z1) => {
+      const x0 = BR.x + fx * sgn * 6.0, z0 = BR.z + fz * sgn * 6.0;
+      const dx = x1 - x0, dz = z1 - z0;
+      const len = Math.hypot(dx, dz);
+      const ux = dx / len, uz = dz / len;
+      const yaw = Math.atan2(ux, uz);
+      const y0 = BR.deckY, y1 = terrainHeight(x1, z1) + 0.12;
+      const pitch = Math.atan2(y0 - y1, len); // slopes down toward the shore
+      const n = Math.max(3, Math.round(len / 6));
+      for (let i = 0; i < n; i++) {
+        const t = (i + 0.5) / n;
+        const mx = x0 + dx * t, mz = z0 + dz * t;
+        const topM = y0 + (y1 - y0) * t;
+        const bed = Math.min(terrainHeight(mx, mz), topM - 1.6);
+        const bh = topM - bed + 1.2; // sunk past the bed → rises solid
+        b.add(TPL.box, mx, topM - bh / 2, mz, 4.4, bh, len / n + 0.5, pitch, yaw, 0, C_DARKSTONE, 0.09);
+        addCol(mx, mz, 2.1, undefined, topM - 1.5);
+      }
+      BR.cws.push({ x0, z0, ux, uz, len, y0, y1 });
+    };
+    causeway(-1, 305, -271);                     // west, toward Emberhollow
+    causeway(1, BR.x + fx * 40, BR.z + fz * 40); // east, toward Barrowdeep
+    // lanterns at both deck ends so the crossing reads at night
     const L1 = { x: BR.x + fx * 5.4 + sxd * 3.2, y: BR.deckY, z: BR.z + fz * 5.4 + szd * 3.2, ry: BR.ry, s: 1.1 };
     const L2 = { x: BR.x - fx * 5.4 - sxd * 3.2, y: BR.deckY, z: BR.z - fz * 5.4 - szd * 3.2, ry: BR.ry + Math.PI, s: 1.1 };
     placeInstances('halloween/lantern_standing.gltf', [L1, L2]);
     glowB.add(TPL.box, L1.x, L1.y + 0.6, L1.z, 0.2, 0.24, 0.2, 0, BR.ry, 0, 0xffd27f, 0);
     glowB.add(TPL.box, L2.x, L2.y + 0.6, L2.z, 0.2, 0.24, 0.2, 0, BR.ry, 0, 0xffd27f, 0);
+    root.add(b.build(MAT.static));
+  }
+
+  // ==========================================================================
+  // THE RUINS ROAD — the north road carries on from the flooded dip's shore
+  // (86,−113) the long way around the marsh lobes to Stonebridge's west
+  // causeway, then picks up again off the east end toward Barrowdeep.
+  // Waypoints probed against terrainHeight so every segment stays above the
+  // waterline (soggiest point ≈ 1.2u above it — a proper marsh road).
+  // ==========================================================================
+  function buildRuinsRoad() {
+    const b = new Builder(672);
+    const WAY = [
+      [86, -113], [76, -152], [66, -196], [30, -204], [-28, -206],
+      [-33, -240], [-30, -268], [-8, -286], [16, -296], [28, -322],
+      [70, -336], [120, -348], [165, -332], [195, -310], [228, -294],
+      [268, -281], [305, -271],
+    ];
+    for (let i = 0; i < WAY.length - 1; i++)
+      path(b, WAY[i][0], WAY[i][1], WAY[i + 1][0], WAY[i + 1][1], 2.4);
+    // east bank: from the causeway landing on toward the ruins climb
+    path(b, 363, -283, 400, -297, 2.4);
+    path(b, 400, -297, 436, -308, 2.4);
+    root.add(b.build(MAT.static));
   }
 
   // ==========================================================================
@@ -1571,6 +1662,22 @@ export function createStructures(g) {
           if (p.velocity.y < 0) p.velocity.y = 0;
           p.onGround = true;
         }
+        // causeway ramps off both deck ends: same clamp, height graded
+        // linearly from the deck down to each shore landing
+        for (let ci = 0; ci < BR.cws.length; ci++) {
+          const cw = BR.cws[ci];
+          const cdx = p.position.x - cw.x0, cdz = p.position.z - cw.z0;
+          const t = cdx * cw.ux + cdz * cw.uz;
+          if (t < -0.5 || t > cw.len) continue;
+          const lat = cdx * cw.uz - cdz * cw.ux;
+          if (lat < -2.2 || lat > 2.2) continue;
+          const topY = cw.y0 + (cw.y1 - cw.y0) * clamp(t / cw.len, 0, 1);
+          if (p.position.y > topY - 3.4 && p.position.y < topY) {
+            p.position.y = topY;
+            if (p.velocity.y < 0) p.velocity.y = 0;
+            p.onGround = true;
+          }
+        }
       }
       if (blessTimer > 0) {
         blessTimer -= dt;
@@ -1609,6 +1716,7 @@ export function createStructures(g) {
   buildShrine();
   buildWitchHut();    // NEW POI
   buildStonebridge(); // NEW POI
+  buildRuinsRoad();   // north road → around the marsh → Stonebridge → east bank
   buildBreadcrumbs();
   buildDocks();
   // finalize the cross-POI merged emissive meshes (1 draw call apiece)

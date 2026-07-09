@@ -1037,6 +1037,12 @@ export function createQuests(g) {
   function torvaldTree() {
     const N = {};
     let start = 'idle';
+    // Vendor hook (economy.js): ores, ingots and leather over the counter.
+    const trade = {
+      label: 'Trade — show me your stock, smith.',
+      next: null,
+      do: () => { if (g.economy && g.economy.openShop) g.economy.openShop('torvald'); },
+    };
 
     if (state.main === 3 && state.stage === 1) {
       start = 't1';
@@ -1076,6 +1082,7 @@ export function createQuests(g) {
           : 'How\'s the old blade sit? ...Thought so. Best work I never did. Keep her out of ' +
             'the rain anyway — habit\'s habit.',
         choices: [
+          trade,
           {
             label: 'Heard anything of the roads?',
             next: 'gossip',
@@ -1093,7 +1100,7 @@ export function createQuests(g) {
       N.idle = {
         text: 'Mind the sparks. You need something hammered, dented, or un-dented, I\'m your ' +
           'man. Conversation, though — try the inn. Bram sells it by the mug.',
-        choices: [{ label: 'Farewell.', next: null }],
+        choices: [trade, { label: 'Farewell.', next: null }],
       };
     }
 
@@ -1208,16 +1215,11 @@ export function createQuests(g) {
   function bramTree() {
     const N = {};
     const gold = () => (g.player ? g.player.stats.gold : 0);
+    // Bram's potion trade goes through the barter panel now (economy.js).
     const buyChoice = {
-      label: 'Buy a healing draught. (20 gold)',
-      next: 'shop',
-      if: () => gold() >= 20,
-      do: () => {
-        if (!g.player || g.player.stats.gold < 20) return;
-        g.player.addGold(-20);
-        g.player.stats.potions += 1;
-        notify('Healing draught bought', 'Potions: ' + g.player.stats.potions);
-      },
+      label: "Trade — draughts and drink. Let's see the shelf.",
+      next: null,
+      do: () => { if (g.economy && g.economy.openShop) g.economy.openShop('bram'); },
     };
     const sellAmulet = {
       label: 'Sell the lake-silver amulet. (80 gold)',
@@ -1284,10 +1286,6 @@ export function createQuests(g) {
         sellAmulet,
         { label: 'Farewell.', next: null },
       ],
-    };
-    N.shop = {
-      text: 'Careful with those — I brew them strong enough to wake a stone. Anything else?',
-      choices: [buyChoice, sellAmulet, { label: 'That\'s all.', next: null }],
     };
     N.amulet = {
       text: 'Lake-silver! Rare as honest weather, that... moon on the face, even. Wendel\'s ' +

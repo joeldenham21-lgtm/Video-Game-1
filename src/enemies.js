@@ -7,6 +7,13 @@
 // thralls + Lord Morvane, witch Grimhilde, the Stonebridge troll, night
 // werewolves, skeleton archers and atmospheric village guards.
 // Owns `enemyKilled`, `spawnLoot`, `combatState` and `bossBar` events.
+// Wave-3 endgame (FORGE-ECON.md, revised scaling): the whole world scales
+// WITH the player (base × (1 + 0.05×(lvl−1)), soft cap ~×2.6; XP/loot follow);
+// danger areas differ by ENCOUNTER DESIGN (bigger packs, ~15% elite chance,
+// mixed ranged/melee, ridge ambushes, ≤+15% flat mod) — never stat walls.
+// Bosses lock their scale at first engagement (challenge floor = base stats).
+// Plus: elite variants, material drops, the inn Hunt Board, Blood Moon siege
+// nights and the Trial of Echoes at the Shrine of Aldric.
 //
 // Contract §5 + ASSETS-ART.md. Only imports: three + core.js. Zero per-frame
 // allocations in update() — all temps are preallocated; query results reuse
