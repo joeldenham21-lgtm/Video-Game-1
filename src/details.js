@@ -183,7 +183,6 @@ void main() {
 
 // Ring pool (vec4 per-instance tint → fading water rings AND dark footprints)
 const RING_VERT = /* glsl */ `
-attribute mat4 instanceMatrix;
 attribute vec4 aTint;
 varying vec4 vTint;
 void main() {

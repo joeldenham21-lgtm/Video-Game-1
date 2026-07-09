@@ -11,7 +11,10 @@ events, and APIs; replace/upgrade visuals and add the specified mechanics.
   rogue_hooded, skeleton_warrior, skeleton_mage, skeleton_rogue,
   skeleton_minion, fox.
 - `g.assets.charSync(name)` → same or `null` if not yet loaded.
-- `await g.assets.prop('dungeon/chest_common.gltf')` / `propSync(rel)` →
+- IMPORTANT: verify exact filenames with `ls assets/<pack>/` before coding —
+  dungeon files are `<name>.gltf.glb` (e.g. `chest.glb`, `banner_red.gltf.glb`),
+  hexagon/halloween/furniture are `<name>.gltf` + sidecar `.bin`.
+- `await g.assets.prop('dungeon/chest.glb')` / `propSync(rel)` →
   Object3D clone. Packs: `dungeon/*` (203 pieces: walls/columns/arches/
   chests/barrels/banners/torches/bones), `halloween/*` (crypt, coffins,
   graves, fences, candles, lanterns, pumpkins, dead trees), `furniture/*`

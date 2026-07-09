@@ -39,7 +39,7 @@ const PRELOAD = [
   'prop:hexagon/building_windmill_red.gltf',
   'prop:hexagon/building_market_red.gltf',
   'char:skeleton_warrior', 'char:skeleton_mage', 'char:skeleton_rogue', 'char:skeleton_minion',
-  'prop:dungeon/chest_common.gltf',
+  'prop:dungeon/chest.glb',
 ];
 
 export function createAssets(g) {
