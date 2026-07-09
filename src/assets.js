@@ -42,6 +42,26 @@ const PRELOAD = [
   'prop:dungeon/chest.glb',
 ];
 
+const DEFAULT_GEAR = {
+  knight: { r: '1H_Sword', l: 'Round_Shield' },
+  barbarian: { r: '2H_Axe', l: null },
+  mage: { r: '2H_Staff', l: null },
+  rogue: { r: 'Knife', l: 'Knife_Offhand' },
+  rogue_hooded: { r: 'Knife', l: null },
+};
+
+function applyGear(scene, name, opts) {
+  const want = { ...(DEFAULT_GEAR[name] || {}), ...(opts && opts.gear) };
+  for (const [slot, node] of [['l', 'handslot.l'], ['r', 'handslot.r']]) {
+    const holder = scene.getObjectByName(node);
+    if (!holder || !holder.children.length) continue;
+    const desired = want[slot] !== undefined ? want[slot] : holder.children[0].name;
+    for (const child of holder.children) {
+      child.visible = child.name === desired;
+    }
+  }
+}
+
 export function createAssets(g) {
   const loader = new GLTFLoader();
   const cache = new Map();      // url -> Promise<gltf>
@@ -52,7 +72,10 @@ export function createAssets(g) {
   function convertMaterials(root) {
     root.traverse((o) => {
       if (!o.isMesh && !o.isSkinnedMesh) return;
-      o.castShadow = true;
+      // Small clutter (mugs, bones, bottles) doubles draw calls in the shadow
+      // pass for zero visible benefit — gate by authored size.
+      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+      o.castShadow = o.isSkinnedMesh || o.geometry.boundingSphere.radius > 0.22;
       o.frustumCulled = true;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       const out = mats.map((m) => {
@@ -95,17 +118,26 @@ export function createAssets(g) {
     get progress() { return Math.min(1, loadedCount / Math.max(1, targetCount)); },
 
     // --- characters (skinned, animated) ---
-    // char('knight') → { scene, animations } — scene is a fresh SkeletonUtils
-    // clone; animations are the SHARED clip array (do not mutate).
-    async char(name) {
+    // char('knight', {gear:{r:'2H_Sword', l:null}}) → { scene, animations } —
+    // scene is a fresh SkeletonUtils clone; animations are the SHARED clip
+    // array (do not mutate). KayKit rigs carry EVERY gear variant under the
+    // handslot bones — we keep one per hand (default loadout below, override
+    // via opts.gear; null = empty hand) and hide the rest, which also saves
+    // ~14 draw calls per humanoid.
+    async char(name, opts) {
       const gltf = await loadUrl(CHAR_URLS[name]);
       const scene = SkeletonUtils.clone(gltf.scene);
+      applyGear(scene, name, opts);
       return { scene, animations: gltf.animations };
     },
-    charSync(name) {
+    charSync(name, opts) {
       const p = cache.get(CHAR_URLS[name]);
       let out = null;
-      if (p && p._v) out = { scene: SkeletonUtils.clone(p._v.scene), animations: p._v.animations };
+      if (p && p._v) {
+        const scene = SkeletonUtils.clone(p._v.scene);
+        applyGear(scene, name, opts);
+        out = { scene, animations: p._v.animations };
+      }
       return out;
     },
     async clips(name) {
