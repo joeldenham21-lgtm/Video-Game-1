@@ -270,6 +270,24 @@ export function createStructures(g) {
   }
 
   // ---- fire / smoke / bubble particle pools (3 draw calls, global) ---------
+  // Shared 32×32 radial-gradient sprite: points read as soft round puffs
+  // instead of hard opaque squares (QA: dawn chimney smoke).
+  let puffTex = null;
+  function softPuff() {
+    if (!puffTex) {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 32;
+      const ctx = cv.getContext('2d');
+      const grd = ctx.createRadialGradient(16, 16, 2, 16, 16, 15);
+      grd.addColorStop(0, 'rgba(255,255,255,1)');
+      grd.addColorStop(0.5, 'rgba(255,255,255,0.45)');
+      grd.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, 32, 32);
+      puffTex = new THREE.CanvasTexture(cv);
+    }
+    return puffTex;
+  }
   const FLAME_N = 120, SMOKE_N = 84, BUBBLE_N = 16;
   function makePool(n, size, opacity) {
     const pos = new Float32Array(n * 3);
@@ -280,11 +298,21 @@ export function createStructures(g) {
     const ca = new THREE.BufferAttribute(col, 3); ca.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('position', pa);
     geo.setAttribute('color', ca);
+    // static per-point size jitter (deterministic; consumed via onBeforeCompile)
+    const psz = new Float32Array(n);
+    for (let i = 0; i < n; i++) psz[i] = 0.75 + ((i * 37) % 13) / 13 * 0.55;
+    geo.setAttribute('psize', new THREE.BufferAttribute(psz, 1));
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
     const mat = new THREE.PointsMaterial({
-      size, vertexColors: true, transparent: true, opacity,
+      size, vertexColors: true, transparent: true, opacity: Math.min(opacity, 0.9),
+      map: softPuff(),
       blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
     });
+    mat.onBeforeCompile = (sh) => { // inject the psize attribute (r160 chunks)
+      sh.vertexShader = sh.vertexShader
+        .replace('uniform float size;', 'uniform float size;\nattribute float psize;')
+        .replace('gl_PointSize = size;', 'gl_PointSize = size * psize;');
+    };
     const pts = new THREE.Points(geo, mat);
     pts.frustumCulled = false;
     root.add(pts);
@@ -315,6 +343,12 @@ export function createStructures(g) {
 
   function updateEmitters(dt) {
     const cp = g.camera.position;
+    // smoke leans toward the sky/fog horizon color so it never reads as a
+    // stack of white squares against the dawn sky (lazy read, once per frame)
+    const hc = g.sky && g.sky.horizonColor;
+    const hr = hc ? 0.45 + hc.r * 0.55 : 1;
+    const hg = hc ? 0.45 + hc.g * 0.55 : 1;
+    const hb = hc ? 0.45 + hc.b * 0.55 : 1;
     for (let k = 0; k < emitters.length; k++) {
       const e = emitters[k];
       const P = e.pool;
@@ -361,7 +395,7 @@ export function createStructures(g) {
             P.pos[i3 + 1] = e.y + tN * e.rise;
             P.pos[i3 + 2] = e.z + Math.sin(P.seed[i] * 5) * P.rad[i] * spread;
             const v = 0.15 * (1 - tN) * Math.min(1, tN * 6);
-            P.col[i3] = v; P.col[i3 + 1] = v; P.col[i3 + 2] = v * 1.08;
+            P.col[i3] = v * hr; P.col[i3 + 1] = v * hg; P.col[i3 + 2] = v * 1.08 * hb;
           }
         }
         P.dirty = true;
@@ -488,6 +522,11 @@ export function createStructures(g) {
     b.add(TPL.disc, 0, py + 0.05, 0, 21, 21, 1, -Math.PI / 2, 0, 0, C_DIRT, 0.14);
     path(b, 0, 11, 0, 66, 3.2);       // south road (spawn approach)
     path(b, 0, -11, -5, -60, 3.0);    // north road
+    // ...which keeps going north-east toward Stonebridge (330,-260), following
+    // the dry ridge until the flooded dip's shore (QA: it ended mid-field)
+    path(b, -5, -60, 30, -72, 2.8);
+    path(b, 30, -72, 62, -96, 2.6);
+    path(b, 62, -96, 86, -113, 2.4);
     path(b, 10, 4, 28, 11, 2.2);
     path(b, -10, 5, -26, 14, 2.2);
     path(b, 9, -6, 26, -13, 2.2);
@@ -950,8 +989,10 @@ export function createStructures(g) {
     TW.topY = topY;
     const da = Math.atan2(-x, -z); // door faces Emberhollow
     const b = new Builder(401);
-    // real tower body (hexagon tower_B, roof cap hidden → open watch platform)
-    place('hexagon/building_tower_B_red.gltf', x, gy - 0.35, z, da, [7.5, 9.2, 7.5], (obj) => {
+    // real tower body (hexagon tower_B, UNIFORM scale so nothing distorts;
+    // 8.5 puts the body top at gy+12.4, flush with the platform support ring;
+    // roof cap hidden → open watch platform)
+    place('hexagon/building_tower_B_red.gltf', x, gy - 0.35, z, da, 8.5, (obj) => {
       obj.traverse((o) => { if (o.name && o.name.indexOf('_top_') !== -1) o.visible = false; });
     });
     b.add(TPL.cyl12, x, gy + 1.0, z, 8.6, 2.2, 8.6, 0, 0, 0, C_DARKSTONE, 0.1);    // foundation skirt
@@ -964,8 +1005,17 @@ export function createStructures(g) {
       addCol(mx, mz, 0.72, gy + 12.8, gy + 17.5); // parapet keeps you from strolling off
     }
     const dx = x + Math.sin(da) * 3.28, dz = z + Math.cos(da) * 3.28;
-    glowB.add(TPL.quad, x + Math.sin(da) * 3.95, gy + 7.5, z + Math.cos(da) * 3.95, 0.28, 0.9, 1, 0, da, 0, 0xffcf7a, 0);
-    glowB.add(TPL.quad, x + Math.sin(da + 2.1) * 3.95, gy + 10.4, z + Math.cos(da + 2.1) * 3.95, 0.28, 0.9, 1, 0, da + 2.1, 0, 0xffcf7a, 0);
+    // banner-shaped window glows sit PROUD of the wall: shaft corner radius is
+    // 0.47×8.5 ≈ 4.0 (buttress band reaches ≈4.5 up high) — they were buried
+    glowB.add(TPL.quad, x + Math.sin(da) * 4.15, gy + 7.5, z + Math.cos(da) * 4.15, 0.28, 0.9, 1, 0, da, 0, 0xffcf7a, 0);
+    glowB.add(TPL.quad, x + Math.sin(da + 2.1) * 4.6, gy + 10.4, z + Math.cos(da + 2.1) * 4.6, 0.28, 0.9, 1, 0, da + 2.1, 0, 0xffcf7a, 0);
+    // the garrison banner stands on the approach, clear of the wall (the
+    // tower's base flare reaches r≈5.1 — anything closer gets swallowed)
+    const bfx = x + Math.sin(da + 0.55) * 6.4, bfz = z + Math.cos(da + 0.55) * 6.4;
+    placeInstances('hexagon/decoration/props/flag_red.gltf', [
+      { x: bfx, y: terrainHeight(bfx, bfz), z: bfz, ry: da, s: 10 },
+    ]);
+    addCol(bfx, bfz, 0.4);
     // beacon brazier
     const bx2 = x + 1.3, bz2 = z;
     b.add(TPL.cyl, bx2, topY + 0.45, bz2, 1.0, 0.9, 1.0, 0, 0, 0, 0x4a4a50, 0.05);
@@ -1017,12 +1067,24 @@ export function createStructures(g) {
   // REDFANG CAMP — tents, campfire, weapon rack, cage, skull totems
   // ==========================================================================
   let cageDoor = null;
+  let campNightFlames = null; // extra fire throughput, night only (slowTick)
 
   function buildCamp() {
     const P = POI.camp;
     const b = new Builder(511);
-    campfire(b, P.x, P.z, 1.3);
-    addEmitter(smoke, P.x, terrainHeight(P.x, P.z) + 1.2, P.z, 5, 1.0, 4.5, 3.0, 1.2);
+    const campGy = campfire(b, P.x, P.z, 1.3);
+    addEmitter(smoke, P.x, campGy + 1.2, P.z, 5, 1.0, 4.5, 3.0, 1.2);
+    // QA: the camp was pitch black at night — the fire has to READ. A wide
+    // amber glow disc under it, a second night-only flame emitter, and three
+    // ember stones in the ring (all emissive fakes; g.pointLight is combat's).
+    discB.add(TPL.disc, P.x, campGy + 0.14, P.z, 7.4, 7.4, 1, -Math.PI / 2, 0, 0, 0xff8630, 0);
+    campNightFlames = addEmitter(flames, P.x, campGy + 0.5, P.z, 10, 1.1, 1.9, 0.6, 0.4);
+    campNightFlames.active = false;
+    for (let i = 0; i < 3; i++) {
+      const a = i / 3 * Math.PI * 2 + 1.4;
+      fireB.add(TPL.sphere, P.x + Math.cos(a) * 1.15, campGy + 0.18, P.z + Math.sin(a) * 1.15,
+        0.42, 0.3, 0.36, 0.2, a, 0, 0xffa040, 0.08);
+    }
     // tents facing the fire (the big one is Vargr's)
     const tents = [[0.5, 9, 4.4, 2.7, 3.6, 0x77503a], [2.5, 9.5, 4.2, 2.6, 3.4, 0x6e4a38], [4.4, 10, 5.6, 3.3, 4.6, 0x6e3a30]];
     for (let i = 0; i < tents.length; i++) {
@@ -1034,6 +1096,10 @@ export function createStructures(g) {
       // dark doorway on the fire-facing gable
       b.add(TPL.box, tx + Math.sin(ry) * (d / 2 - 0.1), gy + 0.65, tz + Math.cos(ry) * (d / 2 - 0.1),
         0.95, 1.3, 0.25, 0, ry, 0, 0x241a12, 0.03);
+      // faint warm interior glow in the doorway so tents read at night
+      // (MAT.glow — same ≤1 Hz brighten-at-night path as the windows)
+      glowB.add(TPL.quad, tx + Math.sin(ry) * (d / 2 + 0.06), gy + 0.62, tz + Math.cos(ry) * (d / 2 + 0.06),
+        0.6, 0.9, 1, 0, ry, 0, 0xd0955a, 0);
       addCol(tx, tz, Math.max(w, d) / 2 + 0.2);
       if (i === 2) { // Vargr's banner
         const px = tx + Math.cos(ry) * 2.2, pz = tz - Math.sin(ry) * 2.2;
@@ -1446,6 +1512,8 @@ export function createStructures(g) {
     MAT.rune.emissiveIntensity = g.flags.stonesCleansed ? 1.5 : 0.06;
     MAT.greenGlow.emissiveIntensity = 0.5 + night * 0.9;   // witch windows breathe at night
     MAT.greenDisc.emissiveIntensity = 0.4 + night * 0.3;
+    MAT.glowDisc.emissiveIntensity = 0.55 + night * 0.35;  // fire glow pools read at night
+    if (campNightFlames) campNightFlames.active = night > 0.35; // camp fire roars after dark
     syncBeacon();
     const chimOn = df > 0.27 && df < 0.86; // day + evening only
     for (let i = 0; i < chimneys.length; i++) chimneys[i].active = chimOn;
