@@ -261,6 +261,9 @@ export function createPlayer(g) {
   // Main update
   // -------------------------------------------------------------------------
   function update(dt) {
+    // Cinematics / photo mode own the camera: freeze input & camera writes,
+    // keep shake decaying so control returns cleanly.
+    if (g.cameraLock) { shake *= Math.pow(0.001, g.time.rawDt); velocity.x = velocity.z = 0; return; }
     if (g.paused) return;
     const rawDt = g.time.rawDt;
     const input = (g.ui && g.ui.input) ? g.ui.input : nullInput;

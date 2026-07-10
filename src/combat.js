@@ -2001,6 +2001,9 @@ export function createCombat(g) {
   // Main update
   // -------------------------------------------------------------------------
   function update(dt) {
+    // Cinematics/photo mode: hide first-person arms, ignore combat input
+    if (vmRoot.visible === !!g.cameraLock) vmRoot.visible = !g.cameraLock;
+    if (g.cameraLock) { if (typeof updateParticles === 'function') updateParticles(dt); return; }
     if (g.paused) return; // gameplay frozen (menus/dialogue)
     const rawDt = g.time.rawDt;
     rawClock += rawDt;

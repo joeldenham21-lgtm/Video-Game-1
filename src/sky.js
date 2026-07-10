@@ -256,11 +256,13 @@ export function createSky(g) {
   g.scene.add(hemi);
 
   // ---- shadows (optional 1024 PCF bubble following the camera) --------------
-  const SHADOW_EXTENT = 36; // tighter box: crisper shadows + fewer casters in the pass
+  const SHADOW_EXTENT = (g.quality && g.quality.ultra) ? 52 : 36; // desktop: wider bubble at 2048
   const SHADOW_TEXEL = (SHADOW_EXTENT * 2) / 1024;
   if (g.quality.shadows) {
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.set(1024, 1024);
+    const ultra = !!(g.quality && g.quality.ultra);
+    sunLight.shadow.mapSize.set(ultra ? 2048 : 1024, ultra ? 2048 : 1024);
+    if (ultra && g.renderer) g.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     const sc = sunLight.shadow.camera;
     sc.left = -SHADOW_EXTENT; sc.right = SHADOW_EXTENT;
     sc.top = SHADOW_EXTENT;   sc.bottom = -SHADOW_EXTENT;

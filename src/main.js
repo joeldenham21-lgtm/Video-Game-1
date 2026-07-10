@@ -24,6 +24,11 @@ import { createAssets } from './assets.js';
 import { createPhysics } from './physics.js';
 import { createEconomy } from './economy.js';
 import { createForge } from './forge.js';
+import { createPostfx } from './postfx.js';
+import { createCinema } from './cinema.js';
+import { createDice } from './dice.js';
+import { createWeather } from './weather.js';
+import { createExplore } from './explore.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -74,8 +79,9 @@ addEventListener('resize', () => {
 // Quality tier
 // ---------------------------------------------------------------------------
 const qualityPref = localStorage.getItem('elderfall_quality');
-const tier = qualityPref || (IS_COARSE ? 'high' : 'high'); // 'low' available via menu
-const quality = { tier, shadows: tier === 'high' };
+// Desktop defaults to 'ultra' (postprocessing + 2048 soft shadows); phones 'high'.
+const tier = qualityPref || (IS_COARSE ? 'high' : 'ultra');
+const quality = { tier, shadows: tier !== 'low', desktop: !IS_COARSE, ultra: tier === 'ultra' };
 if (quality.shadows) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -148,6 +154,11 @@ function boot(loadSave) {
       g.physics = createPhysics(g);
       g.economy = createEconomy(g);
       g.forge = createForge(g);
+      g.weather = createWeather(g);
+      g.cinema = createCinema(g);
+      g.dice = createDice(g);
+      g.explore = createExplore(g);
+      g.postfx = createPostfx(g);
       if (loadSave) g.save.load();
       titleEl.classList.add('hidden');
       setTimeout(() => titleEl.remove(), 1400);
@@ -209,13 +220,19 @@ function tick(now) {
     g.physics.update(dt);
     g.economy.update(dt);
     g.forge.update(dt);
+    g.weather.update(dt);
+    g.cinema.update(dt);
+    g.dice.update(dt);
+    g.explore.update(dt);
+    g.postfx.update(dt);
     g.ui.input.endFrame();
   } catch (err) {
     if (DEBUG) showErr('TICK: ' + (err.stack || err));
     else console.error(err);
   }
 
-  renderer.render(scene, camera);
+  if (g.postfx && g.postfx.render) g.postfx.render();
+  else renderer.render(scene, camera);
 
   // Asset streaming progress bar (thin gold line at top)
   const ab = assetBarEl;
