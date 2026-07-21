@@ -533,10 +533,12 @@ export function createEnemies(g) {
     part(tail, GEO.box, M.drake, 0, 0.04, -1.95, 0.4, 0.32, 1.35);
     part(tail, GEO.box, M.drake, 0, 0.08, -3.0, 0.24, 0.2, 1.1);
     part(tail, GEO.cone, M.drakeWing, 0, 0.1, -3.7, 0.7, 1.2, 0.08, -Math.PI / 2);  // tail fin
-    // Wings: bone leading edge + membrane fan
+    // Wings: bone leading edge + membrane fan. The finger bone bends back at
+    // the elbow with a slight droop — collinear bones read edge-on as a rigid
+    // spike jutting from the body (ruinous during his own boss intro).
     const wingL = pivot(group, -0.75, 2.35, 0.55);
-    part(wingL, GEO.box, M.drake, -0.9, 0.12, 0.35, 1.9, 0.16, 0.2, 0, -0.08);      // arm bone
-    part(wingL, GEO.box, M.drake, -2.9, 0.08, 0.2, 2.4, 0.11, 0.13, 0, -0.06);      // finger bone
+    part(wingL, GEO.box, M.drake, -0.9, 0.12, 0.35, 1.9, 0.16, 0.2, 0, -0.08, 0.06);   // arm bone
+    part(wingL, GEO.box, M.drake, -2.88, 0.0, 0.05, 2.4, 0.11, 0.13, 0, -0.34, 0.12);  // finger bone (swept back)
     const memL = new THREE.Mesh(wingGeo, M.drakeWing);
     memL.castShadow = true;
     wingL.add(memL);
@@ -544,8 +546,8 @@ export function createEnemies(g) {
     const wr = new THREE.Group();
     wr.scale.x = -1;
     wingR.add(wr);
-    part(wr, GEO.box, M.drake, -0.9, 0.12, 0.35, 1.9, 0.16, 0.2, 0, -0.08);
-    part(wr, GEO.box, M.drake, -2.9, 0.08, 0.2, 2.4, 0.11, 0.13, 0, -0.06);
+    part(wr, GEO.box, M.drake, -0.9, 0.12, 0.35, 1.9, 0.16, 0.2, 0, -0.08, 0.06);
+    part(wr, GEO.box, M.drake, -2.88, 0.0, 0.05, 2.4, 0.11, 0.13, 0, -0.34, 0.12);
     const memR = new THREE.Mesh(wingGeo, M.drakeWing);
     memR.castShadow = true;
     wr.add(memR);
@@ -2533,10 +2535,12 @@ export function createEnemies(g) {
         }
         // potion punish: aggroed duelists surge while the bottle is up.
         // Duelists keep blade distance — they square up at reach, never
-        // chest-hug (readable spacing; the strike lunge closes the rest).
+        // chest-hug (readable spacing; the strike lunge closes the rest, and
+        // they ease back out once it has carried them in).
         if (e.duTier >= 0 && pd < e.reach * 0.75) {
-          e.vel.x -= e.vel.x * Math.min(1, 6 * dt);
-          e.vel.z -= e.vel.z * Math.min(1, 6 * dt);
+          const ax = e.pos.x + (e.pos.x - p.position.x);
+          const az = e.pos.z + (e.pos.z - p.position.z);
+          moveToward(e, ax, az, e.speed * 0.35, dt, false);
         } else {
           moveToward(e, tx, tz, e.speed * (e.duPressT > 0 ? 1.4 : 1), dt, true);
         }
