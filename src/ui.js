@@ -491,6 +491,7 @@ body.ef-photo #hud{display:none!important;}
   <div class="ef-mrow"><span>Look Sensitivity</span><input type="range" id="ef-p-sens" min="0.3" max="2.5" step="0.05"></div>
   <div class="ef-mrow"><span>Invert Y</span><button class="ef-sbtn" id="ef-p-inv">OFF</button></div>
   <div class="ef-mrow"><span>Voiced Dialogue</span><button class="ef-sbtn" id="ef-p-voice">ON</button></div>
+  <div class="ef-mrow"><span>Resolution</span><button class="ef-sbtn" id="ef-p-res">NATIVE</button></div>
   <div class="ef-mrow"><span>Field of View</span><input type="range" id="ef-p-fov" min="55" max="95" step="1"></div>
   <div class="ef-mrow" id="ef-p-fxrow" style="display:none"><span>Cinematic FX</span><button class="ef-sbtn" id="ef-p-fx">ON</button></div>
   <button class="ef-mbtn" id="ef-p-photo">Photo Mode</button>
@@ -1446,6 +1447,18 @@ body.ef-photo #hud{display:none!important;}
   // ==========================================================================
   const elPQ = $('ef-p-q'), elPInv = $('ef-p-inv'), elPSens = $('ef-p-sens');
   const elPVoice = $('ef-p-voice');
+  const elPRes = $('ef-p-res');
+  if (elPRes) {
+    const cur = localStorage.getItem('elderfall_res') === '4k';
+    elPRes.textContent = cur ? '4K SS' : 'NATIVE';
+    elPRes.addEventListener('click', () => {
+      const now = localStorage.getItem('elderfall_res') === '4k';
+      localStorage.setItem('elderfall_res', now ? 'native' : '4k');
+      elPRes.textContent = now ? 'NATIVE' : '4K SS';
+      const n = $('ef-p-note'); if (n) n.textContent = 'Applies after reload';
+      click();
+    });
+  }
   if (elPVoice) elPVoice.addEventListener('click', () => {
     g.flags.voiceOff = !g.flags.voiceOff;
     elPVoice.textContent = g.flags.voiceOff ? 'OFF' : 'ON';

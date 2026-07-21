@@ -61,9 +61,17 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const IS_COARSE = matchMedia('(pointer: coarse)').matches;
 const DPR_CAP = 2.0; // flagship phones stay sharp; adaptive scaler protects weaker GPUs
+// 4K supersampling (desktop): render at up to 2x device resolution (capped at
+// a 3840x2160 pixel budget) and downsample — maximum crispness; the adaptive
+// scaler still guards 60fps underneath it.
+const SUPER = !IS_COARSE && localStorage.getItem('elderfall_res') === '4k' ? 2.0 : 1.0;
 let resScale = 1.0;
 function applyResolution() {
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, DPR_CAP) * resScale);
+  let pr = Math.min(devicePixelRatio || 1, DPR_CAP) * resScale * SUPER;
+  const maxPixels = 3840 * 2160;
+  const px = innerWidth * pr * innerHeight * pr;
+  if (px > maxPixels) pr *= Math.sqrt(maxPixels / px);
+  renderer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight);
 }
 
