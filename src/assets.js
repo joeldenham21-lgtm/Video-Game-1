@@ -74,6 +74,9 @@ export function createAssets(g) {
   function convertMaterials(root) {
     root.traverse((o) => {
       if (!o.isMesh && !o.isSkinnedMesh) return;
+      // Some sources (Khronos Fox) ship without normals — Lambert renders
+      // them black. Compute once at load; all clones share the geometry.
+      if (o.geometry && !o.geometry.getAttribute('normal')) o.geometry.computeVertexNormals();
       // Small clutter (mugs, bones, bottles) doubles draw calls in the shadow
       // pass for zero visible benefit — gate by authored size.
       if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
