@@ -2441,6 +2441,7 @@ export function createEnemies(g) {
       }
       default: { // the walk. relentless, 2.2u/s, no more, no less
         e.aggro = true;
+        e.state = 'chase'; // normalize (spawnAt debug spawns arrive 'idle'; integrate() anchors idle)
         if (p.stats.hp <= 0) { dissolveRider(e); return; }
         if (pd > 120 || !riderWindow(g.time.dayFrac)) { e.state = 'stare'; e.stateT = 0; break; }
         const dv = dist2d(p.position.x, p.position.z, 0, 0);
