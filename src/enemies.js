@@ -2235,9 +2235,15 @@ export function createEnemies(g) {
     }
     // PROJECTILE EVASION — closest approach of each live shot within the
     // threat window; roll = tierBase × distanceFactor × levelScale.
-    if (e.duDodgeCd > 0 || _proj.length === 0) return;
+    // getProjectiles is read fresh per duelist poll (10Hz staggered, per the
+    // contract) — a shared cache adds up to 0.2s of read latency, which eats
+    // most of a 0.5s arrow flight's reaction window.
+    if (e.duDodgeCd > 0) return;
     if (e.state !== 'chase' && e.state !== 'flank' &&
         e.state !== 'losRetreat' && e.state !== 'guard') return;
+    if (!g.combat || !g.combat.getProjectiles) return;
+    g.combat.getProjectiles(_proj);
+    if (_proj.length === 0) return;
     const tier = duEffTier(e);
     const widen = tier > e.duTier;          // adaptation widens the window
     const win = widen ? 1.5 : 1.2;
@@ -2520,8 +2526,15 @@ export function createEnemies(g) {
           tx += -(p.position.z - e.pos.z) * inv * perp;
           tz += (p.position.x - e.pos.x) * inv * perp;
         }
-        // potion punish: aggroed duelists surge while the bottle is up
-        moveToward(e, tx, tz, e.speed * (e.duPressT > 0 ? 1.4 : 1), dt, true);
+        // potion punish: aggroed duelists surge while the bottle is up.
+        // Duelists keep blade distance — they square up at reach, never
+        // chest-hug (readable spacing; the strike lunge closes the rest).
+        if (e.duTier >= 0 && pd < e.reach * 0.75) {
+          e.vel.x -= e.vel.x * Math.min(1, 6 * dt);
+          e.vel.z -= e.vel.z * Math.min(1, 6 * dt);
+        } else {
+          moveToward(e, tx, tz, e.speed * (e.duPressT > 0 ? 1.4 : 1), dt, true);
+        }
         turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 6, dt);
         // vampire thralls sidestep in a blur between closes
         if (e.type === 'thrall' && pd < 8 && pd > 2.2) {
@@ -2666,9 +2679,11 @@ export function createEnemies(g) {
           // — shortened telegraph, hungrier lunge, +15% (DUELIST.md §2)
           if (e.duCounter === 1 && e.aggro) {
             e.duCounter = 0;
-            if (pd < e.reach + 3.6 && duMayAttack(e, t, true)) {
+            // gate covers a max-range whiff (3.5u) plus the full hop (~3u);
+            // beyond lunge reach the counter simply whiffs — that's fencing
+            if (pd < e.reach + 4.6 && duMayAttack(e, t, true)) {
               e.state = 'telegraph'; e.stateT = 0;
-              e.duTeleOv = 0.22; e.duDmgMul = 1.15; e.duLunge = 2.6;
+              e.duTeleOv = 0.22; e.duDmgMul = 1.15; e.duLunge = 3.2;
               sfx('swingHeavy'); // distinct counter audio
               break;
             }
@@ -4060,15 +4075,13 @@ export function createEnemies(g) {
     scanT -= dt;
     if (scanT <= 0) { scanT = 0.6; scanSpawners(t); }
 
-    // DUELIST global 10Hz tick: turtle-read timer, projectile cache (one
-    // getProjectiles call shared by every staggered duelist poll), and the
-    // attack-token / flank-ring arbitration.
+    // DUELIST global 10Hz tick: turtle-read timer + the attack-token /
+    // flank-ring arbitration. (Projectiles are read fresh inside each
+    // duelist's own staggered poll — see duelistPoll.)
     duBlockHeldT = (g.player.isBlocking && g.player.stats.hp > 0) ? duBlockHeldT + dt : 0;
     duTickT -= dt;
     if (duTickT <= 0) {
       duTickT = 0.1;
-      if (g.combat && g.combat.getProjectiles && inCombat) g.combat.getProjectiles(_proj);
-      else _proj.length = 0;
       duTokenTick(t);
     }
 
