@@ -124,6 +124,10 @@ export const POIS = [
   { id: 'lake',    name: 'Mirrormere',        x: -350, z: 520,   r: 0 },
   { id: 'shrine',  name: 'Shrine of Aldric',  x: 260,  z: -180,  r: 16,  flatten: 0.9, flatH: 5 },
   { id: 'peak',    name: 'Drakespire',        x: 150,  z: -1250, r: 60,  flatten: 0.75 },
+  // Terrain-only flatten patches (no discovery entry semantics beyond POIS use):
+  // seat the witch hut on level ground; lift Redfang's flooded west flank.
+  { id: 'witchhut', name: 'The Crone\'s Hollow', x: -260, z: -520, r: 20, flatten: 0.9, flatH: 4.5 },
+  { id: 'campwest', name: 'Redfang West',       x: -680, z: 195,  r: 30, flatten: 0.8, flatH: 5 },
 ];
 export const POI = Object.fromEntries(POIS.map(p => [p.id, p]));
 
