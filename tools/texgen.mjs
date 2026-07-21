@@ -414,23 +414,30 @@ async function genRock() {
   RSEED = 9001;
   const alb = newAlbedo(), hgt = newHeight();
 
-  fillHeight(hgt, (u, v) => {
-    const [wu, wv] = warp(u, v, 0.18, 3, 3, 601);
-    // Strata: ridged, stretched horizontally, warped.
-    const strata = rfbm(wu * 0.5 + 10, wv, 6, 4, 0.55, 613);
-    const chunk = fbm(wu, wv, 4, 4, 0.5, 617);
-    const fine = fbm(u, v, 60, 3, 0.5, 619);
-    let h = strata * 0.6 + chunk * 0.5 + fine * 0.18;
-    // Crack veins: inverted ridged noise, carved deep.
-    const [cu, cv] = warp(u, v, 0.1, 4, 3, 631);
-    const cr = rfbm(cu, cv, 5, 3, 0.6, 641);
-    const vein = sstep(0.82, 0.97, cr);
-    h -= vein * 0.55;
+  const bandPhase = new Float32Array(S * S); // reused for albedo tinting
+  fillHeight(hgt, (u, v, x, y) => {
+    const [wu, wv] = warp(u, v, 0.14, 3, 3, 601);
+    // Banded strata: warped sine layers with fbm phase jitter.
+    const ph = wv * 11 + fbm(wu, wv, 3, 3, 0.5, 613) * 2.4;
+    bandPhase[y * S + x] = ph;
+    const band = Math.sin(ph * Math.PI * 2);
+    const strata = Math.pow(0.5 + 0.5 * band, 1.6);
+    const chunk = fbm(wu, wv, 5, 4, 0.55, 617);
+    const ridge = rfbm(wu, wv, 4, 3, 0.55, 618);
+    const fine = fbm(u, v, 70, 3, 0.5, 619);
+    let h = strata * 0.42 + chunk * 0.42 + ridge * 0.3 + fine * 0.14;
+    // Crack veins: level-set contours of warped noise -> long connected cracks.
+    const [cu, cv] = warp(u, v, 0.09, 4, 3, 631);
+    const n1 = fbm(cu, cv, 4, 3, 0.5, 641);
+    const n2 = fbm(cu, cv, 8, 3, 0.5, 643);
+    const vein1 = 1 - sstep(0.004, 0.035, Math.abs(n1 - 0.5));
+    const vein2 = 1 - sstep(0.003, 0.022, Math.abs(n2 - 0.5));
+    h -= vein1 * 0.5 + vein2 * 0.28;
     return h;
   });
 
-  // Albedo from height + hue variation + lichen.
-  const cool = [96, 97, 102], warm = [118, 112, 102], dark = [52, 52, 56];
+  // Albedo from height + banded tint + hue variation + lichen.
+  const cool = [104, 105, 110], warm = [128, 121, 108], dark = [38, 38, 42];
   for (let y = 0; y < S; y++) {
     const v = y / S;
     for (let x = 0; x < S; x++) {
@@ -438,22 +445,23 @@ async function genRock() {
       const h = hgt[y * S + x];
       const hue = fbm(u, v, 3, 3, 0.5, 651);
       const g = fbm(u, v, 110, 3, 0.5, 653);
-      let c = mix3(cool, warm, hue);
-      c = mix3(dark, c, clamp01(h * 0.85 + 0.18));           // recesses dark
-      const k = 0.82 + g * 0.4;                              // granular sparkle
+      const bandT = 0.5 + 0.5 * Math.sin(bandPhase[y * S + x] * Math.PI * 2 + 1.7);
+      let c = mix3(cool, warm, clamp01(hue * 0.7 + bandT * 0.45));
+      c = mix3(dark, c, clamp01(h * 1.05 + 0.06));           // recesses dark
+      const k = 0.76 + g * 0.5;                              // granular variation
       c = [c[0] * k, c[1] * k, c[2] * k];
       // Lichen speckle: clustered grey-green flecks ~4%.
       const lm = fbm(u, v, 5, 3, 0.5, 661);
       const spec = vnoise(u * 256, v * 256, 256, 256, 667);
-      if (lm > 0.58 && spec > 0.86) {
-        const t = (spec - 0.86) / 0.14;
-        c = mix3(c, [104, 112, 82], 0.5 + t * 0.4);
+      if (lm > 0.55 && spec > 0.82) {
+        const t = (spec - 0.82) / 0.18;
+        c = mix3(c, [106, 114, 82], 0.45 + t * 0.4);
       }
       const i = (y * S + x) * 3;
       alb[i] = c[0]; alb[i + 1] = c[1]; alb[i + 2] = c[2];
     }
   }
-  await emitSet('rock', alb, hgt, 5.0);
+  await emitSet('rock', alb, hgt, 5.5);
 }
 
 // ================================================================== DIRT

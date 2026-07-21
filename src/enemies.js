@@ -1319,7 +1319,7 @@ export function createEnemies(g) {
             type === 'undergloom' || type === 'broodmother' || type === 'palerider',
       isVargr: type === 'vargr',
       spawner: spawner || null,
-      summoned: false, taunted: false,
+      summoned: false, taunted: false, gone: false,
       // wave-3 endgame bookkeeping
       hpScale, lockScale: pScale, elite, eliteNotified: false,
       baseScale: eSize,
@@ -3510,7 +3510,9 @@ export function createEnemies(g) {
     updateGuards(dt);
     updateFire(dt);
     updateBurst(dt);
+    updateGloomFx(dt);
     updateBolts(dt);
+    updatePlayerSlow(dt);
     updateGlobalState(t);
 
     // wave-3 endgame systems
@@ -3521,6 +3523,7 @@ export function createEnemies(g) {
       endTick = 1.0;
       updateHunt();
       echoTick();
+      riderTick(t); // the dead-hours road-walker
     }
   }
 
@@ -3544,8 +3547,9 @@ export function createEnemies(g) {
     // is re-derived on the next endgame tick.
     for (let i = list.length - 1; i >= 0; i--) {
       const e = list[i];
-      if (e.huntTarget || e.echo || e.bloodMoon) despawn(e);
+      if (e.huntTarget || e.echo || e.bloodMoon || e.type === 'palerider') despawn(e);
     }
+    riderE = null; // the road-walker is a transient; the clock re-summons it
     huntEnemy = null;
     api.activeHunt = null;
     clearHuntMarker();
