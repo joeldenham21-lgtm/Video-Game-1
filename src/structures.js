@@ -638,6 +638,8 @@ export function createStructures(g) {
       const wd = 0.30 * s;
       glowB.add(TPL.quad, cx + fx * wd + sxd * 1.2, gy + 3.1, cz + fz * wd + szd * 1.2, 0.5, 1.1, 1, 0, ry, 0, 0xffdf9a, 0);
       glowB.add(TPL.quad, cx + fx * wd - sxd * 1.2, gy + 3.1, cz + fz * wd - szd * 1.2, 0.5, 1.1, 1, 0, ry, 0, 0xffdf9a, 0);
+      // one real candle-gold light through the chapel glass at night
+      lamp(cx + fx * (wd + 1.0), gy + 2.8, cz + fz * (wd + 1.0), { color: 0xffdf9a, intensity: 1.1, radius: 9, flicker: 0.2 });
       // bookshelf in the doorway alcove (clear of the books module's lecterns)
       const shx = cx + fx * (wd + 0.9) + sxd * 1.9, shz = cz + fz * (wd + 0.9) + szd * 1.9;
       place('dungeon/shelves.gltf.glb', shx, terrainHeight(shx, shz) - 0.7, shz, ry + Math.PI, 0.85);
@@ -672,14 +674,16 @@ export function createStructures(g) {
       });
       addCol(wx, wz, 2.7);
     }
-    // --- lantern posts — amber at night, strung along the paths -------------
+    // --- lantern posts — REAL warm light pools on the paths at night --------
     const LP = [[8, 9], [-8, 9], [9, -9], [-9, -9], [2, 26], [-2, 42], [14, -17], [-16, -2], [1, -24]];
     const lampI = [];
     for (const [lx, lz] of LP) {
       const gy = terrainHeight(lx, lz);
       const ry = Math.atan2(-lx, -lz); // arm reaches over the path
       lampI.push({ x: lx, y: gy - 0.05, z: lz, ry, s: 0.85 });
-      glowB.add(TPL.box, lx + Math.sin(ry) * 1.0, gy + 2.0, lz + Math.cos(ry) * 1.0, 0.26, 0.3, 0.26, 0, ry, 0, 0xffd27f, 0);
+      lamp(lx + Math.sin(ry) * 1.0, gy + 2.0, lz + Math.cos(ry) * 1.0, {
+        color: 0xffa951, intensity: 1.6, radius: 10, flicker: 0.3,
+      });
       addCol(lx, lz, 0.3);
     }
     placeInstances('halloween/post_lantern.gltf', lampI);
@@ -688,8 +692,8 @@ export function createStructures(g) {
       { x: 13.6, y: terrainHeight(13.6, 6.4), z: 6.4, ry: 0.3, s: 1.0 },
       { x: -9.2, y: terrainHeight(-9.2, 4.6), z: 4.6, ry: 2.1, s: 1.0 },
     ]);
-    glowB.add(TPL.box, 13.6, terrainHeight(13.6, 6.4) + 0.55, 6.4, 0.2, 0.24, 0.2, 0, 0.3, 0, 0xffd27f, 0);
-    glowB.add(TPL.box, -9.2, terrainHeight(-9.2, 4.6) + 0.55, 4.6, 0.2, 0.24, 0.2, 0, 2.1, 0, 0xffd27f, 0);
+    lamp(13.6, terrainHeight(13.6, 6.4) + 0.7, 6.4, { intensity: 1.2, radius: 8 });
+    lamp(-9.2, terrainHeight(-9.2, 4.6) + 0.7, 4.6, { intensity: 1.2, radius: 8 });
     // --- fenced field (halloween fence pieces), hay, clutter (south-east) ---
     {
       const fenceI = [], brokenI = [];
@@ -835,12 +839,14 @@ export function createStructures(g) {
         { x: cx - 1.9, y: gy + 1.9, z: cz - 4.75, s: 1 }, { x: cx + 1.9, y: gy + 1.9, z: cz - 4.75, s: 1 },
       ];
       placeInstances('dungeon/torch_lit.gltf.glb', torchI);
-      for (const t of torchI) addEmitter(flames, t.x, t.y + 0.6, t.z, 3, 0.3, 0.55, 0.45, 0.25);
+      for (const t of torchI) {
+        addEmitter(flames, t.x, t.y + 0.6, t.z, 3, 0.3, 0.55, 0.45, 0.25);
+        // real torchlight licks the crypt walls (interior — burns at all hours)
+        lamp(t.x, t.y + 0.7, t.z, { color: 0xff9944, intensity: 1.3, radius: 7, flicker: 0.5, nightOnly: false });
+      }
     }
     fireB.add(TPL.sphere, cx - 3.1, gy + 0.25, cz + 3.1, 0.55, 0.25, 0.55, 0, 0, 0, 0xff8226, 0.05);
     fireB.add(TPL.sphere, cx + 3.1, gy + 0.25, cz + 3.1, 0.55, 0.25, 0.55, 0, 0, 0, 0xff8226, 0.05);
-    discB.add(TPL.disc, cx - 3.1, gy + 0.34, cz + 3.1, 2.0, 2.0, 1, -Math.PI / 2, 0, 0, 0xff8630, 0);
-    discB.add(TPL.disc, cx + 3.1, gy + 0.34, cz + 3.1, 2.0, 2.0, 1, -Math.PI / 2, 0, 0, 0xff8630, 0);
     // wall colliders (door gap kept clear)
     colRow(cx - 3.6, cz + 3.95, cx + 3.6, cz + 3.95, 1.0, 1.5);
     colRow(cx - 3.95, cz - 3.4, cx - 3.95, cz + 3.4, 1.0, 1.5);
@@ -903,13 +909,13 @@ export function createStructures(g) {
         { x: 626, y: terrainHeight(626, KZ - 13.5), z: KZ - 13.5, ry: 0.2, s: 1 },
         { x: 599.5, y: terrainHeight(599.5, KZ + 2), z: KZ + 2, ry: 1.1, s: 1 },
       ]);
-      // grave lanterns, faintly burning even for the forgotten
+      // grave lanterns, faintly burning even for the forgotten (real light)
       placeInstances('halloween/lantern_standing.gltf', [
         { x: 613.4, y: terrainHeight(613.4, KZ - 3.8), z: KZ - 3.8, ry: 0.8, s: 1 },
         { x: 628.6, y: terrainHeight(628.6, KZ - 10.8), z: KZ - 10.8, ry: 2.4, s: 1 },
       ]);
-      glowB.add(TPL.box, 613.4, terrainHeight(613.4, KZ - 3.8) + 0.55, KZ - 3.8, 0.2, 0.24, 0.2, 0, 0.8, 0, 0xffd27f, 0);
-      glowB.add(TPL.box, 628.6, terrainHeight(628.6, KZ - 10.8) + 0.55, KZ - 10.8, 0.2, 0.24, 0.2, 0, 2.4, 0, 0xffd27f, 0);
+      lamp(613.4, terrainHeight(613.4, KZ - 3.8) + 0.7, KZ - 3.8, { intensity: 1.1, radius: 8, flicker: 0.4 });
+      lamp(628.6, terrainHeight(628.6, KZ - 10.8) + 0.7, KZ - 10.8, { intensity: 1.1, radius: 8, flicker: 0.4 });
     }
     // the crypt house — a proper vampire address (halloween crypt building)
     {
@@ -924,7 +930,7 @@ export function createStructures(g) {
       placeInstances('halloween/pumpkin_orange_jackolantern.gltf', [
         { x: jx, y: terrainHeight(jx, jz), z: jz, ry: bry, s: 0.8 },
       ]);
-      glowB.add(TPL.box, jx, terrainHeight(jx, jz) + 0.45, jz, 0.32, 0.32, 0.32, 0, bry, 0, 0xffb04a, 0);
+      lamp(jx, terrainHeight(jx, jz) + 0.6, jz, { color: 0xffb04a, intensity: 1.0, radius: 6, flicker: 0.5 });
     }
     // dead trees claw at the sky
     {
@@ -980,6 +986,11 @@ export function createStructures(g) {
         runeB.add(TPL.quad, fx, gy + h * 0.24 + k * h * 0.15, fz,
           0.24, 0.36, 1, 0, ry, (srand(i, k, 832) - 0.5) * 0.9, 0x9fe8ff, 0);
       }
+      // cold real light breathes off each cleansed stone, day and night
+      lamp(fx, gy + h * 0.55, fz, {
+        color: 0x66ccff, intensity: 1.2, radius: 9, flicker: 0.1, nightOnly: false,
+        enabled: () => !!g.flags.stonesCleansed,
+      });
       addCol(x, z, 1.05);
     }
     const cy = terrainHeight(P.x, P.z);
@@ -992,12 +1003,11 @@ export function createStructures(g) {
   // GREYWATCH TOWER — climb/descend teleports + quest beacon brazier
   // ==========================================================================
   const TW = { x: POI.tower.x, z: POI.tower.z, topY: 0 };
-  let beaconFlame = null, beaconDisc = null, beaconFlameEm = null, beaconSmokeEm = null;
+  let beaconFlame = null, beaconFlameEm = null, beaconSmokeEm = null;
 
   function syncBeacon() {
     const lit = !!g.flags.beaconLit;
     if (beaconFlame) beaconFlame.visible = lit;
-    if (beaconDisc) beaconDisc.visible = lit;
     if (beaconFlameEm) beaconFlameEm.active = lit;
     if (beaconSmokeEm) beaconSmokeEm.active = lit;
   }
@@ -1049,11 +1059,11 @@ export function createStructures(g) {
     beaconFlame = fb.build(MAT.fire, false);
     beaconFlame.visible = false;
     root.add(beaconFlame);
-    const db2 = new Builder(403);
-    db2.add(TPL.disc, bx2, topY + 1.44, bz2, 5.2, 5.2, 1, -Math.PI / 2, 0, 0, 0xff8630, 0);
-    beaconDisc = db2.build(MAT.glowDisc, false);
-    beaconDisc.visible = false;
-    root.add(beaconDisc);
+    // the beacon is a REAL blaze once lit — seen from the platform and below
+    lamp(bx2, topY + 2.2, bz2, {
+      color: 0xffcc66, intensity: 2.5, radius: 20, flicker: 0.4, nightOnly: false,
+      enabled: () => !!g.flags.beaconLit,
+    });
     beaconFlameEm = addEmitter(flames, bx2, topY + 1.5, bz2, 16, 1.7, 2.8, 0.6, 0.4);
     beaconFlameEm.active = false;
     beaconSmokeEm = addEmitter(smoke, bx2, topY + 2.8, bz2, 12, 1.6, 6.5, 3.0, 1.4);
@@ -1094,10 +1104,8 @@ export function createStructures(g) {
     const b = new Builder(511);
     const campGy = campfire(b, P.x, P.z, 1.3);
     addEmitter(smoke, P.x, campGy + 1.2, P.z, 5, 1.0, 4.5, 3.0, 1.2);
-    // QA: the camp was pitch black at night — the fire has to READ. A wide
-    // amber glow disc under it, a second night-only flame emitter, and three
-    // ember stones in the ring (all emissive fakes; g.pointLight is combat's).
-    discB.add(TPL.disc, P.x, campGy + 0.14, P.z, 7.4, 7.4, 1, -Math.PI / 2, 0, 0, 0xff8630, 0);
+    // the camp fire is a REAL light (registered in campfire()); at night a
+    // second flame emitter makes it roar. Ember stones ring it.
     campNightFlames = addEmitter(flames, P.x, campGy + 0.5, P.z, 10, 1.1, 1.9, 0.6, 0.4);
     campNightFlames.active = false;
     for (let i = 0; i < 3; i++) {
@@ -1304,8 +1312,9 @@ export function createStructures(g) {
     const cX = P.x + fx * 6.2 + sxd * 1.6, cZ = P.z + fz * 6.2 + szd * 1.6;
     const cy = terrainHeight(cX, cZ);
     place('dungeon/barrel_large.gltf.glb', cX, cy, cZ, 0.4, 0.75, (obj) => g.assets.tint(obj, '#4a4f52'));
-    greenDiscB.add(TPL.disc, cX, cy + 1.56, cZ, 1.1, 1.1, 1, -Math.PI / 2, 0, 0, 0x6cff8e, 0); // brew surface
-    greenDiscB.add(TPL.disc, cX, cy + 0.07, cZ, 4.6, 4.6, 1, -Math.PI / 2, 0, 0, 0x3fd465, 0); // ground glow
+    brewB.add(TPL.disc, cX, cy + 1.56, cZ, 1.1, 1.1, 1, -Math.PI / 2, 0, 0, 0x6cff8e, 0); // brew surface
+    // the brew casts REAL sickly-green light over the clearing
+    lamp(cX, cy + 1.9, cZ, { color: 0x66ff88, intensity: 1.4, radius: 8, flicker: 0.3, nightOnly: false });
     addEmitter(bubbles, cX, cy + 1.55, cZ, 12, 0.55, 1.5, 1.2, 0.9);
     fireB.add(TPL.sphere, cX, cy + 0.14, cZ, 0.9, 0.24, 0.9, 0, 0, 0, 0xff8226, 0.05);
     addEmitter(flames, cX, cy + 0.2, cZ, 4, 0.5, 0.5, 0.45, 0.3);
@@ -1321,7 +1330,6 @@ export function createStructures(g) {
       b.add(TPL.cyl6, px, py2 + hgt / 2, pz, 0.16, hgt, 0.16, 0, a, 0.06, 0xe8e2cf, 0.08);
       b.add(TPL.sphere, px, py2 + hgt + 0.05, pz, 0.5, 0.28, 0.5, 0, a, 0, cap, 0.1);
     }
-    greenDiscB.add(TPL.disc, mx, terrainHeight(mx, mz) + 0.06, mz, 8.4, 8.4, 1, -Math.PI / 2, 0, 0, 0x2e9c4e, 0);
     // hanging bones on a crooked frame by the door
     const hx = P.x + fx * 4.6 - sxd * 2.6, hz = P.z + fz * 4.6 - szd * 2.6;
     const hy = terrainHeight(hx, hz);
@@ -1420,8 +1428,8 @@ export function createStructures(g) {
     const L1 = { x: BR.x + fx * 5.4 + sxd * 3.2, y: BR.deckY, z: BR.z + fz * 5.4 + szd * 3.2, ry: BR.ry, s: 1.1 };
     const L2 = { x: BR.x - fx * 5.4 - sxd * 3.2, y: BR.deckY, z: BR.z - fz * 5.4 - szd * 3.2, ry: BR.ry + Math.PI, s: 1.1 };
     placeInstances('halloween/lantern_standing.gltf', [L1, L2]);
-    glowB.add(TPL.box, L1.x, L1.y + 0.6, L1.z, 0.2, 0.24, 0.2, 0, BR.ry, 0, 0xffd27f, 0);
-    glowB.add(TPL.box, L2.x, L2.y + 0.6, L2.z, 0.2, 0.24, 0.2, 0, BR.ry, 0, 0xffd27f, 0);
+    lamp(L1.x, L1.y + 0.7, L1.z, { intensity: 1.3, radius: 9 });
+    lamp(L2.x, L2.y + 0.7, L2.z, { intensity: 1.3, radius: 9 });
     root.add(b.build(MAT.static));
   }
 
@@ -1614,17 +1622,237 @@ export function createStructures(g) {
   }
 
   // ==========================================================================
+  // MONUMENT: THE TITAN OF THE VALE — a ~26u ruined colossus on the lake road
+  // at (-140, 300). Aldric I kneels facing Emberhollow, one arm raised with a
+  // broken sword. Grey stone stacked from primitives, moss creeping up the
+  // shaded faces, his other hand fallen among the rubble. One merged mesh.
+  // ==========================================================================
+  function buildTitan() {
+    const X = -140, Z = 300;
+    const ty = terrainHeight(X, Z);
+    const ry = Math.atan2(0 - X, 0 - Z); // he faces the village
+    const cos = Math.cos(ry), sin = Math.sin(ry);
+    const b = new Builder(801);
+    // local frame: +lz toward the village, +lx to his left
+    const W = (lx, lz) => [X + lx * cos + lz * sin, Z - lx * sin + lz * cos];
+    const P = (tpl, lx, y, lz, sx, sy, sz, rx, lry, rz, col, jit) => {
+      const [wx, wz] = W(lx, lz);
+      b.add(tpl, wx, ty + y, wz, sx, sy, sz, rx, ry + lry, rz, col, jit);
+    };
+    const STONE = 0x767b74, STONE_D = 0x696e67, MOSSY = 0x6d7a64;
+    // --- carved plinth (two weathered steps) --------------------------------
+    P(TPL.box, 0, 1.0, 0, 17, 2.2, 17, 0, 0.02, 0, STONE_D, 0.09);
+    P(TPL.box, 0, 2.8, 0, 13, 1.6, 13, 0, -0.015, 0, STONE, 0.08);
+    // --- kneeling figure (top of plinth ≈ +3.6) -----------------------------
+    // right leg: knee down, shin flat behind him
+    P(TPL.box, 2.4, 4.6, -2.2, 3.0, 2.0, 5.6, 0, 0, 0.03, MOSSY, 0.1);
+    P(TPL.box, 2.4, 6.6, -0.2, 3.0, 2.6, 3.2, 0.35, 0, 0, STONE, 0.09);   // right thigh, rising
+    // left leg: foot planted, knee up
+    P(TPL.box, -2.6, 5.6, 2.6, 2.6, 4.4, 2.8, 0, 0, -0.04, STONE, 0.09);  // shin upright
+    P(TPL.box, -2.6, 8.0, 1.0, 2.8, 2.8, 4.8, -0.5, 0, 0, MOSSY, 0.1);    // thigh sloping back
+    P(TPL.box, -2.6, 4.2, 3.9, 2.6, 1.3, 2.6, 0, 0, 0, STONE_D, 0.09);    // boot
+    // pelvis + torso, leaning slightly into the raised arm
+    P(TPL.box, 0, 9.2, -0.8, 6.6, 3.0, 4.4, 0.06, 0, 0, STONE_D, 0.08);
+    P(TPL.box, 0, 13.2, -0.4, 6.0, 6.4, 4.2, 0.09, 0, -0.02, STONE, 0.08);
+    P(TPL.box, 0, 13.6, 1.5, 4.6, 4.2, 0.9, 0.09, 0, 0, MOSSY, 0.12);     // mossed breastplate
+    P(TPL.box, 0, 16.9, -0.2, 8.8, 2.4, 4.6, 0.05, 0, 0, STONE, 0.08);    // shoulders
+    // head with the shattered crown (a fragment missing)
+    P(TPL.sphere, 0, 19.6, 0.2, 3.0, 3.3, 3.0, 0.1, 0, 0, STONE, 0.07);
+    P(TPL.box, 0, 20.0, 1.5, 2.2, 1.4, 0.8, 0.1, 0, 0, STONE_D, 0.07);    // brow/visor
+    P(TPL.box, -0.9, 21.4, 0.2, 0.8, 1.3, 0.7, 0, 0.3, 0.1, STONE_D, 0.08);   // crown points…
+    P(TPL.box, 0.2, 21.5, -0.7, 0.8, 1.5, 0.7, 0.1, -0.2, 0, STONE_D, 0.08);
+    P(TPL.box, 1.0, 21.3, 0.6, 0.7, 1.1, 0.6, 0, 0.5, -0.12, STONE_D, 0.08); // …one snapped short
+    // left arm: broken off at the elbow, raw break faces lighter
+    P(TPL.box, -5.0, 16.2, -0.3, 2.4, 3.6, 2.4, 0, 0, 0.4, STONE, 0.08);
+    P(TPL.box, -5.9, 14.5, -0.3, 1.9, 0.8, 1.9, 0.1, 0.4, 0.4, 0x8b8f86, 0.14); // the break
+    // right arm: raised, fist gripping the broken sword
+    P(TPL.box, 4.9, 18.6, 0.2, 2.4, 5.2, 2.4, 0, 0, -0.5, STONE, 0.08);   // upper arm out-up
+    P(TPL.box, 6.6, 22.2, 0.5, 2.0, 4.4, 2.0, 0.05, 0, -0.14, MOSSY, 0.09); // forearm
+    P(TPL.sphere, 7.0, 24.6, 0.6, 2.3, 2.1, 2.3, 0, 0, 0, STONE, 0.07);   // fist
+    P(TPL.box, 7.0, 24.7, 0.6, 1.6, 1.2, 2.9, 0, 0, 0, STONE_D, 0.07);    // crossguard
+    P(TPL.box, 7.0, 26.6, 0.6, 0.95, 2.8, 0.4, 0, 0.1, 0.04, 0x84898f, 0.06); // blade stump…
+    P(TPL.cone, 7.15, 28.2, 0.6, 0.9, 0.9, 0.4, 0, 0.1, 0.5, 0x8d9298, 0.06); // …snapped jagged
+    // --- ruin at his feet: the fallen hand, sword tip, rubble ---------------
+    {
+      const [hx, hz] = W(7.5, 9.5);
+      const hy = terrainHeight(hx, hz);
+      b.add(TPL.box, hx, hy + 0.7, hz, 2.6, 1.4, 3.6, 0.08, ry + 0.7, 0.05, STONE, 0.1); // palm
+      for (let i = -1; i <= 1; i++)
+        b.add(TPL.box, hx + Math.cos(ry + 0.7) * i * 0.85, hy + 0.9, hz - Math.sin(ry + 0.7) * i * 0.85,
+          0.7, 0.9, 2.2, 0.5, ry + 0.7, 0, MOSSY, 0.12); // curled fingers
+      addCol(hx, hz, 1.9);
+      const [sx2, sz2] = W(-8.5, 7.0);
+      const sy2 = terrainHeight(sx2, sz2);
+      b.add(TPL.box, sx2, sy2 + 0.4, sz2, 1.0, 0.5, 6.5, 0, ry + 2.3, 0.06, 0x7f848a, 0.07); // the lost blade-half
+      b.add(TPL.cone, sx2 + Math.sin(ry + 2.3) * 3.6, sy2 + 0.4, sz2 + Math.cos(ry + 2.3) * 3.6,
+        1.0, 1.6, 0.5, Math.PI / 2, ry + 2.3, 0, 0x7f848a, 0.07);
+      addCol(sx2, sz2, 1.2);
+      for (let i = 0; i < 7; i++) { // scattered plinth rubble
+        const a = srand(i, 2, 871) * 6.283, r = 10.5 + srand(i, 3, 871) * 4.5;
+        const [rx2, rz2] = W(Math.cos(a) * r, Math.sin(a) * r * 0.8);
+        const ryy = terrainHeight(rx2, rz2);
+        const s = 0.7 + srand(i, 4, 871) * 1.3;
+        b.add(TPL.box, rx2, ryy + s * 0.3, rz2, s, s * 0.7, s * 0.85, 0.2, a * 2, 0.15,
+          srand(i, 5, 871) < 0.4 ? MOSSY : STONE_D, 0.13);
+        if (s > 1.2) addCol(rx2, rz2, s * 0.6);
+      }
+    }
+    // --- the inscription: a carved tablet on the plinth's village face ------
+    const [px2, pz2] = W(0, 8.6);
+    P(TPL.box, 0, 1.6, 8.55, 3.6, 2.0, 0.25, 0, 0, 0, 0x848980, 0.05);
+    P(TPL.quad, 0, 1.6, 8.72, 3.0, 1.4, 1, 0, 0, 0, 0x9a9f94, 0.03);
+    addInter(px2, ty + 1.6, pz2, 3.0, 'Read the inscription', () => {
+      notify('ALDRIC I — HE HELD THE DAWN',
+        'Three hundred years he kept the vale, and the dark did not pass. '
+        + 'The blade broke before the man did. Kneel, traveler, and be counted.');
+    });
+    // the plinth itself blocks (figure stands atop it)
+    addCol(X, Z, 9.2);
+    root.add(b.build(MAT.static));
+  }
+
+  // ==========================================================================
+  // MONUMENT: THE ELDER GATE — two 14u pillars and a broken lintel span the
+  // north road at (200, -640); their fallen twin lies in the grass beside.
+  // ==========================================================================
+  function buildElderGate() {
+    const X = 200, Z = -640;
+    const b = new Builder(802);
+    const gry = 0.18; // gate face ~squares to the road; passage runs N–S
+    const cos = Math.cos(gry), sin = Math.sin(gry);
+    const W = (lx, lz) => [X + lx * cos + lz * sin, Z - lx * sin + lz * cos];
+    const STONE = 0x71767b, STONE_D = 0x646a70, MOSSY = 0x6b7568;
+    const pillar = (lx) => {
+      const [px, pz] = W(lx, 0);
+      const gy = terrainHeight(px, pz);
+      b.add(TPL.box, px, gy + 0.7, pz, 4.4, 1.5, 4.4, 0, gry, 0, STONE_D, 0.09);          // footing
+      b.add(TPL.box, px, gy + 5.2, pz, 3.2, 8.0, 3.2, 0, gry, 0.01 * lx / 5.5, STONE, 0.08); // shaft
+      b.add(TPL.box, px, gy + 10.8, pz, 2.8, 4.0, 2.8, 0, gry, 0, MOSSY, 0.1);            // upper shaft
+      b.add(TPL.box, px, gy + 13.3, pz, 3.8, 1.1, 3.8, 0, gry, 0, STONE_D, 0.08);         // capital
+      // carved rune column on the passage-facing side (muted, no glow)
+      for (let k = 0; k < 5; k++)
+        b.add(TPL.quad, px - Math.sign(lx) * (1.62 + 0.004), gy + 3.0 + k * 1.7, pz,
+          0.5, 0.8, 1, 0, gry + Math.sign(lx) * Math.PI / 2, (srand(k, lx | 0, 881) - 0.5) * 0.8, 0x8d939b, 0.04);
+      addCol(px, pz, 2.4);
+      return gy;
+    };
+    const gyW = pillar(-5.5);
+    const gyE = pillar(5.5);
+    const topY = Math.max(gyW, gyE) + 13.85;
+    // broken lintel: two slabs reach for each other and fail to meet
+    {
+      const [ax, az] = W(-3.4, 0);
+      b.add(TPL.box, ax, topY + 0.75, az, 4.6, 1.4, 3.0, 0, gry, 0.05, STONE, 0.08);
+      const [bx2, bz2] = W(3.9, 0);
+      b.add(TPL.box, bx2, topY + 0.7, bz2, 3.4, 1.4, 3.0, 0, gry, -0.08, MOSSY, 0.09);
+      const [kx, kz] = W(-1.2, 0.4); // keystone chunk atop the west slab
+      b.add(TPL.box, kx, topY + 1.8, kz, 1.6, 1.0, 2.0, 0.1, gry + 0.3, 0.1, STONE_D, 0.1);
+    }
+    // the fallen twin, half-swallowed by the grass
+    {
+      const [fx2, fz2] = W(14.5, 6.5);
+      const fy = terrainHeight(fx2, fz2);
+      const fry = gry + 2.55;
+      b.add(TPL.box, fx2, fy + 0.9, fz2, 3.0, 3.0, 11.5, 0, fry, 0.04, MOSSY, 0.1);
+      b.add(TPL.box, fx2 + Math.sin(fry) * 7.4, fy + 0.7, fz2 + Math.cos(fry) * 7.4,
+        3.6, 2.2, 1.6, 0.15, fry, 0.2, STONE_D, 0.1); // its capital, split off
+      colRow(fx2 - Math.sin(fry) * 5, fz2 - Math.cos(fry) * 5, fx2 + Math.sin(fry) * 5, fz2 + Math.cos(fry) * 5, 1.7, 2.2);
+      // rubble where it tore free
+      for (let i = 0; i < 4; i++) {
+        const [rx2, rz2] = W(9 + srand(i, 6, 882) * 4, 2 + srand(i, 7, 882) * 4);
+        const ryy = terrainHeight(rx2, rz2);
+        const s = 0.6 + srand(i, 8, 882) * 0.9;
+        b.add(TPL.box, rx2, ryy + s * 0.3, rz2, s, s * 0.6, s * 0.8, 0.2, i * 1.9, 0.1, STONE_D, 0.13);
+      }
+    }
+    // the gate's dedication, carved low on the west pillar
+    const [ix, iz] = W(-5.5, 2.35);
+    b.add(TPL.quad, ix, terrainHeight(ix, iz) + 1.7, iz, 1.7, 1.1, 1, 0, gry, 0, 0x868c94, 0.03);
+    addInter(ix, terrainHeight(ix, iz) + 1.6, iz, 3.0, 'Read the inscription', () => {
+      notify('THE ELDER GATE',
+        'Here ended the old realm, and here it swore to stand. '
+        + 'Pass beneath with your name spoken true, or not at all.');
+    });
+    root.add(b.build(MAT.static));
+  }
+
+  // ==========================================================================
+  // MONUMENT: THE BATTLEFIELD OF HARROW FEN — at (-120, -320) the shield-wall
+  // broke. Rusted spears still angle from the earth among broken shields,
+  // three burial mounds, and tattered banners. The crows belong to details.js.
+  // ==========================================================================
+  function buildHarrowFen() {
+    const X = -120, Z = -320;
+    const b = new Builder(803);
+    const RUST = 0x6e4a36, ASH_WOOD = 0x53483a, DIRT_M = 0x625e48;
+    // three long barrows, moss-backed
+    const MOUNDS = [[-14, 8, 9.5, 2.3, 6.5, 0.4], [4, -12, 11, 2.6, 7, 1.9], [16, 10, 8, 2.0, 5.5, 1.1]];
+    for (const [mx, mz, mw, mh, md, mr] of MOUNDS) {
+      const gy = terrainHeight(X + mx, Z + mz);
+      b.add(TPL.sphere, X + mx, gy + 0.3, Z + mz, mw, mh, md, 0, mr, 0, DIRT_M, 0.1);
+      b.add(TPL.box, X + mx + Math.sin(mr) * mw * 0.42, gy + 0.8, Z + mz + Math.cos(mr) * mw * 0.42,
+        1.1, 1.6, 0.4, 0, mr, 0.08, 0x757a72, 0.1); // headstone leaning at its foot
+      addCol(X + mx, Z + mz, Math.min(mw, md) * 0.42);
+    }
+    // rusted spears angled in the earth, the line they died holding
+    for (let i = 0; i < 15; i++) {
+      const sx = X + (srand(i, 1, 891) - 0.5) * 46;
+      const sz = Z + (srand(i, 2, 891) - 0.5) * 34;
+      const gy = terrainHeight(sx, sz);
+      const tiltX = (srand(i, 3, 891) - 0.5) * 0.9;
+      const tiltZ = (srand(i, 4, 891) - 0.5) * 0.9;
+      const h = 2.2 + srand(i, 5, 891) * 1.2;
+      b.add(TPL.cyl6, sx, gy + h * 0.42, sz, 0.09, h, 0.09, tiltX, i * 1.7, tiltZ, ASH_WOOD, 0.1);
+      b.add(TPL.cone, sx + tiltZ * h * 0.5, gy + h * 0.88, sz - tiltX * h * 0.5,
+        0.22, 0.6, 0.12, tiltX, i * 1.7, tiltZ, RUST, 0.12);
+    }
+    // broken shields, half-swallowed by the fen
+    for (let i = 0; i < 6; i++) {
+      const sx = X + (srand(i, 6, 892) - 0.5) * 40;
+      const sz = Z + (srand(i, 7, 892) - 0.5) * 30;
+      const gy = terrainHeight(sx, sz);
+      const col = i % 2 ? 0x6e3f33 : 0x676c66;
+      b.add(TPL.cyl12, sx, gy + 0.12, sz, 1.5, 0.14, 1.5, 1.35 + (srand(i, 8, 892) - 0.5) * 0.5, i * 2.3, 0.2, col, 0.12);
+      b.add(TPL.box, sx + 0.4, gy + 0.1, sz + 0.3, 0.9, 0.1, 0.5, 1.3, i * 2.3 + 1, 0, ASH_WOOD, 0.12); // split-off plank
+    }
+    // tattered banner poles, cloth almost gone
+    for (const [bx2, bz2, bry, lean] of [[-8, -4, 0.6, 0.12], [10, 2, 2.4, -0.16], [-2, 16, 4.0, 0.08], [22, -8, 1.2, -0.1]]) {
+      const gy = terrainHeight(X + bx2, Z + bz2);
+      b.add(TPL.cyl6, X + bx2, gy + 2.3, Z + bz2, 0.14, 4.6, 0.14, lean, bry, lean * 0.7, ASH_WOOD, 0.09);
+      b.add(TPL.box, X + bx2, gy + 4.3, Z + bz2, 1.15, 0.1, 0.1, 0, bry + Math.PI / 2, lean, ASH_WOOD, 0.09);
+      // two ragged strips per banner, faded war-red
+      b.add(TPL.quad, X + bx2 + Math.sin(bry) * 0.08, gy + 3.75, Z + bz2 + Math.cos(bry) * 0.08,
+        0.5, 1.0, 1, -0.1, bry, 0.15, 0x6e3a34, 0.1);
+      b.add(TPL.quad, X + bx2 + Math.sin(bry) * 0.08 - Math.cos(bry) * 0.45, gy + 3.95, Z + bz2 + Math.cos(bry) * 0.08 + Math.sin(bry) * 0.45,
+        0.4, 0.6, 1, -0.15, bry, -0.2, 0x633630, 0.1);
+      addCol(X + bx2, Z + bz2, 0.35);
+    }
+    // the rememberance stone on the road edge
+    const ix = X - 2, iz = Z - 24;
+    const iy = terrainHeight(ix, iz);
+    b.add(TPL.box, ix, iy + 1.1, iz, 1.7, 2.3, 0.55, 0, 0.3, 0.05, 0x757a72, 0.08);
+    b.add(TPL.quad, ix + Math.sin(0.3) * 0.29, iy + 1.25, iz + Math.cos(0.3) * 0.29, 1.2, 1.3, 1, 0, 0.3, 0, 0x868c84, 0.03);
+    addCol(ix, iz, 0.9);
+    addInter(ix, iy + 1.3, iz, 3.0, 'Read the inscription', () => {
+      notify('HARROW FEN',
+        'Nine hundred stood where the fen narrows. None ran. '
+        + 'When the ravens speak here, count them — they are the tally-keepers.');
+    });
+    root.add(b.build(MAT.static));
+  }
+
+  // ==========================================================================
   // Slow tick (≤1 Hz): night windows, runes, beacon state, chimney schedule
   // ==========================================================================
   let tickAcc = 10; // forces a sync on the very first frame
   function slowTick() {
     const df = g.time.dayFrac;
     const night = clamp((1 - smoothstep(0.22, 0.3, df)) + smoothstep(0.72, 0.8, df), 0, 1);
-    MAT.glow.emissiveIntensity = 0.12 + night * 1.25;
-    MAT.rune.emissiveIntensity = g.flags.stonesCleansed ? 1.5 : 0.06;
-    MAT.greenGlow.emissiveIntensity = 0.5 + night * 0.9;   // witch windows breathe at night
-    MAT.greenDisc.emissiveIntensity = 0.4 + night * 0.3;
-    MAT.glowDisc.emissiveIntensity = 0.55 + night * 0.35;  // fire glow pools read at night
+    // Window glass reads LIT, not radioactive — real light does the work now
+    MAT.glow.emissiveIntensity = 0.05 + night * 0.5;
+    MAT.rune.emissiveIntensity = g.flags.stonesCleansed ? 1.1 : 0.06;
+    MAT.greenGlow.emissiveIntensity = 0.25 + night * 0.4;  // witch windows breathe at night
+    MAT.brew.emissiveIntensity = 0.35 + night * 0.25;
     if (campNightFlames) campNightFlames.active = night > 0.35; // camp fire roars after dark
     syncBeacon();
     const chimOn = df > 0.27 && df < 0.86; // day + evening only
@@ -1740,13 +1968,15 @@ export function createStructures(g) {
   buildRuinsRoad();   // north road → around the marsh → Stonebridge → east bank
   buildBreadcrumbs();
   buildDocks();
+  buildTitan();     // NEW: the Titan of the Vale (-140, 300)
+  buildElderGate(); // NEW: the Elder Gate (200, -640)
+  buildHarrowFen(); // NEW: the Battlefield of Harrow Fen (-120, -320)
   // finalize the cross-POI merged emissive meshes (1 draw call apiece)
   root.add(glowB.build(MAT.glow, false));
   root.add(fireB.build(MAT.fire, false));
-  root.add(discB.build(MAT.glowDisc, false));
   root.add(runeB.build(MAT.rune, false));
   root.add(greenB.build(MAT.greenGlow, false));
-  root.add(greenDiscB.build(MAT.greenDisc, false));
+  root.add(brewB.build(MAT.brew, false));
 
   return { update };
 }

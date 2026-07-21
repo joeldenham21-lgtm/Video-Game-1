@@ -952,6 +952,249 @@ void main() {
 }`;
 
 // ---------------------------------------------------------------------------
+// EPIC WAVE — beyond-the-map mega-peaks, dawn valley fog, forest god-rays
+// ---------------------------------------------------------------------------
+// Mega-peak ring: colossal silhouette massifs OUTSIDE the far shell
+// (r 2600–3400, peaks 700–1300u). One static mesh, one draw call, ~4.8k tris.
+// They sit beyond fog.far AND beyond the sky dome radius (1900), so:
+//  - renderOrder 2 draws them AFTER the dome (dome writes no depth), and
+//  - a custom shader bakes atmospheric haze toward the live horizonColor
+//    instead of scene fog (which would erase them completely).
+//  - clip-space z is clamped just inside the far plane so a player at the
+//    map's far side never sees a massif sliced by the 4200u frustum.
+// Bearings (atan2(z,x) degrees): Drakespire reads at ~-77° from the village,
+// so the ring leaves a wide sky gap from ~-112° to ~-51° that FRAMES it,
+// plus sea-level gaps east / southeast / west — 6 massifs, not a wall.
+const MASSIFS = [ // sorted far → near (painter's order under equal clamped z)
+  { c: -175, span: 36, r: 3350, h: 1300, seed: 7 },  // W — farthest ghost giant
+  { c: -30,  span: 42, r: 3100, h: 1250, seed: 3 },  // NNE — right flank of the frame
+  { c: 152,  span: 46, r: 3050, h: 950,  seed: 5 },  // SSW
+  { c: -140, span: 55, r: 2950, h: 1150, seed: 1 },  // NW — left flank of the frame
+  { c: 22,   span: 34, r: 2750, h: 780,  seed: 9 },  // E
+  { c: 88,   span: 40, r: 2700, h: 700,  seed: 11 }, // SE
+];
+
+const MEGA_VERT = /* glsl */ `
+attribute float aSnow;
+attribute float aHaze;
+varying vec3 vN;
+varying float vSnow;
+varying float vHaze;
+void main() {
+  vN = normal; // mesh is static at the origin → object space == world space
+  vSnow = aSnow;
+  vHaze = aHaze;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  // Never far-clip: clamp depth just inside the far plane (they are always
+  // the farthest geometry, so ordering vs. terrain is unaffected).
+  gl_Position.z = min(gl_Position.z, gl_Position.w * 0.9999);
+}`;
+
+const MEGA_FRAG = /* glsl */ `
+uniform vec3 uHaze;      // sky horizonColor (shared instance)
+uniform vec3 uSunDir;    // shared sky sunDir
+uniform vec3 uLightCol;  // sun/moon light color
+uniform float uDay;      // 0 night … 1 day
+uniform float uGolden;   // golden-hour weight
+varying vec3 vN;
+varying float vSnow;
+varying float vHaze;
+void main() {
+  vec3 N = normalize(vN);
+  float sf = max(dot(N, uSunDir), 0.0);
+  // Silhouette rock: a darker, cooler read of the sky itself.
+  vec3 rock = uHaze * (mix(0.60, 0.46, uDay) + 0.16 * sf * uDay);
+  // Snow caps: lifted toward white, catching the sun on lit faces.
+  vec3 snow = mix(uHaze, vec3(1.0), 0.28 + 0.26 * uDay) * (0.72 + 0.40 * sf * uDay);
+  vec3 col = mix(rock, snow, vSnow);
+  // Golden-hour kiss on sun-facing slopes (strongest on snow).
+  col += uLightCol * uGolden * sf * (0.10 + 0.15 * vSnow);
+  // Baked atmospheric perspective: bases melt into the horizon.
+  col = mix(col, uHaze, vHaze);
+  gl_FragColor = vec4(col, 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+
+// Build the whole ring as one indexed heightfield-strip geometry.
+function buildMegaPeakGeometry() {
+  const NU = 40, NV = 10, DEPTH = 700;
+  const vertsPer = (NU + 1) * (NV + 1);
+  const total = vertsPer * MASSIFS.length;
+  const pos = new Float32Array(total * 3);
+  const snowA = new Float32Array(total);
+  const hazeA = new Float32Array(total);
+  const idx = new Uint32Array(NU * NV * 6 * MASSIFS.length);
+  let vo = 0, io = 0;
+  const D2R = Math.PI / 180;
+  for (const M of MASSIFS) {
+    const a0 = (M.c - M.span / 2) * D2R, a1 = (M.c + M.span / 2) * D2R;
+    const s1 = M.seed * 13.7, s2 = M.seed * 7.1;
+    const snowline = 0.42 * M.h + 160;
+    const baseHaze = 0.18 + 0.38 * smoothstep(2650, 3400, M.r);
+    const base = vo;
+    for (let iu = 0; iu <= NU; iu++) {
+      const u01 = iu / NU;
+      const ang = lerp(a0, a1, u01);
+      // Ridge profile along the arc: 2–4 sub-peaks (ridged noise), tapered ends.
+      const envU = Math.pow(Math.sin(Math.PI * u01), 0.85);
+      const prof = 0.40 + 0.60 * Math.pow(1 - Math.abs(snoise(u01 * 3.1 + s1, s2)), 2);
+      const crest = 0.5 + 0.16 * snoise(u01 * 2.3 + s1 * 0.31, s2 + 9.7); // wandering spine
+      for (let iv = 0; iv <= NV; iv++) {
+        const v01 = iv / NV;
+        const rr = M.r + (v01 - 0.5) * DEPTH;
+        const dv = (v01 - crest) / 0.55;
+        const envV = Math.pow(Math.max(0, 1 - dv * dv), 1.4);
+        const detail = snoise(u01 * 9.3 + s1, v01 * 4.1 + s2) * 0.07;
+        let h = M.h * envU * envV * (prof + detail) - 45;
+        if (h < -60) h = -60;
+        const i3 = vo * 3;
+        pos[i3] = Math.cos(ang) * rr;
+        pos[i3 + 1] = h;
+        pos[i3 + 2] = Math.sin(ang) * rr;
+        const jit = snoise(u01 * 23.1 + s2, v01 * 17.7 + s1) * 70;
+        snowA[vo] = smoothstep(snowline, snowline + M.h * 0.26, h + jit);
+        hazeA[vo] = clamp(baseHaze + 0.62 * smoothstep(380, 20, h), 0, 0.96);
+        vo++;
+      }
+    }
+    for (let iu = 0; iu < NU; iu++) {
+      for (let iv = 0; iv < NV; iv++) {
+        const a = base + iu * (NV + 1) + iv;
+        const b = a + NV + 1;
+        idx[io++] = a; idx[io++] = b; idx[io++] = a + 1;
+        idx[io++] = b; idx[io++] = b + 1; idx[io++] = a + 1;
+      }
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aSnow', new THREE.BufferAttribute(snowA, 1));
+  geo.setAttribute('aHaze', new THREE.BufferAttribute(hazeA, 1));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  geo.computeVertexNormals();
+  return geo; // 6 massifs × 800 tris = 4800 tris
+}
+
+// -- dawn valley fog banks ---------------------------------------------------
+// Soft ellipse discs (radial vertex-alpha falloff) stacked 3-high per bank,
+// merged into ONE geometry per drift layer → 2 draw calls total, and only
+// while 0.18 < dayFrac < 0.34. Centers hug the low ground by Mirrormere and
+// the south fields (terrain h ≈ -3…16 there).
+const FOG_BANKS = [
+  { x: -350, z: 520, r: 170, y: 0.5 }, // over Mirrormere itself
+  { x: -520, z: 400, r: 110, y: 1.0 }, // lake west shore
+  { x: -180, z: 620, r: 115, y: 9.5 }, // lake east meadows
+  { x: -30,  z: 680, r: 135, y: 7.0 }, // south fields
+  { x: 150,  z: 655, r: 120, y: 15.0 }, // south fields, east rise
+  { x: 80,   z: 850, r: 125, y: 8.0 }, // far south hollow
+];
+
+// One soft disc: center vertex → mid ring (55%) → rim (alpha 0), 18 segments.
+function pushFogDisc(P, C, I, cx, y, cz, r, alpha, seed) {
+  const SEG = 18;
+  const v0 = P.length / 3;
+  P.push(cx, y, cz); C.push(1, 1, 1, alpha);
+  for (let ring = 0; ring < 2; ring++) {
+    const rr = ring === 0 ? r * 0.55 : r;
+    const a = ring === 0 ? alpha * 0.72 : 0;
+    for (let k = 0; k <= SEG; k++) {
+      const t = (k / SEG) * TAU;
+      const wob = 1 + (hash2(k + ring * 31, seed, 733) - 0.5) * 0.24; // organic rim
+      P.push(cx + Math.cos(t) * rr * wob, y + (hash2(k, seed + ring, 739) - 0.5) * 1.2,
+        cz + Math.sin(t) * rr * wob);
+      C.push(1, 1, 1, a);
+    }
+  }
+  const inner = v0 + 1, outer = v0 + 1 + (SEG + 1);
+  for (let k = 0; k < SEG; k++) {
+    I.push(v0, inner + k, inner + k + 1);
+    I.push(inner + k, outer + k, outer + k + 1, inner + k, outer + k + 1, inner + k + 1);
+  }
+}
+
+function buildFogBankGeometry(layerB) {
+  const P = [], C = [], I = [];
+  const LIFT = [1.5, 4.5, 8.0];         // stacked plane heights
+  const AL = [0.55, 0.42, 0.30];        // fading with height
+  let si = 0;
+  for (const b of FOG_BANKS) {
+    const cx = b.x + (layerB ? 35 : 0), cz = b.z + (layerB ? -25 : 0);
+    const r = b.r * (layerB ? 0.78 : 1);
+    const y = b.y + (layerB ? 2.2 : 0);
+    for (let s = 0; s < 3; s++) {
+      pushFogDisc(P, C, I, cx, y + LIFT[s], cz, r * (1 - s * 0.13), AL[s], si * 7 + s);
+    }
+    si++;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(P), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(C), 4)); // RGBA → USE_COLOR_ALPHA
+  geo.setIndex(I);
+  geo.computeBoundingSphere();
+  return geo; // 18 discs × 54 tris ≈ 970 tris per layer
+}
+
+// -- forest god-rays ---------------------------------------------------------
+// 12 shafts in the dense forest north of the village (all verified FOREST
+// biome), each two crossed tapered quads with soft vertex-alpha edges,
+// merged per time-window (morning lean ≠ evening lean) → 2 meshes sharing
+// ONE additive material; at most 1 visible at a time.
+const RAY_SPOTS = [
+  [150, -350], [110, -350], [70, -350], [190, -350], [230, -350],
+  [110, -390], [70, -390], [230, -310], [190, -310],
+  [150, -430], [110, -430], [190, -430],
+];
+
+function sunAxisAt(f) { // beam axis: toward the sun, lifted so shafts stay readable
+  const ang = (f - 0.25) * TAU;
+  const v = new THREE.Vector3(Math.cos(ang) * 0.92, Math.sin(ang), 0.5).normalize();
+  return v.multiplyScalar(0.55).add(new THREE.Vector3(0, 0.45, 0)).normalize();
+}
+
+function buildGodRayGeometry(axis) {
+  const P = [], C = [], I = [];
+  const ROW_A = [0.0, 0.5, 0.85, 0.6]; // ground → canopy alpha profile
+  const q = new THREE.Quaternion().setFromUnitVectors(UP, axis);
+  const v = new THREE.Vector3();
+  let si = 0;
+  for (const [sx, sz] of RAY_SPOTS) {
+    const h = terrainHeight(sx, sz);
+    const L = 13 + hash2(si, 1, 811) * 5;
+    const inten = 0.7 + hash2(si, 2, 811) * 0.3;
+    const yaw0 = hash2(si, 3, 811) * TAU;
+    for (let pl = 0; pl < 2; pl++) {
+      const yaw = yaw0 + pl * Math.PI / 2;
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const v0 = P.length / 3;
+      for (let j = 0; j <= 3; j++) { // rows bottom → top
+        const t = j / 3;
+        const hw = lerp(1.7, 0.8, t); // beam narrows toward the canopy
+        for (let i = -1; i <= 1; i++) {
+          v.set(i * hw * cy, t * L, i * hw * sy).applyQuaternion(q);
+          P.push(sx + v.x, h + 0.4 + v.y, sz + v.z);
+          const a = ROW_A[j] * (i === 0 ? 1 : 0) * inten;
+          C.push(1.0 * inten, 0.87 * inten, 0.66 * inten, a);
+        }
+      }
+      for (let j = 0; j < 3; j++) {
+        for (let i = 0; i < 2; i++) {
+          const a = v0 + j * 3 + i, b = a + 3;
+          I.push(a, b, a + 1, b, b + 1, a + 1);
+        }
+      }
+    }
+    si++;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(P), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(C), 4));
+  geo.setIndex(I);
+  geo.computeBoundingSphere();
+  return geo; // 12 spots × 2 planes × 12 tris = 288 tris per window mesh
+}
+
+// ---------------------------------------------------------------------------
 // createWorld
 // ---------------------------------------------------------------------------
 export function createWorld(g) {

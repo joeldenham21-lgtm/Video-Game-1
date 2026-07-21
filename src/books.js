@@ -1,9 +1,10 @@
 // ============================================================================
 // ELDERFALL — books.js
-// The lore library: 16 readable books scattered across the vale on small
+// The lore library: 24 readable books scattered across the vale on small
 // procedural lecterns, shelves and stone slabs. Parchment reading overlay
-// with page turns, a codex (X/16), skill books, and The Gravedigger's
-// Confession — which spawns a buried-treasure dig site.
+// with page turns, a codex (X/24), skill books, The Gravedigger's
+// Confession — which spawns a buried-treasure dig site — and The Ember
+// Testament, which teaches the blade to any hand that holds Aldric's Ember.
 //
 // Owns: one merged static mesh (all book props), one optional dig-mound mesh,
 // its own DOM/CSS overlay. State lives in g.flags.books (+ related flags),
@@ -13,7 +14,7 @@ import * as THREE from 'three';
 import { terrainHeight, hash2, WATER_LEVEL, POI, clamp } from './core.js';
 
 // ---------------------------------------------------------------------------
-// THE LIBRARY — 16 books. place: [x, z, kind, yaw]; y from terrainHeight.
+// THE LIBRARY — 24 books. place: [x, z, kind, yaw]; y from terrainHeight.
 // kind: 'lectern' | 'shelf' | 'slab'
 // ---------------------------------------------------------------------------
 const BOOKS = [

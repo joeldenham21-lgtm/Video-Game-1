@@ -28,6 +28,23 @@
 // - setRain(level): filtered-pink-noise rain bed + distant intermittent
 //   rumble above level 0.7. Exposed on the returned api (weather.js calls it
 //   lazily). debug() exposes gain values for automated verification.
+//
+// Wave 5 (DREAD) — the fear layer. Uneasy, never deafening:
+// - NEW SFX (all in the play() registry): 'whisper' (breathy sibilant swells,
+//   Pale Rider), 'dread_drone' (one-shot 28–35 Hz beating sub swell),
+//   'gloom_roar' (layered roar bigger than drakeRoar: pitched-down saws +
+//   AM growl + metal partials + long cavern wash), 'skitter' (chitinous tick
+//   cluster — ONE voice slot via a gated envelope chain), 'horn_distant'
+//   (lone far-off horn: triangle+saw through a formant bandpass, long verb,
+//   breath sag), 'stone_groan' (deep grinding for crypt doors / the titan).
+// - AMBIENT WIRING (rides the 0.25 s ambience throttle, everything guarded):
+//   dread-drone BED (persistent 31/31.4/62 Hz sines) fades in within 40 u of
+//   the crypt/cemetery at night — felt more than heard; a whisper every
+//   8–20 s only while the Pale Rider stalks within 45 u; skitters near the
+//   spider den (-460, -240) inside 50 u; the homecoming horn ONCE as dusk
+//   falls (dayFrac crossing 0.78) on ~30 % of days, panned toward the
+//   village; Undergloom bossBar → the boss choir stands down and the dread
+//   drone + a restrained 2-note minor-2nd doom motif (A1 → Bb1) take over.
 // ============================================================================
 
 import {
@@ -60,6 +77,8 @@ export function createAudio(g) {
   let cricketGain = null, cricketLfo = null;
   let lapGain = null, shimGain = null;
   let rainGain = null, rainLP = null;          // wave-4 rain bed
+  let dreadGain = null;                        // wave-5 dread-drone bed (crypt / Undergloom)
+  let gloomMotifGain = null;                   // wave-5 Undergloom doom-motif bus
 
   // ---- bookkeeping ---------------------------------------------------------
   const MAX_VOICES = 16;
@@ -75,6 +94,12 @@ export function createAudio(g) {
   let nextRumbleAt = 0;        // distant storm rumble scheduler
   let fiddleNextAt = 0;        // next time the fiddle may take a phrase
   let fiddleCount = 0;         // notes played (debug/verification)
+  // wave-5 dread bookkeeping
+  let undergloomOn = false;    // bossBar name matched /undergloom/i
+  let nextWhisperAt = 0;       // Pale Rider whisper scheduler
+  let nextSkitterAt = 0;       // spider-den skitter scheduler
+  let prevDayFrac = -1;        // dusk-crossing detector for the horn
+  let whisperCount = 0, skitterCount = 0, hornCount = 0;  // debug/verification
   const EMPTY = {};
 
   const now = () => ctx.currentTime;
@@ -455,6 +480,166 @@ export function createAudio(g) {
       noise1(t + 0.05, 3.0, 0.35, sfxBus, { fType: 'lowpass', ff0: 420, ff1: 55, a: 0.05, verb: 0.4 });
       osc1(t + 0.05, 1.6, 'sine', 46 * jit(), 24, 0.28, sfxBus, { a: 0.03 });
     },
+    // ---- wave-5 DREAD -------------------------------------------------------
+    whisper(t) {
+      // Breathy sibilant swells — more breath than voice, and deliberately
+      // quiet. 2–3 narrow-band noise swells drifting in pitch, each tipped
+      // with a faint 'sss' consonant. The Pale Rider's calling card.
+      const j = jit(0.1);
+      const n = 2 + ((Math.random() * 2) | 0);
+      let tt = t;
+      for (let i = 0; i < n; i++) {
+        const f = (1900 + Math.random() * 1400) * j;
+        const dur = 0.5 + Math.random() * 0.5;
+        noise1(tt, dur, 0.028 + Math.random() * 0.012, sfxBus, {
+          fType: 'bandpass', ff0: f, ff1: f * (Math.random() < 0.5 ? 0.62 : 1.5),
+          q: 6.5, a: dur * 0.45, verb: 0.5,
+        });
+        if (Math.random() < 0.7) {                          // sibilant tip
+          noise1(tt + dur * 0.15, 0.09, 0.013, sfxBus, { fType: 'highpass', ff0: 5200, a: 0.02, verb: 0.3 });
+        }
+        tt += dur * (0.55 + Math.random() * 0.4);
+      }
+      whisperCount++;
+    },
+    dread_drone(t, o) {
+      // One-shot sub-bass pressure swell: a 28–35 Hz sine pair beating slowly,
+      // plus a faint octave so small speakers register *something*. (The
+      // persistent crypt/Undergloom BED lives in buildAmbience — this is the
+      // registry version so anything can play() a moment of dread by name.)
+      const v = (o && o.vol) || 1;
+      const f = 29 + Math.random() * 5;                     // 29–34 Hz
+      osc1(t, 4.5, 'sine', f, 0, 0.3 * v, sfxBus, { a: 1.6 });
+      osc1(t, 4.5, 'sine', f + 0.35, 0, 0.24 * v, sfxBus, { a: 1.9 });
+      osc1(t, 4.0, 'sine', f * 2 + 0.2, 0, 0.04 * v, sfxBus, { a: 1.6, verb: 0.4 });
+    },
+    gloom_roar(t) {
+      // The Undergloom's voice — bigger, lower and longer than drakeRoar:
+      // pitched-down saw cluster + deep AM noise growl + inharmonic metal
+      // partials, all soaked in a long cavern wash.
+      const j = jit(0.03);
+      for (const det of [-16, -4, 9]) {                     // saw cluster, dropping
+        osc1(t, 2.6, 'sawtooth', 96 * j, 34 * j, 0.16, sfxBus, { a: 0.1, fType: 'lowpass', ff0: 640, ff1: 160, q: 0.7, verb: 0.5, detune: det });
+      }
+      osc1(t, 2.5, 'sine', 52 * j, 24, 0.34, sfxBus, { a: 0.08, verb: 0.25 });                 // sub floor
+      if (claim(t, 2.6)) {                                  // 19 Hz AM growl
+        const src = ctx.createBufferSource(); src.buffer = noiseWhite; src.loop = true;
+        const f = ctx.createBiquadFilter(); f.type = 'lowpass';
+        f.frequency.setValueAtTime(520, t);
+        f.frequency.exponentialRampToValueAtTime(140, t + 2.6);
+        const am = ctx.createGain(); am.gain.value = 0.5;
+        const lfo = ctx.createOscillator(); lfo.frequency.value = 19;
+        const lg = ctx.createGain(); lg.gain.value = 0.5;
+        lfo.connect(lg); lg.connect(am.gain);
+        const gn = ctx.createGain();
+        gn.gain.setValueAtTime(0.0001, t);
+        gn.gain.linearRampToValueAtTime(0.3, t + 0.14);
+        gn.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
+        src.connect(f); f.connect(am); am.connect(gn); gn.connect(sfxBus);
+        sendVerb(gn, 0.5);
+        src.start(t, Math.random()); src.stop(t + 2.7); lfo.start(t); lfo.stop(t + 2.7);
+      }
+      metal(t + 0.1, 87 * j, [1, 2.31, 3.97], [1, 0.5, 0.28], [1.4, 1.1, 0.8], 0.1, 0.7);      // vast metal underbelly
+      noise1(t + 0.4, 3.4, 0.07, sfxBus, { fType: 'lowpass', ff0: 300, ff1: 45, a: 0.5, verb: 0.7 }); // cavern wash tail
+    },
+    skitter(t, o) {
+      // Rapid chitinous tick cluster. ONE voice slot: a single looped-noise
+      // source gated by a scheduled envelope chain (8–13 ticks ≠ 13 voices),
+      // with the bandpass hopping per tick so no two ticks match.
+      const v = 0.09 * ((o && o.vol) || 1);
+      const nTicks = 8 + ((Math.random() * 6) | 0);
+      const maxDur = nTicks * 0.08 + 0.1;
+      if (!claim(t, maxDur)) return;
+      const src = ctx.createBufferSource(); src.buffer = noiseWhite; src.loop = true;
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 3.5;
+      bp.frequency.setValueAtTime(3400, t);
+      const gn = ctx.createGain();
+      gn.gain.setValueAtTime(0.0001, t);
+      let tt = t;
+      for (let i = 0; i < nTicks; i++) {
+        bp.frequency.setValueAtTime(2600 + Math.random() * 2600, tt);
+        gn.gain.setValueAtTime(0.0001, tt);
+        gn.gain.linearRampToValueAtTime(v * (0.6 + Math.random() * 0.4), tt + 0.004);
+        gn.gain.exponentialRampToValueAtTime(0.0001, tt + 0.02 + Math.random() * 0.012);
+        tt += 0.028 + Math.random() * 0.05;
+      }
+      src.connect(bp); bp.connect(gn); gn.connect(sfxBus);
+      sendVerb(gn, 0.15);
+      src.start(t, Math.random()); src.stop(tt + 0.06);
+      skitterCount++;
+    },
+    horn_distant(t, o) {
+      // A lone horn far across the fields — the homecoming call. Triangle+saw
+      // blend through a formant-ish bandpass (horn bell), mostly reverb at
+      // this distance, the pitch sagging at the end as the breath gives out.
+      const dur = 3.4;
+      if (!claim(t, dur + 0.4)) return;
+      const j = jit(0.015);
+      const f0 = 174.6 * j;                                 // F3 — noble, low
+      const f1 = f0 * 1.5;                                  // lift a fifth, hold
+      const vol = 0.06 * ((o && o.vol) || 1);
+      const mix = ctx.createGain(); mix.gain.value = 1;
+      for (const [type, v] of [['triangle', 1], ['sawtooth', 0.35]]) {
+        const os = ctx.createOscillator(); os.type = type;
+        os.frequency.setValueAtTime(f0, t);
+        os.frequency.setValueAtTime(f0, t + 0.85);
+        os.frequency.exponentialRampToValueAtTime(f1, t + 1.05);
+        os.frequency.setValueAtTime(f1, t + 2.2);
+        os.frequency.exponentialRampToValueAtTime(f1 * 0.972, t + dur);  // breath sag
+        const og = ctx.createGain(); og.gain.value = v;
+        os.connect(og); og.connect(mix);
+        os.start(t); os.stop(t + dur + 0.2);
+      }
+      const formant = ctx.createBiquadFilter(); formant.type = 'bandpass';
+      formant.frequency.value = 520; formant.Q.value = 1.1;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 0.4;
+      const gn = ctx.createGain();
+      gn.gain.setValueAtTime(0.0001, t);
+      gn.gain.linearRampToValueAtTime(vol, t + 0.5);
+      gn.gain.linearRampToValueAtTime(vol * 1.15, t + 1.2); // swell on the lift
+      gn.gain.setValueAtTime(vol * 1.15, t + 2.3);
+      gn.gain.linearRampToValueAtTime(0.0001, t + dur);
+      mix.connect(formant); formant.connect(lp); lp.connect(gn);
+      let out = gn;
+      if (o && o.pan && ctx.createStereoPanner) {           // from the village direction
+        const pn = ctx.createStereoPanner();
+        pn.pan.value = clamp(o.pan, -1, 1);
+        gn.connect(pn); out = pn;
+      }
+      out.connect(sfxBus);
+      sendVerb(out, 0.85);                                  // far away = mostly verb
+      hornCount++;
+    },
+    stone_groan(t, o) {
+      // Deep stone grinding — crypt slabs, titan joints. Looped noise through
+      // a low sweeping bandpass with irregular AM judder, over a sub saw and
+      // capped with a settling thud.
+      const j = jit(0.08);
+      const v = (o && o.vol) || 1;
+      const dur = 2.4 + Math.random() * 0.8;
+      if (claim(t, dur)) {
+        const src = ctx.createBufferSource(); src.buffer = noiseWhite; src.loop = true;
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 4;
+        bp.frequency.setValueAtTime(90 * j, t);
+        bp.frequency.exponentialRampToValueAtTime(150 * j, t + dur * 0.6);
+        bp.frequency.exponentialRampToValueAtTime(70 * j, t + dur);
+        const am = ctx.createGain(); am.gain.value = 0.7;   // grinding judder
+        const lfo = ctx.createOscillator(); lfo.frequency.value = 1.3 + Math.random();
+        const lg = ctx.createGain(); lg.gain.value = 0.3;
+        lfo.connect(lg); lg.connect(am.gain);
+        const gn = ctx.createGain();
+        gn.gain.setValueAtTime(0.0001, t);
+        gn.gain.linearRampToValueAtTime(0.5 * v, t + 0.3);
+        gn.gain.setValueAtTime(0.5 * v, t + dur * 0.75);
+        gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        src.connect(bp); bp.connect(am); am.connect(gn); gn.connect(sfxBus);
+        sendVerb(gn, 0.5);
+        src.start(t, Math.random()); src.stop(t + dur + 0.05); lfo.start(t); lfo.stop(t + dur);
+      }
+      osc1(t, dur, 'sawtooth', 38 * j, 30, 0.16 * v, sfxBus, { a: 0.25, fType: 'lowpass', ff0: 130, verb: 0.35 }); // sub weight
+      noise1(t + dur * 0.3, 0.35, 0.08 * v, sfxBus, { fType: 'bandpass', ff0: 480 * j, q: 2, a: 0.05 });           // grit catch
+      osc1(t + dur - 0.35, 0.5, 'sine', 55 * j, 30, 0.22 * v, sfxBus, { a: 0.01, verb: 0.3 });                     // settle thud
+    },
   };
 
   // ==========================================================================
@@ -662,11 +847,17 @@ export function createAudio(g) {
         }
       }
     }
+    // wave-5 Undergloom motif bus: while the Undergloom's bossBar is up, the
+    // choir stands down and a restrained 2-note doom motif (scheduled in
+    // scheduleStep) speaks through this gain instead, over the dread bed.
+    gloomMotifGain = ctx.createGain(); gloomMotifGain.gain.value = 0; gloomMotifGain.connect(musicBus);
+    sendVerb(gloomMotifGain, 0.4);
     M.nextT = now() + 0.15;
     M.timer = setInterval(scheduleMusic, 200);             // lookahead pump
     applyCombatState();                                     // honor pre-unlock events
     applyBossState();
     applyTier2();
+    applyUndergloom();
   }
 
   function applyCombatState() {
@@ -688,8 +879,18 @@ export function createAudio(g) {
     bossGain.gain.cancelScheduledValues(t);
     bossGain.gain.setTargetAtTime(bossOn ? 0.75 : 0.0001, t, bossOn ? 0.4 : 1.4);
     // The choir swells in slower than the drums — dread, not a jump-scare.
+    // wave-5: against the Undergloom the choir yields the top of the mix to
+    // the dread drone + doom motif (applyUndergloom / updateAmbience).
+    const choirOn = bossOn && !undergloomOn;
     choirGain.gain.cancelScheduledValues(t);
-    choirGain.gain.setTargetAtTime(bossOn ? 0.5 : 0.0001, t, bossOn ? 1.7 : 2.2);
+    choirGain.gain.setTargetAtTime(choirOn ? 0.5 : 0.0001, t, choirOn ? 1.7 : 2.2);
+  }
+  // wave-5: Undergloom doom-motif layer fade (dread bed rides updateAmbience).
+  function applyUndergloom() {
+    if (!ctx || !gloomMotifGain) return;
+    const t = now();
+    gloomMotifGain.gain.cancelScheduledValues(t);
+    gloomMotifGain.gain.setTargetAtTime(undergloomOn ? 0.7 : 0.0001, t, undergloomOn ? 1.2 : 1.6);
   }
   function applyTier2() {
     if (!ctx) return;
@@ -812,6 +1013,20 @@ export function createAudio(g) {
         if (step % 32 === 24) osc1(t, 2.0, 'sine', 65, 40, 0.16, bossPerc, { a: 0.4 }); // dread swell
       }
     }
+    // wave-5 Undergloom doom motif: two notes a minor 2nd apart (A1 → Bb1),
+    // one per half-bar — restrained, funereal, riding the dread-drone bed.
+    if (undergloomOn || (gloomMotifGain && gloomMotifGain.gain.value > 0.02)) {
+      const s16 = step % 16;
+      if (s16 === 0) gloomNote(t, 55);                     // A1
+      else if (s16 === 10) gloomNote(t, 58.27);            // Bb1 — the half-step of dread
+    }
+  }
+
+  // wave-5: one doom-motif tone — dark sine root + a faint filtered saw an
+  // octave up for edge, both through gloomMotifGain (faded by applyUndergloom).
+  function gloomNote(t, f) {
+    osc1(t, 2.2, 'sine', f, 0, 0.26, gloomMotifGain, { a: 0.06, verb: 0.35 });
+    osc1(t, 2.2, 'sawtooth', f * 2, 0, 0.05, gloomMotifGain, { a: 0.1, fType: 'lowpass', ff0: 300, ff1: 120 });
   }
 
   function beginChord(t) {
@@ -1015,6 +1230,18 @@ export function createAudio(g) {
         rainLP.frequency.value = 700 + rainLevel * 1900;
       }
     }
+    // wave-5 dread-drone bed: 28–35 Hz pressure, more felt than heard. Two
+    // sines a hair apart beat at ~0.4 Hz; a faint octave keeps a trace of it
+    // alive on small speakers. Gain 0 at rest — updateAmbience fades it in
+    // near the crypt/cemetery at night and under the Undergloom fight.
+    {
+      dreadGain = ctx.createGain(); dreadGain.gain.value = 0; dreadGain.connect(ambBus);
+      for (const [f, v] of [[31, 1], [31.4, 0.8], [62.3, 0.16]]) {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const gg = ctx.createGain(); gg.gain.value = v;
+        o.connect(gg); gg.connect(dreadGain); o.start();
+      }
+    }
   }
 
   // wave-4: distant storm rumble — thunder with the crack rounded off.
@@ -1087,6 +1314,78 @@ export function createAudio(g) {
     } else if (nextRumbleAt < t + 4) {
       nextRumbleAt = t + 4;                                  // no instant rumble on onset
     }
+
+    // ---- wave-5 dread layer (same 0.25 s throttle, everything guarded) -----
+    // Crypt/cemetery dread-drone bed: sub-bass pressure inside 40 u at night,
+    // very quiet — felt, not heard. A dedicated crypt/cemetery POI is honored
+    // if the world grows one; until then Barrowdeep Ruins (which holds the
+    // cemetery + crypt) anchors it. The Undergloom fight sets a floor.
+    {
+      const dp = POI.crypt || POI.cemetery || POI.ruins;
+      let dreadT = 0;
+      if (dp && nightness > 0.15) {
+        const dd = dist2d(px, pz, dp.x, dp.z);
+        dreadT = clamp((40 - dd) / 28, 0, 1) * nightness * 0.1;
+      }
+      if (undergloomOn) dreadT = Math.max(dreadT, 0.16);
+      dreadGain.gain.setTargetAtTime(dreadT, t, 1.8);
+    }
+
+    // Pale Rider whispers: one every 8–20 s ONLY while he stalks within 45 u.
+    {
+      let riderNear = false;
+      const el = g.enemies && g.enemies.list;
+      if (el && el.length) {
+        for (let i = 0; i < el.length; i++) {
+          const e = el[i];
+          if (!e || !e.alive || !e.pos) continue;
+          const isRider = e.type === 'palerider' ||
+            (typeof e.name === 'string' && /pale\s*rider/i.test(e.name));
+          if (isRider && dist2d(px, pz, e.pos.x, e.pos.z) < 45) { riderNear = true; break; }
+        }
+      }
+      if (riderNear) {
+        if (t > nextWhisperAt) {
+          play('whisper', { delay: Math.random() * 0.4 });
+          nextWhisperAt = t + 8 + Math.random() * 12;
+        }
+      } else if (nextWhisperAt < t + 4) {
+        nextWhisperAt = t + 4;                               // no instant whisper on arrival
+      }
+    }
+
+    // Spider-den skitters: chitin ticks in the dark around (-460, -240),
+    // louder the deeper in you are.
+    {
+      const dDen = dist2d(px, pz, -460, -240);
+      if (dDen < 50) {
+        if (t > nextSkitterAt) {
+          play('skitter', { delay: Math.random() * 0.8, vol: 0.5 + 0.5 * clamp((50 - dDen) / 40, 0, 1) });
+          nextSkitterAt = t + 5 + Math.random() * 9;
+        }
+      } else if (nextSkitterAt < t + 3) {
+        nextSkitterAt = t + 3;
+      }
+    }
+
+    // The homecoming horn: ONCE as dusk falls (dayFrac crossing ~0.78) on
+    // ~30 % of days, drifting in from the village direction.
+    if (prevDayFrac >= 0 && prevDayFrac < 0.78 && df >= 0.78 && df - prevDayFrac < 0.5) {
+      if (Math.random() < 0.3) {
+        let pan = 0;
+        try {                                                // stereo is a nicety
+          const dx = POI.village.x - px, dz = POI.village.z - pz;
+          const len = Math.hypot(dx, dz);
+          const cam = g.camera;
+          if (len > 1 && cam && cam.matrixWorld) {
+            const m = cam.matrixWorld.elements;              // column 0 = camera right
+            pan = clamp((dx * m[0] + dz * m[2]) / len, -1, 1) * 0.75;
+          }
+        } catch (e) { /* ignore */ }
+        play('horn_distant', { delay: 0.5 + Math.random() * 2, pan });
+      }
+    }
+    prevDayFrac = df;
   }
 
   // wave-4: setRain(level 0..1) — public; weather.js calls it lazily.
@@ -1210,6 +1509,13 @@ export function createAudio(g) {
       fiddleIn: musicBus ? Math.max(0, fiddleNextAt - now()) : -1,
       fiddleCount,
       dayness,
+      // wave-5 dread layer
+      undergloomOn,
+      dread: dreadGain ? dreadGain.gain.value : 0,
+      gloomMotif: gloomMotifGain ? gloomMotifGain.gain.value : 0,
+      whisperCount, skitterCount, hornCount,
+      whisperIn: Math.max(0, nextWhisperAt - now()),
+      skitterIn: Math.max(0, nextSkitterAt - now()),
     };
   }
 
@@ -1243,6 +1549,13 @@ export function createAudio(g) {
   });
   E.on('bossBar', (d) => {
     const on = !!d;                 // emitted repeatedly while near the boss
+    // wave-5: the Undergloom trades the choir for dread drone + doom motif.
+    const ug = !!(d && d.name != null && /undergloom/i.test(String(d.name)));
+    if (ug !== undergloomOn) {
+      undergloomOn = ug;
+      applyUndergloom();
+      if (on === bossOn) applyBossState();  // re-aim the choir on a name flip
+    }
     if (on === bossOn) return;
     bossOn = on;
     applyBossState();
