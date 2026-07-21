@@ -157,7 +157,7 @@ export function createEnemies(g) {
                   attacks: ['Unarmed_Melee_Attack_Punch_A', 'Unarmed_Melee_Attack_Punch_B', 'Unarmed_Melee_Attack_Kick'] },
     // Nazgûl-dread: gaunt hooded silhouette ×1.3, near-black, cold inner pallor
     palerider:  { char: 'rogue_hooded', h: 2.60, tint: '#1a1a22',
-                  tintOpts: { emissive: '#232c3e', emissiveIntensity: 0.4 },
+                  tintOpts: { emissive: '#39435c', emissiveIntensity: 0.65 },
                   attacks: ['1H_Melee_Attack_Slice_Horizontal', '1H_Melee_Attack_Stab', '1H_Melee_Attack_Chop'] },
     guard:      { char: 'knight', h: 1.85 },
   };
@@ -666,7 +666,7 @@ export function createEnemies(g) {
       holder.lightPos = lp;
       holder.lightHandle = g.lights.register(type === 'undergloom'
         ? { pos: lp, color: 0xff2a08, intensity: 2.4, radius: 14, flicker: 0.7, enabled: () => holder.root.visible }
-        : { pos: lp, color: 0x8899bb, intensity: 1.5, radius: 6, flicker: 0.25, enabled: () => holder.root.visible });
+        : { pos: lp, color: 0x8899bb, intensity: 2.4, radius: 6, flicker: 0.25, enabled: () => holder.root.visible });
     }
     holder.root.visible = false;
     g.scene.add(holder.root);
@@ -2587,7 +2587,7 @@ export function createEnemies(g) {
     // pale rider: sickly real light rides at its breast, guttering out in death
     if (h.lightPos) {
       h.lightPos.x = e.pos.x; h.lightPos.y = e.pos.y + 1.6; h.lightPos.z = e.pos.z;
-      if (h.lightHandle) h.lightHandle.src.intensity = e.dead ? Math.max(0, 1.5 * (1 - e.deadT / 2)) : 1.5;
+      if (h.lightHandle) h.lightHandle.src.intensity = e.dead ? Math.max(0, 2.4 * (1 - e.deadT / 2)) : 2.4;
     }
 
     if (e.state === 'dead') {
@@ -3574,6 +3574,8 @@ export function createEnemies(g) {
       const e = list[i];
       if ((e.type === 'drake' && bossState.drake.dead) ||
           (e.type === 'barrowlord' && bossState.barrowlord.dead) ||
+          (e.type === 'undergloom' && g.flags.undergloomDead) ||
+          (e.type === 'broodmother' && g.flags.broodmotherDead) ||
           (e.spawner && e.spawner.deadFlag && g.flags[e.spawner.deadFlag])) {
         despawn(e);
       }

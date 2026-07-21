@@ -1088,7 +1088,7 @@ export function createScore(g) {
     _debug.ctxState = ctx.state;
     _debug.duck = Math.round(duck.gain.value * 100) / 100;
     _debug.aggro = aggroCount();
-    _debug.brass = brassH ? Math.round(brassH.gain.value * 100) / 100 : 0;
+    _debug.brass = brassH ? Math.round(brassH.gain.gain.value * 100) / 100 : 0;
     _debug.pending = pendSwitch ? pendSwitch.target : null;
     if (!cur) _debug.currentCue = 'silence';
   }

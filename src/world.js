@@ -191,9 +191,73 @@ function terrainColor(wx, wz, h, slope, arr, o) {
   arr[o] = r; arr[o + 1] = g; arr[o + 2] = b;
 }
 
+// ---------------------------------------------------------------------------
+// Desktop splat terrain — 6-way texture weights (see TERRAIN.md).
+// ---------------------------------------------------------------------------
+// Village road segments (mirrors structures.js buildVillage) so the terrain
+// itself reads as worn packed dirt under/around the path decals.
+const ROADS = [
+  [0, 11, 0, 66, 3.2], [0, -11, -5, -60, 3.0], [-5, -60, 30, -72, 2.8],
+  [30, -72, 62, -96, 2.6], [62, -96, 86, -113, 2.4], [10, 4, 28, 11, 2.2],
+  [-10, 5, -26, 14, 2.2], [9, -6, 26, -13, 2.2], [-9, -6, -28, -17, 2.2],
+  [6, -10, 7, -30, 2.2],
+];
+function roadDirt(wx, wz) {
+  if (wx < -45 || wx > 105 || wz < -135 || wz > 90) return 0;
+  // plaza disc (r 21) is worn to dirt, feathered at the rim
+  let w = 1 - smoothstep(16, 24, dist2d(wx, wz, 0, 0));
+  for (let i = 0; i < ROADS.length; i++) {
+    const R = ROADS[i];
+    const dx = R[2] - R[0], dz = R[3] - R[1];
+    const t = clamp(((wx - R[0]) * dx + (wz - R[1]) * dz) / (dx * dx + dz * dz), 0, 1);
+    const d = dist2d(wx, wz, R[0] + dx * t, R[1] + dz * t);
+    const k = 1 - smoothstep(R[4] * 0.5 + 0.5, R[4] * 0.5 + 2.8, d);
+    if (k > w) w = k;
+  }
+  return w;
+}
+
+// 6-way splat weights: [grass, forest, rock] → splatA, [dirt, snow, sand] →
+// splatB. Derived from the SAME biome/height/slope logic as terrainColor so
+// the textures agree with the vertex-color macro tint underneath.
+const _sw = new Float32Array(6);
+function terrainSplat(wx, wz, h, slope, ny) {
+  const qx = Math.round(wx * 2.3), qz = Math.round(wz * 2.3);
+  const j1 = hash2(qx, qz, 911) - 0.5;
+  const patch = snoise(wx * 0.021 + 37.2, wz * 0.021) * 0.5 + 0.5;
+  let g = 0, f = 0, r = 0, d = 0, s = 0, sa = 0;
+  const bio = biomeAt(wx, wz, h);
+  if (bio === BIOME.MEADOW) g = 1;
+  else if (bio === BIOME.FOREST) f = 1;
+  else if (bio === BIOME.SAND) sa = 1;
+  else if (bio === BIOME.MARSH) d = 1;    // boggy peat → packed-earth set
+  else r = 1;                             // ROCKY / SNOW base
+  // grass→rock altitude blend (same jittered 48..62 band as terrainColor)
+  if (h > 46 && r < 1) {
+    const t = smoothstep(48, 62, h + j1 * 9 + (patch - 0.5) * 6);
+    if (t > 0) { const k = 1 - t; g *= k; f *= k; d *= k; sa *= k; r += t; }
+  }
+  // village roads: worn packed dirt
+  const road = roadDirt(wx, wz);
+  if (road > 0) { const k = 1 - road; g *= k; f *= k; sa *= k; r *= k; d = d * k + road; }
+  // steep faces are bare rock everywhere (normal.y < 0.72, blended over ~0.1)
+  const cliff = 1 - smoothstep(0.72, 0.82, ny);
+  if (cliff > 0) { const k = 1 - cliff; g *= k; f *= k; d *= k; sa *= k; r = r * k + cliff; }
+  // snow accumulates on high, low-slope ground only (same envelope as color)
+  const snow = smoothstep(86, 99, h + j1 * 12) * (1 - smoothstep(0.75, 1.25, slope));
+  if (snow > 0) { const k = 1 - snow; g *= k; f *= k; d *= k; sa *= k; r *= k; s = snow; }
+  const inv = 1 / (g + f + r + d + s + sa);
+  _sw[0] = g * inv; _sw[1] = f * inv; _sw[2] = r * inv;
+  _sw[3] = d * inv; _sw[4] = s * inv; _sw[5] = sa * inv;
+  return _sw;
+}
+
 // Fill a rotated PlaneGeometry (y-up) with heights + colors. Shared by
 // streaming chunks and the far shell. originX/Z = mesh world position.
-function paintTerrainGeometry(geo, originX, originZ, segs) {
+// detail=true (desktop chunks only): also writes smooth heightfield normals
+// (seam-free across chunks — edge columns sample terrainHeight outside the
+// grid) and the two vec3 splat-weight attributes.
+function paintTerrainGeometry(geo, originX, originZ, segs, detail) {
   const posA = geo.attributes.position, colA = geo.attributes.color;
   const pArr = posA.array, cArr = colA.array;
   const n = segs + 1;
@@ -220,6 +284,32 @@ function paintTerrainGeometry(geo, originX, originZ, segs) {
   }
   posA.needsUpdate = true;
   colA.needsUpdate = true;
+  if (!detail) return;
+  const nArr = geo.attributes.normal.array;
+  const spA = geo.attributes.splatA, spB = geo.attributes.splatB;
+  const aArr = spA.array, bArr = spB.array;
+  const inv2 = 1 / (2 * step);
+  for (let iz = 0; iz < n; iz++) {
+    for (let ix = 0; ix < n; ix++) {
+      const i = iz * n + ix;
+      const wx = originX + pArr[i * 3], wz = originZ + pArr[i * 3 + 2];
+      const hL = ix > 0 ? _hs[i - 1] : terrainHeight(wx - step, wz);
+      const hR = ix < segs ? _hs[i + 1] : terrainHeight(wx + step, wz);
+      const hD = iz > 0 ? _hs[i - n] : terrainHeight(wx, wz - step);
+      const hU = iz < segs ? _hs[i + n] : terrainHeight(wx, wz + step);
+      const gx = (hR - hL) * inv2, gz = (hU - hD) * inv2;
+      const im = 1 / Math.sqrt(gx * gx + gz * gz + 1); // = world normal.y
+      nArr[i * 3] = -gx * im;
+      nArr[i * 3 + 1] = im;
+      nArr[i * 3 + 2] = -gz * im;
+      const w = terrainSplat(wx, wz, _hs[i], Math.hypot(gx, gz), im);
+      aArr[i * 3] = w[0]; aArr[i * 3 + 1] = w[1]; aArr[i * 3 + 2] = w[2];
+      bArr[i * 3] = w[3]; bArr[i * 3 + 1] = w[4]; bArr[i * 3 + 2] = w[5];
+    }
+  }
+  geo.attributes.normal.needsUpdate = true;
+  spA.needsUpdate = true;
+  spB.needsUpdate = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1214,7 +1304,119 @@ export function createWorld(g) {
   const shadows = !!(g.quality && g.quality.shadows);
 
   // ---- shared materials --------------------------------------------------
-  const terrainMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  // Terrain: desktop gets the photoreal 6-way splat material (TERRAIN.md) —
+  // MeshLambertMaterial + onBeforeCompile keeps shadows / fog / point lights
+  // for free. Mobile keeps the legacy vertex-color flat-shaded path untouched.
+  const DESKTOP = !!(g.quality && g.quality.desktop);
+  const terrainMat = DESKTOP
+    ? makeSplatTerrainMaterial()
+    : new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+
+  function makeSplatTerrainMaterial() {
+    const loader = new THREE.TextureLoader();
+    const maxAniso = g.renderer ? Math.min(8, g.renderer.capabilities.getMaxAnisotropy()) : 8;
+    const loadTex = (file, srgb) => {
+      const t = loader.load('assets/terrain/' + file);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = maxAniso;
+      return t;
+    };
+    const SETS = ['grass', 'forest', 'rock', 'dirt', 'snow', 'sand'];
+    const dTex = SETS.map((s2) => loadTex(s2 + '_d.jpg', true));
+    const nTex = SETS.map((s2) => loadTex(s2 + '_n.jpg', false));
+    const macroN = loadTex('macro_n.jpg', false);
+    const noiseT = loadTex('noise.jpg', false);
+    const mat = new THREE.MeshLambertMaterial({ vertexColors: true }); // flatShading OFF
+    mat.onBeforeCompile = (shader) => {
+      for (let i = 0; i < 6; i++) {
+        shader.uniforms['uD' + i] = { value: dTex[i] };
+        shader.uniforms['uN' + i] = { value: nTex[i] };
+      }
+      shader.uniforms.uMacroN = { value: macroN };
+      shader.uniforms.uNoise = { value: noiseT };
+
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', /* glsl */ `#include <common>
+attribute vec3 splatA;
+attribute vec3 splatB;
+varying vec3 vSplatA;
+varying vec3 vSplatB;
+varying vec3 vTerrPos;
+varying vec3 vTerrN;`)
+        .replace('#include <worldpos_vertex>', /* glsl */ `#include <worldpos_vertex>
+vSplatA = splatA;
+vSplatB = splatB;
+vTerrPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+vTerrN = normalize(mat3(modelMatrix) * objectNormal);`);
+
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', /* glsl */ `#include <common>
+uniform sampler2D uD0; uniform sampler2D uD1; uniform sampler2D uD2;
+uniform sampler2D uD3; uniform sampler2D uD4; uniform sampler2D uD5;
+uniform sampler2D uN0; uniform sampler2D uN1; uniform sampler2D uN2;
+uniform sampler2D uN3; uniform sampler2D uN4; uniform sampler2D uN5;
+uniform sampler2D uMacroN; uniform sampler2D uNoise;
+varying vec3 vSplatA;
+varying vec3 vSplatB;
+varying vec3 vTerrPos;
+varying vec3 vTerrN;
+vec3 g_tnrm; // tangent-space splat normal, filled during albedo pass
+// Anti-tiling: two offset copies of each texture blended by a low-frequency
+// phase from noise.jpg — breaks the repeat grid with zero seams.
+vec2 terrOff(float i) { return sin(vec2(3.0, 7.0) * i) * 3.71; }
+void terrTap(sampler2D dT, sampler2D nT, vec2 uv, vec2 oa, vec2 ob, float bf,
+             float w, inout vec3 alb, inout vec3 nrm, inout float ws) {
+  alb += mix(texture2D(dT, uv + oa), texture2D(dT, uv + ob), bf).rgb * w;
+  nrm += (mix(texture2D(nT, uv + oa), texture2D(nT, uv + ob), bf).rgb * 2.0 - 1.0) * w;
+  ws += w;
+}`)
+        .replace('#include <color_fragment>', /* glsl */ `{
+  vec2 tp = vTerrPos.xz;
+  float phase = texture2D(uNoise, tp * (1.0 / 187.0)).g;
+  float pl = phase * 6.0;
+  vec2 oa = terrOff(floor(pl));
+  vec2 ob = terrOff(floor(pl) + 1.0);
+  float bf = smoothstep(0.25, 0.75, fract(pl));
+  vec3 alb = vec3(0.0);
+  vec3 tn = vec3(0.0);
+  float ws = 0.0;
+  // ~1/6u tiling (rock/snow larger so strata & drifts read at scale)
+  if (vSplatA.x > 0.004) terrTap(uD0, uN0, tp * 0.166, oa, ob, bf, vSplatA.x, alb, tn, ws);
+  if (vSplatA.y > 0.004) terrTap(uD1, uN1, tp * 0.166, oa, ob, bf, vSplatA.y, alb, tn, ws);
+  if (vSplatA.z > 0.004) terrTap(uD2, uN2, tp * 0.110, oa, ob, bf, vSplatA.z, alb, tn, ws);
+  if (vSplatB.x > 0.004) terrTap(uD3, uN3, tp * 0.166, oa, ob, bf, vSplatB.x, alb, tn, ws);
+  if (vSplatB.y > 0.004) terrTap(uD4, uN4, tp * 0.125, oa, ob, bf, vSplatB.y, alb, tn, ws);
+  if (vSplatB.z > 0.004) terrTap(uD5, uN5, tp * 0.166, oa, ob, bf, vSplatB.z, alb, tn, ws);
+  float wk = 1.0 / max(ws, 1e-4);
+  alb *= wk;
+  tn *= wk;
+  // macro normal breaks up large-scale flatness (1/90u)
+  vec3 mac = texture2D(uMacroN, tp * (1.0 / 90.0)).rgb * 2.0 - 1.0;
+  tn.xy += mac.xy * 0.55;
+  g_tnrm = tn;
+  // vertex color kept as a subtle 20% tint (painted AO + macro palette drift)
+  vec3 vtint = clamp(vColor.rgb * 2.4, 0.0, 1.5);
+  alb *= mix(vec3(1.0), vtint, 0.20);
+  // waterline wet band + underwater bed sinking to deep teal (match palette)
+  float wet = 1.0 - smoothstep(${(WATER_LEVEL + 0.25).toFixed(2)}, ${(WATER_LEVEL + 1.1).toFixed(2)}, vTerrPos.y);
+  alb *= 1.0 - wet * 0.30;
+  float uw = 1.0 - smoothstep(${(WATER_LEVEL - 7.0).toFixed(2)}, ${(WATER_LEVEL + 0.4).toFixed(2)}, vTerrPos.y);
+  alb = mix(alb, vec3(0.05, 0.13, 0.15), uw);
+  diffuseColor.rgb = alb;
+}`)
+        .replace('#include <normal_fragment_maps>', /* glsl */ `{
+  // world-space TBN from the heightfield normal (terrain: tangent ⟂ Z works)
+  vec3 wN = normalize(vTerrN);
+  vec3 wT = normalize(cross(wN, vec3(0.0, 0.0, 1.0)));
+  vec3 wB = cross(wT, wN);
+  vec3 tsn = normalize(vec3(g_tnrm.xy, max(g_tnrm.z, 0.30)));
+  vec3 wPN = normalize(wT * tsn.x + wB * tsn.y + wN * tsn.z);
+  normal = normalize((viewMatrix * vec4(wPN, 0.0)).xyz);
+}`);
+    };
+    return mat;
+  }
   const shellMat = new THREE.MeshLambertMaterial({
     vertexColors: true, flatShading: true,
     polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2,
@@ -1259,6 +1461,10 @@ export function createWorld(g) {
     const geo = new THREE.PlaneGeometry(CHUNK, CHUNK, segs, segs);
     geo.rotateX(-Math.PI / 2);
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
+    if (DESKTOP) { // 6-way splat weights, packed into two vec3 attributes
+      geo.setAttribute('splatA', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
+      geo.setAttribute('splatB', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
+    }
     const mesh = new THREE.Mesh(geo, terrainMat);
     mesh.visible = false;
     // Always on: costs nothing while shadow maps are disabled, and quality
@@ -1284,7 +1490,7 @@ export function createWorld(g) {
 
   function buildChunkInto(mesh, cx, cz) {
     mesh.position.set(cx * CHUNK + CHUNK / 2, 0, cz * CHUNK + CHUNK / 2);
-    paintTerrainGeometry(mesh.geometry, mesh.position.x, mesh.position.z, mesh.userData.segs);
+    paintTerrainGeometry(mesh.geometry, mesh.position.x, mesh.position.z, mesh.userData.segs, DESKTOP);
     mesh.geometry.computeBoundingSphere();
     mesh.visible = true;
   }
