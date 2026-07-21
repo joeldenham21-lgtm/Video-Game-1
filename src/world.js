@@ -1866,6 +1866,59 @@ export function createWorld(g) {
   scene.add(water);
   const uW = waterMat.uniforms;
 
+  // ---- EPIC WAVE: mega-peak ring beyond the map (1 draw call, built once) --
+  const megaMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uHaze: { value: new THREE.Color(0.72, 0.82, 0.92) },
+      uSunDir: { value: new THREE.Vector3(0.3, 0.8, 0.2) },
+      uLightCol: { value: new THREE.Color(1, 0.9, 0.7) },
+      uDay: { value: 1 },
+      uGolden: { value: 0 },
+    },
+    vertexShader: MEGA_VERT,
+    fragmentShader: MEGA_FRAG,
+    fog: false, // haze is baked toward uHaze — scene fog would erase them
+  });
+  const megaRing = new THREE.Mesh(buildMegaPeakGeometry(), megaMat);
+  megaRing.renderOrder = 2;     // after the sky dome (renderOrder 1, no depth write)
+  megaRing.frustumCulled = false; // surrounds the whole world
+  megaRing.matrixAutoUpdate = false;
+  megaRing.name = 'megaPeaks';
+  scene.add(megaRing);
+  const uM = megaMat.uniforms;
+  let megaBound = false; // lazily bind shared sky color/vector instances
+
+  // ---- EPIC WAVE: dawn valley fog banks (2 draw calls, dawn window only) ---
+  const fogMatA = new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0,
+    depthWrite: false, side: THREE.DoubleSide,
+  });
+  const fogMatB = fogMatA.clone();
+  const fogLayerA = new THREE.Mesh(buildFogBankGeometry(false), fogMatA);
+  const fogLayerB = new THREE.Mesh(buildFogBankGeometry(true), fogMatB);
+  for (const m of [fogLayerA, fogLayerB]) {
+    m.renderOrder = 2; // after the (depthWrite:false) water plane
+    m.visible = false;
+    m.name = 'dawnFog';
+    scene.add(m);
+  }
+
+  // ---- EPIC WAVE: forest god-rays (≤1 visible mesh, shared material) -------
+  const rayMat = new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+    side: THREE.DoubleSide, fog: false,
+  });
+  const raysMorning = new THREE.Mesh(buildGodRayGeometry(sunAxisAt(0.30)), rayMat);
+  const raysEvening = new THREE.Mesh(buildGodRayGeometry(sunAxisAt(0.71)), rayMat);
+  for (const m of [raysMorning, raysEvening]) {
+    m.renderOrder = 3;
+    m.visible = false;
+    m.matrixAutoUpdate = false;
+    m.name = 'godRays';
+    scene.add(m);
+  }
+
   // ---- initial synchronous build around spawn (behind loading screen) -----
   refreshDesired();
   let guard = 0;
@@ -1905,6 +1958,49 @@ export function createWorld(g) {
         uW.uDay.value = clamp(sky.sunDir.y * 2.4, 0, 1); // night → indigo water
       }
       if (sky.horizonColor) uW.uHorizon.value.copy(sky.horizonColor);
+    }
+
+    // ---- EPIC WAVE per-frame drive ----------------------------------------
+    // Mega peaks: bind the sky's live color/vector instances once, then only
+    // cheap scalars per frame (haze + sun direction update themselves).
+    if (sky && sky.sunDir) {
+      if (!megaBound) {
+        uM.uHaze.value = sky.horizonColor;
+        uM.uSunDir.value = sky.sunDir;
+        if (sky.sunLight) uM.uLightCol.value = sky.sunLight.color;
+        megaBound = true;
+      }
+      const el = sky.sunDir.y;
+      uM.uDay.value = clamp(el * 2.4, 0, 1);
+      uM.uGolden.value = clamp(1 - Math.abs(el) / 0.32, 0, 1) * smoothstep(-0.02, 0.06, el);
+    }
+
+    const f = g.time ? g.time.dayFrac : 0.3;
+    const t = g.time ? g.time.elapsed : 0;
+
+    // Dawn valley fog: 0.18 < dayFrac < 0.34, drifting slowly, breathing.
+    const fogVis = smoothstep(0.18, 0.215, f) * (1 - smoothstep(0.30, 0.34, f));
+    if (fogVis > 0.004) {
+      fogLayerA.visible = fogLayerB.visible = true;
+      fogLayerA.position.set(Math.sin(t * 0.021) * 26, 0, Math.cos(t * 0.017) * 18);
+      fogLayerB.position.set(Math.sin(-t * 0.016 + 2.1) * 30, 0, Math.sin(t * 0.019 + 0.7) * 22);
+      fogMatA.opacity = fogVis * (0.42 + 0.10 * Math.sin(t * 0.11));
+      fogMatB.opacity = fogVis * (0.34 + 0.10 * Math.sin(t * 0.13 + 1.7));
+      if (sky && sky.horizonColor) { // pale rose-grey, tinted by the dawn sky
+        fogMatA.color.copy(sky.horizonColor).lerp(_white, 0.55);
+        fogMatB.color.copy(fogMatA.color);
+      }
+    } else {
+      fogLayerA.visible = fogLayerB.visible = false;
+    }
+
+    // Forest god-rays: golden-hour windows, gently swaying opacity.
+    const mVis = smoothstep(0.24, 0.27, f) * (1 - smoothstep(0.33, 0.36, f));
+    const eVis = smoothstep(0.64, 0.675, f) * (1 - smoothstep(0.745, 0.78, f));
+    raysMorning.visible = mVis > 0.004;
+    raysEvening.visible = eVis > 0.004;
+    if (raysMorning.visible || raysEvening.visible) {
+      rayMat.opacity = (mVis + eVis) * (0.16 + 0.05 * Math.sin(t * 0.31));
     }
   }
 

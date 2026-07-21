@@ -47,12 +47,19 @@ const TYPES = {
   witch:      { hp: 120, dmg: 15, speed: 3.8, xp: 90,  reach: 2.0, bodyR: 0.55, height: 1.75, sightR: 20, atkCd: 2.4, mass: 0.80, teleT: 0.9, name: 'Grimhilde' },
   troll:      { hp: 400, dmg: 40, speed: 3.4, xp: 300, reach: 3.0, bodyR: 1.10, height: 4.15, sightR: 20, atkCd: 2.6, mass: 0.15, teleT: 1.0, strikeT: 0.6, name: 'Stonebridge Troll' },
   werewolf:   { hp: 90,  dmg: 18, speed: 7.2, xp: 80,  reach: 1.9, bodyR: 0.62, height: 2.25, sightR: 26, atkCd: 1.1, mass: 0.85, teleT: 0.45, name: 'Werewolf' },
+  // --- TERROR wave: the three horrors (high floors — always frightening) ---
+  undergloom: { hp: 1400, dmg: 55, speed: 3.0, xp: 800, reach: 3.2, bodyR: 1.20, height: 5.50, sightR: 26, atkCd: 3.0, mass: 0.08, teleT: 1.2, strikeT: 0.6, name: 'THE UNDERGLOOM' },
+  palerider:  { hp: 900,  dmg: 45, speed: 2.2, xp: 400, reach: 2.2, bodyR: 0.60, height: 2.60, sightR: 95, atkCd: 2.0, mass: 0.20, teleT: 0.8, name: 'The Pale Rider' },
+  broodmother:{ hp: 380,  dmg: 26, speed: 4.6, xp: 240, reach: 2.4, bodyR: 1.10, height: 1.40, sightR: 22, atkCd: 2.2, mass: 0.30, teleT: 0.8, strikeT: 0.4, name: 'Broodmother' },
+  broodling:  { hp: 25,   dmg: 8,  speed: 6.5, xp: 18,  reach: 1.4, bodyR: 0.38, height: 0.55, sightR: 18, atkCd: 1.2, mass: 1.00, name: 'Broodling' },
 };
 const GOLD = {
   wolf: [3, 8], goblin: [4, 12], bandit: [8, 18], skeleton: [5, 14],
   skelarcher: [6, 15], barrowlord: [50, 90], drake: [120, 200], vargr: [60, 100],
   wraith: [10, 20], thrall: [12, 22], morvane: [80, 140], witch: [30, 60],
   troll: [90, 150], werewolf: [15, 30],
+  // undergloom/palerider pay FIXED purses in dropLoot (1200 / 500)
+  broodmother: [60, 110], broodling: [2, 5],
 };
 
 // Ranged casters/shooters: preferred distance band + bolt kind
@@ -67,7 +74,11 @@ const WITCH_HUT   = { x: -260, z: -520 };
 const STONEBRIDGE = { x: 330,  z: -260 };
 // Boss-class types: lock their scaling at first engagement, persist state,
 // never despawn by distance, excluded from elite rolls.
-const BOSS_TYPES = { barrowlord: true, drake: true, morvane: true, troll: true, vargr: true, witch: true };
+const BOSS_TYPES = {
+  barrowlord: true, drake: true, morvane: true, troll: true, vargr: true, witch: true,
+  // terror wave: scale with the player but never below their (high) base floor
+  undergloom: true, palerider: true, broodmother: true,
+};
 
 const TELEGRAPH_T = 0.55;   // readable windup — contract (per-type teleT overrides)
 const STRIKE_T    = 0.30;   // lunge duration; hit lands at STRIKE_HIT_T
@@ -144,6 +155,10 @@ export function createEnemies(g) {
                   attacks: ['2H_Melee_Attack_Chop', '2H_Melee_Attack_Spin'] },
     werewolf:   { char: 'barbarian', h: 2.25, tint: '#5a4636', hunch: true, runTs: 1.2,
                   attacks: ['Unarmed_Melee_Attack_Punch_A', 'Unarmed_Melee_Attack_Punch_B', 'Unarmed_Melee_Attack_Kick'] },
+    // Nazgûl-dread: gaunt hooded silhouette ×1.3, near-black, cold inner pallor
+    palerider:  { char: 'rogue_hooded', h: 2.60, tint: '#1a1a22',
+                  tintOpts: { emissive: '#232c3e', emissiveIntensity: 0.4 },
+                  attacks: ['1H_Melee_Attack_Slice_Horizontal', '1H_Melee_Attack_Stab', '1H_Melee_Attack_Chop'] },
     guard:      { char: 'knight', h: 1.85 },
   };
   for (const k in SPEC) {
@@ -177,9 +192,23 @@ export function createEnemies(g) {
     drakeEye: lam(0x100804, 0xffa020),
     drakeThroat: lam(0x30161a, 0xff4408),
     witchHand: new THREE.MeshBasicMaterial({ color: 0x55ff44, transparent: true, opacity: 0.85 }),
+    // TERROR wave — the Undergloom: layered darkness + furnace fissures
+    gloom: lam(0x0a0a0d),
+    gloomDark: lam(0x050507),
+    gloomCrack: lam(0x241005, 0xff5a10),
+    gloomEye: new THREE.MeshBasicMaterial({ color: 0xffa030 }),
+    // Broodmother palette: chitin blacks + a rust dorsal sigil + hot little eyes
+    spider: lam(0x17120d),
+    spiderDark: lam(0x0c0a07),
+    spiderMark: lam(0x241108, 0x571008),
+    spiderEye: new THREE.MeshBasicMaterial({ color: 0xff3820 }),
+    deadwood: lam(0x2c2620),
+    eggsac: lam(0xb9b2a2, 0x171510),
   };
   M.drakeEye.emissiveIntensity = 2.0;
   M.drakeThroat.emissiveIntensity = 0.0;
+  M.gloomCrack.emissiveIntensity = 1.5;
+  M.spiderMark.emissiveIntensity = 0.5;
 
   // Blob shadow: shared radial-gradient CanvasTexture quad ---------------------
   const shadowTex = (() => {
@@ -490,6 +519,110 @@ export function createEnemies(g) {
     memR.castShadow = true;
     wr.add(memR);
     return { group, parts: { body, neck, head, jaw, tail, wingL, wingR } };
+  }
+
+  // -------------------------------------------------------------------------
+  // THE UNDERGLOOM — a Balrog-class horror built from LAYERED DARKNESS.
+  // ~5.5u humanoid mass in matte near-blacks, furnace-orange fissures across
+  // chest and arms, twin ember eyes sunk in a hooded wedge, long arms ending
+  // in oversized fists. Wreathed at runtime in its own smoke/ember particle
+  // system and carrying a real dull-red heart light (g.lights).
+  // -------------------------------------------------------------------------
+  function buildUndergloom() {
+    const group = new THREE.Group();
+    // legs: massive pillars from hips at 2.55
+    const legL = pivot(group, -0.58, 2.55, 0);
+    part(legL, GEO.box, M.gloom, 0, -0.95, 0, 0.66, 1.55, 0.74);
+    part(legL, GEO.box, M.gloomDark, 0.02, -2.0, 0.06, 0.52, 0.95, 0.58);
+    const legR = pivot(group, 0.58, 2.55, 0);
+    part(legR, GEO.box, M.gloom, 0, -0.95, 0, 0.66, 1.55, 0.74);
+    part(legR, GEO.box, M.gloomDark, -0.02, -2.0, 0.06, 0.52, 0.95, 0.58);
+    // pelvis block
+    part(group, GEO.box, M.gloomDark, 0, 2.62, 0, 1.4, 0.7, 0.9);
+    // torso: broad chest + shoulder mantle, leaning mass
+    const torso = pivot(group, 0, 2.95, 0);
+    part(torso, GEO.box, M.gloom, 0, 0.72, -0.02, 1.95, 1.5, 1.1);
+    part(torso, GEO.box, M.gloomDark, 0, 1.42, -0.12, 2.45, 0.55, 1.25, 0.08);
+    part(torso, GEO.box, M.gloomDark, 0, 0.15, -0.35, 1.5, 1.1, 0.7);
+    // furnace fissures across the chest
+    const c1 = part(torso, GEO.box, M.gloomCrack, -0.3, 0.85, 0.55, 0.09, 0.95, 0.05, 0, 0, 0.35);
+    const c2 = part(torso, GEO.box, M.gloomCrack, 0.32, 0.68, 0.55, 0.07, 0.75, 0.05, 0, 0, -0.5);
+    const c3 = part(torso, GEO.box, M.gloomCrack, 0.0, 0.42, 0.56, 0.6, 0.07, 0.04, 0, 0, 0.14);
+    const c4 = part(torso, GEO.box, M.gloomCrack, -0.05, 1.1, 0.55, 0.4, 0.06, 0.04, 0, 0, -0.2);
+    c1.castShadow = c2.castShadow = c3.castShadow = c4.castShadow = false;
+    // head: low hooded wedge sunk between the shoulders, twin ember eyes
+    const head = pivot(torso, 0, 1.62, 0.12);
+    part(head, GEO.box, M.gloomDark, 0, 0.28, -0.05, 0.9, 0.8, 0.95);
+    part(head, GEO.cone, M.gloomDark, 0, 0.9, -0.18, 0.85, 0.85, 0.9);
+    part(head, GEO.box, M.gloomDark, 0, 0.05, 0.3, 0.7, 0.5, 0.4);          // cowl lip shadowing the face
+    const eyeL = part(head, GEO.orb, M.gloomEye, -0.19, 0.22, 0.42, 0.55, 0.42, 0.4);
+    const eyeR = part(head, GEO.orb, M.gloomEye, 0.19, 0.22, 0.42, 0.55, 0.42, 0.4);
+    eyeL.castShadow = eyeR.castShadow = false;
+    // arms: too long, knuckles near the ground, oversized fists
+    const armL = pivot(torso, -1.2, 1.28, 0);
+    part(armL, GEO.box, M.gloom, -0.1, -0.8, 0, 0.58, 1.5, 0.62);
+    part(armL, GEO.box, M.gloomDark, -0.14, -1.9, 0.05, 0.5, 0.95, 0.52);
+    part(armL, GEO.box, M.gloom, -0.16, -2.58, 0.1, 0.8, 0.65, 0.85);
+    const a1 = part(armL, GEO.box, M.gloomCrack, -0.35, -0.85, 0.28, 0.05, 1.0, 0.05, 0, 0, 0.18);
+    const armR = pivot(torso, 1.2, 1.28, 0);
+    part(armR, GEO.box, M.gloom, 0.1, -0.8, 0, 0.58, 1.5, 0.62);
+    part(armR, GEO.box, M.gloomDark, 0.14, -1.9, 0.05, 0.5, 0.95, 0.52);
+    part(armR, GEO.box, M.gloom, 0.16, -2.58, 0.1, 0.8, 0.65, 0.85);
+    const a2 = part(armR, GEO.box, M.gloomCrack, 0.35, -0.85, 0.28, 0.05, 1.0, 0.05, 0, 0, -0.18);
+    a1.castShadow = a2.castShadow = false;
+    return { group, parts: { legL, legR, torso, head, armL, armR } };
+  }
+
+  // -------------------------------------------------------------------------
+  // BROODMOTHER / broodlings — procedural giant spider: bulbous abdomen,
+  // cephalothorax, 8 jointed legs with a skittering tetrapod gait, eight
+  // small hot eyes, hanging fangs. scale 1 = ~2.2u leg span (mother);
+  // broodlings reuse the same build at ×0.4 via an inner scaled group.
+  // -------------------------------------------------------------------------
+  function buildSpider(scale) {
+    const group = new THREE.Group();
+    const inner = new THREE.Group();
+    inner.scale.setScalar(scale);
+    group.add(inner);
+    const body = pivot(inner, 0, 0.58, 0);
+    part(body, GEO.box, M.spider, 0, 0, 0.3, 0.62, 0.42, 0.66);              // cephalothorax
+    part(body, GEO.box, M.spiderDark, 0, 0.18, 0.28, 0.44, 0.2, 0.5);       // carapace ridge
+    // head plate: fangs + the eight eyes
+    const head = pivot(body, 0, 0.0, 0.6);
+    part(head, GEO.box, M.spiderDark, 0, 0.02, 0.08, 0.46, 0.32, 0.34);
+    part(head, GEO.cone, M.spiderDark, -0.11, -0.24, 0.18, 0.1, 0.32, 0.1, Math.PI);
+    part(head, GEO.cone, M.spiderDark, 0.11, -0.24, 0.18, 0.1, 0.32, 0.1, Math.PI);
+    for (let i = 0; i < 8; i++) {
+      const top = i < 4;
+      const k = (i % 4) - 1.5;
+      const es = top ? 0.42 : 0.28;
+      const eye = part(head, GEO.orb, M.spiderEye,
+        k * (top ? 0.09 : 0.14), top ? 0.12 : 0.02, 0.24, es, es, es);
+      eye.castShadow = false;
+    }
+    // abdomen: bulbous, marked, with spinneret cone
+    const abdomen = pivot(body, 0, 0.14, -0.34);
+    part(abdomen, GEO.orb, M.spider, 0, 0.1, -0.5, 5.4, 4.6, 6.6);
+    const mk = part(abdomen, GEO.orb, M.spiderMark, 0, 0.5, -0.45, 2.4, 1.5, 3.6);
+    mk.castShadow = false;
+    part(abdomen, GEO.cone, M.spiderDark, 0, -0.02, -1.4, 0.24, 0.5, 0.24, Math.PI * 0.55);
+    // 8 jointed legs — 4 a side, fanned fore/aft, upper + lower segment
+    const legs = [];
+    for (let s2 = -1; s2 <= 1; s2 += 2) {
+      for (let i = 0; i < 4; i++) {
+        const hz = 0.5 - i * 0.3;
+        const hip = pivot(body, s2 * 0.28, 0.08, hz);
+        const baseYaw = -s2 * (i - 1.5) * 0.42;
+        hip.rotation.y = baseYaw;
+        part(hip, GEO.box, M.spider, s2 * 0.42, 0.2, 0, 0.9, 0.07, 0.07, 0, 0, s2 * 0.5);
+        const knee = pivot(hip, s2 * 0.82, 0.4, 0);
+        const baseKnee = s2 * -1.15;
+        part(knee, GEO.box, M.spiderDark, s2 * 0.34, 0, 0, 0.9, 0.055, 0.055, 0, 0, 0);
+        knee.rotation.z = baseKnee;
+        legs.push({ hip, knee, side: s2, idx: i, baseYaw, baseKnee, phase: (i % 2 === (s2 > 0 ? 0 : 1) ? 0 : Math.PI) + i * 0.35 });
+      }
+    }
+    return { group, parts: { body, head, abdomen, legs } };
   }
 
   // -------------------------------------------------------------------------

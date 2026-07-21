@@ -1786,10 +1786,10 @@ export function createStructures(g) {
     const b = new Builder(803);
     const RUST = 0x6e4a36, ASH_WOOD = 0x53483a, DIRT_M = 0x625e48;
     // three long barrows, moss-backed
-    const MOUNDS = [[-14, 8, 9.5, 2.3, 6.5, 0.4], [4, -12, 11, 2.6, 7, 1.9], [16, 10, 8, 2.0, 5.5, 1.1]];
+    const MOUNDS = [[-14, 8, 9.5, 3.4, 6.5, 0.4], [4, -12, 11, 3.8, 7, 1.9], [16, 10, 8, 3.0, 5.5, 1.1]];
     for (const [mx, mz, mw, mh, md, mr] of MOUNDS) {
       const gy = terrainHeight(X + mx, Z + mz);
-      b.add(TPL.sphere, X + mx, gy + 0.3, Z + mz, mw, mh, md, 0, mr, 0, DIRT_M, 0.1);
+      b.add(TPL.sphere, X + mx, gy + 0.4, Z + mz, mw, mh, md, 0, mr, 0, DIRT_M, 0.1);
       b.add(TPL.box, X + mx + Math.sin(mr) * mw * 0.42, gy + 0.8, Z + mz + Math.cos(mr) * mw * 0.42,
         1.1, 1.6, 0.4, 0, mr, 0.08, 0x757a72, 0.1); // headstone leaning at its foot
       addCol(X + mx, Z + mz, Math.min(mw, md) * 0.42);
