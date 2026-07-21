@@ -262,7 +262,7 @@ async function genGrass() {
   const alb = newAlbedo(), hgt = newHeight();
 
   // Base: dark soil + moss shadow between blade clumps.
-  const soilA = [43, 36, 24], soilB = [58, 50, 32], mossB = [52, 58, 33];
+  const soilA = [56, 47, 31], soilB = [74, 63, 42], mossB = [60, 66, 38];
   fillAlbedo(alb, (u, v) => {
     const g = fbm(u, v, 90, 3, 0.55, 11);          // fine grain
     const p = fbm(u, v, 5, 4, 0.5, 23);            // patchiness
@@ -284,12 +284,18 @@ async function genGrass() {
   for (let n = 0; n < NB; n++) {
     const x = rnd() * S, y = rnd() * S;
     const u = x / S, v = y / S;
+    // Worn spots: thin the turf gently (never bare holes, no hard shapes).
+    const [tu, tv] = warp(u, v, 0.3, 3, 2, 89);
+    const thin = sstep(0.45, 0.28, fbm(tu, tv, 6, 4, 0.5, 93)) * 0.7;
+    if (rnd() < thin * 0.28) continue;
     // Direction field: smooth per-patch rotation (toroidal fbm -> seamless).
     const baseAng = (fbm(u, v, 4, 3, 0.5, 71) - 0.5) * 7.5 + (rnd() - 0.5) * 0.8;
     const hueSel = fbm(u, v, 6, 3, 0.5, 87) + (rnd() - 0.5) * 0.35;
-    const isStraw = rnd() < 0.08;
+    // Dry-straw tendency: baseline 6%, up to ~28% inside broad dry zones.
+    const dryZone = sstep(0.52, 0.74, fbm(u, v, 5, 3, 0.5, 97));
+    const isStraw = rnd() < 0.06 + dryZone * 0.22;
     const fam = isStraw ? straw : hues[hueSel < 0.42 ? 0 : hueSel < 0.58 ? 1 : 2];
-    const bright = 0.72 + rnd() * 0.5;
+    const bright = (0.7 + rnd() * 0.55) * (1 - thin * 0.1);
     const c0 = fam[0].map((c) => c * bright), c1 = fam[1].map((c) => c * bright);
     const len = 7 + rnd() * 12;
     stroke(alb, hgt, x, y, baseAng, len, (rnd() - 0.5) * 0.16, 0.75 + rnd() * 0.45,
@@ -311,8 +317,9 @@ async function genGrass() {
     const v = y / S;
     for (let x = 0; x < S; x++) {
       const u = x / S;
-      const m = fbm(u, v, 3, 3, 0.5, 301);
-      const k = 0.82 + 0.36 * m;
+      const [wu, wv] = warp(u, v, 0.22, 2, 2, 307);
+      const m = fbm(wu, wv, 3, 3, 0.5, 301) * 0.6 + fbm(u, v, 8, 2, 0.5, 311) * 0.4;
+      const k = 0.89 + 0.22 * m;
       const i = (y * S + x) * 3;
       alb[i] *= k; alb[i + 1] *= k; alb[i + 2] *= k * 0.98;
     }
@@ -340,43 +347,44 @@ async function genForest() {
     const v = y / S;
     for (let x = 0; x < S; x++) {
       const u = x / S;
-      const [wu, wv] = warp(u, v, 0.08, 3, 3, 401);
-      const m = sstep(0.56, 0.72, fbm(wu, wv, 4, 4, 0.5, 51));
+      const [wu, wv] = warp(u, v, 0.18, 3, 3, 401);
+      const m = sstep(0.58, 0.78, fbm(wu, wv, 4, 4, 0.5, 51)) * 0.7;
       if (m <= 0) continue;
       const fine = fbm(u, v, 120, 2, 0.5, 61);
       const i = (y * S + x) * 3;
-      const mc = [40 + fine * 26, 52 + fine * 30, 28 + fine * 14];
+      const mc = [44 + fine * 20, 50 + fine * 22, 30 + fine * 11];
       alb[i] += (mc[0] - alb[i]) * m;
       alb[i + 1] += (mc[1] - alb[i + 1]) * m;
       alb[i + 2] += (mc[2] - alb[i + 2]) * m;
-      hgt[y * S + x] += m * (0.25 + fine * 0.3);
+      hgt[y * S + x] += m * (0.2 + fine * 0.25);
     }
   }
 
   // Leaf litter — overlapping soft ovals, umber/sienna/faded olive.
   const leafCols = [
-    [[92, 66, 40], [128, 94, 56]],   // umber
-    [[110, 72, 42], [148, 100, 58]], // sienna
-    [[70, 55, 34], [100, 80, 48]],   // dark brown
-    [[86, 78, 44], [112, 102, 58]],  // faded olive
-    [[58, 44, 30], [84, 66, 42]],    // wet rot
+    [[88, 64, 40], [116, 88, 54]],   // umber
+    [[98, 68, 42], [126, 88, 52]],   // muted sienna
+    [[68, 53, 34], [94, 74, 46]],    // dark brown
+    [[80, 72, 44], [102, 92, 54]],   // faded olive
+    [[56, 44, 30], [78, 62, 40]],    // wet rot
+    [[76, 66, 52], [98, 86, 66]],    // grey-brown
   ];
-  const NL = 3100;
+  const NL = 3600;
   for (let n = 0; n < NL; n++) {
     const fam = leafCols[Math.floor(rnd() * leafCols.length)];
-    const s = 0.75 + rnd() * 0.8;
-    const bright = 0.75 + rnd() * 0.5;
-    splatLeaf(alb, hgt, rnd() * S, rnd() * S, (7 + rnd() * 7) * s, (4 + rnd() * 4) * s,
+    const s = 0.6 + rnd() * 0.75;
+    const bright = 0.72 + rnd() * 0.5;
+    splatLeaf(alb, hgt, rnd() * S, rnd() * S, (6 + rnd() * 7) * s, (3.5 + rnd() * 4) * s,
       rnd() * Math.PI * 2, fam[0].map((c) => c * bright), fam[1].map((c) => c * bright),
-      0.62 + rnd() * 0.3, 0.55 + rnd() * 0.5);
+      0.5 + rnd() * 0.35, 0.5 + rnd() * 0.5);
   }
 
-  // Twigs — thin brighter streaks with a height ridge.
-  for (let n = 0; n < 170; n++) {
-    const b = 0.8 + rnd() * 0.5;
-    stroke(alb, hgt, rnd() * S, rnd() * S, rnd() * Math.PI * 2, 26 + rnd() * 55,
-      (rnd() - 0.5) * 0.03, 0.9 + rnd() * 0.5,
-      [112 * b, 94 * b, 62 * b], [134 * b, 112 * b, 74 * b], 0.75, 0.9);
+  // Twigs — thin, nearly straight, slightly brighter than the litter.
+  for (let n = 0; n < 150; n++) {
+    const b = 0.7 + rnd() * 0.45;
+    stroke(alb, hgt, rnd() * S, rnd() * S, rnd() * Math.PI * 2, 24 + rnd() * 50,
+      (rnd() - 0.5) * 0.008, 0.85 + rnd() * 0.45,
+      [104 * b, 88 * b, 60 * b], [122 * b, 102 * b, 70 * b], 0.7, 0.85);
   }
 
   // Pebbles.

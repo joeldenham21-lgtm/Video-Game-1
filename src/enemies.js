@@ -1087,6 +1087,75 @@ export function createEnemies(g) {
   }
 
   // -------------------------------------------------------------------------
+  // Undergloom shroud — its OWN pooled system (~250): constantly-rising dark
+  // smoke motes and furnace embers boiling off the layered-darkness body.
+  // Soft-sprite normal blending so black smoke reads as smoke, embers as fire.
+  // -------------------------------------------------------------------------
+  const GLOOM_N = 250;
+  const gloomPos = new Float32Array(GLOOM_N * 3);
+  const gloomVel = new Float32Array(GLOOM_N * 3);
+  const gloomLife = new Float32Array(GLOOM_N);
+  const gloomCol = new Float32Array(GLOOM_N * 3);
+  for (let i = 0; i < GLOOM_N; i++) { gloomPos[i * 3 + 1] = -9999; gloomLife[i] = 0; }
+  const gloomGeo = new THREE.BufferGeometry();
+  const gloomPosAttr = new THREE.BufferAttribute(gloomPos, 3);
+  gloomPosAttr.setUsage(THREE.DynamicDrawUsage);
+  const gloomColAttr = new THREE.BufferAttribute(gloomCol, 3);
+  gloomColAttr.setUsage(THREE.DynamicDrawUsage);
+  gloomGeo.setAttribute('position', gloomPosAttr);
+  gloomGeo.setAttribute('color', gloomColAttr);
+  const puffTex = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 32;
+    const ctx = c.getContext('2d');
+    const gr = ctx.createRadialGradient(16, 16, 1, 16, 16, 15);
+    gr.addColorStop(0, 'rgba(255,255,255,0.9)');
+    gr.addColorStop(0.55, 'rgba(255,255,255,0.35)');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, 32, 32);
+    return new THREE.CanvasTexture(c);
+  })();
+  const gloomPoints = new THREE.Points(gloomGeo, new THREE.PointsMaterial({
+    size: 0.62, map: puffTex, vertexColors: true, transparent: true,
+    opacity: 0.85, depthWrite: false, sizeAttenuation: true,
+  }));
+  gloomPoints.frustumCulled = false;
+  g.scene.add(gloomPoints);
+  let gloomAlive = 0;
+  let gloomCursor = 0;
+  function emitGloom(x, y, z, ember) {
+    const i = gloomCursor; gloomCursor = (gloomCursor + 1) % GLOOM_N;
+    gloomPos[i * 3] = x; gloomPos[i * 3 + 1] = y; gloomPos[i * 3 + 2] = z;
+    gloomVel[i * 3] = (Math.random() - 0.5) * 0.6;
+    gloomVel[i * 3 + 1] = ember ? 1.2 + Math.random() * 1.8 : 0.5 + Math.random() * 0.9;
+    gloomVel[i * 3 + 2] = (Math.random() - 0.5) * 0.6;
+    if (ember) {
+      const hot = 0.6 + Math.random() * 0.4;
+      gloomCol[i * 3] = hot; gloomCol[i * 3 + 1] = hot * 0.42; gloomCol[i * 3 + 2] = hot * 0.08;
+    } else {
+      const k = 0.02 + Math.random() * 0.035; // near-black smoke motes
+      gloomCol[i * 3] = k; gloomCol[i * 3 + 1] = k; gloomCol[i * 3 + 2] = k * 1.15;
+    }
+    if (gloomLife[i] <= 0) gloomAlive++;
+    gloomLife[i] = ember ? 0.8 + Math.random() * 0.7 : 1.3 + Math.random() * 1.1;
+    gloomColAttr.needsUpdate = true;
+  }
+  function updateGloomFx(dt) {
+    if (gloomAlive === 0) return;
+    for (let i = 0; i < GLOOM_N; i++) {
+      if (gloomLife[i] <= 0) continue;
+      gloomLife[i] -= dt;
+      if (gloomLife[i] <= 0) { gloomPos[i * 3 + 1] = -9999; gloomAlive--; continue; }
+      gloomPos[i * 3] += gloomVel[i * 3] * dt;
+      gloomPos[i * 3 + 1] += gloomVel[i * 3 + 1] * dt;
+      gloomPos[i * 3 + 2] += gloomVel[i * 3 + 2] * dt;
+      gloomVel[i * 3 + 1] += 0.45 * dt; // heat rises, always
+    }
+    gloomPosAttr.needsUpdate = true;
+  }
+
+  // -------------------------------------------------------------------------
   // Enemy bolt projectiles (wraith spirit bolts, witch arcing hexes,
   // skeleton archer arrows) — pooled meshes, owned here
   // -------------------------------------------------------------------------
@@ -1246,7 +1315,8 @@ export function createEnemies(g) {
       orbitA: Math.random() * Math.PI * 2,
       orbitDir: (spawner && spawner.id % 2 === 0) ? 1 : -1,
       boss: !!(spawner && spawner.boss) || type === 'drake' || type === 'barrowlord' ||
-            type === 'morvane' || type === 'troll',
+            type === 'morvane' || type === 'troll' ||
+            type === 'undergloom' || type === 'broodmother' || type === 'palerider',
       isVargr: type === 'vargr',
       spawner: spawner || null,
       summoned: false, taunted: false,
@@ -1271,6 +1341,9 @@ export function createEnemies(g) {
       // drake:
       fly: false, dstate: '', atkT: 0, phaseT: 0, breathTick: 0, roared: false,
       swoopA: null, swoopB: null, swoopC: null, breathTarget: null,
+      // terror wave: undergloom slam rotation + pale rider dread bookkeeping
+      slamCount: 0, gloomSlam: false,
+      villageT: 0, whisperT: 3, riderNear: false,
     };
     if (type === 'drake') {
       e.fly = true;
@@ -1288,7 +1361,8 @@ export function createEnemies(g) {
     if (holder.mixer) { holder.mixer.stopAllAction(); holder.cur = null; holder.curName = ''; }
     setEliteEyes(holder, elite);
     const shadowD = type === 'drake' ? 8 : type === 'troll' ? 3.4 :
-      type === 'barrowlord' ? 3 : e.bodyR * 2.6;
+      type === 'barrowlord' ? 3 : type === 'undergloom' ? 4.4 :
+      type === 'broodmother' ? 3.0 : e.bodyR * 2.6;
     holder.shadow.scale.set(shadowD, shadowD, 1);
     holder.shadow.visible = true;
     e.shadowD = shadowD;
@@ -1312,6 +1386,22 @@ export function createEnemies(g) {
   function dropLoot(e) {
     const gr = GOLD[e.type] || [4, 10];
     const p = { x: e.pos.x, y: e.pos.y + 0.6, z: e.pos.z };
+    // Terror uniques pay a FIXED purse (design contract: 1200g / 500g)
+    if (e.type === 'undergloom') {
+      events.emit('spawnLoot', { pos: p, kind: 'gold', amount: 1200 });
+      return;
+    }
+    if (e.type === 'palerider') {
+      events.emit('spawnLoot', { pos: p, kind: 'gold', amount: 500 });
+      return;
+    }
+    if (e.type === 'broodmother') {
+      // silk + venom sac materials (economy may not price them yet — the
+      // gold below keeps the kill worth its terror regardless)
+      events.emit('spawnLoot', { pos: { x: p.x + 0.6, y: p.y, z: p.z + 0.4 }, kind: 'item', amount: 1, itemId: 'silk' });
+      events.emit('spawnLoot', { pos: { x: p.x - 0.6, y: p.y, z: p.z + 0.5 }, kind: 'item', amount: 1, itemId: 'silk' });
+      events.emit('spawnLoot', { pos: { x: p.x, y: p.y, z: p.z - 0.6 }, kind: 'item', amount: 1, itemId: 'venom_sac' });
+    }
     // Gold scales with the player like the enemy did; elites pay ×3, Blood
     // Moon kills ×2; the shadow tree's goldFind applies to everything here.
     const goldFind = (g.rpg && g.rpg.mult) ? g.rpg.mult('goldFind') : 1;
@@ -1358,6 +1448,23 @@ export function createEnemies(g) {
     if (e.type === 'morvane') g.flags.morvaneDead = true;
     if (e.type === 'troll') g.flags.trollDead = true;
     if (e.type === 'witch') g.flags.witchDead = true;
+    // --- terror wave ---
+    if (e.type === 'undergloom') {
+      g.flags.undergloomDead = true;
+      g.flags.gloomheart = true; // unique trophy flag
+      events.emit('notify', { text: 'The dark beneath the barrows lifts forever', sub: 'The Undergloom is unmade. Its furnace heart is yours.' });
+      emitBurst(e.pos.x, e.pos.y + 2.6, e.pos.z, 30, 1.0, 0.42, 0.08, 1);
+      sfx('thunder');
+      sfx('drakeRoar');
+      if (g.player && g.player.addShake) g.player.addShake(0.8);
+    }
+    if (e.type === 'palerider') {
+      g.flags.riderDead = true;
+      g.flags.riderveil = true; // unique trophy flag
+      events.emit('notify', { text: 'The road is yours again', sub: 'The Pale Rider unravels into cold mist.' });
+      emitBurst(e.pos.x, e.pos.y + 1.4, e.pos.z, 22, 0.55, 0.62, 0.8, 1);
+    }
+    if (e.type === 'broodmother') g.flags.broodmotherDead = true;
     events.emit('enemyKilled', { type: e.type, name: e.name, pos: { x: e.pos.x, y: e.pos.y, z: e.pos.z }, xp: e.xp });
     if (g.player && g.player.addXP) g.player.addXP(e.xp);
     dropLoot(e);
@@ -1566,6 +1673,9 @@ export function createEnemies(g) {
     else if (e.type === 'skeleton' || e.type === 'skelarcher') sfx('skeletonRattle');
     else if (e.type === 'drake' && !e.roared) { e.roared = true; sfx('drakeRoar'); }
     else if (e.type === 'troll') sfx('swingHeavy');
+    else if (e.type === 'undergloom' && !e.roared) { e.roared = true; sfx('drakeRoar'); sfx('thunder'); }
+    else if (e.type === 'broodmother' || e.type === 'broodling') sfx('goblinCackle'); // skitter placeholder
+    else if (e.type === 'palerider') sfx('skeletonRattle'); // whisper placeholder (audio agent owns the real cue)
     if (e.isVargr && !e.taunted && (g.flags.vargrWins | 0) > 0) {
       e.taunted = true;
       events.emit('notify', { text: 'Vargr Redfang remembers you', sub: 'His scars have made him stronger.' });
@@ -1693,8 +1803,43 @@ export function createEnemies(g) {
     p.damage(e.dmg, e.pos);
     // Vampires drain: a landed bite feeds them
     if (e.drains) e.hp = Math.min(e.maxHp, e.hp + e.dmg * 0.7);
+    // Brood bites poison; the mother sometimes throws a snaring web
+    if (e.type === 'broodmother' || e.type === 'broodling') applyVenomHit(e);
+    if (e.type === 'undergloom' && g.player.addShake) g.player.addShake(0.5);
     lastHitter = e;
     lastHitT = g.time.elapsed;
+  }
+
+  // -------------------------------------------------------------------------
+  // Player slow effects (venom / web-snare) — enemies.js owns the state and
+  // enforces it as a horizontal speed cap so player.js stays untouched.
+  // -------------------------------------------------------------------------
+  let pSlowT = 0, pSlowMul = 1;
+  function applyPlayerSlow(mul, dur) {
+    if (mul < pSlowMul || pSlowT <= 0) pSlowMul = mul;
+    pSlowT = Math.max(pSlowT, dur);
+  }
+  function applyVenomHit(e) {
+    if (e.type === 'broodmother' && Math.random() < 0.4) {
+      applyPlayerSlow(0.4, 1.5); // brief web-snare: move ×0.4
+      events.emit('notify', { text: 'Webbing snares your legs', sub: 'Tear free — she is coming.' });
+    } else {
+      applyPlayerSlow(0.72, 2.5); // venom slow
+      if (!g.flags.venomHint) {
+        g.flags.venomHint = true;
+        events.emit('notify', { text: 'Venom burns in the bite', sub: 'Your legs answer slowly.' });
+      }
+    }
+  }
+  function updatePlayerSlow(dt) {
+    if (pSlowT <= 0) return;
+    pSlowT -= dt;
+    if (pSlowT <= 0) { pSlowMul = 1; return; }
+    const v = g.player.velocity;
+    if (!v) return;
+    const h = Math.hypot(v.x, v.z);
+    const cap = 5.5 * pSlowMul;
+    if (h > cap) { const k = cap / h; v.x *= k; v.z *= k; }
   }
 
   // Troll ground-slam: radial dust ring + AoE damage + heavy knockback
@@ -1726,6 +1871,37 @@ export function createEnemies(g) {
       lastHitT = g.time.elapsed;
     }
     if (g.player.addShake) g.player.addShake(0.75);
+  }
+
+  // Undergloom ground-slam: both fists crater the earth — ember ring, wide
+  // AoE, brutal knockback. The 1.2s telegraph is the whole counterplay.
+  function doGloomSlam(e) {
+    const p = g.player;
+    const ix = e.pos.x + Math.sin(e.yaw) * 2.4;
+    const iz = e.pos.z + Math.cos(e.yaw) * 2.4;
+    const iy = terrainHeight(ix, iz);
+    emitBurst(ix, iy + 0.4, iz, 30, 1.0, 0.42, 0.1, 0);   // ember ring
+    emitBurst(ix, iy + 0.6, iz, 12, 0.06, 0.05, 0.06, 0); // black dust
+    sfx('thunder');
+    if (g.player.addShake) g.player.addShake(0.9);
+    if (p.stats.hp <= 0) return;
+    const d = Math.hypot(p.position.x - ix, p.position.z - iz);
+    if (d > 6.2) return;
+    let res = null;
+    if (g.combat && g.combat.tryBlock) res = g.combat.tryBlock(e.dmg);
+    if (res && res.parried) { stagger(e); return; }
+    const nx = d > 0.01 ? (p.position.x - ix) / d : Math.sin(e.yaw);
+    const nz = d > 0.01 ? (p.position.z - iz) / d : Math.cos(e.yaw);
+    if (p.velocity) {
+      p.velocity.x += nx * 15;
+      p.velocity.z += nz * 15;
+      p.velocity.y = Math.max(p.velocity.y, 6.5);
+    }
+    if (!(res && res.blocked)) {
+      p.damage(e.dmg, e.pos);
+      lastHitter = e;
+      lastHitT = g.time.elapsed;
+    }
   }
 
   // Morvane's teleport-blink: collapse in crimson mist, reappear 6u away
@@ -1858,9 +2034,20 @@ export function createEnemies(g) {
           e.state = 'guard'; e.stateT = 0;
           break;
         }
+        // Undergloom: every 3rd blow (or a just-out-of-reach target) becomes
+        // the ground-slam — a wide AoE behind the same long readable windup
+        if (e.type === 'undergloom' && e.cooldown <= 0 && pd < 6.4) {
+          e.slamCount++;
+          e.gloomSlam = (e.slamCount % 3 === 0) || pd > e.reach + 0.4;
+          if (e.gloomSlam || pd < e.reach + 0.4) {
+            e.state = 'telegraph'; e.stateT = 0;
+            sfx('swingHeavy');
+            break;
+          }
+        }
         if (pd < e.reach + 0.4 && e.cooldown <= 0) {
           e.state = 'telegraph'; e.stateT = 0;
-          sfx(e.type === 'barrowlord' || e.type === 'drake' || e.type === 'troll' ? 'swingHeavy' : 'swing'); // audible windup cue
+          sfx(e.type === 'barrowlord' || e.type === 'drake' || e.type === 'troll' || e.type === 'undergloom' ? 'swingHeavy' : 'swing'); // audible windup cue
         }
         // combat vocals
         e.vocalT -= dt;
@@ -1870,6 +2057,8 @@ export function createEnemies(g) {
           else if (e.type === 'skeleton' || e.type === 'skelarcher') sfx('skeletonRattle');
           else if (e.type === 'werewolf') sfx('wolfHowl');
           else if (e.type === 'witch') sfx('goblinCackle');
+          else if (e.type === 'broodmother' || e.type === 'broodling') sfx('goblinCackle'); // skitter
+          else if (e.type === 'undergloom') sfx('drakeRoar');
         }
         break;
       }
@@ -1902,9 +2091,12 @@ export function createEnemies(g) {
           }
           break;
         }
-        if (e.type === 'troll') {
+        if (e.type === 'troll' || (e.type === 'undergloom' && e.gloomSlam)) {
           // the slam: no lunge, the earth answers instead
-          if (!e.hitApplied && e.stateT >= 0.18) { e.hitApplied = true; doSlam(e); }
+          if (!e.hitApplied && e.stateT >= 0.18) {
+            e.hitApplied = true;
+            if (e.type === 'troll') doSlam(e); else doGloomSlam(e);
+          }
           if (e.stateT >= e.strikeT) {
             e.state = 'chase'; e.stateT = 0;
             e.cooldown = e.atkCd * (0.85 + e.seed * 0.4);
@@ -2124,6 +2316,161 @@ export function createEnemies(g) {
   }
 
   // -------------------------------------------------------------------------
+  // THE PALE RIDER — Nazgûl-dread. Materializes on the long roads in the
+  // dead hours (23:00–03:00, dayFrac 0.96–0.13) 60–90u from a traveler far
+  // from the village, and WALKS. Never runs. Never enters the village ring.
+  // Outrun it by 120u — or reach dawn — and it stops, stares, and dissolves.
+  // -------------------------------------------------------------------------
+  // Road polyline: village north road → marsh causeway → Stonebridge →
+  // the east-bank climb toward Barrowdeep (mirrors structures.js paths).
+  const ROAD_WAY = [
+    [0, -11], [-5, -60], [30, -72], [62, -96], [86, -113], [76, -152],
+    [66, -196], [30, -204], [-28, -206], [-33, -240], [-30, -268], [-8, -286],
+    [16, -296], [28, -322], [70, -336], [120, -348], [165, -332], [195, -310],
+    [228, -294], [268, -281], [305, -271], [363, -283], [400, -297], [436, -308],
+  ];
+  const roadPts = [];
+  for (let i = 0; i < ROAD_WAY.length - 1; i++) {
+    const ax = ROAD_WAY[i][0], az = ROAD_WAY[i][1];
+    const bx = ROAD_WAY[i + 1][0], bz = ROAD_WAY[i + 1][1];
+    const n = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / 6));
+    for (let k = 0; k < n; k++) {
+      roadPts.push({ x: ax + (bx - ax) * k / n, z: az + (bz - az) * k / n });
+    }
+  }
+  roadPts.push({ x: 436, z: -308 });
+  function roadDist(x, z) {
+    let m = 1e9;
+    for (let i = 0; i < roadPts.length; i++) {
+      const d = dist2d(x, z, roadPts[i].x, roadPts[i].z);
+      if (d < m) m = d;
+    }
+    return m;
+  }
+  const riderWindow = (f) => f > 0.958 || f < 0.125; // 23:00–03:00
+  let riderE = null;
+  let riderNextT = 0;
+
+  function riderTick(t) {
+    if (riderE && (!riderE.alive || list.indexOf(riderE) < 0)) riderE = null;
+    if (riderE || g.flags.riderDead || t < riderNextT) return;
+    if (!riderWindow(g.time.dayFrac)) return;
+    const p = g.player.position;
+    if (g.player.stats.hp <= 0) return;
+    if (dist2d(p.x, p.z, 0, 0) < 130) return;   // too near the village lights
+    if (roadDist(p.x, p.z) > 8) return;         // only takes travelers ON the road
+    if (Math.random() > 0.35) return;           // the hour has to feel wrong first
+    // pick a road point 60–90u out, preferring the stretch BEHIND the walker
+    const v = g.player.velocity;
+    const spd = v ? Math.hypot(v.x, v.z) : 0;
+    let best = null, bestScore = -1e9;
+    for (let i = 0; i < roadPts.length; i++) {
+      const pt = roadPts[i];
+      const d = dist2d(p.x, p.z, pt.x, pt.z);
+      if (d < 60 || d > 90) continue;
+      if (dist2d(pt.x, pt.z, 0, 0) < 120) continue;
+      let score = hash2(i, (t * 7) | 0, WORLD_SEED + 4441);
+      if (spd > 1) score += -((pt.x - p.x) * v.x + (pt.z - p.z) * v.z) / (d * spd); // behind you
+      if (score > bestScore) { bestScore = score; best = pt; }
+    }
+    if (!best) return;
+    riderE = spawnEnemy('palerider', best.x, best.z, null);
+    riderE.aggro = true;
+    riderE.state = 'chase'; riderE.stateT = 0;
+    riderE.cooldown = 1.5;
+    emitBurst(best.x, riderE.pos.y + 1.4, best.z, 16, 0.5, 0.56, 0.72, 1);
+    sfx('skeletonRattle'); // quiet whisper placeholder
+    riderNextT = t + 30;   // if this one resolves, don't chain-spawn
+  }
+
+  function dissolveRider(e) {
+    emitBurst(e.pos.x, e.pos.y + 1.4, e.pos.z, 20, 0.5, 0.56, 0.72, 1);
+    sfx('skeletonRattle');
+    riderNextT = g.time.elapsed + 140; // roughly the next dead-of-night
+    if (riderE === e) riderE = null;
+    despawn(e);
+  }
+
+  function updateRider(e, dt, t, pd) {
+    const p = g.player;
+    e.stateT += dt;
+    e.cooldown -= dt;
+    // fear beat: one line, then its light and the slow walk do the work
+    if (!e.riderNear && pd < 30 && e.alive) {
+      e.riderNear = true;
+      events.emit('notify', { text: 'Something cold walks the road behind you', sub: '' });
+    }
+    // whispering as it comes (placeholder cue; audio agent owns the real one)
+    e.whisperT -= dt;
+    if (e.whisperT <= 0 && pd < 45 && e.state !== 'dead') {
+      e.whisperT = 5 + Math.random() * 4;
+      sfx('skeletonRattle');
+    }
+    switch (e.state) {
+      case 'stare': {
+        turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 6, dt);
+        e.vel.set(0, e.vel.y, 0);
+        if (e.stateT > 2.4) { dissolveRider(e); return; }
+        break;
+      }
+      case 'telegraph': {
+        turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 5, dt);
+        if (e.stateT >= e.teleT) { e.state = 'strike'; e.stateT = 0; e.hitApplied = false; }
+        break;
+      }
+      case 'strike': {
+        if (e.stateT < 0.16) { // one short cold step in
+          e.pos.x += Math.sin(e.yaw) * 4.5 * dt;
+          e.pos.z += Math.cos(e.yaw) * 4.5 * dt;
+        }
+        if (!e.hitApplied && e.stateT >= STRIKE_HIT_T) { e.hitApplied = true; tryStrikeHit(e); }
+        if (e.stateT >= e.strikeT) {
+          e.state = 'chase'; e.stateT = 0;
+          e.cooldown = e.atkCd * (0.85 + e.seed * 0.4);
+        }
+        break;
+      }
+      case 'flinch': {
+        if (e.stateT >= FLINCH_T) { e.state = 'chase'; e.stateT = 0; }
+        break;
+      }
+      case 'stagger': {
+        if (e.stateT >= STAGGER_T) { e.state = 'chase'; e.stateT = 0; }
+        break;
+      }
+      default: { // the walk. relentless, 2.2u/s, no more, no less
+        e.aggro = true;
+        if (p.stats.hp <= 0) { dissolveRider(e); return; }
+        if (pd > 120 || !riderWindow(g.time.dayFrac)) { e.state = 'stare'; e.stateT = 0; break; }
+        const dv = dist2d(p.position.x, p.position.z, 0, 0);
+        if (dv < 88) {
+          // the village ward holds it at the ring; linger, then give up
+          e.villageT += dt;
+          e.vel.x -= e.vel.x * Math.min(1, 6 * dt);
+          e.vel.z -= e.vel.z * Math.min(1, 6 * dt);
+          turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 4, dt);
+          if (e.villageT > 6) { e.state = 'stare'; e.stateT = 0; }
+          break;
+        }
+        e.villageT = 0;
+        moveToward(e, p.position.x, p.position.z, e.speed, dt, true);
+        if (pd < e.reach + 0.5 && e.cooldown <= 0) {
+          e.state = 'telegraph'; e.stateT = 0;
+          sfx('swing');
+        }
+        break;
+      }
+    }
+    // it NEVER crosses into the village ring
+    const dr = dist2d(e.pos.x, e.pos.z, 0, 0);
+    if (dr > 0.01 && dr < 90) {
+      const k = 90 / dr;
+      e.pos.x *= k; e.pos.z *= k;
+    }
+    integrate(e, dt);
+  }
+
+  // -------------------------------------------------------------------------
   // Animation clip selection — mixer state machine driven by e.state.
   // Attack/cast clips are time-stretched so the clip's windup occupies the
   // telegraph and the swing lands at the strike moment (feet don't slide:
@@ -2233,6 +2580,13 @@ export function createEnemies(g) {
     let tiltX = 0, tiltZ = 0;
 
     if (e.type === 'drake') { animateDrake(e, dt, t); return; }
+    if (e.type === 'undergloom') { animateUndergloom(e, dt, t); return; }
+    if (e.type === 'broodmother' || e.type === 'broodling') { animateSpider(e, dt, t); return; }
+    // pale rider: sickly real light rides at its breast, guttering out in death
+    if (h.lightPos) {
+      h.lightPos.x = e.pos.x; h.lightPos.y = e.pos.y + 1.6; h.lightPos.z = e.pos.z;
+      if (h.lightHandle) h.lightHandle.src.intensity = e.dead ? Math.max(0, 1.5 * (1 - e.deadT / 2)) : 1.5;
+    }
 
     if (e.state === 'dead') {
       // rigged chars fall via Death clip; clipless (fox) tip over procedurally
@@ -2332,6 +2686,135 @@ export function createEnemies(g) {
     gp.rotation.set(tiltX, e.yaw, tiltZ);
   }
 
+  // Undergloom procedural pose: ponderous stride, overhead double-fist windup,
+  // rising smoke/ember shroud, pulsing furnace cracks, heart light surges.
+  function animateUndergloom(e, dt, t) {
+    const h = e.holder;
+    const P = h.parts;
+    const gp = h.root;
+    const spd = Math.hypot(e.vel.x, e.vel.z);
+    e.animSpd += (spd - e.animSpd) * Math.min(1, 10 * dt);
+    gp.position.copy(e.pos);
+    // heart light: dull red, flickering (lights.js), surging with the windup
+    if (h.lightPos) {
+      h.lightPos.x = e.pos.x; h.lightPos.z = e.pos.z; h.lightPos.y = e.pos.y + 3.4;
+      const surge = e.state === 'telegraph' ? 1.5 : e.state === 'strike' ? 2.0 : 1;
+      h.lightHandle.src.intensity = e.dead
+        ? Math.max(0, 2.4 * (1 - e.deadT / 2.6))
+        : 2.4 * surge;
+    }
+    // the shroud: constantly-rising smoke motes + embers off the whole mass
+    if (!e.dead || e.deadT < 2) {
+      let n = Math.min(4, Math.ceil(dt * (e.state === 'telegraph' ? 140 : 90)));
+      while (n-- > 0) {
+        emitGloom(
+          e.pos.x + (Math.random() - 0.5) * 1.8,
+          e.pos.y + 0.4 + Math.random() * 4.6,
+          e.pos.z + (Math.random() - 0.5) * 1.3,
+          Math.random() < 0.45);
+      }
+    }
+    // furnace cracks breathe; blaze open through the telegraph
+    M.gloomCrack.emissiveIntensity = e.state === 'telegraph'
+      ? 1.8 + (e.stateT / e.teleT) * 1.6
+      : 1.3 + Math.sin(t * 3.1) * 0.45;
+
+    if (e.state === 'dead') {
+      const f = Math.min(1, e.deadT / 1.3);
+      gp.rotation.set(f * 0.85, e.yaw, f * 0.25 * e.fallDir); // topples forward
+      gp.position.y -= f * 0.9;
+      if (e.deadT > SINK_AFTER) gp.position.y -= (e.deadT - SINK_AFTER) / SINK_T * (e.height + 0.6);
+      if (!h.gloomDeathBurst) {
+        h.gloomDeathBurst = true;
+        emitBurst(e.pos.x, e.pos.y + 2.4, e.pos.z, 26, 1.0, 0.42, 0.08, 1);
+      }
+      return;
+    }
+    h.gloomDeathBurst = false;
+
+    // ponderous stride
+    e.walkPhase += spd * dt * 1.15;
+    const wp = e.walkPhase;
+    const m = clamp(e.animSpd / 3.0, 0, 1);
+    P.legL.rotation.x = Math.sin(wp) * 0.55 * m;
+    P.legR.rotation.x = -Math.sin(wp) * 0.55 * m;
+    const breathe = Math.sin(t * 1.1 + e.seed * 7) * 0.045;
+    P.torso.position.y = P.torso.userData.by + Math.abs(Math.cos(wp)) * 0.12 * m + breathe;
+    P.torso.rotation.y = Math.sin(wp) * 0.1 * m;
+    // arms: loose counter-swing — or the overhead double-fist windup/slam
+    let armL = -Math.sin(wp) * 0.38 * m + 0.14;
+    let armR = Math.sin(wp) * 0.38 * m + 0.14;
+    let lean = 0.07;
+    if (e.state === 'telegraph') {
+      const q = e.stateT / e.teleT;
+      armL = armR = -2.5 * q;
+      lean = -0.38 * q;
+    } else if (e.state === 'strike') {
+      const q = Math.min(1, e.stateT / 0.22);
+      armL = armR = -2.5 + 3.4 * q;
+      lean = -0.38 + 0.82 * q;
+    } else if (e.state === 'flinch' || e.state === 'stagger') {
+      lean = -0.22;
+    }
+    P.armL.rotation.x += (armL - P.armL.rotation.x) * Math.min(1, 13 * dt);
+    P.armR.rotation.x += (armR - P.armR.rotation.x) * Math.min(1, 13 * dt);
+    P.torso.rotation.x += (lean - P.torso.rotation.x) * Math.min(1, 10 * dt);
+    P.head.rotation.x = -P.torso.rotation.x * 0.55; // eyes stay on the prey
+    gp.rotation.set(0, e.yaw, 0);
+  }
+
+  // Spider procedural pose: skittering tetrapod gait, restless twitch, rearing
+  // telegraph with raised forelegs, abdomen sway; death curls the legs in.
+  function animateSpider(e, dt, t) {
+    const h = e.holder;
+    const P = h.parts;
+    const gp = h.root;
+    const spd = Math.hypot(e.vel.x, e.vel.z);
+    e.animSpd += (spd - e.animSpd) * Math.min(1, 10 * dt);
+    gp.position.copy(e.pos);
+
+    if (e.state === 'dead') {
+      const f = Math.min(1, e.deadT / 0.7);
+      const L = P.legs;
+      for (let i = 0; i < L.length; i++) {
+        L[i].knee.rotation.z = L[i].baseKnee + L[i].side * -1.5 * f; // legs curl in
+        L[i].hip.rotation.z = L[i].side * 1.1 * f;
+      }
+      gp.rotation.set(0, e.yaw, e.fallDir * f * Math.PI); // rolls onto its back
+      gp.position.y += f * 0.35 * (e.type === 'broodling' ? 0.4 : 1);
+      if (e.deadT > SINK_AFTER) gp.position.y -= (e.deadT - SINK_AFTER) / SINK_T * (e.height + 0.6);
+      return;
+    }
+
+    const scaleK = e.type === 'broodling' ? 3.2 : 2.0;
+    e.walkPhase += spd * dt * scaleK;
+    const m = clamp(e.animSpd / (e.speed * 0.55), 0, 1);
+    const tw = Math.sin(t * 9 + e.seed * 20) * 0.05; // restless even at rest
+    const rear = e.state === 'telegraph' ? Math.min(1, e.stateT / e.teleT) :
+      e.state === 'strike' ? Math.max(0, 1 - e.stateT / 0.2) : 0;
+    const L = P.legs;
+    for (let i = 0; i < L.length; i++) {
+      const leg = L[i];
+      const ph = e.walkPhase * 2.2 + leg.phase;
+      const lift = Math.max(0, Math.sin(ph)) * 0.5 * m;
+      const swing = Math.cos(ph) * 0.32 * m;
+      let z = leg.side * lift * 0.55 + tw * leg.side;
+      // rearing: the front pairs rise, fangs bared
+      if (rear > 0 && leg.idx < 2) z += leg.side * rear * (leg.idx === 0 ? 1.0 : 0.55);
+      leg.hip.rotation.y = leg.baseYaw + swing * leg.side;
+      leg.hip.rotation.z = z;
+      leg.knee.rotation.z = leg.baseKnee - leg.side * lift * 0.45;
+    }
+    P.body.position.y = P.body.userData.by +
+      Math.abs(Math.sin(e.walkPhase * 2.2)) * 0.05 * m +
+      Math.sin(t * 3 + e.seed * 9) * 0.02 + rear * 0.22;
+    P.body.rotation.x = -rear * 0.5 + (e.state === 'strike' ? 0.25 : 0);
+    P.head.rotation.x = rear * 0.35;
+    P.abdomen.rotation.x = Math.sin(t * 2.3 + e.seed * 5) * 0.07 + rear * 0.3;
+    P.abdomen.rotation.y = Math.sin(t * 1.7) * 0.05;
+    gp.rotation.set(0, e.yaw, 0);
+  }
+
   // -------------------------------------------------------------------------
   // Billboards: blob shadow + floating hp bar
   // -------------------------------------------------------------------------
@@ -2345,7 +2828,8 @@ export function createEnemies(g) {
     }
     if (e.state === 'dead' && e.deadT > SINK_AFTER) h.shadow.visible = false;
     // hp bar: only when hurt, aggroed and close (drake uses the boss bar)
-    const show = e.alive && e.aggro && e.hp < e.maxHp && pd < 40 && e.type !== 'drake';
+    const show = e.alive && e.aggro && e.hp < e.maxHp && pd < 40 &&
+      e.type !== 'drake' && e.type !== 'undergloom'; // pure boss-bar horrors
     h.bar.visible = show;
     if (show) {
       h.bar.position.set(e.pos.x, e.pos.y + e.height + 0.55, e.pos.z);
@@ -2454,6 +2938,7 @@ export function createEnemies(g) {
       if (s.isVargr && g.flags.vargrDead) { s.permaDead = true; continue; }
       if (s.boss && bossState[s.type] && bossState[s.type].dead) { s.permaDead = true; continue; }
       if (s.deadFlag && g.flags[s.deadFlag]) { s.permaDead = true; continue; }
+      if (s.type === 'undergloom' && !g.flags.undergloomWoken) continue; // the deep dark sleeps until disturbed
       if (s.nightOnly && !night) continue;
       if (t < s.respawnAt) continue;
       const d = dist2d(s.x, s.z, p.x, p.z);
@@ -2550,9 +3035,10 @@ export function createEnemies(g) {
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
       if (!e.alive) continue;
+      if (e.type === 'undergloom' && e.aggro) { bbe = e; break; } // THE UNDERGLOOM owns the bar
       if (e.type === 'drake' && dist2d(e.pos.x, e.pos.z, p.x, p.z) < 120) { bbe = e; break; }
       if (e.type === 'barrowlord' && e.aggro) bbe = e;
-      if ((e.type === 'morvane' || e.type === 'troll') && e.aggro && !bbe) bbe = e;
+      if ((e.type === 'morvane' || e.type === 'troll' || e.type === 'broodmother') && e.aggro && !bbe) bbe = e;
     }
     if (bbe) {
       bossBarT -= g.time.dt;
@@ -2618,6 +3104,7 @@ export function createEnemies(g) {
     goblin:     ['iron_ore', 0.25],
     bandit:     ['old_goblet', 0.15],
     werewolf:   ['pelt', 0.35],
+    broodling:  ['silk', 0.3],
   };
 
   // --- Game-day counter (dayFrac wraps at midnight) ---------------------------
@@ -2986,8 +3473,23 @@ export function createEnemies(g) {
       // Despawn wanderers that drift far behind (bosses persist)
       if (!e.boss && !e.isVargr && pd > DESPAWN_R) { despawn(e); continue; }
 
+      // Undergloom: immune to frost — the furnace does not chill. Undo the
+      // slow the moment combat applies it (its tick then cleans up).
+      if (e.type === 'undergloom' && e._frostBase !== undefined) {
+        e.speed = e._frostBase;
+        e._frostUntil = 0;
+        if (!g.flags.gloomFrostHint) {
+          g.flags.gloomFrostHint = true;
+          events.emit('notify', { text: 'The cold means nothing to it', sub: 'Nothing does.' });
+        }
+      }
+
       if (e.type === 'drake') updateDrake(e, dt, t, pd);
+      else if (e.type === 'palerider') updateRider(e, dt, t, pd);
       else updateGrounded(e, dt, t, pd);
+      if (e.dead || list.indexOf(e) < 0) { // rider may dissolve mid-update
+        if (list.indexOf(e) < 0) continue;
+      }
 
       animate(e, dt, t, pd);
       updateBillboards(e, pd);

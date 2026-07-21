@@ -351,6 +351,7 @@ body.ef-photo #ef-sn-tap{display:none;}
   }
 
   function openTravel(from) {
+    if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
     if (trvOpen || g.paused || g.cameraLock || travel.phase !== 'idle') return;
     if (aggroNear()) {
       notify('Enemies nearby', 'Deal with your pursuers before taking the road.');
@@ -413,6 +414,7 @@ body.ef-photo #ef-sn-tap{display:none;}
     if (fx * fx + fz * fz > 1) { pl.yaw = Math.atan2(-fx, -fz); pl.pitch = 0; }
     // the road takes time: distance/3000 of a day, at least 0.01
     const adv = Math.max(0.01, travel.dist / TRAVEL_DAY_DIV);
+    if (g.time.dayFrac + adv >= 1) g.flags.dayCount = (g.flags.dayCount | 0) + 1; // midnight crossed in transit
     g.time.dayFrac = (g.time.dayFrac + adv) % 1;
     notify(d.name, 'The road took ~' + Math.max(1, Math.round(adv * 24)) + ' hours.');
   }

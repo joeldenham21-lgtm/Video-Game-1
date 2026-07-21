@@ -381,13 +381,18 @@ export function createSky(g) {
     uniforms.uMoonVis.value =
       smoothstep(0.02, 0.14, moonDir.y) * (0.30 + 0.70 * (1 - dayL));
     uniforms.uStars.value = cur.st;
-    uniforms.uCloudThresh.value = lerp(0.74, 0.46, cover);
+    // Weather fronts command the sky: rain/storm force heavy cover and a
+    // bruised, darkened cloud deck (weather.js dims exposure; this darkens
+    // the SOURCE so storms never rain out of a blue sky).
+    const wI = (g.weather && (g.weather.state === 'rain' || g.weather.state === 'storm')) ? (g.weather.intensity || 0) : 0;
+    uniforms.uCloudThresh.value = lerp(lerp(0.74, 0.46, cover), 0.30, wI);
     // Cloud lit face: sun-tinted at golden hour, white by day, moonlit at night
     cloudLit.copy(sunColKF).lerp(CLOUD_WHITE, 0.55)
       .multiplyScalar(0.18 + 0.88 * dayL);
     cloudLit.r += 0.05 * (1 - dayL); // faint cold night sheen
     cloudLit.g += 0.06 * (1 - dayL);
     cloudLit.b += 0.09 * (1 - dayL);
+    if (wI > 0) cloudLit.multiplyScalar(1 - 0.45 * wI); // storm decks are dark-bellied
     cloudShade.copy(midColor).multiplyScalar(0.72);
 
     // --- fog: owned here, always the horizon color -------------------------------

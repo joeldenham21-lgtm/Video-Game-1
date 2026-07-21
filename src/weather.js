@@ -264,7 +264,7 @@ export function createWeather(g) {
       boltQuad(qi, pts[p0], pts[p0 + 1], pts[p0 + 2], pts[p1], pts[p1 + 1], pts[p1 + 2], 0.16);
     }
     boltAttr.needsUpdate = true;
-    boltAge = Math.random() < 0.55 ? 0 : 99;   // occasional VISIBLE bolt; flash always
+    boltAge = 0;   // every strike shows its bolt — the flash alone read as a bug
     flashT = 0;
     flashK = 0.42 + Math.random() * 0.25;
     // Thunder arrives late by distance (0.5–3 s-ish), speed-of-sound feel.
@@ -341,7 +341,7 @@ export function createWeather(g) {
       flashEl.style.opacity = op === 0 ? '0' : op.toFixed(3);
     }
     boltAge += dt;
-    bolt.visible = boltAge < 0.12 && (boltAge < 0.05 || boltAge > 0.075); // flicker
+    bolt.visible = boltAge < 0.28 && (boltAge < 0.12 || boltAge > 0.17); // flicker, long enough to land on screen
 
     // --- sky coupling: exposure dim + fog pull-in (AFTER sky wrote them) -----
     const r = g.renderer;

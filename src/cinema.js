@@ -345,7 +345,7 @@ export function createCinema(g) {
     if (!L) return;
     for (let i = 0; i < L.length; i++) {
       const e = L[i];
-      if (e.alive && e.isVargr && e.aggro) { startBossIntro('Vargr Redfang'); return; }
+      if (e.alive && e.isVargr && e.aggro && !e.echo) { startBossIntro('Vargr Redfang'); return; }
     }
   }
 

@@ -657,7 +657,7 @@ body.ef-photo #hud{display:none!important;}
   }
 
   canvas.addEventListener('pointerdown', (e) => {
-    if (modalOpen()) return;
+    if (modalOpen() || (g.paused && !pauseOpen)) return;
     if (e.pointerType === 'touch' || e.pointerType === 'pen') {
       touchSeen();
       if (e.clientX < innerWidth * 0.45 && joyId === null) startJoy(e);
@@ -789,7 +789,7 @@ body.ef-photo #hud{display:none!important;}
       if (!pauseOpen && !deathOpen) toggleJournal();
       return;
     }
-    if (modalOpen()) return;
+    if (modalOpen() || (g.paused && !pauseOpen)) return;
 
     if (MOVE_KEYS.has(e.code)) { keys.add(e.code); setMoveFromKeys(); return; }
     switch (e.code) {

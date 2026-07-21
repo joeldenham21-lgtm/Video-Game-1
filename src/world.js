@@ -1003,7 +1003,7 @@ void main() {
   vec3 N = normalize(vN);
   float sf = max(dot(N, uSunDir), 0.0);
   // Silhouette rock: a darker, cooler read of the sky itself.
-  vec3 rock = uHaze * (mix(0.60, 0.46, uDay) + 0.16 * sf * uDay);
+  vec3 rock = uHaze * (mix(0.60, 0.40, uDay) + 0.16 * sf * uDay);
   // Snow caps: lifted toward white, catching the sun on lit faces.
   vec3 snow = mix(uHaze, vec3(1.0), 0.28 + 0.26 * uDay) * (0.72 + 0.40 * sf * uDay);
   vec3 col = mix(rock, snow, vSnow);
@@ -1030,7 +1030,7 @@ function buildMegaPeakGeometry() {
   for (const M of MASSIFS) {
     const a0 = (M.c - M.span / 2) * D2R, a1 = (M.c + M.span / 2) * D2R;
     const s1 = M.seed * 13.7, s2 = M.seed * 7.1;
-    const snowline = 0.42 * M.h + 160;
+    const snowline = 0.44 * M.h + 190;
     const baseHaze = 0.18 + 0.38 * smoothstep(2650, 3400, M.r);
     const base = vo;
     for (let iu = 0; iu <= NU; iu++) {
@@ -1160,7 +1160,7 @@ function buildGodRayGeometry(axis) {
   let si = 0;
   for (const [sx, sz] of RAY_SPOTS) {
     const h = terrainHeight(sx, sz);
-    const L = 13 + hash2(si, 1, 811) * 5;
+    const L = 17 + hash2(si, 1, 811) * 6;
     const inten = 0.7 + hash2(si, 2, 811) * 0.3;
     const yaw0 = hash2(si, 3, 811) * TAU;
     for (let pl = 0; pl < 2; pl++) {
@@ -1169,12 +1169,12 @@ function buildGodRayGeometry(axis) {
       const v0 = P.length / 3;
       for (let j = 0; j <= 3; j++) { // rows bottom → top
         const t = j / 3;
-        const hw = lerp(1.7, 0.8, t); // beam narrows toward the canopy
+        const hw = lerp(3.0, 1.4, t); // beam narrows toward the canopy
         for (let i = -1; i <= 1; i++) {
           v.set(i * hw * cy, t * L, i * hw * sy).applyQuaternion(q);
           P.push(sx + v.x, h + 0.4 + v.y, sz + v.z);
           const a = ROW_A[j] * (i === 0 ? 1 : 0) * inten;
-          C.push(1.0 * inten, 0.87 * inten, 0.66 * inten, a);
+          C.push(1.0 * inten, 0.84 * inten, 0.60 * inten, a);
         }
       }
       for (let j = 0; j < 3; j++) {
@@ -2000,7 +2000,7 @@ export function createWorld(g) {
     raysMorning.visible = mVis > 0.004;
     raysEvening.visible = eVis > 0.004;
     if (raysMorning.visible || raysEvening.visible) {
-      rayMat.opacity = (mVis + eVis) * (0.16 + 0.05 * Math.sin(t * 0.31));
+      rayMat.opacity = (mVis + eVis) * (0.22 + 0.06 * Math.sin(t * 0.31));
     }
   }
 
