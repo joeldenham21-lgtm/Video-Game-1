@@ -1817,7 +1817,8 @@ export function createEnemies(g) {
     const damp = Math.min(1, 4 * dt);
     const anchored = e.state === 'idle' || e.state === 'dead' ||
       (e.state === 'telegraph' && !e.castMove) ||
-      e.state === 'stagger' || e.state === 'flinch' || e.state === 'guard' || e.state === 'blink';
+      e.state === 'stagger' || e.state === 'flinch' || e.state === 'guard' ||
+      e.state === 'blink' || e.state === 'feint';
     if (anchored) {
       e.vel.x -= e.vel.x * Math.min(1, 8 * dt);
       e.vel.z -= e.vel.z * Math.min(1, 8 * dt);
@@ -1866,13 +1867,15 @@ export function createEnemies(g) {
     const d = Math.hypot(p.position.x - e.pos.x, p.position.z - e.pos.z);
     if (d > e.reach + 0.6) return;
     if (p.stats.hp <= 0) return;
+    // duelist counter-lunges land +15% (duDmgMul, cleared at strike end)
+    const dmg = Math.max(1, Math.round(e.dmg * (e.duDmgMul || 1)));
     let res = null;
-    if (g.combat && g.combat.tryBlock) res = g.combat.tryBlock(e.dmg);
+    if (g.combat && g.combat.tryBlock) res = g.combat.tryBlock(dmg);
     if (res && res.parried) { stagger(e); return; }
     if (res && res.blocked) return; // combat handled stamina cost, no hp
-    p.damage(e.dmg, e.pos);
+    p.damage(dmg, e.pos);
     // Vampires drain: a landed bite feeds them
-    if (e.drains) e.hp = Math.min(e.maxHp, e.hp + e.dmg * 0.7);
+    if (e.drains) e.hp = Math.min(e.maxHp, e.hp + dmg * 0.7);
     // Brood bites poison; the mother sometimes throws a snaring web
     if (e.type === 'broodmother' || e.type === 'broodling') applyVenomHit(e);
     if (e.type === 'undergloom' && g.player.addShake) g.player.addShake(0.5);
@@ -2011,6 +2014,408 @@ export function createEnemies(g) {
     emitBurst(e.pos.x, e.pos.y + 1.1, e.pos.z, 14, 0.8, 0.1, 0.2, 1);
   }
 
+  // =========================================================================
+  // DUELIST layer (DUELIST.md) — the hagraven feeling. Tiered fight-brains:
+  // 0 basic / 1 skilled / 2 master (elites +1). Everything here is transient
+  // per-fight state on the enemy object; nothing serialized, all polling
+  // 10Hz staggered, module arrays reused.
+  // =========================================================================
+  let duTickT = 0;            // global 10Hz tick (tokens + projectile cache)
+  let duTokensLive = false;   // roster non-empty → token gating is in force
+  let duLastRearT = -99;      // fairness rail: one back-attack per 3s
+  let duBlockHeldT = 0;       // continuous player block duration (turtle read)
+  let duKickNoteT = -99;      // guard-break notify throttle
+
+  // Seeded per-enemy rng — deterministic per fight (see startAggro), testable
+  function duRoll(e) {
+    e.duRng = (Math.imul(e.duRng, 1664525) + 1013904223) >>> 0;
+    return e.duRng / 4294967296;
+  }
+
+  // Adaptation: a projectile-heavy player raises the evasion tier one step
+  function duEffTier(e) {
+    const total = e.duMemMelee + e.duMemProj + e.duMemBow;
+    if (total >= 6 && (e.duMemProj + e.duMemBow) > total * 0.6) {
+      return Math.min(2, e.duTier + 1);
+    }
+    return e.duTier;
+  }
+  function duMeleeHeavyFight(e) {
+    const total = e.duMemMelee + e.duMemProj + e.duMemBow;
+    return total >= 6 && e.duMemMelee > total * 0.6;
+  }
+
+  // Clear per-strike decorations (counter-lunge / feint / kick) — called at
+  // strike end and on any interrupt so nothing leaks between attacks.
+  function duClearAttack(e) {
+    if (e.duTier === undefined || e.duTier < 0) return;
+    e.duFeint = 0; e.duTeleOv = 0; e.duDmgMul = 1; e.duLunge = 0;
+    e.duKick = false; e.duCounter = 0;
+  }
+
+  // Post-strike cooldown — skilled+ duelists PRESS an exhausted player
+  // (attack cooldowns ×0.7 while stamina < 18; contract §6)
+  function duEndCd(e) {
+    let cd = e.atkCd * (0.85 + e.seed * 0.4);
+    if (e.duTier >= 1 && g.player && g.player.stats.stamina < 18) cd *= 0.7;
+    return cd;
+  }
+
+  // May this duelist begin a strike? (recovery frames, attack tokens, and the
+  // never-two-from-behind rail). Non-duelists always pass.
+  function duMayAttack(e, t, skipRecover) {
+    if (e.duTier < 0) return true;
+    if (!skipRecover && e.duRecoverT > 0) return false; // dodge recovery
+    if (e.ranged) return true;                          // ranged never hold tokens
+    if (!e.duToken && duTokensLive) return false;       // wait for a token
+    const p = g.player.position;
+    const dx = e.pos.x - p.x, dz = e.pos.z - p.z;
+    const dd = Math.max(Math.hypot(dx, dz), 0.01);
+    g.camera.getWorldDirection(_duV);
+    if ((dx * _duV.x + dz * _duV.z) / dd < -0.35) {     // striking from behind
+      if (t - duLastRearT < DU_REAR_CD) return false;
+      duLastRearT = t;
+    }
+    return true;
+  }
+
+  // Dress a fresh telegraph with a feint (master) or guard-break kick
+  // (skilled+) when the reads call for it. Rails: feint cd 6s, kick cd 7s.
+  function duDressAttack(e) {
+    const turtling = duBlockHeldT > 2.5;
+    if (e.duTier >= 2 && e.duFeintCd <= 0 && (turtling || duMeleeHeavyFight(e)) &&
+        duRoll(e) < 0.6) {
+      e.duFeint = 1; e.duFeintCd = DU_FEINT_CD;
+      return;
+    }
+    if (turtling && e.duTier >= 1 && e.duKickCd <= 0 && duRoll(e) < 0.7) {
+      e.duKick = true; e.duKickCd = 7;
+    }
+  }
+
+  // The guard-break kick: small damage straight through the shield, stamina
+  // torn away, the stance broken. tryBlock never sees it — the boot doesn't
+  // care (contract §6).
+  function duKickHit(e) {
+    const p = g.player;
+    const d = Math.hypot(p.position.x - e.pos.x, p.position.z - e.pos.z);
+    if (d > e.reach + 0.6 || p.stats.hp <= 0) return;
+    p.damage(4, e.pos);
+    p.stats.stamina = Math.max(0, p.stats.stamina - 20);
+    if (p.velocity && d > 0.01) {
+      p.velocity.x += (p.position.x - e.pos.x) / d * 6;
+      p.velocity.z += (p.position.z - e.pos.z) / d * 6;
+    }
+    if (g.time.elapsed - duKickNoteT > 8) {
+      duKickNoteT = g.time.elapsed;
+      events.emit('notify', { text: 'Guard broken!', sub: 'A kick knocks your shield wide.' });
+    }
+    sfx('swingHeavy');
+    lastHitter = e; lastHitT = g.time.elapsed;
+  }
+
+  // Whiff punish: hop back out of the swing (Dodge_Backward), queue the
+  // counter-lunge. The recovery window makes the hop itself baitable.
+  function duHopBack(e, nx, nz) {
+    e.duDodgeCd = DU_DODGE_CD[e.duTier];
+    e.duRecoverT = DODGE_T + DU_RECOVER_T;
+    e.state = 'dodge'; e.stateT = 0;
+    e.dodgeKind = 1;
+    e.duCounter = 1;
+    e.vel.x = nx * 8; e.vel.z = nz * 8; // ~2.8u hop away from the blade
+    sfx('swing'); // dodge-wind tell
+  }
+
+  // Projectile evasion roll/blink, away from the shot's lateral drift.
+  // (cx,cz) = closest-approach offset from the enemy — the passing side.
+  function duDodgeProjectile(e, pr, cx, cz) {
+    e.duDodgeCd = DU_DODGE_CD[e.duTier] + duRoll(e) * 0.4;
+    e.duRecoverT = DODGE_T + DU_RECOVER_T;
+    let dx = -cx, dz = -cz;
+    const l = Math.hypot(dx, dz);
+    if (l < 0.2) { // dead-on shot: pick a side across the flight line
+      const s = duRoll(e) < 0.5 ? 1 : -1;
+      dx = -pr.vz * s; dz = pr.vx * s;
+      const vl = Math.max(Math.hypot(dx, dz), 0.01);
+      dx /= vl; dz /= vl;
+    } else { dx /= l; dz /= l; }
+    if (e.type === 'witch' || e.type === 'morvane' || e.type === 'palerider') {
+      // casters don't roll in the dirt — they aren't where the arrow lands
+      beginBlink(e);
+      const d = 4 + duRoll(e) * 2;
+      e.blinkDX = dx * d; e.blinkDZ = dz * d;
+      return;
+    }
+    e.state = 'dodge'; e.stateT = 0;
+    e.dodgeKind = 0;
+    e.duCounter = 0;
+    // clip side in the enemy's own frame (matches the thrall convention)
+    e.dodgeDir = (dx * -Math.cos(e.yaw) + dz * Math.sin(e.yaw)) >= 0 ? 1 : -1;
+    e.vel.x = dx * 6.5; e.vel.z = dz * 6.5; // ~4.5u/s burst through the roll
+    sfx('swing'); // dodge-wind tell
+  }
+
+  // Ranged duelists prefer HIGH GROUND: sample 5 retreat candidates, take the
+  // highest dry one that stays in the fight (contract §3).
+  function duKitePick(e) {
+    const p = g.player.position;
+    let ax = e.pos.x - p.x, az = e.pos.z - p.z;
+    const l = Math.max(Math.hypot(ax, az), 0.01);
+    ax /= l; az /= l;
+    const baseA = Math.atan2(ax, az);
+    let bx = 0, bz = 0, bh = -1e9;
+    for (let i = 0; i < 5; i++) {
+      const a = baseA + (i - 2) * 0.55;
+      const cx = e.pos.x + Math.sin(a) * 7;
+      const cz = e.pos.z + Math.cos(a) * 7;
+      const h2 = terrainHeight(cx, cz);
+      if (h2 < WATER_LEVEL + 0.5) continue;
+      if (dist2d(cx, cz, p.x, p.z) > 18) continue; // stay in the band
+      if (h2 > bh) { bh = h2; bx = cx; bz = cz; }
+    }
+    if (bh > -1e8) { e.duKiteX = bx; e.duKiteZ = bz; }
+    else { e.duKiteX = e.pos.x + ax * 7; e.duKiteZ = e.pos.z + az * 7; }
+  }
+
+  // LOS denial: find a fat collider (r > 1.2) and a waypoint on its far side
+  // so the stone sits square on the player→duelist segment.
+  function duFindCover(e) {
+    const p = g.player.position;
+    const cols = g.colliders;
+    let best = -1, bestD = 1e9;
+    for (let i = 0; i < cols.length; i++) {
+      const c = cols[i];
+      if (!(c.r > 1.2)) continue;
+      const dE = dist2d(c.x, c.z, e.pos.x, e.pos.z);
+      if (dE > 34) continue;
+      if (dist2d(c.x, c.z, p.x, p.z) < 6) continue; // player already on it
+      if (dE < bestD) { bestD = dE; best = i; }
+    }
+    if (best < 0) return false;
+    const c = cols[best];
+    let ux = c.x - p.x, uz = c.z - p.z;
+    const ul = Math.max(Math.hypot(ux, uz), 0.01);
+    ux /= ul; uz /= ul;
+    const wx = c.x + ux * (c.r + 2.2);
+    const wz = c.z + uz * (c.r + 2.2);
+    if (terrainHeight(wx, wz) < WATER_LEVEL + 0.5) return false;
+    e.duCoverX = wx; e.duCoverZ = wz;
+    return true;
+  }
+  function duStartRetreat(e, dur) {
+    e.state = 'losRetreat'; e.stateT = 0;
+    e.duRetreatT = dur;
+    e.duToken = false; e.duSlot = -1;
+    duClearAttack(e);
+  }
+
+  // Per-duelist 10Hz staggered poll: kite spots, LOS retreat, pressure barks,
+  // and the headline act — projectile evasion off g.combat.getProjectiles.
+  function duelistPoll(e, t, pd) {
+    const p = g.player;
+    // pressure read: exhausted player → audible aggression (press is applied
+    // at cooldown time; the bark is the tell)
+    if (e.duTier >= 1 && e.duBarkT <= 0 && p.stats.stamina < 18) {
+      e.duBarkT = 7;
+      if (e.type === 'goblin' || e.type === 'witch') sfx('goblinCackle');
+      else if (e.type === 'skeleton' || e.type === 'skelarcher') sfx('skeletonRattle');
+      else if (e.type === 'werewolf') sfx('wolfHowl');
+    }
+    // ranged: refresh the high-ground kite spot while crowded
+    if (e.ranged && pd < 13) duKitePick(e);
+    // LOS-denial retreat: hurt below 35% by projectiles → put stone between.
+    // (Never the Pale Rider — the walk does not break.)
+    if (e.hp < e.maxHp * 0.35 && e.duProjHit && e.duRetreatCd <= 0 &&
+        e.type !== 'palerider' &&
+        (e.state === 'chase' || e.state === 'flank') && duFindCover(e)) {
+      duStartRetreat(e, 12);
+      return;
+    }
+    // PROJECTILE EVASION — closest approach of each live shot within the
+    // threat window; roll = tierBase × distanceFactor × levelScale.
+    if (e.duDodgeCd > 0 || _proj.length === 0) return;
+    if (e.state !== 'chase' && e.state !== 'flank' &&
+        e.state !== 'losRetreat' && e.state !== 'guard') return;
+    const tier = duEffTier(e);
+    const widen = tier > e.duTier;          // adaptation widens the window
+    const win = widen ? 1.5 : 1.2;
+    const threatR = e.bodyR + (widen ? 0.9 : 0.6);
+    const ex = e.pos.x, ey = e.pos.y + e.height * 0.55, ez = e.pos.z;
+    for (let i = 0; i < _proj.length; i++) {
+      const pr = _proj[i];
+      const rx = ex - pr.x, ry = ey - pr.y, rz = ez - pr.z;
+      const vv = pr.vx * pr.vx + pr.vy * pr.vy + pr.vz * pr.vz;
+      if (vv < 1) continue;
+      const tca = (rx * pr.vx + ry * pr.vy + rz * pr.vz) / vv;
+      if (tca <= 0.02 || tca > win) continue;
+      const cx = pr.x + pr.vx * tca - ex;
+      const cy = pr.y + pr.vy * tca - ey;
+      const cz = pr.z + pr.vz * tca - ez;
+      if (Math.sqrt(cx * cx + cy * cy + cz * cz) > threatR) continue;
+      // late reads fail: > 0.55s to impact → full chance, < 0.25s → none
+      const df = clamp((tca - 0.25) / 0.30, 0.05, 1);
+      const chance = Math.min(0.95, DU_TIER_BASE[tier] * df * playerScale());
+      if (duRoll(e) < chance) duDodgeProjectile(e, pr, cx, cz);
+      break; // one read per poll — nearest threat only
+    }
+  }
+
+  // Global 10Hz tick: refresh the projectile cache and arbitrate ATTACK
+  // TOKENS (cap 2) + the 6-slot flank ring for every aggroed melee duelist.
+  function duTokenTick(t) {
+    _duFighters.length = 0;
+    const p = g.player.position;
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
+      if (!e.alive || e.duTier < 0 || e.ranged || e.fly || e.type === 'palerider') continue;
+      if (!e.aggro) { e.duToken = false; e.duSlot = -1; continue; }
+      const pd = dist2d(e.pos.x, e.pos.z, p.x, p.z);
+      if (pd > 60) {
+        e.duToken = false; e.duSlot = -1;
+        if (e.state === 'flank') { e.state = 'chase'; e.stateT = 0; }
+        continue;
+      }
+      e.duPd = pd;
+      _duFighters.push(e);
+    }
+    duTokensLive = _duFighters.length > 0;
+    if (!duTokensLive) return;
+    _duFighters.sort(duByPd);
+    // attackers mid-blade always keep their token (never yanked mid-swing)
+    let tokens = 0;
+    for (let i = 0; i < _duFighters.length; i++) {
+      const f = _duFighters[i];
+      if (f.duToken && (f.state === 'telegraph' || f.state === 'strike' || f.state === 'feint')) tokens++;
+      else f.duToken = false;
+    }
+    // grant the rest nearest-first
+    for (let i = 0; i < _duFighters.length && tokens < DU_TOKENS; i++) {
+      const f = _duFighters[i];
+      if (f.duToken || f.state === 'losRetreat') continue;
+      f.duToken = true; tokens++;
+      f.duSlot = -1;
+      if (f.state === 'flank') { f.state = 'chase'; f.stateT = 0; }
+    }
+    // everyone else rings the fight on the 6 flank slots
+    for (let k = 0; k < 6; k++) _slotBusy[k] = 0;
+    g.camera.getWorldDirection(_duV);
+    const faceA = Math.atan2(_duV.x, _duV.z);
+    for (let i = 0; i < _duFighters.length; i++) {
+      const f = _duFighters[i];
+      if (f.duToken) continue;
+      if (f.state !== 'chase' && f.state !== 'flank') continue; // busy reeling/dodging
+      // master tier slips to cover between tokens (proactive LOS denial)
+      if (f.duTier === 2 && f.duRetreatCd <= 0 && duRoll(f) < 0.2 && duFindCover(f)) {
+        duStartRetreat(f, 5);
+        continue;
+      }
+      let s = f.duSlot;
+      if (s < 0 || _slotBusy[s]) {
+        const ea = Math.atan2(f.pos.x - p.x, f.pos.z - p.z);
+        let bestK = -1, bestD = 1e9;
+        for (let k = 0; k < 6; k++) {
+          if (_slotBusy[k]) continue;
+          const d = angDiff(faceA + DU_SLOTS[k], ea);
+          if (d < bestD) { bestD = d; bestK = k; }
+        }
+        s = bestK;
+      }
+      if (s < 0) { // ring full (7+ fighters): fall back to plain chase
+        if (f.state === 'flank') { f.state = 'chase'; f.stateT = 0; }
+        continue;
+      }
+      _slotBusy[s] = 1;
+      f.duSlot = s;
+      const a = faceA + DU_SLOTS[s];
+      f.duFlankX = p.x + Math.sin(a) * DU_RING_R;
+      f.duFlankZ = p.z + Math.cos(a) * DU_RING_R;
+      if (f.state === 'chase') { f.state = 'flank'; f.stateT = 0; }
+    }
+  }
+
+  // --- Duelist event reads ---------------------------------------------------
+  // Every player action feeds per-enemy fight memory; melee swings inside the
+  // forward arc trigger the whiff-punish hop (contract §2, §5).
+  events.on('attackSwing', (d) => {
+    if (!d || !g.player) return;
+    const w = d.weapon;
+    const isBow = w === 'bow';
+    const isCast = w === 'fire' || w === 'frost' || w === 'lightning';
+    const px = g.player.position.x, pz = g.player.position.z;
+    let haveDir = false;
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
+      if (!e.alive || !e.aggro || e.duTier < 0) continue;
+      const dx = e.pos.x - px, dz = e.pos.z - pz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > 3600) continue;
+      if (isBow) e.duMemBow++;
+      else if (isCast) e.duMemProj++;
+      else e.duMemMelee++;
+      // WHIFF PUNISH: skilled+ inside the swing arc, dodge ready → hop back
+      if (!isBow && !isCast && e.duTier >= 1 && e.duDodgeCd <= 0 && e.duRecoverT <= 0 &&
+          d2 < 12.25 && (e.state === 'chase' || e.state === 'flank' || e.state === 'guard')) {
+        if (!haveDir) { g.camera.getWorldDirection(_duV); haveDir = true; }
+        const dd = Math.sqrt(d2) || 0.01;
+        if ((dx * _duV.x + dz * _duV.z) / dd > 0.5 &&
+            duRoll(e) < (e.duTier >= 2 ? 0.7 : 0.4)) {
+          duHopBack(e, dx / dd, dz / dd);
+        }
+      }
+    }
+  });
+
+  // Hitscan spells (frost/lightning): the cast event fires a beat before the
+  // damage lands — a skilled+ duelist ALREADY IN MOTION takes one long stride
+  // off the aim line. Feels like they saw it coming, never like rollback.
+  events.on('spellCast', (d) => {
+    if (!d || (d.school !== 'frost' && d.school !== 'lightning')) return;
+    const p = g.player.position;
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
+      if (!e.alive || !e.aggro || e.duTier < 1 || e.duDodgeCd > 0) continue;
+      if (e.state !== 'flank' && !(e.ranged && e.state === 'chase')) continue;
+      const sp = Math.hypot(e.vel.x, e.vel.z);
+      if (sp < 1.4) continue; // must already be strafing
+      if (dist2d(e.pos.x, e.pos.z, p.x, p.z) > 60) continue;
+      if (duRoll(e) >= DU_TIER_BASE[duEffTier(e)] * 0.8) continue;
+      const k = 1.9 / sp;
+      const nx = e.pos.x + e.vel.x * k, nz = e.pos.z + e.vel.z * k;
+      if (terrainHeight(nx, nz) < WATER_LEVEL - 0.5) continue;
+      e.pos.x = nx; e.pos.z = nz;
+      e.duDodgeCd = DU_DODGE_CD[e.duTier];
+      e.duRecoverT = DODGE_T + DU_RECOVER_T;
+      e.state = 'dodge'; e.stateT = 0;
+      e.dodgeKind = 0;
+      e.duCounter = 0;
+      e.dodgeDir = (e.vel.x * -Math.cos(e.yaw) + e.vel.z * Math.sin(e.yaw)) >= 0 ? 1 : -1;
+      sfx('swing');
+    }
+  });
+
+  // Drinking is a duel decision: every aggroed duelist surges 1.4× for 2.5s
+  // and the nearest token-holder answers the sip immediately (contract §6).
+  events.on('potionUsed', () => {
+    if (!g.player) return;
+    const p = g.player.position;
+    let best = null, bd = 1e9;
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
+      if (!e.alive || !e.aggro || e.duTier < 0) continue;
+      const pd2 = dist2d(e.pos.x, e.pos.z, p.x, p.z);
+      if (pd2 > 60) continue;
+      e.duPressT = 2.5;
+      if (e.duToken && !e.ranged && pd2 < bd) { bd = pd2; best = e; }
+    }
+    if (best) {
+      best.cooldown = 0;
+      if (bd < best.reach + 2.4 && (best.state === 'chase' || best.state === 'flank')) {
+        best.state = 'telegraph'; best.stateT = 0;
+        sfx('swing');
+      }
+    }
+  });
+
   // -------------------------------------------------------------------------
   // Grounded state machine (all types except flying drake)
   // -------------------------------------------------------------------------
@@ -2050,12 +2455,33 @@ export function createEnemies(g) {
         // Blood pact struck mid-fight → the vampires stand down
         if (pactPassive(e)) { e.aggro = false; e.state = 'return'; e.stateT = 0; break; }
         if (R) {
-          // ranged: hold the band, back off when crowded, fire when clear
-          if (pd < R.min) {
-            const ax = e.pos.x + (e.pos.x - p.position.x);
-            const az = e.pos.z + (e.pos.z - p.position.z);
-            moveToward(e, ax, az, e.speed, dt, false);
-          } else if (pd > R.max) {
+          // ranged: hold the band, back off when crowded, fire when clear.
+          // Duelist archers/casters kite a wider 10-16u band toward sampled
+          // HIGH GROUND, with the occasional backward spring (DUELIST.md §3).
+          const kite = e.duTier >= 0;
+          const rMin = kite ? 10 : R.min;
+          const rMax = kite ? 16 : R.max;
+          if (pd < rMin) {
+            if (kite && (e.duKiteX !== 0 || e.duKiteZ !== 0)) {
+              if (pd < rMin * 0.6 && e.duDodgeCd <= 0 && duRoll(e) < 0.45) {
+                // kite tell: the backward spring out of the closing player
+                e.duDodgeCd = DU_DODGE_CD[e.duTier];
+                e.duRecoverT = DODGE_T + DU_RECOVER_T;
+                e.state = 'dodge'; e.stateT = 0;
+                e.dodgeKind = 1; e.duCounter = 0;
+                const inv = 1 / Math.max(pd, 0.01);
+                e.vel.x = (e.pos.x - p.position.x) * inv * 8;
+                e.vel.z = (e.pos.z - p.position.z) * inv * 8;
+                sfx('swing');
+                break;
+              }
+              moveToward(e, e.duKiteX, e.duKiteZ, e.speed * (e.duPressT > 0 ? 1.4 : 1.05), dt, false);
+            } else {
+              const ax = e.pos.x + (e.pos.x - p.position.x);
+              const az = e.pos.z + (e.pos.z - p.position.z);
+              moveToward(e, ax, az, e.speed, dt, false);
+            }
+          } else if (pd > rMax) {
             moveToward(e, p.position.x, p.position.z, e.speed, dt, false);
           } else {
             // slow strafing drift while holding range
@@ -2063,7 +2489,8 @@ export function createEnemies(g) {
             moveToward(e, p.position.x + Math.cos(e.orbitA) * pd, p.position.z + Math.sin(e.orbitA) * pd, e.speed * 0.4, dt, false);
           }
           turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 7, dt);
-          if (e.cooldown <= 0 && pd > R.min * 0.5 && pd < R.max + 3 && losClear(e)) {
+          if (e.cooldown <= 0 && pd > rMin * 0.5 && pd < rMax + 3 && losClear(e) &&
+              (e.duTier < 0 || e.duRecoverT <= 0)) {
             e.state = 'telegraph'; e.stateT = 0;
             sfx(e.type === 'skelarcher' ? 'bowDraw' : 'fireCast');
           }
@@ -2091,7 +2518,8 @@ export function createEnemies(g) {
           tx += -(p.position.z - e.pos.z) * inv * perp;
           tz += (p.position.x - e.pos.x) * inv * perp;
         }
-        moveToward(e, tx, tz, e.speed, dt, true);
+        // potion punish: aggroed duelists surge while the bottle is up
+        moveToward(e, tx, tz, e.speed * (e.duPressT > 0 ? 1.4 : 1), dt, true);
         turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 6, dt);
         // vampire thralls sidestep in a blur between closes
         if (e.type === 'thrall' && pd < 8 && pd > 2.2) {
@@ -2099,6 +2527,7 @@ export function createEnemies(g) {
           if (e.dodgeT <= 0) {
             e.dodgeT = 1.6 + e.seed * 2.2;
             e.dodgeDir = Math.random() < 0.5 ? 1 : -1;
+            e.dodgeKind = 0;
             e.state = 'dodge'; e.stateT = 0;
             const inv = 1 / Math.max(pd, 0.01);
             e.vel.x += -(p.position.z - e.pos.z) * inv * 10 * e.dodgeDir;
@@ -2111,9 +2540,11 @@ export function createEnemies(g) {
           e.blinkT -= dt;
           if (e.blinkT <= 0 && pd < 16) { beginBlink(e); break; }
         }
-        // bandits (and Vargr) raise their blade sometimes
+        // bandits (and Vargr) raise their blade sometimes — a melee-heavy
+        // player teaches them to raise it far more often (DUELIST.md §5)
         if ((e.type === 'bandit' || e.isVargr) && e.cooldown > 0.4 && pd < 5 &&
-            hash2((t * 10) | 0, e.spawner ? e.spawner.id : 5, 23) < (e.isVargr ? 0.09 : 0.06)) {
+            hash2((t * 10) | 0, e.spawner ? e.spawner.id : 5, 23) <
+              (duMeleeHeavyFight(e) ? 0.22 : (e.isVargr ? 0.09 : 0.06))) {
           e.state = 'guard'; e.stateT = 0;
           break;
         }
@@ -2128,8 +2559,9 @@ export function createEnemies(g) {
             break;
           }
         }
-        if (pd < e.reach + 0.4 && e.cooldown <= 0) {
+        if (pd < e.reach + 0.4 && e.cooldown <= 0 && duMayAttack(e, t, false)) {
           e.state = 'telegraph'; e.stateT = 0;
+          if (e.duTier >= 0) duDressAttack(e); // feint / guard-break reads
           sfx(e.type === 'barrowlord' || e.type === 'drake' || e.type === 'troll' || e.type === 'undergloom' ? 'swingHeavy' : 'swing'); // audible windup cue
         }
         // combat vocals
@@ -2159,7 +2591,28 @@ export function createEnemies(g) {
           const az = e.pos.z + (e.pos.z - p.position.z);
           moveToward(e, ax, az, e.speed * 0.55, dt, false);
         }
-        if (e.stateT >= e.teleT) { e.state = 'strike'; e.stateT = 0; e.hitApplied = false; }
+        // counter-lunges and feint re-strikes run a shortened windup
+        const tele = e.duTeleOv > 0 ? e.duTeleOv : e.teleT;
+        // master FEINT: the windup snaps shut at 60% — a quiet click, a tilt,
+        // a beat of nothing... then the true strike (DUELIST.md §5)
+        if (e.duFeint === 1 && e.stateT >= tele * 0.6) {
+          e.duFeint = 2;
+          e.state = 'feint'; e.stateT = 0;
+          sfx('uiClick');
+          break;
+        }
+        if (e.stateT >= tele) { e.state = 'strike'; e.stateT = 0; e.hitApplied = false; }
+        break;
+      }
+      case 'feint': {
+        // the cancel: readable by the patient, devastating to panic blockers
+        turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 6, dt);
+        if (e.stateT >= DU_FEINT_T) {
+          e.duFeint = 0;
+          e.state = 'telegraph'; e.stateT = 0;
+          e.duTeleOv = 0.26; // the real blow comes fast
+          sfx('swing');
+        }
         break;
       }
       case 'strike': {
@@ -2170,7 +2623,8 @@ export function createEnemies(g) {
           }
           if (e.stateT >= e.strikeT) {
             e.state = 'chase'; e.stateT = 0;
-            e.cooldown = e.atkCd * (0.85 + e.seed * 0.4);
+            e.cooldown = duEndCd(e);
+            duClearAttack(e);
           }
           break;
         }
@@ -2186,24 +2640,73 @@ export function createEnemies(g) {
           }
           break;
         }
-        if (e.stateT < 0.16) { // lunge
-          e.pos.x += Math.sin(e.yaw) * e.speed * 1.9 * dt;
-          e.pos.z += Math.cos(e.yaw) * e.speed * 1.9 * dt;
+        if (e.stateT < 0.16) { // lunge (counter-lunges bite deeper)
+          const lg = e.duLunge > 0 ? e.duLunge : 1.9;
+          e.pos.x += Math.sin(e.yaw) * e.speed * lg * dt;
+          e.pos.z += Math.cos(e.yaw) * e.speed * lg * dt;
         }
         if (!e.hitApplied && e.stateT >= STRIKE_HIT_T) {
           e.hitApplied = true;
-          tryStrikeHit(e);
+          if (e.duKick) duKickHit(e); else tryStrikeHit(e);
         }
         if (e.stateT >= e.strikeT) {
           e.state = 'chase'; e.stateT = 0;
-          e.cooldown = e.atkCd * (0.85 + e.seed * 0.4);
+          e.cooldown = duEndCd(e);
+          duClearAttack(e);
         }
         break;
       }
       case 'dodge': {
-        // thrall blur-step: brief burst of lateral velocity, then re-engage
+        // thrall blur-step / duelist roll: burst of velocity, then re-engage
         turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 6, dt);
-        if (e.stateT >= DODGE_T) { e.state = e.aggro ? 'chase' : 'idle'; e.stateT = 0; }
+        if (e.stateT >= DODGE_T) {
+          // WHIFF PUNISH part two: the hop-back answers with a counter-lunge
+          // — shortened telegraph, hungrier lunge, +15% (DUELIST.md §2)
+          if (e.duCounter === 1 && e.aggro) {
+            e.duCounter = 0;
+            if (pd < e.reach + 3.6 && duMayAttack(e, t, true)) {
+              e.state = 'telegraph'; e.stateT = 0;
+              e.duTeleOv = 0.22; e.duDmgMul = 1.15; e.duLunge = 2.6;
+              sfx('swingHeavy'); // distinct counter audio
+              break;
+            }
+          }
+          e.state = e.aggro ? 'chase' : 'idle'; e.stateT = 0;
+        }
+        break;
+      }
+      case 'flank': {
+        // tokenless duelist: hold a ring slot, strafe-facing the prey, and
+        // swap in the moment a token frees (DUELIST.md §3)
+        if (pd > DEAGGRO_R || p.stats.hp <= 0 || pactPassive(e)) {
+          e.aggro = false; e.state = 'return'; e.stateT = 0;
+          e.duToken = false; e.duSlot = -1;
+          break;
+        }
+        moveToward(e, e.duFlankX, e.duFlankZ, e.speed * 0.85 * (e.duPressT > 0 ? 1.4 : 1), dt, false);
+        turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 7, dt);
+        break;
+      }
+      case 'losRetreat': {
+        // LOS denial: fall back through cover, mend, re-engage (DUELIST.md §4)
+        if (pd > DEAGGRO_R || p.stats.hp <= 0) {
+          e.aggro = false; e.state = 'return'; e.stateT = 0;
+          break;
+        }
+        e.duRetreatT -= dt;
+        if (Math.hypot(e.duCoverX - e.pos.x, e.duCoverZ - e.pos.z) > 1.3) {
+          moveToward(e, e.duCoverX, e.duCoverZ, e.speed * 1.05, dt, true);
+        } else {
+          // in cover: breathe, mend (home-heal rate), watch the approach
+          e.vel.x -= e.vel.x * Math.min(1, 6 * dt);
+          e.vel.z -= e.vel.z * Math.min(1, 6 * dt);
+          e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.05 * dt);
+          turnTo(e, Math.atan2(p.position.x - e.pos.x, p.position.z - e.pos.z), 6, dt);
+        }
+        if (e.hp >= e.maxHp * 0.6 || e.duRetreatT <= 0 || pd < 4) {
+          e.state = 'chase'; e.stateT = 0;
+          e.duRetreatCd = 16;
+        }
         break;
       }
       case 'blink': {
@@ -2521,6 +3024,15 @@ export function createEnemies(g) {
         if (e.stateT >= STAGGER_T) { e.state = 'chase'; e.stateT = 0; }
         break;
       }
+      case 'blink': {
+        // master-tier evasion: the Rider is simply not where the arrow lands
+        if (!e.blinkDone && e.stateT >= BLINK_T * 0.45) {
+          e.blinkDone = true;
+          doBlinkJump(e);
+        }
+        if (e.stateT >= BLINK_T) { e.state = 'chase'; e.stateT = 0; }
+        break;
+      }
       default: { // the walk. relentless, 2.2u/s, no more, no less
         e.aggro = true;
         e.state = 'chase'; // normalize (spawnAt debug spawns arrive 'idle'; integrate() anchors idle)
@@ -2567,7 +3079,7 @@ export function createEnemies(g) {
     switch (e.state) {
       case 'telegraph':
       case 'strike': {
-        const total = e.teleT + e.strikeT;
+        const total = (e.duTeleOv > 0 ? e.duTeleOv : e.teleT) + e.strikeT;
         if (spec.cast) {
           if (entered && e.state === 'telegraph') {
             playOnce(h, spec.cast, 0.12, clipDur(h, spec.cast) / Math.max(total, 0.3));
@@ -2576,8 +3088,13 @@ export function createEnemies(g) {
         }
         if (spec.attacks) {
           if (entered && e.state === 'telegraph') {
-            e.atkIdx = (e.atkIdx + 1) % spec.attacks.length;
-            const nm = spec.attacks[e.atkIdx];
+            let nm;
+            if (e.duKick && h.clips.Unarmed_Melee_Attack_Kick) {
+              nm = 'Unarmed_Melee_Attack_Kick'; // the guard-break boot
+            } else {
+              e.atkIdx = (e.atkIdx + 1) % spec.attacks.length;
+              nm = spec.attacks[e.atkIdx];
+            }
             playOnce(h, nm, 0.1, clipDur(h, nm) / Math.max(total, 0.3));
           }
           break;
@@ -2612,9 +3129,29 @@ export function createEnemies(g) {
       }
       case 'dodge': {
         if (entered) {
-          const nm = e.dodgeDir > 0 ? 'Dodge_Right' : 'Dodge_Left';
+          const nm = e.dodgeKind === 1 ? 'Dodge_Backward'
+            : (e.dodgeDir > 0 ? 'Dodge_Right' : 'Dodge_Left');
           if (h.clips[nm]) playOnce(h, nm, 0.06, clipDur(h, nm) / (DODGE_T + 0.05));
         }
+        break;
+      }
+      case 'flank': {
+        // ring the prey: strafe clips picked by lateral motion (flank tell)
+        const spd = e.animSpd;
+        if (spd > 0.6) {
+          const lat = e.vel.x * -Math.cos(e.yaw) + e.vel.z * Math.sin(e.yaw);
+          const nm = lat >= 0 ? 'Running_Strafe_Right' : 'Running_Strafe_Left';
+          if (h.clips[nm]) { play(h, nm, 0.2, clamp(spd / REF_RUN, 0.5, 1.8)); break; }
+          play(h, spd > 3.1 && h.clips[spec.locoRun] ? spec.locoRun : spec.locoWalk,
+            0.2, clamp(spd / REF_RUN, 0.5, 2.0));
+          break;
+        }
+        play(h, spec.locoIdle, 0.3, 1);
+        break;
+      }
+      case 'feint': {
+        // the cancel: windup snaps shut to idle — with the click, the tell
+        if (entered) play(h, spec.locoIdle, 0.08, 1);
         break;
       }
       case 'blink': {
@@ -2699,6 +3236,8 @@ export function createEnemies(g) {
     }
     // werewolf hunch fallback when no spine bone was found
     if (h.spec && h.spec.hunch && h.rig && !h.spine) tiltX += 0.35;
+    // duelist feint: slight head-tilt through the cancel — the readable tell
+    if (e.state === 'feint') tiltZ += 0.14;
 
     // Morvane blink: collapse to mist and re-form
     if (e.state === 'blink') {
@@ -3519,6 +4058,18 @@ export function createEnemies(g) {
     scanT -= dt;
     if (scanT <= 0) { scanT = 0.6; scanSpawners(t); }
 
+    // DUELIST global 10Hz tick: turtle-read timer, projectile cache (one
+    // getProjectiles call shared by every staggered duelist poll), and the
+    // attack-token / flank-ring arbitration.
+    duBlockHeldT = (g.player.isBlocking && g.player.stats.hp > 0) ? duBlockHeldT + dt : 0;
+    duTickT -= dt;
+    if (duTickT <= 0) {
+      duTickT = 0.1;
+      if (g.combat && g.combat.getProjectiles && inCombat) g.combat.getProjectiles(_proj);
+      else _proj.length = 0;
+      duTokenTick(t);
+    }
+
     // Cheap pairwise separation (before state updates, uses last positions)
     for (let i = 0; i < list.length - 1; i++) {
       const a = list[i];
@@ -3565,6 +4116,21 @@ export function createEnemies(g) {
         if (!g.flags.gloomFrostHint) {
           g.flags.gloomFrostHint = true;
           events.emit('notify', { text: 'The cold means nothing to it', sub: 'Nothing does.' });
+        }
+      }
+
+      // DUELIST timers + 10Hz staggered per-enemy poll (skip far / unaggroed)
+      if (e.duTier >= 0) {
+        if (e.duDodgeCd > 0) e.duDodgeCd -= dt;
+        if (e.duRecoverT > 0) e.duRecoverT -= dt;
+        if (e.duPressT > 0) e.duPressT -= dt;
+        if (e.duFeintCd > 0) e.duFeintCd -= dt;
+        if (e.duKickCd > 0) e.duKickCd -= dt;
+        if (e.duRetreatCd > 0) e.duRetreatCd -= dt;
+        if (e.duBarkT > 0) e.duBarkT -= dt;
+        if (e.aggro && pd < 60) {
+          e.duPollT -= dt;
+          if (e.duPollT <= 0) { e.duPollT = 0.1; duelistPoll(e, t, pd); }
         }
       }
 

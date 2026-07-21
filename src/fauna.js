@@ -1110,6 +1110,17 @@ export function createFauna(g) {
   // Rig: the same Khronos Fox the wolves wear, warm brown, ~0.9× their size.
   g.assets.char('fox').then((res) => {
     const rig = res.scene;
+    // Fox.glb ships with no vertex normals, which renders BLACK under the
+    // Lambert lighting (fine for night wolves, wrong for a warm-brown village
+    // dog in daylight). Give Biscuit's clone its own geometry with computed
+    // normals — one-time init cost, and the wolves' shared geometry stays
+    // exactly as the enemies module expects it.
+    rig.traverse((o) => {
+      if ((o.isMesh || o.isSkinnedMesh) && !o.geometry.getAttribute('normal')) {
+        o.geometry = o.geometry.clone();
+        o.geometry.computeVertexNormals();
+      }
+    });
     const box = new THREE.Box3().setFromObject(rig);
     const nh = Math.max(0.01, box.max.y - box.min.y);
     rig.scale.setScalar(DOG_H / nh);

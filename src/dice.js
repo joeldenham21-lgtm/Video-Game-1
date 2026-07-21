@@ -7,7 +7,10 @@
 // EV-playing opponent with personality taunts, CSS-tumbled dice, rattle sfx,
 // escrowed gold through g.player.addGold, record in g.flags.dice = {w,l,gold}.
 // g.paused is held while the table is open. Both hands are always face-up and
-// named/ranked so losing feels fair.
+// named/ranked so losing feels fair. After dusk (dayFrac >0.76 or <0.22) the
+// game follows Bram into the Ember Hearth: the outdoor table sleeps and a
+// 'Dice by the fire' interactable wakes at the buried taproom's fireside
+// table (spot published by structures on g.emberHearth).
 // Owns only itself: no other src module is imported (contract rule).
 // ============================================================================
 import * as THREE from 'three';
@@ -260,9 +263,27 @@ export function createDice(g) {
       radius: 3.2,
       label: '🎲 Dice Poker — Bram',
       onInteract: () => invite('bram'),
-      enabled: () => !g.paused,
+      // Bram's evenings belong to the Ember Hearth — the game moves inside.
+      enabled: () => !g.paused && !hearthNight(),
     });
   }
+
+  // --- Dice by the fire: after dusk the game relocates into the Ember
+  //     Hearth (structures.js buries the tavern interior and publishes
+  //     g.emberHearth; the fireside-table spot streams in via update()) ------
+  const hearthNight = () => {
+    const f = g.time.dayFrac;
+    return f > 0.76 || f < 0.22;
+  };
+  const hearthPos = new THREE.Vector3(0, -9999, 0);
+  let hearthPosSet = false;
+  g.interactables.push({
+    pos: hearthPos,
+    radius: 3.0,
+    label: '🎲 Dice by the fire',
+    onInteract: () => invite('bram'),
+    enabled: () => !g.paused && hearthPosSet && hearthNight(),
+  });
 
   // --- Fenwick's dice mat (his stall at the village edge; he plays only
   //     while he's stopped there — his road walk is a function of dayFrac) ---
@@ -876,8 +897,14 @@ export function createDice(g) {
 
   ev.on('gameLoaded', () => { if (state !== 'closed') close(); });
 
-  // --- update: hold the pause while the table is open --------------------------
+  // --- update: hold the pause while the table is open; adopt the Ember
+  //     Hearth fireside spot once structures has published it -----------------
   function update() {
+    if (!hearthPosSet && g.emberHearth && g.emberHearth.diceSpot) {
+      const s = g.emberHearth.diceSpot;
+      hearthPos.set(s.x, s.y, s.z);
+      hearthPosSet = true;
+    }
     if (state !== 'closed' && !g.paused) g.paused = true;
   }
 

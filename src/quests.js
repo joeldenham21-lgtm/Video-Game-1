@@ -90,6 +90,46 @@ export function createQuests(g) {
   const WALK_CLIP_SPEED = 2.2;  // u/s the Walking_A clip was animated at
   const NPC_WALK_SPEED = 0.85;  // u/s villagers actually amble at
 
+  // --- The Ember Hearth dusk schedule (schedules-lite) ----------------------
+  // structures.js buries the tavern interior and publishes g.emberHearth.
+  // Each villager sets off for the tavern door at a staggered dusk moment,
+  // fades through it to an interior spot (their Talk interactable follows —
+  // it references group.position), and dawn 0.24 restores the day posts.
+  // An NPC targeted by the active quest marker skips the pub entirely.
+  const HEARTH_AT = { maera: 0.72, torvald: 0.73, sylva: 0.74, bram: 0.75, wendel: 0.76 };
+
+  // Which NPC (if any) the active quest marker points at — mirror of
+  // markerPos()'s markNpc cases so a marker never leads to an empty post.
+  function markerNpcId() {
+    const s = state.stage;
+    switch (state.main) {
+      case 1: return 'maera';
+      case 2: return s >= 2 ? 'maera' : null;
+      case 3: return s === 0 ? null : 'torvald';
+      case 4: return (s === 0 || s === 3) ? 'maera' : null;
+      case 5: return s === 1 ? 'maera' : null;
+    }
+    if (state.crone === 6) return 'wendel';
+    return null;
+  }
+
+  // One rotating fireside rumor a night, seeded by the economy day.
+  const HEARTH_RUMORS = [
+    'Fenwick came through with mud to the knee — says the marsh road drinks a ' +
+      "cart wheel a week now. If you're hauling, go by Stonebridge and pay the " +
+      'toll like an honest fool.',
+    "Torvald's been buying every sack of coal Wendel can spare. When a smith " +
+      "hoards fire, the valley's about to need swords. Sleep on that.",
+    'Sylva counted wolf sign past the fold again — bolder each moon. The fire ' +
+      "is warm, stranger; the pines aren't.",
+    'Bram waters nothing, whatever they mutter. But the ale IS thinner — the ' +
+      'barley came up short this year, and fields tell fewer lies than farmers.',
+    "They say a light burns some nights on Mirrormere's far shore. Old wives " +
+      "call it Enna's lamp. Old wives are right more often than old men.",
+    'The crows have moved off Harrow Fen. First time in my life. Either the ' +
+      'dead are done counting... or something worse is doing the counting for them.',
+  ];
+
   // Blob shadow — shared radial-gradient CanvasTexture quad
   const shCanvas = document.createElement('canvas');
   shCanvas.width = shCanvas.height = 64;
@@ -152,6 +192,8 @@ export function createQuests(g) {
     const npc = {
       id: def.id, name: def.name, group,
       homeX: def.x, homeZ: def.z, homeR: def.homeR,
+      dayX: def.x, dayZ: def.z, dayR: def.homeR, // day post (Hearth schedule swaps home)
+      sched: 0, // 0 = at the day post, 1 = walking to the tavern door, 2 = inside
       tgtX: def.x, tgtZ: def.z, waitT: 1 + Math.random() * 4,
       phase: Math.random() * 6.28, t: 0, walking: false, talking: false,
       mixer: null, actions: null, current: null, animAcc: 0,
@@ -215,10 +257,41 @@ export function createQuests(g) {
       n.t += dt;
       const gp = n.group.position;
       const pd = p ? dist2d(gp.x, gp.z, p.x, p.z) : 1e9;
-      const nearPlayer = pd < 4;
+      // en-route villagers don't stop to chat — they'd never make last call
+      const nearPlayer = pd < 4 && n.sched !== 1;
+      const H = g.emberHearth;
 
       if (!g.paused) {
         n.walking = false;
+        // --- Ember Hearth schedule: dusk walk in, dawn walk out --------------
+        if (H) {
+          const f = g.time.dayFrac;
+          const due = (f >= HEARTH_AT[n.id] || f < 0.24) && markerNpcId() !== n.id;
+          if (due && n.sched === 0) {
+            n.sched = 1; // set off for the tavern door
+            n.waitT = 0;
+          } else if (!due && n.sched !== 0) {
+            // dawn 0.24 (or an active quest marker wants them) → day post
+            n.sched = 0;
+            n.homeX = n.dayX; n.homeZ = n.dayZ; n.homeR = n.dayR;
+            n.tgtX = n.dayX; n.tgtZ = n.dayZ;
+            gp.x = n.dayX; gp.z = n.dayZ;
+            n.waitT = 2 + Math.random() * 4;
+          }
+          if (n.sched === 1) {
+            n.tgtX = H.door.x; n.tgtZ = H.door.z; n.waitT = 0;
+            if (dist2d(gp.x, gp.z, H.door.x, H.door.z) < 1.7) {
+              // fade through the door to their spot by the fire
+              const s = H.npcSpots[n.id] || H.npcSpots.maera;
+              n.sched = 2;
+              gp.x = s.x; gp.z = s.z;
+              n.group.rotation.y = s.ry;
+              n.homeX = s.x; n.homeZ = s.z; n.homeR = 0.45;
+              n.tgtX = s.x; n.tgtZ = s.z;
+              n.waitT = 3 + Math.random() * 5;
+            }
+          }
+        }
         if (nearPlayer) {
           // Face the player
           const want = Math.atan2(p.x - gp.x, p.z - gp.z);
@@ -250,7 +323,7 @@ export function createQuests(g) {
             n.walking = true;
           }
         }
-        gp.y = terrainHeight(gp.x, gp.z);
+        gp.y = (n.sched === 2 && H) ? H.floorY : terrainHeight(gp.x, gp.z);
       } else if (n.talking && p) {
         // Paused in dialogue: keep turning to face the player
         const want = Math.atan2(p.x - gp.x, p.z - gp.z);
@@ -756,6 +829,35 @@ export function createQuests(g) {
     }
     // Dawn detector re-arms from current time-of-day on load.
     wasNight = null;
+    // Villagers snap straight to wherever the clock says they belong (no
+    // ghost cross-village walks right after a load into night).
+    syncHearth();
+  }
+
+  // Place every villager per the Ember Hearth schedule immediately.
+  function syncHearth() {
+    const H = g.emberHearth;
+    if (!H) return;
+    const f = g.time.dayFrac;
+    for (let i = 0; i < npcList.length; i++) {
+      const n = npcList[i];
+      const due = (f >= HEARTH_AT[n.id] || f < 0.24) && markerNpcId() !== n.id;
+      if (due) {
+        const s = H.npcSpots[n.id] || H.npcSpots.maera;
+        n.sched = 2;
+        n.group.position.set(s.x, H.floorY, s.z);
+        n.group.rotation.y = s.ry;
+        n.homeX = s.x; n.homeZ = s.z; n.homeR = 0.45;
+        n.tgtX = s.x; n.tgtZ = s.z;
+        n.waitT = 3;
+      } else {
+        n.sched = 0;
+        n.homeX = n.dayX; n.homeZ = n.dayZ; n.homeR = n.dayR;
+        n.tgtX = n.dayX; n.tgtZ = n.dayZ;
+        n.group.position.set(n.dayX, terrainHeight(n.dayX, n.dayZ), n.dayZ);
+        n.waitT = 2;
+      }
+    }
   }
 
   // ==========================================================================
@@ -1032,6 +1134,20 @@ export function createQuests(g) {
         choices: [{ label: 'Farewell.', next: null }],
       };
       N.idle.choices.unshift({ label: 'You\'ve been cold since the pines, Maera.', next: 'mCrone' });
+    }
+
+    // --- The Ember Hearth: while she's at the fire, one rotating rumor a
+    // night (seeded by the economy day so it changes with each game-day).
+    if (npcs.maera && npcs.maera.sched === 2) {
+      N.hearthRumor = {
+        text: HEARTH_RUMORS[((g.flags.econDay | 0) + 1) % HEARTH_RUMORS.length],
+        choices: [{ label: 'Good night, Maera.', next: null }],
+      };
+      const entry = N[start];
+      if (entry && entry.choices) {
+        entry.choices.splice(Math.max(0, entry.choices.length - 1), 0,
+          { label: 'Any word over the fire?', next: 'hearthRumor' });
+      }
     }
 
     return { start, nodes: N };

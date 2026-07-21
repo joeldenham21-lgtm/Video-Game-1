@@ -1522,6 +1522,33 @@ void terrTap(sampler2D dT, sampler2D nT, vec2 uv, vec2 oa, vec2 ob, float bf,
         }
       }
     }
+    // Desktop: tuck the shell just under the fine heightfield so it never
+    // buries the textured near chunks. The coarse 19.6u grid overshoots
+    // concave/steep ground by many units, which used to be invisible (both
+    // surfaces shared one palette) but now hides the splat textures behind
+    // flat untextured shell. Blanket -1.2u bias on gentle ground; on steep
+    // cells clamp to the fine minimum sampled at four half-step diagonals.
+    if (DESKTOP) {
+      const pa = geo.attributes.position.array;
+      const n = segs + 1, step = 4400 / segs, hs = step * 0.55;
+      for (let iz = 0; iz < n; iz++) {
+        for (let ix = 0; ix < n; ix++) {
+          const i = iz * n + ix;
+          const h0 = pa[i * 3 + 1];
+          const hL = pa[(ix > 0 ? i - 1 : i) * 3 + 1], hR = pa[(ix < segs ? i + 1 : i) * 3 + 1];
+          const hD = pa[(iz > 0 ? i - n : i) * 3 + 1], hU = pa[(iz < segs ? i + n : i) * 3 + 1];
+          let m = h0;
+          if (Math.max(Math.abs(hL - h0), Math.abs(hR - h0), Math.abs(hD - h0), Math.abs(hU - h0)) > 4) {
+            const wx = pa[i * 3], wz = pa[i * 3 + 2];
+            let h2 = terrainHeight(wx - hs, wz - hs); if (h2 < m) m = h2;
+            h2 = terrainHeight(wx + hs, wz - hs); if (h2 < m) m = h2;
+            h2 = terrainHeight(wx - hs, wz + hs); if (h2 < m) m = h2;
+            h2 = terrainHeight(wx + hs, wz + hs); if (h2 < m) m = h2;
+          }
+          pa[i * 3 + 1] = m - 1.2;
+        }
+      }
+    }
     geo.computeBoundingSphere();
     const shell = new THREE.Mesh(geo, shellMat);
     shell.receiveShadow = true; // free when shadow maps are off

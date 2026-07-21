@@ -581,8 +581,10 @@ export function createStructures(g) {
       place('hexagon/building_tavern_red.gltf', tx, gy - 0.35, tz, ry, s);
       const fx = Math.sin(ry), fz = Math.cos(ry);
       const sxd = Math.cos(ry), szd = -Math.sin(ry);
-      addCol(tx + sxd * 1.4, tz + szd * 1.4, 3.0);
-      addCol(tx - sxd * 1.4, tz - szd * 1.4, 3.0);
+      // hMin-bounded: the Ember Hearth interior is buried directly below and
+      // unbounded cylinders would reach 40u down into the taproom
+      addCol(tx + sxd * 1.4, tz + szd * 1.4, 3.0, gy - 3);
+      addCol(tx - sxd * 1.4, tz - szd * 1.4, 3.0, gy - 3);
       const wd = 0.34 * s;
       for (const k of [-1.5, 0, 1.5])
         glowB.add(TPL.quad, tx + fx * wd + sxd * k, gy + 2.3, tz + fz * wd + szd * k,
@@ -609,8 +611,8 @@ export function createStructures(g) {
         const [ax, az] = W(clx, clz);
         furnChairs.push({ x: ax, y: terrainHeight(ax, az), z: az, ry: ry + cro, s: 0.9 });
       }
-      addCol(t1x, t1z, 0.8);
-      addCol(t2x, t2z, 0.8);
+      addCol(t1x, t1z, 0.8, gy - 3); // bounded — buried taproom below
+      addCol(t2x, t2z, 0.8, gy - 3);
       // village chest tucked behind the inn
       addChest('village', 23.5, 16.5, Math.atan2(-23.5, -16.5) + Math.PI, {});
     }
@@ -725,13 +727,258 @@ export function createStructures(g) {
       { x: 12.6, y: terrainHeight(12.6, 1.6), z: 1.6, ry: 0.9, s: 6 },
       { x: -10.1, y: terrainHeight(-10.1, 5.3), z: 5.3, ry: 2.2, s: 6 },
     ]);
-    addCol(21.2, 14.2, 0.9);
+    addCol(21.2, 14.2, 0.9, terrainHeight(21.2, 14.2) - 3); // bounded — Hearth below
     addCol(4.7, -12.8, 0.8);
     // --- outdoor furniture flush --------------------------------------------
     placeInstances('furniture/table_medium.gltf', furnTables);
     placeInstances('furniture/chair_A_wood.gltf', furnChairs);
     placeInstances('halloween/bench.gltf', benches);
     root.add(b.build(MAT.static));
+  }
+
+  // ==========================================================================
+  // THE EMBER HEARTH — the tavern's enterable interior. Crypt-interior
+  // technique, buried ~40u under the tavern so the acoustics VILLAGE zone
+  // (x/z-only) still applies: an 8×10 timber taproom with a real fireplace,
+  // bar, tables, seated patrons and true pooled point lights. Entry/exit are
+  // door-fade teleports; a platform clamp in update() undoes player.js's
+  // terrain snap (camera included) so the player stands on the built floor.
+  // Geometry is published on g.emberHearth for quests (dusk schedule) + dice.
+  // ==========================================================================
+  const HEARTH = {
+    x: 17, z: 13, floorY: 0,             // floorY finalized in buildEmberHearth
+    minX: 13.45, maxX: 20.55, minZ: 8.35, maxZ: 17.55, // safety clamp bounds
+    door: { x: 0, z: 0 },                // outside, on the tavern porch
+    outYaw: 0,
+    npcSpots: null, diceSpot: null,
+  };
+  let hearthIn = false;                  // authoritative; g.flags.inTavern mirrors
+  const patrons = [];                    // seated KayKit chars (mixer ticks in update)
+
+  // Self-owned 0.5s door fade: dip to black, teleport at the midpoint.
+  const fadeEl = document.createElement('div');
+  fadeEl.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;' +
+    'pointer-events:none;z-index:60;transition:opacity .24s ease;';
+  document.body.appendChild(fadeEl);
+  let hearthFade = false;
+  function doorFade(mid) {
+    if (hearthFade) return;
+    hearthFade = true;
+    if (g.audio && g.audio.play) g.audio.play('chestOpen'); // door creak
+    fadeEl.style.opacity = '1';
+    setTimeout(() => {
+      mid();
+      fadeEl.style.opacity = '0';
+      setTimeout(() => { hearthFade = false; }, 260);
+    }, 260);
+  }
+
+  function addPatron(charName, tint, x, y, z, ry) {
+    const grp = new THREE.Group();
+    grp.position.set(x, y, z);
+    grp.rotation.y = ry;
+    root.add(grp);
+    const rec = { grp, mixer: null };
+    patrons.push(rec);
+    // async attach — bare hands (no bar brawls tonight), Sit_Chair_Idle loop
+    g.assets.char(charName, { gear: { r: null, l: null } }).then((a) => {
+      if (!a) return;
+      const box = new THREE.Box3().setFromObject(a.scene);
+      const rawH = Math.max(0.1, box.max.y - box.min.y);
+      a.scene.scale.setScalar(1.78 / rawH);
+      if (g.assets.tint) g.assets.tint(a.scene, tint);
+      grp.add(a.scene);
+      let clip = null;
+      for (let i = 0; i < a.animations.length; i++) {
+        const nm = a.animations[i].name;
+        if (nm === 'Sit_Chair_Idle' || nm.endsWith('|Sit_Chair_Idle')) { clip = a.animations[i]; break; }
+      }
+      if (clip) {
+        rec.mixer = new THREE.AnimationMixer(a.scene);
+        const act = rec.mixer.clipAction(clip);
+        act.play();
+        act.time = Math.random() * (clip.duration || 1); // desync breathing
+      }
+    }).catch(() => {});
+  }
+
+  function buildEmberHearth() {
+    const HX = HEARTH.x, HZ = HEARTH.z;
+    const gy = terrainHeight(17, 10);        // the tavern's ground (village flat ≈ 8)
+    const F = gy - 40;                       // taproom floor, 40u down
+    HEARTH.floorY = F;
+    // porch door: just outside the tavern's plaza-facing face
+    const dry = Math.atan2(-17, -10);
+    const fx = Math.sin(dry), fz = Math.cos(dry);
+    HEARTH.door.x = 17 + fx * 3.6;
+    HEARTH.door.z = 10 + fz * 3.6;
+    HEARTH.outYaw = Math.atan2(fx, fz);      // facing the plaza on exit
+
+    const b = new Builder(951);
+    const PLASTER = 0x94815f, PLASTER_D = 0x87755a, WOODFLOOR = 0x6a4a28;
+    // ---- shell: plank floor, plastered walls, beamed ceiling ----------------
+    b.add(TPL.box, HX, F - 0.12, HZ, 8.6, 0.24, 10.6, 0, 0, 0, WOODFLOOR, 0.06);
+    for (let i = 0; i < 7; i++) // plank seams, alternating tone
+      b.add(TPL.box, HX - 3.51 + i * 1.17, F + 0.006, HZ, 1.02, 0.014, 10.2,
+        0, 0, 0, i % 2 ? 0x71512e : 0x634523, 0.09);
+    b.add(TPL.box, 12.8, F + 2.1, HZ, 0.5, 4.2, 10.6, 0, 0, 0, PLASTER, 0.07);   // west
+    b.add(TPL.box, 21.2, F + 2.1, HZ, 0.5, 4.2, 10.6, 0, 0, 0, PLASTER_D, 0.07); // east
+    b.add(TPL.box, HX, F + 2.1, 18.2, 8.9, 4.2, 0.5, 0, 0, 0, PLASTER, 0.07);    // north
+    b.add(TPL.box, 14.4, F + 2.1, 7.8, 3.25, 4.2, 0.5, 0, 0, 0, PLASTER_D, 0.07); // south (door gap)
+    b.add(TPL.box, 19.62, F + 2.1, 7.8, 3.35, 4.2, 0.5, 0, 0, 0, PLASTER_D, 0.07);
+    b.add(TPL.box, HX, F + 3.9, 7.8, 2.4, 0.6, 0.5, 0, 0, 0, PLASTER_D, 0.07);   // over-door
+    // corner timber posts + wall band
+    for (const [px2, pz2] of [[13.08, 8.08], [20.92, 8.08], [13.08, 17.92], [20.92, 17.92]])
+      b.add(TPL.box, px2, F + 2.15, pz2, 0.34, 4.3, 0.34, 0, 0, 0, C_TIMBER, 0.06);
+    b.add(TPL.box, 13.06, F + 3.85, HZ, 0.2, 0.26, 10.2, 0, 0, 0, C_TIMBER, 0.06);
+    b.add(TPL.box, HX, F + 3.85, 17.94, 8.1, 0.26, 0.2, 0, 0, 0, C_TIMBER, 0.06);
+    // ceiling + 3 beams
+    b.add(TPL.box, HX, F + 4.45, HZ, 8.9, 0.3, 10.9, 0, 0, 0, 0x4a3820, 0.08);
+    for (const bz of [9.8, 13, 16.2])
+      b.add(TPL.box, HX, F + 4.1, bz, 8.7, 0.36, 0.42, 0, 0, 0, C_TIMBER, 0.07);
+    // ---- the door home again (shut — passage is by fade-teleport) -----------
+    b.add(TPL.box, 16.05, F + 1.9, 7.95, 0.35, 3.8, 0.6, 0, 0, 0, C_TIMBER, 0.06);
+    b.add(TPL.box, 17.95, F + 1.9, 7.95, 0.35, 3.8, 0.6, 0, 0, 0, C_TIMBER, 0.06);
+    b.add(TPL.box, HX, F + 3.62, 7.95, 2.3, 0.42, 0.6, 0, 0, 0, C_TIMBER, 0.06);
+    b.add(TPL.box, HX, F + 1.72, 8.02, 1.7, 3.44, 0.18, 0, 0, 0, 0x2e2013, 0.05);
+    b.add(TPL.sphere, 16.45, F + 1.7, 8.14, 0.09, 0.09, 0.09, 0, 0, 0, 0xc9a441, 0.03);
+    // ---- fireplace, north wall center ---------------------------------------
+    b.add(TPL.box, HX, F + 1.7, 17.55, 2.9, 3.4, 0.9, 0, 0, 0, 0x74786f, 0.12);  // stone breast
+    b.add(TPL.box, HX, F + 3.6, 17.6, 2.1, 1.7, 0.8, 0, 0, 0, 0x6b6f66, 0.12);   // chimney throat
+    b.add(TPL.box, HX, F + 2.0, 17.38, 3.15, 0.2, 1.0, 0, 0, 0, C_TIMBER, 0.06); // mantel
+    b.add(TPL.box, HX, F + 0.85, 17.28, 1.7, 1.7, 0.62, 0, 0, 0, 0x120d08, 0.03); // firebox
+    b.add(TPL.box, HX, F + 0.07, 16.75, 2.7, 0.14, 1.7, 0, 0, 0, 0x63665e, 0.1); // hearth slab
+    b.add(TPL.cyl6, HX - 0.3, F + 0.32, 17.2, 0.24, 1.1, 0.24, 1.57, 0.35, 0, 0x4a3520, 0.08); // logs
+    b.add(TPL.cyl6, HX + 0.28, F + 0.3, 17.2, 0.22, 1.0, 0.22, 1.57, -0.3, 0, 0x422e1b, 0.08);
+    fireB.add(TPL.sphere, HX, F + 0.3, 17.15, 1.1, 0.34, 0.75, 0, 0, 0, 0xff8226, 0.05);
+    addEmitter(flames, HX, F + 0.5, 17.15, 9, 0.75, 1.0, 0.55, 0.35);
+    addEmitter(smoke, HX, F + 1.6, 17.3, 4, 0.4, 1.5, 2.2, 1.0); // drifting up the flue
+    // REAL firelight — the room's heart, warm pools on every table
+    lamp(HX, F + 1.6, 16.6, { color: 0xff8c3e, intensity: 2.3, radius: 15, flicker: 0.7, nightOnly: false });
+    // ---- the bar along the east wall ----------------------------------------
+    b.add(TPL.box, 19.75, F + 0.52, 12.3, 0.85, 1.04, 4.4, 0, 0, 0, 0x5a4128, 0.07);
+    b.add(TPL.box, 19.75, F + 1.08, 12.3, 1.05, 0.1, 4.7, 0, 0, 0, 0x77552f, 0.05);
+    b.add(TPL.box, 19.42, F + 0.16, 12.3, 0.12, 0.08, 4.3, 0, 0, 0, 0x3f2d18, 0.05);
+    place('dungeon/shelf_small.gltf.glb', 20.85, F, 11.3, -Math.PI / 2, 1);
+    placeInstances('dungeon/keg.gltf.glb', [
+      { x: 20.35, y: F, z: 15.2, ry: 0.4, s: 1 },
+      { x: 20.45, y: F, z: 16.2, ry: 2.1, s: 0.9 },
+      { x: 19.3, y: F, z: 15.8, ry: 1.2, s: 1 },
+    ]);
+    placeInstances('dungeon/bottle_A_brown.gltf.glb', [
+      { x: 19.6, y: F + 1.13, z: 11.0, ry: 0.3, s: 1 },
+      { x: 19.95, y: F + 1.13, z: 13.4, ry: 1.9, s: 1 },
+    ]);
+    placeInstances('dungeon/bottle_B_green.gltf.glb', [
+      { x: 19.8, y: F + 1.13, z: 13.62, ry: 0.8, s: 1 },
+    ]);
+    // ---- tables, chairs, stool (furniture pack) -----------------------------
+    placeInstances('furniture/table_medium.gltf', [
+      { x: 14.9, y: F, z: 15.0, ry: 0.3, s: 0.9 },   // fireside table
+      { x: 15.0, y: F, z: 10.6, ry: -0.2, s: 0.9 },  // door table
+    ]);
+    placeInstances('furniture/chair_A_wood.gltf', [
+      { x: 13.85, y: F, z: 14.55, ry: 1.17, s: 0.95 },  // patron seat
+      { x: 15.6, y: F, z: 15.9, ry: -2.48, s: 0.95 },   // patron seat
+      { x: 15.45, y: F, z: 13.85, ry: -0.5, s: 0.95 },
+      { x: 14.05, y: F, z: 10.15, ry: 1.13, s: 0.95 },
+      { x: 15.95, y: F, z: 11.05, ry: -2.01, s: 0.95 },
+    ]);
+    placeInstances('dungeon/stool.gltf.glb', [{ x: 15.35, y: F, z: 9.55, ry: 0.7, s: 1 }]);
+    // ---- rugs, candles, mugs -------------------------------------------------
+    placeInstances('furniture/rug_oval_A.gltf', [{ x: HX, y: F + 0.02, z: 15.6, ry: 0.2, s: 1.3 }]);
+    placeInstances('furniture/rug_rectangle_A.gltf', [{ x: 15.6, y: F + 0.02, z: 12.6, ry: 1.57, s: 1.2 }]);
+    placeInstances('dungeon/candle_lit.gltf.glb', [
+      { x: 15.05, y: F + 0.68, z: 14.9, ry: 0.4, s: 1 },
+      { x: 14.9, y: F + 0.68, z: 10.75, ry: 1.7, s: 1 },
+      { x: 19.75, y: F + 1.13, z: 10.7, ry: 2.6, s: 1 },
+    ]);
+    const mug = (x, y, z, c) => b.add(TPL.cyl, x, y + 0.07, z, 0.13, 0.14, 0.13, 0, 0, 0, c, 0.06);
+    mug(15.15, F + 0.68, 15.25, 0xb8a888);
+    mug(14.5, F + 0.68, 14.7, 0x8a6c48);
+    mug(14.75, F + 0.68, 10.42, 0xb8a888);
+    mug(19.6, F + 1.13, 12.0, 0x8a6c48);
+    mug(19.92, F + 1.13, 12.62, 0xb8a888);
+    // ---- wall sconces: bracket shelves + standing lanterns + REAL lights ----
+    b.add(TPL.box, 13.32, F + 1.98, 10.5, 0.55, 0.09, 0.55, 0, 0, 0, C_TIMBER, 0.05);
+    b.add(TPL.box, 13.32, F + 1.98, 15.5, 0.55, 0.09, 0.55, 0, 0, 0, C_TIMBER, 0.05);
+    b.add(TPL.box, 20.68, F + 2.28, 10.0, 0.55, 0.09, 0.55, 0, 0, 0, C_TIMBER, 0.05);
+    placeInstances('halloween/lantern_standing.gltf', [
+      { x: 13.42, y: F + 2.02, z: 10.5, ry: 1.2, s: 0.9 },
+      { x: 13.42, y: F + 2.02, z: 15.5, ry: 2.6, s: 0.9 },
+      { x: 20.58, y: F + 2.32, z: 10.0, ry: -1.2, s: 0.85 },
+    ]);
+    lamp(13.7, F + 2.6, 10.5, { intensity: 1.15, radius: 8.5, flicker: 0.25, nightOnly: false });
+    lamp(13.7, F + 2.6, 15.5, { intensity: 1.15, radius: 8.5, flicker: 0.25, nightOnly: false });
+    lamp(20.3, F + 2.9, 10.0, { intensity: 1.0, radius: 7.5, flicker: 0.3, nightOnly: false });
+    // a shield banner over the mantel
+    place('dungeon/banner_shield_red.gltf.glb', 15.1, F + 4.1, 17.88, Math.PI, 1);
+    root.add(b.build(MAT.static, false));
+
+    // ---- two regulars by the fire (KayKit chars, Sit_Chair_Idle) ------------
+    addPatron('barbarian', '#5e4634', 13.97, F, 14.6, 1.17);
+    addPatron('rogue_hooded', '#7d8391', 15.5, F, 15.82, -2.48);
+
+    // ---- colliders (ALL height-bounded — the plaza above must not feel them)
+    const colRowH = (x1, z1, x2, z2) => {
+      const n = Math.max(1, Math.round(Math.hypot(x2 - x1, z2 - z1) / 0.8));
+      for (let i = 0; i <= n; i++)
+        addCol(x1 + (x2 - x1) * i / n, z1 + (z2 - z1) * i / n, 0.25, F - 1, F + 6);
+    };
+    colRowH(12.8, 8.4, 12.8, 17.6);   // west wall
+    colRowH(21.2, 8.4, 21.2, 17.6);   // east wall
+    colRowH(13.2, 18.2, 20.8, 18.2);  // north wall
+    colRowH(13.2, 7.8, 20.8, 7.8);    // south wall (the door stays shut)
+    addCol(HX, 17.35, 1.3, F - 1, F + 5);        // fireplace
+    addCol(14.9, 15.0, 0.85, F - 1, F + 5);      // fireside table
+    addCol(15.0, 10.6, 0.85, F - 1, F + 5);      // door table
+    for (const bz of [10.4, 11.6, 12.8, 14.0]) addCol(19.75, bz, 0.62, F - 1, F + 5); // bar
+    addCol(20.1, 15.7, 0.85, F - 1, F + 5);      // kegs
+    addCol(13.85, 14.55, 0.42, F - 1, F + 5);    // seated patrons
+    addCol(15.6, 15.9, 0.42, F - 1, F + 5);
+
+    // ---- door interactables (fade + teleport) -------------------------------
+    addInter(HEARTH.door.x, gy + 1.3, HEARTH.door.z, 2.7, 'Enter the Ember Hearth', () => {
+      doorFade(() => {
+        const p = g.player;
+        if (!p) return;
+        p.position.set(HX, F, 9.7);
+        p.velocity.set(0, 0, 0);
+        p.onGround = true;
+        p.yaw = Math.PI;      // facing the fire
+        hearthIn = true;
+        g.flags.inTavern = true;
+      });
+    }, () => !hearthIn && !hearthFade);
+    addInter(HX, F + 1.2, 8.6, 2.4, 'Step outside', () => {
+      doorFade(() => {
+        const p = g.player;
+        if (!p) return;
+        p.position.set(HEARTH.door.x, terrainHeight(HEARTH.door.x, HEARTH.door.z), HEARTH.door.z);
+        p.velocity.set(0, 0, 0);
+        p.onGround = true;
+        p.yaw = HEARTH.outYaw;
+        hearthIn = false;
+        g.flags.inTavern = false;
+      });
+    }, () => hearthIn && !hearthFade);
+
+    // ---- publish for quests' dusk schedule + dice ----------------------------
+    HEARTH.npcSpots = {
+      maera:   { x: 16.1, z: 16.2, ry: 0.73 },   // warming her hands at the fire
+      torvald: { x: 13.9, z: 16.8, ry: 2.46 },   // propping up the north-west corner
+      sylva:   { x: 16.4, z: 9.4, ry: -0.86 },   // one eye on the door
+      bram:    { x: 20.55, z: 12.3, ry: -1.57 }, // behind his own bar at last
+      wendel:  { x: 18.7, z: 9.9, ry: -0.72 },   // near the warmth, near the exit
+    };
+    HEARTH.diceSpot = { x: 14.6, y: F + 0.9, z: 14.35 }; // fireside table corner
+    g.emberHearth = {
+      x: HX, z: HZ, floorY: F,
+      door: HEARTH.door,
+      npcSpots: HEARTH.npcSpots,
+      diceSpot: HEARTH.diceSpot,
+      isInside: () => hearthIn,
+    };
   }
 
   // ==========================================================================
@@ -1891,6 +2138,16 @@ export function createStructures(g) {
     if (tickAcc >= 1) { tickAcc = 0; slowTick(); }
     // flames & smoke (near-camera emitters only)
     updateEmitters(dt);
+    // Ember Hearth patrons breathe only when someone is down there to see
+    if (patrons.length) {
+      const c = g.camera.position;
+      const pdx = c.x - HEARTH.x, pdy = c.y - (HEARTH.floorY + 1.5), pdz = c.z - HEARTH.z;
+      if (pdx * pdx + pdy * pdy + pdz * pdz < 900) {
+        for (let i = 0; i < patrons.length; i++) {
+          if (patrons[i].mixer) patrons[i].mixer.update(dt);
+        }
+      }
+    }
     if (g.paused) return;
     // gameplay: stand on the tower platform + shrine blessing timer
     const p = g.player;
@@ -1931,6 +2188,22 @@ export function createStructures(g) {
           }
         }
       }
+      // The Ember Hearth platform clamp: player.js snaps position.y up to
+      // terrainHeight every frame — undo it here while inside the buried
+      // taproom, shifting the camera by the same delta so bob/dip/shake
+      // offsets survive and the render never sees the surface snap.
+      if (hearthIn) {
+        const hp = p.position;
+        if (hp.x < HEARTH.minX) hp.x = HEARTH.minX;
+        else if (hp.x > HEARTH.maxX) hp.x = HEARTH.maxX;
+        if (hp.z < HEARTH.minZ) hp.z = HEARTH.minZ;
+        else if (hp.z > HEARTH.maxZ) hp.z = HEARTH.maxZ;
+        const camOff = g.camera.position.y - (hp.y + p.eyeHeight);
+        hp.y = HEARTH.floorY;
+        g.camera.position.y = HEARTH.floorY + p.eyeHeight + camOff;
+        if (p.velocity.y < 0) p.velocity.y = 0;
+        p.onGround = true;
+      }
       if (blessTimer > 0) {
         blessTimer -= dt;
         if (blessTimer <= 0) {
@@ -1941,6 +2214,12 @@ export function createStructures(g) {
       }
     }
   }
+
+  // Death takes you out of the Hearth — respawn is at the village spawn.
+  g.events.on('playerDied', () => {
+    hearthIn = false;
+    g.flags.inTavern = false;
+  });
 
   // Snap chest lids / cage door to the freshly loaded flags
   g.events.on('gameLoaded', () => {
@@ -1957,10 +2236,34 @@ export function createStructures(g) {
     blessTimer = 0;
     lastBless = -1e9;
     tickAcc = 10;
+    // Ember Hearth save guard: a save flagged inTavern must actually hold an
+    // interior position (player.deserialize clobbers y to terrain, so judge
+    // by x/z). Flagged-but-elsewhere → wake up on the tavern porch instead.
+    {
+      const p = g.player;
+      const inFoot = p && p.position.x > HEARTH.minX - 1 && p.position.x < HEARTH.maxX + 1 &&
+        p.position.z > HEARTH.minZ - 1 && p.position.z < HEARTH.maxZ + 1;
+      if (g.flags.inTavern && inFoot) {
+        hearthIn = true;
+        p.position.y = HEARTH.floorY;
+        p.velocity.set(0, 0, 0);
+        p.onGround = true;
+      } else {
+        if (g.flags.inTavern && p) {
+          p.position.set(HEARTH.door.x,
+            terrainHeight(HEARTH.door.x, HEARTH.door.z), HEARTH.door.z);
+          p.velocity.set(0, 0, 0);
+          p.yaw = HEARTH.outYaw;
+        }
+        g.flags.inTavern = false;
+        hearthIn = false;
+      }
+    }
   });
 
   // ---- build the world (deterministic, once) --------------------------------
   buildVillage();
+  buildEmberHearth(); // NEW: the tavern interior, buried under the village
   buildRuins();       // includes the NEW cemetery ring
   buildStones();
   buildTower();
