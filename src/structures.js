@@ -8,8 +8,12 @@
 // Async asset pattern: colliders/interactables register immediately at final
 // positions; meshes attach when g.assets resolves. Repeated props use
 // InstancedMesh (shared geo/mats → 1 draw call per prop type per POI).
-// Fires/smoke/bubbles are pooled Points systems (NO real lights — emissive +
-// fake ground-glow discs); window glow is shared emissive material ≤1 Hz.
+// Fires/smoke/bubbles are pooled Points systems. Lighting is REAL now: every
+// lantern/fire/torch/cauldron registers a pooled point light via
+// g.lights.register (fake ground-glow discs are gone); window glass keeps a
+// subtle shared emissive ≤1 Hz so it reads lit, not radioactive.
+// Epic monuments this wave: the Titan of the Vale, the Elder Gate, and the
+// Battlefield of Harrow Fen (each one merged Builder mesh + an inscription).
 // ============================================================================
 import * as THREE from 'three';
 import {
@@ -55,12 +59,14 @@ function buildTemplates() {
 }
 
 // ---------------------------------------------------------------------------
-// Shared materials (Lambert only per contract; emissive fakes all "light")
+// Shared materials (Lambert only per contract). Real illumination comes from
+// g.lights; emissives here are surfaces that ARE lit (glass, coals, brew) —
+// kept deliberately subtle so they read lit rather than radioactive.
 // ---------------------------------------------------------------------------
 const MAT = {
   static: new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }),
   glow: new THREE.MeshLambertMaterial({
-    color: 0x241a10, emissive: 0xffb44d, emissiveIntensity: 0.12, flatShading: true,
+    color: 0x241a10, emissive: 0xffb44d, emissiveIntensity: 0.05, flatShading: true,
   }),
   rune: new THREE.MeshLambertMaterial({
     color: 0x39404a, emissive: 0x3fd9ff, emissiveIntensity: 0.06, flatShading: true,
@@ -68,16 +74,11 @@ const MAT = {
   fire: new THREE.MeshLambertMaterial({
     color: 0x1c0d04, emissive: 0xff8226, emissiveIntensity: 1.0, flatShading: true,
   }),
-  glowDisc: new THREE.MeshLambertMaterial({
-    color: 0x000000, emissive: 0xff8630, emissiveIntensity: 0.55, flatShading: true,
-    transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false,
-  }),
   greenGlow: new THREE.MeshLambertMaterial({
-    color: 0x0d1a10, emissive: 0x5aff7e, emissiveIntensity: 0.9, flatShading: true,
+    color: 0x0d1a10, emissive: 0x5aff7e, emissiveIntensity: 0.35, flatShading: true,
   }),
-  greenDisc: new THREE.MeshLambertMaterial({
-    color: 0x000000, emissive: 0x3fe86a, emissiveIntensity: 0.5, flatShading: true,
-    transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false,
+  brew: new THREE.MeshLambertMaterial({
+    color: 0x061208, emissive: 0x3fe86a, emissiveIntensity: 0.45, flatShading: true,
   }),
 };
 
@@ -411,11 +412,25 @@ export function createStructures(g) {
   }
 
   // ---- cross-POI merged builders (1 draw call each, world-spanning) --------
-  const glowB = new Builder(51);   // windows / lanterns / candles → MAT.glow
+  const glowB = new Builder(51);   // window glass / candle flames → MAT.glow
   const fireB = new Builder(52);   // coal beds / embers           → MAT.fire
-  const discB = new Builder(53);   // fake ground-glow discs       → MAT.glowDisc
   const greenB = new Builder(55);  // witch-green window quads     → MAT.greenGlow
-  const greenDiscB = new Builder(56); // cauldron brew / fairy glow → MAT.greenDisc
+  const brewB = new Builder(56);   // cauldron brew surface        → MAT.brew
+
+  // ---- REAL light registration (pooled point lights via g.lights) ----------
+  // Every lantern, fire, torch and cauldron gets one of these. The fake
+  // additive glow-discs and orange lantern glow-boxes are gone.
+  function lamp(x, y, z, opts = {}) {
+    return g.lights.register({
+      pos: { x, y, z },
+      color: opts.color ?? 0xffa951,
+      intensity: opts.intensity ?? 1.6,
+      radius: opts.radius ?? 10,
+      flicker: opts.flicker ?? 0.3,
+      nightOnly: opts.nightOnly !== undefined ? opts.nightOnly : true,
+      enabled: opts.enabled,
+    });
+  }
 
   // ---- chests ---------------------------------------------------------------
   let chestBaseGeo = null, chestLidGeo = null;
@@ -481,8 +496,9 @@ export function createStructures(g) {
     b.add(TPL.cyl6, x + 0.1, gy + 0.24, z, 0.22, 1.4 * scale, 0.22, 1.35, 0.5, 0, 0x4e3722, 0.08);
     b.add(TPL.cyl6, x - 0.1, gy + 0.24, z, 0.22, 1.3 * scale, 0.22, 1.4, 2.1, 0, 0x46311e, 0.08);
     fireB.add(TPL.sphere, x, gy + 0.16, z, 0.9 * scale, 0.3, 0.9 * scale, 0, 0, 0, 0xff8226, 0.05);
-    discB.add(TPL.disc, x, gy + 0.09, z, 3.4 * scale, 3.4 * scale, 1, -Math.PI / 2, 0, 0, 0xff8630, 0);
     addEmitter(flames, x, gy + 0.35, z, Math.round(8 * scale), 0.85 * scale, 1.2 * scale, 0.55, 0.35);
+    // REAL firelight — the flame particles dance over an actual point light
+    lamp(x, gy + 1.0, z, { color: 0xff8844, intensity: 1.3 + 0.5 * scale, radius: 11, flicker: 0.6, nightOnly: false });
     return gy;
   }
 
@@ -568,6 +584,8 @@ export function createStructures(g) {
       for (const k of [-1.5, 0, 1.5])
         glowB.add(TPL.quad, tx + fx * wd + sxd * k, gy + 2.3, tz + fz * wd + szd * k,
           0.62, 0.75, 1, 0, ry, 0, 0xffcf7a, 0);
+      // one real hearth-warm light spilling from the tavern front at night
+      lamp(tx + fx * (wd + 1.2), gy + 2.4, tz + fz * (wd + 1.2), { color: 0xffc070, intensity: 1.4, radius: 11, flicker: 0.15 });
       chimneys.push(addEmitter(smoke, tx - sxd * 1.2, gy + 1.40 * s - 0.6, tz - szd * 1.2, 6, 0.9, 3.8, 2.6, 1.2));
       // hanging sign on a post out front (the inn sign — quests reference it)
       const cos = Math.cos(ry), sin = Math.sin(ry);
@@ -602,8 +620,9 @@ export function createStructures(g) {
       const fx = Math.sin(ry), fz = Math.cos(ry);
       const hx = bx + fx * 3.4, hz = bz + fz * 3.4; // ember bed in the yard
       fireB.add(TPL.box, hx, gy + 0.5, hz, 0.95, 0.14, 0.72, 0, ry, 0, 0xff8226, 0.05);
-      discB.add(TPL.disc, hx, gy + 0.58, hz, 2.4, 2.4, 1, -Math.PI / 2, 0, 0, 0xff8630, 0);
       addEmitter(flames, hx, gy + 0.55, hz, 6, 0.55, 0.7, 0.5, 0.3);
+      // the forge hearth burns day and night — real light, always on
+      lamp(hx, gy + 1.1, hz, { color: 0xff7733, intensity: 1.6, radius: 8, flicker: 0.5, nightOnly: false });
       chimneys.push(addEmitter(smoke, bx - fx * 0.8, gy + 0.98 * s - 0.6, bz - fz * 0.8, 6, 0.9, 3.6, 2.4, 1.0));
       hexBarrels.push({ x: bx + fx * 4.6 + 1.0, y: terrainHeight(bx + fx * 4.6 + 1.0, bz + fz * 4.6), z: bz + fz * 4.6, ry: 0.5, s: 5 });
     }
