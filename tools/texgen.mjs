@@ -74,6 +74,23 @@ function rfbm(u, v, freq, oct, gain, seed) {
   return sum / norm;
 }
 
+// Periodic Worley/cellular noise — returns F2-F1 (0 at cell borders).
+function worleyEdge(u, v, freq, seed) {
+  const x = u * freq, y = v * freq;
+  const ix = Math.floor(x), iy = Math.floor(y);
+  let f1 = 1e9, f2 = 1e9;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const cx = ix + dx, cy = iy + dy;
+      const wx = ((cx % freq) + freq) % freq, wy = ((cy % freq) + freq) % freq;
+      const px = cx + hash2(wx, wy, seed), py = cy + hash2(wx, wy, seed + 501);
+      const d = (px - x) * (px - x) + (py - y) * (py - y);
+      if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) { f2 = d; }
+    }
+  }
+  return Math.sqrt(f2) - Math.sqrt(f1);
+}
+
 // Domain warp — offsets are themselves toroidal, so seamlessness is preserved.
 function warp(u, v, amp, freq, oct, seed) {
   return [
@@ -415,24 +432,27 @@ async function genRock() {
   const alb = newAlbedo(), hgt = newHeight();
 
   const bandPhase = new Float32Array(S * S); // reused for albedo tinting
+  const veinF = new Float32Array(S * S);     // reused for albedo darkening
   fillHeight(hgt, (u, v, x, y) => {
     const [wu, wv] = warp(u, v, 0.14, 3, 3, 601);
     // Banded strata: warped sine layers with fbm phase jitter.
     const ph = wv * 11 + fbm(wu, wv, 3, 3, 0.5, 613) * 2.4;
     bandPhase[y * S + x] = ph;
     const band = Math.sin(ph * Math.PI * 2);
-    const strata = Math.pow(0.5 + 0.5 * band, 1.6);
+    const strata = Math.pow(0.5 + 0.5 * band, 2.2);
     const chunk = fbm(wu, wv, 5, 4, 0.55, 617);
     const ridge = rfbm(wu, wv, 4, 3, 0.55, 618);
-    const fine = fbm(u, v, 70, 3, 0.5, 619);
-    let h = strata * 0.42 + chunk * 0.42 + ridge * 0.3 + fine * 0.14;
-    // Crack veins: level-set contours of warped noise -> long connected cracks.
-    const [cu, cv] = warp(u, v, 0.09, 4, 3, 631);
-    const n1 = fbm(cu, cv, 4, 3, 0.5, 641);
-    const n2 = fbm(cu, cv, 8, 3, 0.5, 643);
-    const vein1 = 1 - sstep(0.004, 0.035, Math.abs(n1 - 0.5));
-    const vein2 = 1 - sstep(0.003, 0.022, Math.abs(n2 - 0.5));
-    h -= vein1 * 0.5 + vein2 * 0.28;
+    const fine = fbm(u, v, 90, 3, 0.5, 619);
+    let h = strata * 0.4 + chunk * 0.42 + ridge * 0.3 + fine * 0.2;
+    // Crack veins: Worley cell borders (constant width) under domain warp.
+    const [cu, cv] = warp(u, v, 0.06, 4, 3, 631);
+    const e1 = worleyEdge(cu, cv, 6, 645);
+    const e2 = worleyEdge(cu, cv, 13, 647);
+    const vein1 = 1 - sstep(0.012, 0.05, e1);
+    const vein2 = (1 - sstep(0.01, 0.04, e2)) * 0.6;
+    const vein = Math.min(1, vein1 + vein2);
+    veinF[y * S + x] = vein;
+    h -= vein1 * 0.3 + vein2 * 0.18;
     return h;
   });
 
@@ -448,14 +468,16 @@ async function genRock() {
       const bandT = 0.5 + 0.5 * Math.sin(bandPhase[y * S + x] * Math.PI * 2 + 1.7);
       let c = mix3(cool, warm, clamp01(hue * 0.7 + bandT * 0.45));
       c = mix3(dark, c, clamp01(h * 1.05 + 0.06));           // recesses dark
-      const k = 0.76 + g * 0.5;                              // granular variation
+      const k = 0.7 + g * 0.6;                               // granular variation
       c = [c[0] * k, c[1] * k, c[2] * k];
+      const vd = 1 - veinF[y * S + x] * 0.42;                // cracks stay dark
+      c = [c[0] * vd, c[1] * vd, c[2] * vd];
       // Lichen speckle: clustered grey-green flecks ~4%.
       const lm = fbm(u, v, 5, 3, 0.5, 661);
       const spec = vnoise(u * 256, v * 256, 256, 256, 667);
-      if (lm > 0.55 && spec > 0.82) {
-        const t = (spec - 0.82) / 0.18;
-        c = mix3(c, [106, 114, 82], 0.45 + t * 0.4);
+      if (lm > 0.62 && spec > 0.85) {
+        const t = (spec - 0.85) / 0.15;
+        c = mix3(c, [106, 114, 82], 0.4 + t * 0.4);
       }
       const i = (y * S + x) * 3;
       alb[i] = c[0]; alb[i + 1] = c[1]; alb[i + 2] = c[2];

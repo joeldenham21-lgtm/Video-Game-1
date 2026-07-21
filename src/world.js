@@ -1091,7 +1091,8 @@ const FOG_BANKS = [
 ];
 
 // One soft disc: center vertex → mid ring (55%) → rim (alpha 0), 18 segments.
-function pushFogDisc(P, C, I, cx, y, cz, r, alpha, seed) {
+// axis: 0 = horizontal sheet (XZ), 1 = vertical curtain in XY, 2 = vertical in ZY.
+function pushFogDisc(P, C, I, cx, y, cz, r, alpha, seed, axis = 0, ry = 1) {
   const SEG = 18;
   const v0 = P.length / 3;
   P.push(cx, y, cz); C.push(1, 1, 1, alpha);
@@ -1101,8 +1102,14 @@ function pushFogDisc(P, C, I, cx, y, cz, r, alpha, seed) {
     for (let k = 0; k <= SEG; k++) {
       const t = (k / SEG) * TAU;
       const wob = 1 + (hash2(k + ring * 31, seed, 733) - 0.5) * 0.24; // organic rim
-      P.push(cx + Math.cos(t) * rr * wob, y + (hash2(k, seed + ring, 739) - 0.5) * 1.2,
-        cz + Math.sin(t) * rr * wob);
+      const u = Math.cos(t) * rr * wob, v = Math.sin(t) * rr * wob;
+      if (axis === 0) {
+        P.push(cx + u, y + (hash2(k, seed + ring, 739) - 0.5) * 1.2, cz + v);
+      } else if (axis === 1) {
+        P.push(cx + u, y + v * ry, cz + (hash2(k, seed + ring, 741) - 0.5) * 6);
+      } else {
+        P.push(cx + (hash2(k, seed + ring, 743) - 0.5) * 6, y + v * ry, cz + u);
+      }
       C.push(1, 1, 1, a);
     }
   }
@@ -1125,6 +1132,11 @@ function buildFogBankGeometry(layerB) {
     for (let s = 0; s < 3; s++) {
       pushFogDisc(P, C, I, cx, y + LIFT[s], cz, r * (1 - s * 0.13), AL[s], si * 7 + s);
     }
+    // Crossed vertical curtains: sheets vanish edge-on from ground level, so
+    // these carry the bank when seen from a hill at grazing angles (squashed
+    // to ~9% height → a low lens of mist, not a wall).
+    pushFogDisc(P, C, I, cx, y + 5.5, cz, r * 0.92, 0.34, si * 7 + 3, 1, 0.09);
+    pushFogDisc(P, C, I, cx, y + 5.5, cz, r * 0.92, 0.34, si * 7 + 4, 2, 0.09);
     si++;
   }
   const geo = new THREE.BufferGeometry();
@@ -1142,8 +1154,8 @@ function buildFogBankGeometry(layerB) {
 // ONE additive material; at most 1 visible at a time.
 const RAY_SPOTS = [
   [150, -350], [110, -350], [70, -350], [190, -350], [230, -350],
-  [110, -390], [70, -390], [230, -310], [190, -310],
-  [150, -430], [110, -430], [190, -430],
+  [230, -310], [190, -310], [170, -320], [250, -330],
+  [270, -350], [60, -320], [40, -340],
 ];
 
 function sunAxisAt(f) { // beam axis: toward the sun, lifted so shafts stay readable
