@@ -661,6 +661,11 @@ export function createAudio(g) {
   // ==========================================================================
   // play() — public. Safe no-op before unlock; 30 ms same-name dedupe protects
   // the mix when an event is both auto-wired here and play()ed by its emitter.
+  // wave-6: opts.at = {x,y,z} routes the one-shot through a pooled spatial
+  // voice (HRTF + ray occlusion on desktop, cheap stereo pan on mobile) by
+  // briefly aiming sfxBus at the pool entry while the recipe builds its graph
+  // (recipes read sfxBus at call time; connections are synchronous). Without
+  // opts.at — or if acoustics is unavailable — the legacy path is unchanged.
   // ==========================================================================
   function play(name, opts) {
     if (!ctx) return;
@@ -670,7 +675,18 @@ export function createAudio(g) {
     const prev = lastPlay.get(name);
     if (prev !== undefined && t - prev < 0.03) return;
     lastPlay.set(name, t);
-    try { fn(t, opts || EMPTY); } catch (e) { /* never break the game loop */ }
+    let spat = null;
+    if (opts && opts.at && AC) {
+      try { spat = AC.acquire(opts.at); } catch (e) { spat = null; }
+    }
+    if (spat) {
+      const saved = sfxBus;
+      sfxBus = spat;
+      try { fn(t, opts); } catch (e) { /* never break the game loop */ }
+      sfxBus = saved;
+    } else {
+      try { fn(t, opts || EMPTY); } catch (e) { /* never break the game loop */ }
+    }
   }
 
   // ==========================================================================
@@ -990,6 +1006,9 @@ export function createAudio(g) {
 
   function scheduleMusic() {
     if (!ctx) return;
+    // wave-6: the legacy music layer defers while the film score is active
+    // (a composer agent owns g.score); keep nextT current so resuming is clean.
+    if (g.score && g.flags.scoreActive) { M.nextT = now() + 0.1; return; }
     const horizon = now() + 0.9;
     if (M.nextT < now() - 1) M.nextT = now() + 0.1;          // tab-hidden gap: resync
     while (M.nextT < horizon) {
@@ -1441,6 +1460,12 @@ export function createAudio(g) {
 
     sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(comp);
     buildReverb();
+
+    // wave-6: ray-driven acoustics — pooled HRTF panners, occlusion, zone
+    // convolvers and early reflections all hang off the world-SFX bus (music /
+    // dread / ambience buses connect straight to comp and stay dry). Fully
+    // feature-detected: any failure leaves AC null and the legacy path intact.
+    try { AC = createAcoustics(g, ctx, sfxBus, comp); } catch (e) { AC = null; }
 
     // Pre-rendered noise buffers (seeded — cheap and deterministic).
     const nrng = makeRng((WORLD_SEED ^ 0xabad1dea) >>> 0);
