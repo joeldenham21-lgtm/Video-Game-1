@@ -382,9 +382,220 @@ I could not put it back. I could not bear to spend it, neither. So it is all und
 
 Dig it up, stranger, and take the dream with it. Tell her I am sorry. Tell her I kept the graves straight. All but hers.`,
   },
+  {
+    id: 'elderwar',
+    title: 'The Elder War, Chronicle of the First Dark',
+    author: 'the fragments of Maelor, last scribe of the elder folk',
+    place: [238, -756, 'lectern', 2.4], // roadside by the Elder Gate pass
+    cover: [0.16, 0.18, 0.26],
+    text:
+`(What survives of the oldest chronicle in the world, rendered out of the old tongue. The elder folk wrote on stone, and stone forgets slowly; but it does forget. Where the record fails, I have marked it. — E. of Greywatch)
+
+Before the vale, before the barrows, before any king or shepherd, the world was young and the north was low. Walk far enough in those days and you came at last to level country under an open sky, and the dawn ran across it like water. So the fragments say, and I believe them, for someone remembers it still — ask any old wife of Emberhollow why the light lingers so long and gold here, and she will tell you the sky is remembering. It is.
+
+Then came the First Dark. It was not an army. The stones are very clear on this, clearer than I could wish. It did not march and it did not burn. It rose. Wells went bitter first; then the birds forgot their songs; then names — whole villages forgot their own names — and then the elder folk understood that something beneath the world had turned toward them, and the Elder War began.
+
+How does one fight the cellar of the world? The fragments count seventy years of it. I will not write what stands in the middle fragments; I tried once, and my hand [text lost]. Know only that the elder folk won, insofar as anyone did. They could not slay the Dark. So they buried it.
+
+All the nations of that morning carried stone into the north. Mountains were heaped upon mountains at the top of the world, higher than any need of nature — you have seen them, past Drakespire, the great white teeth beyond every map ever drawn. The elder folk raised them so high that dawn touches those peaks before it touches anything else alive, and they named them the Wall of Morning: that whatever lies beneath should lie furthest of all made things from the light, and be reminded of it, every morning, forever.
+
+The raising spent them. That is the whole meaning of the old word ELDERFALL, which men now put on maps without a shiver. Their last work was a rampart of gates and watch-stones across the passes. One arch of it stands yet — the Elder Gate, under which you likely read this — and one stone of their setting stands among our five in the west, the one the wardens do not name.
+
+The Dark was not slain. I set it down once more, plainly, as a chronicler must. It was buried, and burial is a patience, not an ending. Read the wardens' books after this, if you would sleep less soundly, and better informed.`,
+  },
+  {
+    id: 'titanbook',
+    title: 'Of the Titan',
+    author: 'Edwyn of Greywatch, Loremaster',
+    place: [-152, 310, 'slab', -0.6], // south vale, off the Titan's plinth
+    cover: [0.36, 0.33, 0.28],
+    text:
+`Being a note appended in my last years to the Chronicle of the Drake Wars, concerning the great figure that stands over the south vale, which the shepherds call the Titan, and do not graze beneath.
+
+Set aside, first, what the masons will tell you. They say it is elder-work, a monument of the old world, and they say it with confidence, at a distance. Go and stand at the foot. There is not a chisel mark on him from crown to heel. The cloak has a mended tear in it. He wears a soldier's boots, twice resoled — I climbed the plinth to look, and came down quieter than I went up. Monuments are made. This man was worn.
+
+The old families of the south vale keep the other account, and keep it stubbornly. He was called Harn, they say, a gate-ward of the old line, in the years when the watch on the north was let lapse — for peace makes forgetters of us all. When they disbanded his order, he refused the order. He took up his post on the last hill of the south vale, whence a man can see the whole road from the Elder Gate down to Emberhollow, and he swore the ward-oath alone, on a chip of wardstone he carried: I will keep the watch until morning comes to the vale floor.
+
+An oath is a small thing in a warm mouth. It is another thing said alone, entire, with the stones listening. He stood his watch. He stood it past his strength, past his years, past — the families insist — his death, for the vow would not let the body go. Stone came up over his boots like slow water, and there he stands yet, facing north; and I note that all deliberate things in this country face north, and were set so on purpose.
+
+Now the matter I hesitated thirty years to write. The grave-rolls of the south vale record that Harn had a son, who farmed in the shadow of the standing man; and that farmer's line runs down, name by unremarkable name, to a steading burned by drakes in the year of the long winter, and to a boy of seventeen who did not flee and did not die.
+
+I make no claim. Chroniclers who claim outlive their credit. But if the rolls run true, then Aldric the Ember King had his standing from a grandsire who never learned to do anything else; and when the pilgrims at the shrine say the king's blade is only sleeping, I think of the old man on the hill who has not once, in all the long years, sat down.`,
+  },
+  {
+    id: 'binding',
+    title: 'The Binding of the Wardstones',
+    author: 'warden-script, unsigned',
+    place: [-552, -628, 'slab', 1.7], // within the Wardstones circle, southwest
+    cover: [0.10, 0.20, 0.24],
+    text:
+`(The leaves were found rolled in lead, in the hollow beneath the Nameless stone. The warden-script is of the oldest cutting. No warden now living will say who set them there, and Casilde's treatise does not mention them. Draw what conclusion you must.)
+
+You have read the fourth warden. She wrote well, and what she wrote is true, and it is the second truth. The stones notice; the stones cry warning; the web feels what crosses the high passes. All true. A door also has a handle. That is not what a door is for.
+
+Hear now the first truth, which is told to each warden once, on the night the office passes, in a whisper, under the open sky, and never twice. Four of the stones watch. The fifth does not watch. The fifth leans.
+
+Vigil, Hearth, Grief and Winter were raised by the five wardens in the year after the wars, and they look north, and north is a direction. The Nameless was raised by no warden and by no man. It was old when the passes were young; it is a sister to the far white peaks, and quarried by the same spent hands. It does not look anywhere, for what it minds is not in a direction. It is beneath. It presses, as a thumb presses a latch, and it has pressed so since the elder folk set it, and the four younger stones stand about it the way men stand about a laboring beast — to be of use, and to be near, and because one does not like to leave it alone.
+
+Of the weight beneath I will write nothing that gives it shape, for it listens best to descriptions of itself. Know only this much. The barrows of the east were dug where they were dug because the ground there was already deep beyond any spade's report; and the honored dead were laid over that deepness in ranks, king and shieldman together, as sandbags are laid upon a dyke. Ask the shepherds why the grass grows strange on the barrow field. Ask why the sheep stand staring at the barrow mouth until they are dragged away. A flock knows a door when it grazes on one.
+
+Your duties, then, beyond the fourth warden's list. Never let all five stones go grey in one season. Speak to the Nameless last, and briefly, and never kindly — pity has loosened more latches than hate ever did. And when the light in the cuts runs thin, do not only look north, as good Casilde bade you. She was kind. Looking north will at least keep your eyes off the ground.
+
+But it is not the passes that keep me from sleeping.`,
+  },
+  {
+    id: 'palerider',
+    title: 'The Pale Rider',
+    author: "told at the Ember's Rest; set down by B., innkeep",
+    place: [12.5, 15.5, 'shelf', -2.2], // the inn's outdoor shelf, by the sign
+    cover: [0.55, 0.52, 0.46],
+    text:
+`There's a story we only tell with the fire built up and the door on the latch, and folk complain if a winter goes by without it. You'll want the ale for this one. Here it is as I had it, and I had it true.
+
+There is a rider on the roads of this vale that no horse in any stable ever foaled. Pale, they say — pale horse, pale cloak, and under the hood a face nobody has stood close enough to bring home. He does not hail you. He does not hurry. He is simply on the road, at dusk, at the edge of naming distance, and he is always facing this way.
+
+My great-grandmother saw him first — first that we know of. A girl then, drawing water at Stonebridge of an autumn evening, in the quiet years before the Drake Wars. A rider on the far hill, she said, standing in the road where no road went. She fetched her mother, who looked a long while, and said nothing, and counted the milestones with her eyes. He stood at the third milestone. And he was closer.
+
+My father's generation saw him next. Old Wendel's uncle it was, carting home in the year of the long winter — and mark well what came out of the north the autumn after. The cart passed a pale rider stopped stone-still on the west road. The ox would not turn its head. There was no sound of hooves, no breath, no creak of leather; and when a lantern was held up, the light seemed to lose interest. He stood at the first milestone. And he was closer.
+
+The third sighting was last autumn. I'll not name the man; he drinks here still, and his hand has not steadied. Dusk, on the vale road, this side of the bridge — between the milestone and the well, friends, which is to say past the milestones altogether. Horse and rider, still as the Titan, facing Emberhollow. The man stood a long time, he says, because his legs would not take instruction. And he was closer.
+
+Now, before you sleep badly. My grandmother, who feared nothing on legs or off them, always said the old word for him was never "death". The old word was "herald". He has harmed no living soul. He is only arriving, at his own pace, ahead of something — the way gulls come inland ahead of weather.
+
+That's the story. Whose round is it?`,
+  },
+  {
+    id: 'harrowsongs',
+    title: 'Songs from the Harrow Fen',
+    author: 'the elegies of the fen, gathered from many mouths',
+    place: [-112, -312, 'slab', 0.9], // by the burial mound on Harrow Fen
+    cover: [0.20, 0.30, 0.20],
+    text:
+`(In the Drake Wars there was a battle in the low wet country west of the vale, where the beacon-line could not see and help came a day too late. Edwyn's chronicle gives it two lines. The fen people gave it these, and sing them still, low, at the year's turning. The mound holds four hundred under one green roof.)
+
+THE CALLING
+Who lies in the fen? Say their names over water,
+For water remembers what chronicle won't:
+The reed and the rush hold the son and the daughter,
+The names go down sweetly. The forgetting don't.
+
+THE STAND
+They stood in the mist where no beacon could find them,
+Between the red weather and everything green;
+No wall at their backs and no morning behind them,
+And none to bear word what that standing would mean.
+The fires went over. The waters closed after.
+The vale never heard, and the vale slept sound —
+O all you who sleep in the warmth and the laughter,
+Your suppers were laid upon Harrow Fen ground.
+
+THE MOUND
+Raise it green, raise it low,
+Where the grey herons go;
+No stone for a roof but the rain and the plover,
+No horn at the door but the wind in the sedge —
+Sleep, for the war and the weather are over,
+Sleep, for the beacons still burn at the edge.
+
+THE LAST VERSE
+(added later, in another hand)
+Where now is the shield-arm, and where is the shieldman?
+The mist on the water has taken them in.
+But ask on a still night, alone on the fen-land,
+And up through the water they answer as one:
+We hold. We hold. We hold.
+
+(Do not sing the last verse out on the fen itself. This is not superstition. It is manners.)`,
+  },
+  {
+    id: 'brood',
+    title: 'The Brood in the Pines',
+    author: 'the journal of Garrick, hunter',
+    place: [-296, -468, 'slab', -2.4], // the dark pinewood's edge, west of the vale
+    cover: [0.10, 0.16, 0.12],
+    text:
+`(The pages that follow were found weighted under a stone at the edge of the dark pinewood, wrapped in oilskin against the wet. Garrick hunted these hills for forty years, and taught the hunter Sylva her bow. His hand starts steady.)
+
+First day. Deer gone from the west pines. Not thinned — gone, the whole wood swept clean, and no wolf sign, and that is wrong twice over, because the wolves are gone too. Found silk in the high branches, thirty feet up. Not cobweb. Rope. Told Sylva to mind the west wood and to sell my pelts if I am long. She minds nothing, that girl. Good girl.
+
+Second day. Followed the silk lines all morning. They all run one way, deeper in. A hunter follows sign — that is the whole trade — but I have never in forty years had sign LEAD me before. Killed one at noon. Big as a dog. Where its eyes should stop, they don't.
+
+Third day. Found the den mouth under the split rocks. Bigger than I said aloud. Bigger than I want to write down. Old bones at the door — deer, boar, and one kind I won't name. This is no mother grown big on easy hunting. This is a brood.
+
+Fourth day. Should have gone back for Sylva and a dozen bows.
+
+Went in.
+
+Webs behind me now.
+
+Two more of the dog-sized. The quiet ones are bigger. You hear the small ones. You don't hear the big ones. That is how you know.
+
+Torch low.
+
+Down is warmer. It shouldn't be.
+
+They wait for the torch.
+
+Pines are quiet.
+
+So quiet.
+
+(Nothing further is written. Nothing further was found.)`,
+  },
+  {
+    id: 'wallmorning',
+    title: 'On the Wall of Morning',
+    author: 'the last notebook of Vane, cartographer',
+    place: [388, 527, 'shelf', -0.4], // at the foot of Greywatch Tower
+    cover: [0.48, 0.40, 0.24],
+    text:
+`(Bought out of Fenwick's pack for two coppers, and shelved here at Greywatch, whence the far peaks can be seen on a clear day. Fenwick does not remember taking it in trade — which he says of nothing else in that pack — and he will not buy it back.)
+
+Day 1. A commission from the Collegium, gods rest its ashes, and thirty years of survey behind me: fix the height and line of the outer peaks, the range beyond Drakespire that the vale-folk call the Wall of Morning. A peasant name. Fine peaks, freak weather, nothing a theodolite and a steady walker cannot reduce to ink. I have mapped four kingdoms. Mountains do not embarrass me.
+
+Day 4. First anomaly. Triangulated the great summit from the Greywatch hill, and again from the Drakespire shoulder. The two answers disagree, and the disagreement is not error, because I do not make errors of four hundred feet. Remeasured at dusk. The Wall is taller at dusk. I have checked the instruments. The instruments are fine. I record this because a surveyor records.
+
+Day 7. Marched due north from my last cairn, six hours, compass true the whole way, fair pace on open ground. The peaks are no nearer. Worse: at the fifth hour I passed my own cairn again, from the south side. I have walked a straight line asleep, drunk, and once under arrow-fire. I do not walk circles. The ground walks them for me.
+
+Day 9. I understand it now, and have written to no one. The dawn comes to those summits a full hour before the geometry of any honest sun allows. I have timed it three mornings running. The light there does not behave. It is DELIVERED. The Wall does not catch the morning — the morning is carried up to it, first of all created things, deliberately, the way a jailer carries a lamp along a cellar stair. Not to comfort the prisoner. To count him.
+
+Day 10. The peaks are not being measured. They are being watched. They have been watched so long and so hard that watching is what they are made of, and my little brass angles are an impertinence — like surveying the lid of a coffin during the funeral. The height of the Wall of Morning is: ENOUGH. Write that in the margin of every map I ever drew.
+
+Day 11. North again regardless. A cartographer finishes the sheet. If the ground turns me, I will map the turning. If the light is a lamp, I will find what it is shown t
+
+(The writing stops on the stroke. The remaining leaves are blank, save the last — where a different and far older hand has ruled a single line, perfectly straight, east to west.)`,
+  },
+  {
+    id: 'embertestament',
+    title: 'The Ember Testament',
+    author: "the hand is the king's",
+    special: 'ember',
+    place: [617.3, -438.3, 'slab', 0.5], // inside the Barrowdeep crypt chamber
+    cover: [0.30, 0.10, 0.06],
+    text:
+`(Sealed in wax beneath the coffin-boards at Barrowdeep, though the wardens who laid the king down swore there was nothing under the boards but stone. Judge the writing yourself. It is a plain hand, a farmer's hand, and it shakes only at the end.)
+
+They tell me I am dying, in the gentle sideways way of soldiers, and I have sent them out for air and honesty. Six days since Drakespire. The wound will not close. Very well. I was a farmer before I was ever a spear-point, and a farmer knows the season's end without being told twice.
+
+Set down, then, what I never said in council, because councils leak like hay-barns.
+
+First, of my sword. They say the blade drank a drake's fire at the Cinder Fields and never went cold after. It is a good story and I let it live, because the truth frightened me more. The blade was warm BEFORE the Cinder Fields. It took its warmth the year I first marched north, the day we passed in the rain beneath the old stone man of the south vale — my own folk's hill, though I told no one that either. I felt it go warm at my hip like a coal handed down; and I looked up at the standing grandsire of my line, if the old wives have it right, and his face was wet with the rain, and I will say it here, being past mockery: it did not look like rain.
+
+Second, of the drakes. Nine years I fought them, and somewhere in the middle years I stopped hating them, for by then I had seen how they fight. Men fight for hunger, or fear, or gold. The drakes fought like things with a door at their backs. They came south over the Wall of Morning, out of the far cold peaks where nothing feeds, and no living thing crosses that country southward unless something beneath it has turned over in its sleep. Mark me, you who read. We did not break an invasion. We broke a flight. And what a flying terror flees, I never met in nine years of war, and have prayed nightly I never would; and my prayers have the smell about them of a man asking the frost to spare one field.
+
+So, third, my testament, and the reason for the wax and the hiding. Lay me at Barrowdeep, over the deep places, where the old dead lie ranked like sandbags on a dyke — the wardens know the truth of that ground; ask them nothing. Lay the Ember on my breast, and let the story say it sleeps. It does not sleep. A warm blade over the deep dark is a small lamp in a vast cellar, and small lamps have kept great houses standing before now. While it lies warm above, the weight beneath dreams of morning; and a thing that dreams of morning does not rise. That is the whole of my statecraft, and I had it from keeping a night-candle for my children.
+
+Last. If you have lifted the blade — and you have, or this seal is broken for nothing — then one of two things is true. Either you are a grave-thief, in which case put it back, child; the cold you feel is not the stone. Or the wardstones have gone grey and the vale has need, in which case: the Ember remembers every hand it ever served and every cut that nine years taught it, and it will teach your arm in its turn. Stand the way my grandsire stands. Meet the blow at its birth, and swing through — weight and heart together, as the drillmasters bark. It is only a farmer's sword. It has only ever had to be.
+
+The light is going long and gold out there, the way it does in this vale, the way it does nowhere else in the world.
+
+Good. Let the mountains keep the morning.
+
+I kept the evenings.`,
+  },
 ];
 
-const BOOK_COUNT = BOOKS.length; // 16
+const BOOK_COUNT = BOOKS.length; // 24
 const DIG_POS = { x: 430, z: -80 };
 const SKILL_XP = 120;
 
@@ -821,6 +1032,16 @@ export function createBooks(g) {
     elCodex.innerHTML = html;
   }
 
+  // The Ember Testament: the king's last lesson takes only in a hand that
+  // holds Aldric's Ember. Checked on every read (world, codex, or re-read) so
+  // claiming the blade after the first reading still grants it. Once, ever.
+  function maybeEmberXP(book) {
+    if (book.special !== 'ember' || g.flags.emberTestamentXP || !g.flags.hasAldricSword) return;
+    g.flags.emberTestamentXP = true;
+    if (g.rpg && g.rpg.addSkillXP) g.rpg.addSkillXP('blade', SKILL_XP);
+    notify('The Ember remembers', "The king's last lesson settles into your sword-arm. (+" + SKILL_XP + ' Blade experience)');
+  }
+
   function showReader(book, dir) {
     codexMode = false;
     root.classList.remove('codex');
@@ -829,6 +1050,7 @@ export function createBooks(g) {
     elAuthor.textContent = book.author;
     elPrev.style.visibility = elNext.style.visibility = elPageNo.style.visibility = 'visible';
     renderPage(dir || 0);
+    maybeEmberXP(book);
   }
 
   function showCodex() {
@@ -874,7 +1096,10 @@ export function createBooks(g) {
         notify('A confession, and a bearing', 'Disturbed earth lies east and a touch south of the Shrine of Aldric.');
         // dig site itself is spawned by the reconcile check in update()
       }
-      // Loremaster: all 16 read
+      if (book.special === 'ember' && !g.flags.hasAldricSword) {
+        notify('The Ember Testament', 'The last page is written to a hand that holds the blade. Yours is empty.');
+      }
+      // Loremaster: all 24 read
       if (countRead() >= BOOK_COUNT && !g.flags.loremaster) {
         g.flags.loremaster = true;
         if (g.player && g.player.addGold) g.player.addGold(200);
