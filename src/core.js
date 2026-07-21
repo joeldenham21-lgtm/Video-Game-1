@@ -138,13 +138,13 @@ function rawHeight(x, z) {
   // Northern mountain range (negative z), ridged
   const northness = smoothstep(-450, -1050, z);
   if (northness > 0) {
-    h += ridged(x * 0.0016, z * 0.0016, 4) * 190 * northness + 30 * northness;
+    h += ridged(x * 0.0016, z * 0.0016, 4) * 240 * northness + 38 * northness;
   }
 
   // Drakespire: the anchor peak, a huge gaussian bump at the POI
   {
     const d = dist2d(x, z, 150, -1250);
-    h += 300 * Math.exp(-(d * d) / (2 * 330 * 330));
+    h += 375 * Math.exp(-(d * d) / (2 * 340 * 340));
   }
 
   // Mirrormere lake basin

@@ -29,6 +29,7 @@ import { createCinema } from './cinema.js';
 import { createDice } from './dice.js';
 import { createWeather } from './weather.js';
 import { createExplore } from './explore.js';
+import { createLights } from './lights.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -137,6 +138,7 @@ function boot(loadSave) {
       g.assets.preload();
       g.audio = createAudio(g);
       g.audio.unlock(); // we are inside a user gesture chain
+      g.lights = createLights(g);
       g.world = createWorld(g);
       g.sky = createSky(g);
       g.structures = createStructures(g);
@@ -224,6 +226,7 @@ function tick(now) {
     g.cinema.update(dt);
     g.dice.update(dt);
     g.explore.update(dt);
+    g.lights.update(dt);
     g.postfx.update(dt);
     g.ui.input.endFrame();
   } catch (err) {
