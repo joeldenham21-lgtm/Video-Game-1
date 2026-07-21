@@ -386,7 +386,7 @@ Dig it up, stranger, and take the dream with it. Tell her I am sorry. Tell her I
     id: 'elderwar',
     title: 'The Elder War, Chronicle of the First Dark',
     author: 'the fragments of Maelor, last scribe of the elder folk',
-    place: [238, -756, 'lectern', 2.4], // roadside by the Elder Gate pass
+    place: [208, -652, 'lectern', 2.4], // beside the Elder Gate's fallen twin pillar
     cover: [0.16, 0.18, 0.26],
     text:
 `(What survives of the oldest chronicle in the world, rendered out of the old tongue. The elder folk wrote on stone, and stone forgets slowly; but it does forget. Where the record fails, I have marked it. — E. of Greywatch)
