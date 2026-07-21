@@ -14,6 +14,20 @@
 //   bounded at MAX_VOICES (16).
 // - Music is scheduled with a lookahead setInterval timer, NOT per-frame.
 // - Ambience parameters are re-targeted at most every 0.25 s.
+//
+// Wave 4 (NEXT-LEVEL) additions — the mix stays restrained, silence is golden:
+// - LOCATION THEMES: village / ruins / lake / mountains motif + voicing
+//   variation. Region polled every 2 s; on change the whole melodic bed
+//   (pads + lute) crossfades over 6 s via two A/B "deck" gain nodes.
+// - COMBAT TIERS: tier 1 = existing drums + drone. Tier 2 (≥3 aggroed or an
+//   aggroed elite) adds a syncopated second drum + tremolo string. Boss tier
+//   (bossBar active) adds a slow detuned choir-ish pad (formant filters) and
+//   deeper scheduled hits. All crossfade cleanly both ways.
+// - FIDDLE: bowed-string lead (sawtooth → bandpass, slow vibrato, bow-noise
+//   attack) trading sparse phrases with the lute by day (≤1 per 20–40 s).
+// - setRain(level): filtered-pink-noise rain bed + distant intermittent
+//   rumble above level 0.7. Exposed on the returned api (weather.js calls it
+//   lazily). debug() exposes gain values for automated verification.
 // ============================================================================
 
 import {
@@ -33,19 +47,34 @@ export function createAudio(g) {
   // music buses / persistent nodes
   let padLP = null, padGain = null, luteGain = null, luteLP = null;
   let combatGain = null, bossGain = null, combatPerc = null, bossPerc = null;
+  // wave-4 music nodes
+  let decks = null, deckIdx = 0;               // A/B region-crossfade decks
+  let xfAt = 0;                                // deck crossfade start (ctx time)
+  const xfSnap = { op: 1, ol: 1, np: 0, nl: 0 }; // gain snapshot at fade start
+  let droneGain = null;                        // ruins low drone layer
+  let tier2Gain = null, tier2Perc = null;      // combat tier 2 layer
+  let choirGain = null;                        // boss choir-ish pad
+  let fiddleGain = null;                       // bowed-string lead bus
   // ambience persistent nodes
   let windGain = null, windLP = null;
   let cricketGain = null, cricketLfo = null;
   let lapGain = null, shimGain = null;
+  let rainGain = null, rainLP = null;          // wave-4 rain bed
 
   // ---- bookkeeping ---------------------------------------------------------
   const MAX_VOICES = 16;
   let activeVoices = 0;
   const lastPlay = new Map();  // sfx name → last scheduled time (dedupe 30ms)
   let ambAcc = 0;              // ambience throttle accumulator
+  let lastPollAt = 0;          // region poll clock (ctx time — every 2 s wall)
+  let lastTierAt = 0;          // combat-tier check clock (every 0.3 s wall)
   let nextBirdAt = 0;
   let dayness = 0.7, nightness = 0.3;
-  let combatOn = false, bossOn = false;
+  let combatOn = false, bossOn = false, tier2On = false;
+  let rainLevel = 0;           // wave-4: set via setRain(), remembered pre-unlock
+  let nextRumbleAt = 0;        // distant storm rumble scheduler
+  let fiddleNextAt = 0;        // next time the fiddle may take a phrase
+  let fiddleCount = 0;         // notes played (debug/verification)
   const EMPTY = {};
 
   const now = () => ctx.currentTime;
@@ -468,6 +497,8 @@ export function createAudio(g) {
     stepDur: 60 / 110 / 2,                 // 8th notes at 110 bpm (~0.273 s)
     chordIdx: 0,
     melIdx: 5,
+    nextChordStep: 0,                      // region-aware harmonic rhythm
+    forceChord: false,                     // set on region change → fresh chord
     rng: makeRng((WORLD_SEED ^ 0x51ed2701) >>> 0),
     timer: 0,
   };
@@ -478,6 +509,42 @@ export function createAudio(g) {
   const NIGHT_CH = [[0, 7, 12, 15], [-5, 2, 7, 10], [-7, 0, 5, 8], [-4, 3, 8, 12]];
   // A minor pentatonic pool for lute phrases (fits every chord above)
   const PENTA = [12, 15, 17, 19, 22, 24, 27, 29, 31, 34, 36];
+
+  // ---- wave-4 location themes ----------------------------------------------
+  // Village: warmer, major-leaning — C — G — Am — F, full voicings.
+  const VILLAGE_DAY = [[3, 10, 15, 19], [10, 14, 17, 22], [0, 7, 12, 15], [8, 12, 15, 20]];
+  // Ruins / cemetery: sparse minor with the b3 spoken aloud — Am — Em — Dm — Em.
+  const RUINS_CH = [[0, 3, 7, 12], [-5, -2, 2, 7], [-7, -4, 0, 5], [-5, -2, 2, 7]];
+  // Lake: airy suspended voicings, no thirds at all — Asus2 — Gsus2 — Fsus2 — Csus2.
+  const LAKE_CH = [[0, 7, 14, 19], [-2, 5, 12, 17], [-4, 3, 10, 15], [3, 10, 17, 22]];
+  // Mountains: nothing but open fifths and octaves — A5 — G5 — F5 — E5.
+  const MTN_CH = [[0, 7, 12, 19], [-2, 5, 10, 17], [-4, 3, 8, 15], [-5, 2, 7, 14]];
+  // Melodic pools per theme
+  const MAJ_POOL = [12, 15, 17, 19, 22, 24, 26, 27, 29, 31];  // adds B — major-7 color
+  const MINOR_POOL = [0, 3, 5, 7, 10, 12, 15, 17];            // low, dark, with b3
+  const SUS_POOL = [12, 14, 17, 19, 22, 24, 26];              // 2nds and 4ths — airy
+  const FIFTH_POOL = [0, 5, 7, 12, 17, 19, 24];               // fourths and fifths only
+  // Region spec: chord tables (day/night), rest odds, phrase odds, lute/pad
+  // filter targets, phrase octave bias and pacing. 'wilds' = original song.
+  const REGIONS = {
+    wilds:     { day: DAY_CH, night: NIGHT_CH, pool: PENTA, chordSteps: 32,
+                 rest: 0, nrest: 0.25, phrase: 0.45, nphrase: 0.22,
+                 luteF: 2300, padF: 780, oct: 0, pace: 1 },
+    village:   { day: VILLAGE_DAY, night: DAY_CH, pool: MAJ_POOL, chordSteps: 32,
+                 rest: 0, nrest: 0.2, phrase: 0.55, nphrase: 0.28,
+                 luteF: 2650, padF: 920, oct: 0, pace: 1 },
+    ruins:     { day: RUINS_CH, night: RUINS_CH, pool: MINOR_POOL, chordSteps: 40,
+                 rest: 0.2, nrest: 0.4, phrase: 0.22, nphrase: 0.12,
+                 luteF: 1650, padF: 580, oct: 0, pace: 1.25 },
+    lake:      { day: LAKE_CH, night: LAKE_CH, pool: SUS_POOL, chordSteps: 48,
+                 rest: 0.1, nrest: 0.3, phrase: 0.3, nphrase: 0.16,
+                 luteF: 2050, padF: 700, oct: 0, pace: 1.6 },
+    mountains: { day: MTN_CH, night: MTN_CH, pool: FIFTH_POOL, chordSteps: 40,
+                 rest: 0.08, nrest: 0.3, phrase: 0.3, nphrase: 0.16,
+                 luteF: 2400, padF: 840, oct: 0, pace: 1.2 },
+  };
+  let currentRegion = 'village';               // player spawns in Emberhollow
+  let REG = REGIONS.village;
 
   function buildMusic() {
     musicBus = ctx.createGain(); musicBus.gain.value = 0.55; musicBus.connect(comp);
@@ -491,6 +558,38 @@ export function createAudio(g) {
     luteLP = ctx.createBiquadFilter(); luteLP.type = 'lowpass'; luteLP.frequency.value = 2300; luteLP.Q.value = 0.4;
     luteGain.connect(luteLP); luteLP.connect(musicBus);
     sendVerb(luteLP, 0.45);
+    // wave-4: A/B decks — all scheduled pads/plucks route through the active
+    // deck; a region change swaps decks and crossfades them over 6 s (driven
+    // per-frame by updateDeckFade — direct .value writes, no param automation)
+    // so the old theme's still-sounding chords genuinely fade under the new.
+    decks = [0, 1].map((i) => {
+      const pad = ctx.createGain(); pad.gain.value = i === 0 ? 1 : 0; pad.connect(padLP);
+      const lute = ctx.createGain(); lute.gain.value = i === 0 ? 1 : 0; lute.connect(luteGain);
+      return { pad, lute };
+    });
+    luteLP.frequency.value = REG.luteF;                    // boot voicing = boot region
+    padLP.frequency.value = REG.padF;
+    // wave-4: ruins low drone — beating A1 sines + a whisper of filtered saw.
+    // Lives outside the decks; its gain IS the region crossfade for ruins.
+    {
+      droneGain = ctx.createGain(); droneGain.gain.value = 0; droneGain.connect(musicBus);
+      sendVerb(droneGain, 0.3);
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 170; lp.Q.value = 0.6;
+      lp.connect(droneGain);
+      for (const [type, f, v] of [['sine', 55, 0.5], ['sine', 55.4, 0.4], ['sawtooth', 110.2, 0.12]]) {
+        const o = ctx.createOscillator(); o.type = type; o.frequency.value = f;
+        const og = ctx.createGain(); og.gain.value = v;
+        o.connect(og); og.connect(lp); o.start();
+      }
+    }
+    // wave-4: fiddle bus — bowed lead, gently low-passed so it never rasps.
+    {
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200; lp.Q.value = 0.4;
+      fiddleGain = ctx.createGain(); fiddleGain.gain.value = 0.9;
+      fiddleGain.connect(lp); lp.connect(musicBus);
+      sendVerb(lp, 0.5);
+    }
+    fiddleNextAt = now() + 14 + M.rng() * 16;              // first phrase a while in
     // combat layer: percussion bus + dark drone, faded in/out on combatState
     combatGain = ctx.createGain(); combatGain.gain.value = 0; combatGain.connect(musicBus);
     combatPerc = ctx.createGain(); combatPerc.gain.value = 0.9; combatPerc.connect(combatGain);
@@ -505,6 +604,24 @@ export function createAudio(g) {
       const lfo = ctx.createOscillator(); lfo.frequency.value = 0.45;      // slow menace swell
       const lg = ctx.createGain(); lg.gain.value = 0.13;
       lfo.connect(lg); lg.connect(dg.gain); lfo.start();
+    }
+    // wave-4 combat tier 2: syncopated second-drum bus + tremolo string synth
+    // (detuned saws → string-body bandpass → 8.5 Hz bow-tremolo AM).
+    tier2Gain = ctx.createGain(); tier2Gain.gain.value = 0; tier2Gain.connect(musicBus);
+    tier2Perc = ctx.createGain(); tier2Perc.gain.value = 0.9; tier2Perc.connect(tier2Gain);
+    {
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1250; bp.Q.value = 1.3;
+      for (const [f, det] of [[220, -7], [220, 6], [329.6, -3]]) {
+        const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det;
+        o.connect(bp); o.start();
+      }
+      const am = ctx.createGain(); am.gain.value = 0.55;    // bow tremolo
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 8.5;
+      const lg = ctx.createGain(); lg.gain.value = 0.45;
+      lfo.connect(lg); lg.connect(am.gain); lfo.start();
+      const sg = ctx.createGain(); sg.gain.value = 0.13;
+      bp.connect(am); am.connect(sg); sg.connect(tier2Gain);
+      sendVerb(sg, 0.25);
     }
     // boss urgency layer: tremolo high drone + extra percussion bus
     bossGain = ctx.createGain(); bossGain.gain.value = 0; bossGain.connect(musicBus);
@@ -522,10 +639,34 @@ export function createAudio(g) {
         o.connect(lp); o.start();
       }
     }
+    // wave-4 boss choir: slow detuned voices through formant-ish bandpasses
+    // (rough "ah" vowel), drifting slowly — swells in over ~5 s on bossBar.
+    {
+      choirGain = ctx.createGain(); choirGain.gain.value = 0; choirGain.connect(musicBus);
+      sendVerb(choirGain, 0.5);
+      const cin = ctx.createGain(); cin.gain.value = 0.08;  // sum of 6 saws, tamed
+      for (const [f, d1, d2] of [[110, -12, 9], [164.8, -8, 11], [220, -10, 7]]) {
+        for (const det of [d1, d2]) {
+          const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det;
+          o.connect(cin); o.start();
+        }
+      }
+      const drift = ctx.createOscillator(); drift.frequency.value = 0.11; drift.start();
+      for (const [ff, q, v, dAmt] of [[700, 9, 1, 55], [1080, 10, 0.62, 80], [2300, 12, 0.16, 0]]) {
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = ff; bp.Q.value = q;
+        const fg = ctx.createGain(); fg.gain.value = v;
+        cin.connect(bp); bp.connect(fg); fg.connect(choirGain);
+        if (dAmt) {                                         // slow vowel drift
+          const dg2 = ctx.createGain(); dg2.gain.value = dAmt;
+          drift.connect(dg2); dg2.connect(bp.frequency);
+        }
+      }
+    }
     M.nextT = now() + 0.15;
     M.timer = setInterval(scheduleMusic, 200);             // lookahead pump
     applyCombatState();                                     // honor pre-unlock events
     applyBossState();
+    applyTier2();
   }
 
   function applyCombatState() {
@@ -546,6 +687,88 @@ export function createAudio(g) {
     const t = now();
     bossGain.gain.cancelScheduledValues(t);
     bossGain.gain.setTargetAtTime(bossOn ? 0.75 : 0.0001, t, bossOn ? 0.4 : 1.4);
+    // The choir swells in slower than the drums — dread, not a jump-scare.
+    choirGain.gain.cancelScheduledValues(t);
+    choirGain.gain.setTargetAtTime(bossOn ? 0.5 : 0.0001, t, bossOn ? 1.7 : 2.2);
+  }
+  function applyTier2() {
+    if (!ctx) return;
+    const t = now();
+    tier2Gain.gain.cancelScheduledValues(t);
+    tier2Gain.gain.setTargetAtTime(tier2On ? 0.8 : 0.0001, t, tier2On ? 0.35 : 1.2);
+  }
+
+  // wave-4: combat tier detection — ≥3 aggroed enemies OR any aggroed elite.
+  // Polled every 0.3 s (wall clock); crossfades are handled by applyTier2 so
+  // state flips are cheap.
+  function updateCombatTier() {
+    const list = g.enemies && g.enemies.list;
+    let n = 0, elite = false;
+    if (list) {
+      for (let i = 0; i < list.length; i++) {
+        const e = list[i];
+        if (e && e.alive && e.aggro) { n++; if (e.elite) elite = true; }
+      }
+    }
+    const on = n >= 3 || (elite && n > 0);
+    if (on !== tier2On) { tier2On = on; applyTier2(); }
+  }
+
+  // wave-4: location themes ---------------------------------------------------
+  // Region from player position (POI distances + altitude). Priority order
+  // matters: named places win over the mountain altitude test.
+  function computeRegion(px, pz, py, slack) {
+    if (dist2d(px, pz, POI.village.x, POI.village.z) < 115 + slack) return 'village';
+    if (dist2d(px, pz, POI.ruins.x, POI.ruins.z) < 145 + slack) return 'ruins';  // incl. cemetery/crypt
+    if (dist2d(px, pz, POI.lake.x, POI.lake.z) < 190 + slack) return 'lake';
+    if (py > 55 - slack * 0.35 || pz < -700 + slack) return 'mountains';
+    return 'wilds';
+  }
+
+  function pollRegion() {
+    const p = g.player;
+    if (!p || !decks) return;
+    const px = p.position.x, pz = p.position.z, py = p.position.y;
+    let r = computeRegion(px, pz, py, 0);
+    // Hysteresis: keep the current region until clearly outside it (no
+    // 2 s ping-pong when idling on a boundary).
+    if (r !== currentRegion && computeRegion(px, pz, py, 22) === currentRegion) r = currentRegion;
+    if (r !== currentRegion) applyRegion(r);
+  }
+
+  function applyRegion(r) {
+    currentRegion = r;
+    REG = REGIONS[r] || REGIONS.wilds;
+    if (!ctx || !decks) return;
+    const t = now();
+    // Swap decks: old theme rides its deck down over 6 s while the new rides
+    // up. The fade itself is driven per-frame in update() with direct .value
+    // writes (updateDeckFade) — no automation events on the deck gains.
+    const oldD = decks[deckIdx];
+    deckIdx ^= 1;
+    const newD = decks[deckIdx];
+    xfSnap.op = oldD.pad.gain.value; xfSnap.ol = oldD.lute.gain.value;
+    xfSnap.np = newD.pad.gain.value; xfSnap.nl = newD.lute.gain.value;
+    xfAt = t;
+    M.forceChord = true;                                   // new motif starts now
+    // Voicing color: filters glide, ruins drone crossfades (τ2 ≈ 6 s settle).
+    luteLP.frequency.setTargetAtTime(REG.luteF, t, 2);
+    padLP.frequency.setTargetAtTime(REG.padF, t, 2);
+    droneGain.gain.setTargetAtTime(r === 'ruins' ? 0.55 : 0.0001, t, 2);
+  }
+
+  // Per-frame 6 s equal-ish-power deck crossfade (smoothstep on both legs;
+  // snapshot start values so a mid-fade region flip continues without a jump).
+  function updateDeckFade(tw) {
+    if (!xfAt || !decks) return;
+    const k = Math.min(1, (tw - xfAt) / 6);
+    const e = k * k * (3 - 2 * k);
+    const oldD = decks[1 - deckIdx], newD = decks[deckIdx];
+    oldD.pad.gain.value = xfSnap.op * (1 - e);
+    oldD.lute.gain.value = xfSnap.ol * (1 - e);
+    newD.pad.gain.value = xfSnap.np + (1 - xfSnap.np) * e;
+    newD.lute.gain.value = xfSnap.nl + (1 - xfSnap.nl) * e;
+    if (k >= 1) xfAt = 0;
   }
 
   function scheduleMusic() {
@@ -560,7 +783,11 @@ export function createAudio(g) {
   }
 
   function scheduleStep(step, t) {
-    if (step % 32 === 0) beginChord(t);                      // ~8.7 s harmonic rhythm
+    if (M.forceChord || step >= M.nextChordStep) {           // region-aware harmonic rhythm
+      M.forceChord = false;
+      M.nextChordStep = step + REG.chordSteps;
+      beginChord(t);
+    }
     // Combat percussion only exists while the layer is (fading) audible.
     const combatLive = combatOn || combatGain.gain.value > 0.02;
     if (combatLive) {
@@ -568,9 +795,20 @@ export function createAudio(g) {
       if (step % 4 === 0) drumKick(t, 0.5, combatPerc);
       if (s8 === 2 || s8 === 6) drumTap(t, 0.16, 900, combatPerc);
       if (s8 === 7 && M.rng() < 0.3) drumKick(t + M.stepDur * 0.5, 0.24, combatPerc);
+      // Tier 2: syncopated second drum — pushed 16th offsets against tier 1.
+      if (tier2On || tier2Gain.gain.value > 0.02) {
+        if (s8 === 1 || s8 === 4) drumKick(t + M.stepDur * 0.5, 0.34, tier2Perc);
+        if (s8 === 3) drumTap(t + M.stepDur * 0.5, 0.18, 1200, tier2Perc);
+        if (s8 === 6 && M.rng() < 0.5) drumKick(t, 0.26, tier2Perc);
+      }
       if (bossOn || bossGain.gain.value > 0.02) {
         if (step % 2 === 1) drumTap(t, 0.2, 1500, bossPerc); // driving off-beats
         if (s8 === 4) drumKick(t, 0.42, bossPerc);
+        // wave-4 deeper hits: a slow sub boom under everything, once a bar.
+        if (step % 16 === 8) {
+          osc1(t, 0.6, 'sine', 52, 24, 0.5, bossPerc, { a: 0.005, verb: 0.25 });
+          noise1(t, 0.09, 0.2, bossPerc, { fType: 'lowpass', ff0: 850 });
+        }
         if (step % 32 === 24) osc1(t, 2.0, 'sine', 65, 40, 0.16, bossPerc, { a: 0.4 }); // dread swell
       }
     }
@@ -578,18 +816,28 @@ export function createAudio(g) {
 
   function beginChord(t) {
     const night = dayness < 0.5;
-    const table = night ? NIGHT_CH : DAY_CH;
+    const table = night ? REG.night : REG.day;
     const ch = table[M.chordIdx % table.length];
     M.chordIdx++;
-    const dur = 32 * M.stepDur;
-    // Night sometimes rests the pad entirely — more air, more dark.
-    if (!(night && M.rng() < 0.25)) padChord(ch, t, dur, night);
+    const dur = REG.chordSteps * M.stepDur;
+    const deck = decks[deckIdx];
+    // Some regions (and every night) rest the pad — more air, more dark.
+    const rest = night ? REG.nrest : REG.rest;
+    if (M.rng() >= rest) padChord(ch, t, dur, night, deck.pad);
+    // The fiddle trades sparse phrases with the lute during day exploration:
+    // when it takes a chord, the lute sits that one out (≤1 per 20–40 s).
+    let fiddled = false;
+    if (!night && dayness > 0.55 && !combatOn && t >= fiddleNextAt) {
+      fiddled = true;
+      fiddleNextAt = t + 20 + M.rng() * 20;
+      scheduleFiddlePhrase(t + M.stepDur * (2 + ((M.rng() * 6) | 0)), dur);
+    }
     // Sparse lute phrases; long silences are part of the music.
-    const chance = night ? 0.22 : 0.45;
-    if (M.rng() < chance) schedulePhrase(t, dur, night);
+    const chance = night ? REG.nphrase : REG.phrase;
+    if (!fiddled && M.rng() < chance) schedulePhrase(t, dur, night, deck.lute);
   }
 
-  function padChord(semis, t, dur, night) {
+  function padChord(semis, t, dur, night, dest) {
     const peak = night ? 0.038 : 0.05;
     const atk = 2.6, rel = 3.2;
     for (let i = 0; i < semis.length; i++) {
@@ -603,7 +851,7 @@ export function createAudio(g) {
       gn.gain.linearRampToValueAtTime(v, t + atk);
       gn.gain.setValueAtTime(v, t + dur);
       gn.gain.linearRampToValueAtTime(0.0001, t + dur + rel);
-      o.connect(gn); gn.connect(padLP);
+      o.connect(gn); gn.connect(dest);
       o.start(t); o.stop(t + dur + rel + 0.1);
     }
     const sub = ctx.createOscillator();                      // sine root an octave down
@@ -614,25 +862,76 @@ export function createAudio(g) {
     sg.gain.linearRampToValueAtTime(peak * 1.2, t + atk);
     sg.gain.setValueAtTime(peak * 1.2, t + dur);
     sg.gain.linearRampToValueAtTime(0.0001, t + dur + rel);
-    sub.connect(sg); sg.connect(padLP);
+    sub.connect(sg); sg.connect(dest);
     sub.start(t); sub.stop(t + dur + rel + 0.1);
   }
 
-  function schedulePhrase(t0, dur, night) {
+  function schedulePhrase(t0, dur, night, dest) {
+    const pool = REG.pool;
     const n = 3 + ((M.rng() * 5) | 0);
-    let idx = clamp(M.melIdx + ((M.rng() * 3) | 0) - 1, 0, PENTA.length - 1);
+    let idx = clamp(M.melIdx + ((M.rng() * 3) | 0) - 1, 0, pool.length - 1);
     let st = t0 + M.stepDur * (2 + ((M.rng() * 8) | 0));
-    const oct = night ? -12 : 0;
+    const oct = (night ? -12 : 0) + REG.oct;
     for (let i = 0; i < n; i++) {
       const move = M.rng() < 0.65 ? (M.rng() < 0.5 ? -1 : 1) : ((M.rng() * 4) | 0) - 2;
-      idx = clamp(idx + move, 0, PENTA.length - 1);
+      idx = clamp(idx + move, 0, pool.length - 1);
       const vol = 0.1 + M.rng() * 0.08;
-      pluck(st, nfreq(PENTA[idx] + oct), vol, luteGain, 0);
+      pluck(st, Math.max(58, nfreq(pool[idx] + oct)), vol, dest, 0);
       if (M.rng() < 0.15 && idx >= 2) {                      // occasional soft dyad
-        pluck(st + 0.02, nfreq(PENTA[idx - 2] + oct), vol * 0.55, luteGain, 0);
+        pluck(st + 0.02, Math.max(58, nfreq(pool[idx - 2] + oct)), vol * 0.55, dest, 0);
       }
-      st += M.stepDur * (2 + ((M.rng() * 3) | 0));
+      st += M.stepDur * (2 + ((M.rng() * 3) | 0)) * REG.pace;
       if (st > t0 + dur - 1) break;
+    }
+    M.melIdx = idx;
+  }
+
+  // ---- wave-4 fiddle — bowed-string lead -----------------------------------
+  // Sawtooth through a body-resonance bandpass; vibrato eases in like a bow
+  // settling on the string; a short rosin-scratch noise transient at the bite.
+  function fiddleNote(t, f, dur, vol) {
+    if (!claim(t, dur + 0.3)) return;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.value = f;
+    const vib = ctx.createOscillator();                      // slow vibrato
+    vib.frequency.value = 5.3 + Math.random() * 0.6;
+    const vg = ctx.createGain();
+    vg.gain.setValueAtTime(0, t);
+    vg.gain.linearRampToValueAtTime(16, t + Math.min(0.5, dur * 0.5));  // cents
+    vib.connect(vg); vg.connect(o.detune);
+    const bp = ctx.createBiquadFilter();                     // body resonance
+    bp.type = 'bandpass';
+    bp.frequency.value = clamp(f * 2.2, 500, 2400);
+    bp.Q.value = 1.1;
+    const gn = ctx.createGain();
+    gn.gain.setValueAtTime(0.0001, t);
+    gn.gain.linearRampToValueAtTime(vol, t + 0.09);          // bow bite
+    gn.gain.linearRampToValueAtTime(vol * 1.12, t + dur * 0.65); // gentle swell
+    gn.gain.linearRampToValueAtTime(0.0001, t + dur);
+    o.connect(bp); bp.connect(gn); gn.connect(fiddleGain);
+    noise1(t, 0.07, vol * 0.5, fiddleGain, {                 // bow-noise attack
+      fType: 'bandpass', ff0: clamp(f * 4, 1200, 3400), q: 2.5, a: 0.006,
+    });
+    o.start(t); o.stop(t + dur + 0.1);
+    vib.start(t); vib.stop(t + dur + 0.1);
+    fiddleCount++;
+  }
+
+  function scheduleFiddlePhrase(t0, dur) {
+    const pool = REG.pool;
+    const n = 3 + ((M.rng() * 3) | 0);
+    let idx = clamp(M.melIdx, 1, pool.length - 2);
+    let st = t0;
+    for (let i = 0; i < n; i++) {
+      const move = M.rng() < 0.7 ? (M.rng() < 0.5 ? -1 : 1) : ((M.rng() * 4) | 0) - 2;
+      idx = clamp(idx + move, 0, pool.length - 1);
+      const last = i === n - 1;
+      const ndur = last ? 1.6 + M.rng() * 1.2 : 0.55 + M.rng() * 0.8;
+      const f = Math.max(196, nfreq(pool[idx] + 12));        // sits above the lute
+      fiddleNote(st, f, ndur, 0.055 + M.rng() * 0.02);
+      st += ndur + (M.rng() < 0.3 ? 0.25 : 0.05);            // mostly legato
+      if (st > t0 + dur - 1.5) break;
     }
     M.melIdx = idx;
   }
@@ -698,6 +997,30 @@ export function createAudio(g) {
         }
       }
     }
+    // wave-4 rain bed: looped pink noise, band-limited; setRain(level) drives
+    // gain + brightness. Slow 0.21 Hz wash keeps it breathing, not static.
+    {
+      const src = ctx.createBufferSource(); src.buffer = noisePink; src.loop = true;
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 320;
+      rainLP = ctx.createBiquadFilter(); rainLP.type = 'lowpass'; rainLP.frequency.value = 700; rainLP.Q.value = 0.5;
+      const am = ctx.createGain(); am.gain.value = 0.85;
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.21;
+      const lg = ctx.createGain(); lg.gain.value = 0.12;
+      lfo.connect(lg); lg.connect(am.gain);
+      rainGain = ctx.createGain(); rainGain.gain.value = 0;
+      src.connect(hp); hp.connect(rainLP); rainLP.connect(am); am.connect(rainGain); rainGain.connect(ambBus);
+      src.start(0, 0.9); lfo.start();
+      if (rainLevel > 0) {                                  // honor pre-unlock setRain
+        rainGain.gain.value = rainLevel * 0.14;
+        rainLP.frequency.value = 700 + rainLevel * 1900;
+      }
+    }
+  }
+
+  // wave-4: distant storm rumble — thunder with the crack rounded off.
+  function distantRumble(t, inten) {
+    noise1(t, 3.4, 0.1 * inten, ambBus, { fType: 'lowpass', ff0: 240, ff1: 60, a: 1.2, verb: 0.4 });
+    osc1(t, 2.8, 'sine', 44 * jit(0.12), 25, 0.08 * inten, ambBus, { a: 1.0 });
   }
 
   function birdChirp(t) {
@@ -754,6 +1077,26 @@ export function createAudio(g) {
     const dRuins = dist2d(px, pz, POI.ruins.x, POI.ruins.z);
     const shim = clamp((115 - dRuins) / 75, 0, 1) * (0.55 + 0.45 * nightness);
     shimGain.gain.setTargetAtTime(shim * 0.045, t, 1.0);
+
+    // wave-4: distant intermittent rumble while the rain bed is heavy.
+    if (rainLevel > 0.7) {
+      if (t > nextRumbleAt) {
+        distantRumble(t + Math.random() * 1.5, (rainLevel - 0.7) / 0.3);
+        nextRumbleAt = t + 12 + Math.random() * 18;
+      }
+    } else if (nextRumbleAt < t + 4) {
+      nextRumbleAt = t + 4;                                  // no instant rumble on onset
+    }
+  }
+
+  // wave-4: setRain(level 0..1) — public; weather.js calls it lazily.
+  // Safe pre-unlock (level is remembered and applied when the ctx exists).
+  function setRain(level) {
+    rainLevel = clamp(+level || 0, 0, 1);
+    if (!ctx || !rainGain) return;
+    const t = now();
+    rainGain.gain.setTargetAtTime(rainLevel * 0.14, t, 1.2);
+    rainLP.frequency.setTargetAtTime(700 + rainLevel * 1900, t, 1.2);
   }
 
   // ==========================================================================
@@ -827,11 +1170,47 @@ export function createAudio(g) {
   // ==========================================================================
   function update(dt) {
     if (!ctx) return;
+    // wave-4 clocks ride ctx.currentTime (wall time) so cadence holds even
+    // when frames run long — rawDt is clamped and would starve the polls.
+    const tw = ctx.currentTime;
+    if (tw - lastPollAt >= 2) { lastPollAt = tw; pollRegion(); }      // region themes
+    if (tw - lastTierAt >= 0.3) { lastTierAt = tw; updateCombatTier(); } // combat tiers
+    updateDeckFade(tw);                                               // 6 s theme fade
     ambAcc += g.time.rawDt || dt;
     if (ambAcc < 0.25) return;
     ambAcc = 0;
     if (ctx.state === 'suspended') { try { ctx.resume(); } catch (e) { /* ignore */ } }
     updateAmbience();
+  }
+
+  // ==========================================================================
+  // wave-4 debug handle — read the live graph programmatically (used by the
+  // automated browser verification; harmless in production).
+  // debug('fiddleNow') arms the fiddle to take the very next day chord.
+  // ==========================================================================
+  function debug(action) {
+    if (action === 'fiddleNow') { fiddleNextAt = 0; return true; }
+    if (!ctx) return { ctxState: 'none' };
+    return {
+      ctxState: ctx.state,
+      region: currentRegion,
+      deckIdx,
+      deckPad: decks ? [decks[0].pad.gain.value, decks[1].pad.gain.value] : null,
+      deckLute: decks ? [decks[0].lute.gain.value, decks[1].lute.gain.value] : null,
+      drone: droneGain ? droneGain.gain.value : 0,
+      luteLPf: luteLP ? luteLP.frequency.value : 0,
+      padLPf: padLP ? padLP.frequency.value : 0,
+      combatOn, tier2On, bossOn,
+      combat: combatGain ? combatGain.gain.value : 0,
+      tier2: tier2Gain ? tier2Gain.gain.value : 0,
+      boss: bossGain ? bossGain.gain.value : 0,
+      choir: choirGain ? choirGain.gain.value : 0,
+      rainLevel,
+      rain: rainGain ? rainGain.gain.value : 0,
+      fiddleIn: musicBus ? Math.max(0, fiddleNextAt - now()) : -1,
+      fiddleCount,
+      dayness,
+    };
   }
 
   // ==========================================================================
@@ -869,5 +1248,5 @@ export function createAudio(g) {
     applyBossState();
   });
 
-  return { update, play, unlock };
+  return { update, play, unlock, setRain, debug };
 }

@@ -365,6 +365,10 @@ export function createUI(g) {
 /* while the weapon wheel is open, clear the center of competing chrome */
 #hud.ef-wheel-open #ef-pill,#hud.ef-wheel-open #ef-cross,#hud.ef-wheel-open #ef-counter,
 #hud.ef-wheel-open #ef-hint{opacity:0!important;pointer-events:none!important;}
+
+/* ---------- photo mode (EXPLORE) — explore.js stamps 'ef-photo' on <body>
+   while the free camera is up; the ENTIRE hud vanishes for clean captures */
+body.ef-photo #hud{display:none!important;}
 `;
   document.head.appendChild(style);
 
@@ -487,6 +491,9 @@ export function createUI(g) {
   <div class="ef-mrow"><span>Look Sensitivity</span><input type="range" id="ef-p-sens" min="0.3" max="2.5" step="0.05"></div>
   <div class="ef-mrow"><span>Invert Y</span><button class="ef-sbtn" id="ef-p-inv">OFF</button></div>
   <div class="ef-mrow"><span>Voiced Dialogue</span><button class="ef-sbtn" id="ef-p-voice">ON</button></div>
+  <div class="ef-mrow"><span>Field of View</span><input type="range" id="ef-p-fov" min="55" max="95" step="1"></div>
+  <div class="ef-mrow" id="ef-p-fxrow" style="display:none"><span>Cinematic FX</span><button class="ef-sbtn" id="ef-p-fx">ON</button></div>
+  <button class="ef-mbtn" id="ef-p-photo">Photo Mode</button>
   <button class="ef-mbtn" id="ef-p-fs">Fullscreen</button>
   <div id="ef-p-note"></div>
 </div>
@@ -837,7 +844,10 @@ export function createUI(g) {
     if (input.attackHeld) { input.attackHeld = false; input.attackReleased = true; }
     input.blockHeld = false;
     if (wheel.open && wheel.keyHeld) closeWheel(false);
-    if (!modalOpen() && !suppressLockPause && everLocked) openPause();
+    // Photo mode (explore.js) exits pointer lock when it takes the camera —
+    // that lock-loss is intentional, not a pause request.
+    if (!modalOpen() && !suppressLockPause && everLocked &&
+        !document.body.classList.contains('ef-photo')) openPause();
     suppressLockPause = false;
   });
 
@@ -1444,6 +1454,40 @@ export function createUI(g) {
   const elPNote = $('ef-p-note'), elPLoad = $('ef-p-load'), elPNew = $('ef-p-new'), elPFs = $('ef-p-fs');
   let newConfirm = 0;
 
+  // --------------------------------------------------------------------------
+  // EXPLORE scoped additions: base FOV (g.baseFov), Photo Mode, Cinematic FX.
+  //
+  // player.js caches the boot-time camera.fov as its sprint-lerp base and
+  // combat.js layers a decaying FOV kick on top AFTER player each frame, so a
+  // one-shot slider write would be overwritten next frame. Instead ui owns
+  // g.baseFov and re-bases the camera every frame (ui runs after both
+  // writers): whatever offset the gameplay writers left on top of the boot
+  // base (sprint lerp + combat kick) is preserved on top of the user's base.
+  // When g.baseFov equals the boot base this writes NOTHING — the untouched
+  // (mobile/default) path stays byte-identical.
+  // --------------------------------------------------------------------------
+  const elPFov = $('ef-p-fov'), elPPhoto = $('ef-p-photo');
+  const elPFxRow = $('ef-p-fxrow'), elPFx = $('ef-p-fx');
+  const bootBaseFov = g.camera.fov; // same value player.js cached at creation
+  {
+    const sv = parseFloat(localStorage.getItem('elderfall_fov') || '');
+    g.baseFov = isFinite(sv) ? clamp(sv, 55, 95) : bootBaseFov;
+  }
+  let fovOffset = 0; // sprint lerp + combat kick, measured off the boot base
+  function rebaseFov() {
+    if (g.cameraLock) return; // photo/cinema own the camera (and its fov)
+    const cam = g.camera;
+    // While unpaused, player.update rewrote fov this frame (combat may have
+    // added its kick after) — measure the gameplay offset fresh. While paused
+    // neither writer runs, so keep the last measured offset frozen.
+    if (!g.paused) fovOffset = cam.fov - bootBaseFov;
+    const want = (g.baseFov || bootBaseFov) + fovOffset;
+    if (Math.abs(cam.fov - want) > 0.005) {
+      cam.fov = want;
+      cam.updateProjectionMatrix();
+    }
+  }
+
   function syncPauseUI() {
     elPQ.textContent = g.quality.tier === 'low' ? 'LOW' : 'HIGH';
     elPInv.textContent = invertY ? 'ON' : 'OFF';
@@ -1455,6 +1499,12 @@ export function createUI(g) {
     newConfirm = 0;
     elPNote.textContent = '';
     elPFs.textContent = document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen';
+    // EXPLORE additions: base-FOV slider + ultra-only Cinematic FX row
+    elPFov.value = String(Math.round(g.baseFov || bootBaseFov));
+    const fx = g.quality.ultra && g.postfx && g.postfx.setEnabled;
+    elPFxRow.style.display = fx ? '' : 'none';
+    if (fx) elPFx.textContent = g.postfx.enabled === false ? 'OFF' : 'ON';
+    elPPhoto.disabled = !(g.explore && g.explore.openPhoto);
   }
   function openPause() {
     if (modalOpen()) return;
@@ -1524,6 +1574,27 @@ export function createUI(g) {
       document.documentElement.requestFullscreen().catch(() => { /* ok */ });
       elPFs.textContent = 'Exit Fullscreen';
     }
+  });
+  // --- EXPLORE additions: FOV slider / Photo Mode / Cinematic FX bindings ---
+  elPFov.addEventListener('input', () => {
+    const v = parseFloat(elPFov.value);
+    if (!isFinite(v)) return;
+    g.baseFov = clamp(v, 55, 95);
+    localStorage.setItem('elderfall_fov', String(g.baseFov));
+    rebaseFov(); // live preview while the menu is open
+  });
+  elPPhoto.addEventListener('click', () => {
+    if (!(g.explore && g.explore.openPhoto)) return;
+    click();
+    closePause();
+    g.explore.openPhoto();
+  });
+  elPFx.addEventListener('click', () => {
+    if (!(g.postfx && g.postfx.setEnabled)) return;
+    click();
+    const on = g.postfx.enabled === false;
+    g.postfx.setEnabled(on);
+    elPFx.textContent = on ? 'ON' : 'OFF';
   });
 
   // ==========================================================================
@@ -1619,6 +1690,10 @@ export function createUI(g) {
   function update() {
     const rdt = g.time.rawDt || 0.016;
     frame++;
+
+    // EXPLORE addition: apply the user base FOV over the gameplay writers
+    // (no-op while g.baseFov matches the boot base — the default path).
+    rebaseFov();
 
     input.sprintOn = shiftDown || sprintToggle;
 
