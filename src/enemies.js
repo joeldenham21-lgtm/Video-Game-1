@@ -30,12 +30,14 @@ import {
 // ---------------------------------------------------------------------------
 // Type stat table (hp / dmg / speed / xp per contract; wave-2 additions)
 // ---------------------------------------------------------------------------
+// `du` is the DUELIST tier (DUELIST.md): 0 basic / 1 skilled / 2 master;
+// absent = null tier (beasts, walls and horrors keep their existing behavior).
 const TYPES = {
   wolf:       { hp: 30,  dmg: 8,  speed: 6.2, xp: 20,  reach: 1.6, bodyR: 0.60, height: 1.05, sightR: 20, atkCd: 1.4, mass: 1.00, name: 'Wolf' },
-  goblin:     { hp: 40,  dmg: 10, speed: 4.4, xp: 25,  reach: 1.7, bodyR: 0.50, height: 1.25, sightR: 16, atkCd: 1.6, mass: 1.00, name: 'Goblin' },
-  bandit:     { hp: 70,  dmg: 14, speed: 4.8, xp: 40,  reach: 2.0, bodyR: 0.60, height: 1.85, sightR: 18, atkCd: 1.8, mass: 0.80, name: 'Bandit' },
-  skeleton:   { hp: 55,  dmg: 12, speed: 3.6, xp: 35,  reach: 1.9, bodyR: 0.55, height: 1.80, sightR: 15, atkCd: 1.9, mass: 1.00, name: 'Skeleton' },
-  skelarcher: { hp: 45,  dmg: 11, speed: 3.4, xp: 40,  reach: 1.9, bodyR: 0.52, height: 1.75, sightR: 20, atkCd: 2.4, mass: 1.00, teleT: 0.7, name: 'Skeleton Archer' },
+  goblin:     { hp: 40,  dmg: 10, speed: 4.4, xp: 25,  reach: 1.7, bodyR: 0.50, height: 1.25, sightR: 16, atkCd: 1.6, mass: 1.00, du: 0, name: 'Goblin' },
+  bandit:     { hp: 70,  dmg: 14, speed: 4.8, xp: 40,  reach: 2.0, bodyR: 0.60, height: 1.85, sightR: 18, atkCd: 1.8, mass: 0.80, du: 1, name: 'Bandit' },
+  skeleton:   { hp: 55,  dmg: 12, speed: 3.6, xp: 35,  reach: 1.9, bodyR: 0.55, height: 1.80, sightR: 15, atkCd: 1.9, mass: 1.00, du: 0, name: 'Skeleton' },
+  skelarcher: { hp: 45,  dmg: 11, speed: 3.4, xp: 40,  reach: 1.9, bodyR: 0.52, height: 1.75, sightR: 20, atkCd: 2.4, mass: 1.00, teleT: 0.7, du: 1, name: 'Skeleton Archer' },
   barrowlord: { hp: 260, dmg: 22, speed: 3.2, xp: 150, reach: 2.7, bodyR: 1.00, height: 2.85, sightR: 20, atkCd: 2.3, mass: 0.30, name: 'Barrow Lord' },
   drake:      { hp: 700, dmg: 28, speed: 8.0, xp: 500, reach: 3.4, bodyR: 2.40, height: 3.20, sightR: 90, atkCd: 2.2, mass: 0.10, name: 'Vhastrix' },
   // Nemesis: bandit ×2.2 (per-win +15% applied at spawn)

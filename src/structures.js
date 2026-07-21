@@ -14,6 +14,9 @@
 // subtle shared emissive ≤1 Hz so it reads lit, not radioactive.
 // Epic monuments this wave: the Titan of the Vale, the Elder Gate, and the
 // Battlefield of Harrow Fen (each one merged Builder mesh + an inscription).
+// NEW this wave: THE EMBER HEARTH — the tavern's enterable interior, a buried
+// crypt-style chamber under the village green reached by door-fade teleport
+// (geometry published on g.emberHearth for quests' dusk schedule + dice).
 // ============================================================================
 import * as THREE from 'three';
 import {

@@ -9,7 +9,13 @@
 //  - Mirrormere fish: expanding ripple rings + jumping fish arcs (more at
 //    dawn/dusk), splash sound when close.
 //  - Forest leaf-fall, golden-hour pollen motes, meadow dandelion-seed gusts.
-// Techniques: everything pooled + instanced (≤8 draw calls total), distance
+//  - Biscuit, the Emberhollow village dog: one warm-brown retinted Fox.glb
+//    that trots a fixed loop of village stations (well → market → tavern →
+//    forge), greets the player, follows them to the village edge and sits to
+//    watch them go, flees aggroed enemies, and lies down at the tavern door
+//    at dusk. Steering at 10 Hz, one skinned rig + one blob-shadow quad.
+// Techniques: everything pooled + instanced (≤8 draw calls + the dog rig),
+// distance
 // culled to a ≤120u bubble around the player, steering AI throttled to 10 Hz
 // (per-frame work is only integration + matrix writes), biome/time-of-day
 // gated with smooth fades. Purely atmospheric — zero gameplay coupling.
@@ -1011,6 +1017,334 @@ export function createFauna(g) {
   }
 
   // ===========================================================================
+  // BISCUIT — the Emberhollow village dog (one retinted Fox.glb)
+  // Loop: idle-sit (Survey) 20–60 s at a station → trot to the next station
+  // (well → market → tavern door → forge hearth) along prop-safe lanes.
+  // Player within 6 u: comes over, sits, faces them (one quiet greeting bark
+  // per day). Follows a player who walks away — up to the village edge
+  // (r 85), where it stops, sits, and watches them go — then returns.
+  // At dusk (dayFrac 0.74) it heads to the tavern door and lies down for the
+  // night. Never fights: flees 15 u from any aggroed enemy, then returns.
+  // NOTE (dusk): the playtest allows a g.flags tavern/hearth position if
+  // another module adds one, but prefers the doorstep regardless — so this
+  // stays purely position-based on the tavern-door station (no flag needed).
+  // ===========================================================================
+  const DOG_H = 1.1;                    // ~0.9× the wolf rig (enemies h=1.25)
+  const DOG_TINT = '#8a6a4a';           // warm brown over the fox fur
+  const DOG_REF_WALK = 2.2, DOG_REF_RUN = 5.5;  // clip-authored speeds
+  const DOG_WALK = 2.6, DOG_RUN = 5.2;
+  const DOG_VILLAGE_R = 85;             // Emberhollow POI radius (core.js)
+  // Stations sit clear of building/prop colliders (structures.js layout).
+  const DOG_STATIONS = [
+    { x: 2.3, z: -5.0 },                // the stone well
+    { x: -13.2, z: 11.4 },              // blacksmith hearth yard
+    { x: 12.0, z: 12.0 },               // tavern doorstep
+    { x: 8.5, z: 2.1 },                 // market stalls
+  ];
+  const DOG_CYCLE = [0, 3, 2, 1];       // well → market → tavern → forge → …
+  // Lane waypoints that steer the trot around the market stalls / tavern
+  // tables (fauna has no collider physics — routes are authored clear).
+  const DOG_WP_H = { x: 4.8, z: 0.6 };  // plaza hub (east of the well)
+  const DOG_WP_W = { x: -16, z: -1 };   // west lane (skirts the green market)
+  const DOG_WP_T = { x: 8.5, z: 12.5 }; // north lane (clears tavern tables)
+  // Via-waypoints per station pair, key = min*4+max ([] = straight shot).
+  const DOG_VIA = {
+    1: [DOG_WP_W],  // well ↔ forge
+    2: [DOG_WP_T],  // well ↔ tavern
+    3: [],          // well ↔ market
+    6: [],          // forge ↔ tavern
+    7: [DOG_WP_W],  // forge ↔ market
+    11: [DOG_WP_T], // tavern ↔ market
+  };
+  // Homecoming entry lane per station (used when returning from anywhere).
+  const DOG_ENTRY = [DOG_WP_H, DOG_WP_W, DOG_WP_T, DOG_WP_H];
+
+  const dogRoot = new THREE.Group();
+  dogRoot.visible = false;
+  scene.add(dogRoot);
+
+  // Blob shadow — same soft radial disc treatment the other creatures get.
+  const dogShadowTex = (() => {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const ctx = cv.getContext('2d');
+    const grd = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+    grd.addColorStop(0, 'rgba(0,0,0,0.42)');
+    grd.addColorStop(0.7, 'rgba(0,0,0,0.25)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(cv);
+  })();
+  const dogShadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ map: dogShadowTex, transparent: true, depthWrite: false }),
+  );
+  dogShadow.rotation.x = -Math.PI / 2;
+  dogShadow.renderOrder = 2;
+  dogShadow.scale.set(1.5, 1.5, 1);
+  dogShadow.visible = false;
+  scene.add(dogShadow);
+
+  const dogPath = [{ x: 0, z: 0 }, { x: 0, z: 0 }, { x: 0, z: 0 }]; // ≤3 legs
+  const dog = {
+    ready: false,
+    mixer: null, clips: null, actions: null, cur: null, curName: '',
+    x: DOG_STATIONS[0].x, z: DOG_STATIONS[0].z, y: 0,
+    yaw: 0, yawT: 0,
+    // idle | go | greet | follow | edge | flee | lie
+    mode: 'idle',
+    station: 0, cycleI: 0,
+    idleT: 18 + Math.random() * 20,
+    wpN: 0, wpI: 0,
+    spd: 2.6,            // commanded speed while moving
+    animSpd: 0,          // smoothed actual speed (drives Walk/Run/Survey)
+    lieF: 0,             // 0 → 1 lie-down pose blend
+    barked: false,       // one greeting bark per day
+    edgeT: 0,
+    fleeX: 0, fleeZ: 0,  // unit flee direction (refreshed at 10 Hz)
+    frameC: 0, lodAcc: 0,
+    prevF: -1,
+  };
+
+  // Rig: the same Khronos Fox the wolves wear, warm brown, ~0.9× their size.
+  g.assets.char('fox').then((res) => {
+    const rig = res.scene;
+    const box = new THREE.Box3().setFromObject(rig);
+    const nh = Math.max(0.01, box.max.y - box.min.y);
+    rig.scale.setScalar(DOG_H / nh);
+    g.assets.tint(rig, DOG_TINT);
+    dogRoot.add(rig);
+    dog.mixer = new THREE.AnimationMixer(rig);
+    dog.clips = {};
+    for (let i = 0; i < res.animations.length; i++) dog.clips[res.animations[i].name] = res.animations[i];
+    dog.actions = {};
+    dog.y = terrainHeight(dog.x, dog.z);
+    dogRoot.position.set(dog.x, dog.y, dog.z);
+    dogRoot.visible = true;
+    dogShadow.visible = true;
+    dog.ready = true;
+  }).catch(() => {});
+
+  function dogPlay(name, fade, ts) {
+    const clip = dog.clips[name];
+    if (!clip) return;
+    let a = dog.actions[name];
+    if (!a) { a = dog.mixer.clipAction(clip); dog.actions[name] = a; }
+    if (dog.curName === name) { a.timeScale = ts; return; }
+    a.reset();
+    a.timeScale = ts;
+    a.setLoop(THREE.LoopRepeat, Infinity);
+    if (dog.cur && dog.cur !== a) dog.cur.fadeOut(fade);
+    a.fadeIn(fade);
+    a.play();
+    dog.cur = a; dog.curName = name;
+  }
+
+  // Quiet greeting "wuff": PLACEHOLDER — audio.js has no bark-adjacent SFX
+  // (wolfHowl is a 2.3 s mournful howl, far too big for a doorstep hello), so
+  // per the playtest this is a quiet footstep_grass double-tap until a real
+  // dog bark lands in the audio registry.
+  function dogBark() {
+    if (!g.audio) return;
+    g.audio.play('footstep_grass', { vol: 0.55 });
+    g.audio.play('footstep_grass', { vol: 0.4, delay: 0.13 });
+  }
+
+  // Build a walk route to station si. fromStation = true when leaving a
+  // station (use the authored via lanes); false when returning from anywhere
+  // (enter along the station's homecoming lane if we're far out).
+  function dogGoTo(si, fromStation) {
+    let n = 0;
+    if (fromStation && si !== dog.station) {
+      const via = DOG_VIA[Math.min(dog.station, si) * 4 + Math.max(dog.station, si)];
+      for (let i = 0; i < via.length; i++) { dogPath[n].x = via[i].x; dogPath[n].z = via[i].z; n++; }
+    } else if (!fromStation &&
+               dist2d(dog.x, dog.z, DOG_STATIONS[si].x, DOG_STATIONS[si].z) > 12) {
+      dogPath[n].x = DOG_ENTRY[si].x; dogPath[n].z = DOG_ENTRY[si].z; n++;
+    }
+    dogPath[n].x = DOG_STATIONS[si].x; dogPath[n].z = DOG_STATIONS[si].z; n++;
+    dog.wpN = n; dog.wpI = 0;
+    dog.station = si;
+    dog.mode = 'go';
+    dog.spd = DOG_WALK;
+  }
+
+  function dogArrive(nightWin) {
+    if (nightWin && dog.station === 2) {
+      dog.mode = 'lie';                    // settle on the tavern doorstep
+    } else {
+      dog.mode = 'idle';
+      dog.idleT = 20 + Math.random() * 40; // sit & survey 20–60 s
+    }
+    dog.yawT = Math.atan2(-dog.x, -dog.z); // face the plaza
+  }
+
+  function aiDog(px, pz) {
+    if (!dog.ready) return;
+    const f = g.time.dayFrac;
+    if (dog.prevF >= 0 && dog.prevF < 0.21 && f >= 0.21) dog.barked = false; // new day
+    dog.prevF = f;
+    const nightWin = f >= 0.74 || f < 0.205; // dusk → dawn: bed at the tavern
+
+    // Combat is never Biscuit's business: flee 15 u from any aggroed enemy.
+    const el = g.enemies && g.enemies.list;
+    let thX = 0, thZ = 0, thD = 1e9;
+    if (el) {
+      for (let i = 0; i < el.length; i++) {
+        const e = el[i];
+        if (!e || !e.alive || !e.aggro || !e.pos) continue;
+        const d = dist2d(dog.x, dog.z, e.pos.x, e.pos.z);
+        if (d < thD) { thD = d; thX = e.pos.x; thZ = e.pos.z; }
+      }
+    }
+    if (dog.mode === 'flee') {
+      if (thD > 20) { dogGoTo(dog.station, false); return; }
+    } else if (thD < 15) {
+      dog.mode = 'flee';
+      dog.spd = DOG_RUN;
+    }
+    if (dog.mode === 'flee') {
+      // away from the threat, biased toward the village heart so the dash
+      // stays on home ground
+      let ax = dog.x - thX, az = dog.z - thZ;
+      const al = Math.hypot(ax, az) || 1;
+      ax /= al; az /= al;
+      const cl = Math.hypot(dog.x, dog.z);
+      if (cl > 30) { ax -= dog.x / cl * 0.5; az -= dog.z / cl * 0.5; }
+      const nl = Math.hypot(ax, az) || 1;
+      dog.fleeX = ax / nl; dog.fleeZ = az / nl;
+      return;
+    }
+
+    // Dusk/night: head for the tavern doorstep and lie down (position-based;
+    // see NOTE above re: g.flags hearth positions).
+    if (nightWin) {
+      if (dog.mode === 'lie') return;
+      if (dog.mode === 'go' && dog.station === 2) return; // already en route
+      dogGoTo(2, dog.mode === 'idle');
+      return;
+    }
+    if (dog.mode === 'lie') { dog.mode = 'idle'; dog.idleT = 4; }
+
+    const pd = dist2d(dog.x, dog.z, px, pz);
+    switch (dog.mode) {
+      case 'idle':
+      case 'go':
+        if (pd < 6) {                       // player! come say hello
+          dog.mode = 'greet';
+          if (!dog.barked) { dogBark(); dog.barked = true; }
+        } else if (dog.mode === 'idle') {
+          dog.idleT -= AI_DT;
+          if (dog.idleT <= 0) {
+            dog.cycleI = (dog.cycleI + 1) % DOG_CYCLE.length;
+            dogGoTo(DOG_CYCLE[dog.cycleI], true);
+          }
+        }
+        break;
+      case 'greet':
+        if (pd > 5.5) dog.mode = 'follow';
+        break;
+      case 'follow':
+        if (pd < 4) dog.mode = 'greet';
+        else if (pd > 45) dogGoTo(dog.station, false); // lost them — head home
+        break;
+      case 'edge':
+        dog.edgeT += AI_DT;
+        if (pd < 6) dog.mode = 'greet';    // they came back!
+        else if (pd > 60 || dog.edgeT > 12) dogGoTo(dog.station, false);
+        break;
+    }
+  }
+
+  function frameDog(dt, px, pz) {
+    if (!dog.ready) return;
+    const pd = dist2d(dog.x, dog.z, px, pz);
+    if (pd > 160) return;                   // far out of sight — sleep cheap
+
+    // ---- movement -----------------------------------------------------------
+    let moved = 0;
+    if (dog.mode === 'go') {
+      const wp = dogPath[dog.wpI];
+      const dx = wp.x - dog.x, dz = wp.z - dog.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.35) {
+        dog.wpI++;
+        if (dog.wpI >= dog.wpN) {
+          const f = g.time.dayFrac;
+          dogArrive(f >= 0.74 || f < 0.205);
+        }
+      } else {
+        moved = Math.min(dog.spd * dt, d);
+        dog.x += dx / d * moved; dog.z += dz / d * moved;
+        dog.yawT = Math.atan2(dx, dz);
+      }
+    } else if (dog.mode === 'greet' || dog.mode === 'follow') {
+      const dx = px - dog.x, dz = pz - dog.z;
+      const d = Math.hypot(dx, dz);
+      const stop = dog.mode === 'greet' ? 2.2 : 2.5;
+      if (d > stop) {
+        const spd = dog.mode === 'follow' ? (d > 8 ? DOG_RUN : 3.4)
+          : (d > 4 ? 4.2 : DOG_WALK);
+        moved = Math.min(spd * dt, d - stop);
+        dog.x += dx / d * moved; dog.z += dz / d * moved;
+        dog.yawT = Math.atan2(dx, dz);
+        // the village edge is as far as Biscuit goes: sit and watch them go
+        if (dog.mode === 'follow') {
+          const r = Math.hypot(dog.x, dog.z);
+          if (r >= DOG_VILLAGE_R) {
+            dog.x *= DOG_VILLAGE_R / r; dog.z *= DOG_VILLAGE_R / r;
+            dog.mode = 'edge';
+            dog.edgeT = 0;
+          }
+        }
+      } else {
+        dog.yawT = Math.atan2(dx, dz);      // sit, look at the player
+      }
+    } else if (dog.mode === 'edge') {
+      dog.yawT = Math.atan2(px - dog.x, pz - dog.z); // eyes on the traveler
+    } else if (dog.mode === 'flee') {
+      moved = DOG_RUN * dt;
+      dog.x += dog.fleeX * moved; dog.z += dog.fleeZ * moved;
+      dog.yawT = Math.atan2(dog.fleeX, dog.fleeZ);
+      const r = Math.hypot(dog.x, dog.z);   // never bolts out of the vale
+      if (r > 95) { dog.x *= 95 / r; dog.z *= 95 / r; }
+    }
+
+    // ---- pose / transform ---------------------------------------------------
+    let dy = dog.yawT - dog.yaw;
+    dy = ((dy + Math.PI) % TAU + TAU) % TAU - Math.PI;
+    dog.yaw += dy * Math.min(1, 7 * dt);
+    dog.y = terrainHeight(dog.x, dog.z);
+    const lieT = dog.mode === 'lie' ? 1 : 0;
+    dog.lieF += (lieT - dog.lieF) * Math.min(1, 2.2 * dt);
+    dogRoot.position.set(dog.x, dog.y, dog.z);
+    dogRoot.rotation.set(0, dog.yaw, 1.25 * dog.lieF); // gentle roll = lie down
+    dogShadow.position.set(dog.x, dog.y + 0.05, dog.z);
+
+    // ---- animation (Walk / Run / Survey are the only fox clips) -------------
+    const spd = dt > 0 ? moved / dt : 0;
+    dog.animSpd += (spd - dog.animSpd) * Math.min(1, 10 * dt);
+    if (dog.mixer) {
+      if (dog.animSpd > 0.25) {
+        if (dog.animSpd > 3.4) dogPlay('Run', 0.18, clamp(dog.animSpd / DOG_REF_RUN, 0.6, 1.6));
+        else dogPlay('Walk', 0.18, clamp(dog.animSpd / DOG_REF_WALK, 0.5, 1.8));
+      } else {
+        // Survey doubles as the sit/idle (and, slowed, the dozing) pose
+        dogPlay('Survey', 0.3, dog.lieF > 0.5 ? 0.3 : 1);
+      }
+      // animation LOD like the guards: full rate near, quartered far away
+      dog.lodAcc += dt;
+      dog.frameC++;
+      const step = pd > 80 ? 4 : pd > 40 ? 2 : 1;
+      if (step === 1 || (dog.frameC % step) === 0) {
+        dog.mixer.update(dog.lodAcc);
+        dog.lodAcc = 0;
+      }
+    }
+  }
+
+  // ===========================================================================
   // 10 Hz AI tick — gates, wind, scatters, spawners, steering
   // ===========================================================================
   let ffAX = 1e9, ffAZ = 1e9;      // firefly 32u re-scatter anchor
@@ -1056,6 +1390,7 @@ export function createFauna(g) {
     aiLake(px, pz);
     aiLeaves(px, pz);
     aiPollen(px, pz);
+    aiDog(px, pz);
   }
 
   // ===========================================================================
@@ -1095,7 +1430,16 @@ export function createFauna(g) {
     frameLeaves(dt);
     framePollen(dt);
     frameSeeds(dt);
+    frameDog(dt, pp.x, pp.z);
   }
 
-  return { update };
+  // dogDebug: tiny inspection handle for playtests/smoke tests (not called by
+  // game code; allocates only when invoked from the console).
+  return {
+    update,
+    dogDebug: () => ({
+      ready: dog.ready, mode: dog.mode, station: dog.station,
+      x: +dog.x.toFixed(1), z: +dog.z.toFixed(1), barked: dog.barked,
+    }),
+  };
 }

@@ -7,7 +7,10 @@
 //                 showBanner(title, sub) }
 // Only imports: './core.js' (no three.js needed here — all math is 2D).
 // ============================================================================
-import { POIS, clamp } from './core.js';
+import {
+  POIS, clamp, lerp, smoothstep, hash2, makeRng,
+  terrainHeight, biomeAt, BIOME, WATER_LEVEL,
+} from './core.js';
 
 export function createUI(g) {
   // ==========================================================================
@@ -334,6 +337,21 @@ export function createUI(g) {
 #ef-journal .be .f{font-size:13px;font-style:italic;color:#5c4520;margin-top:1px;line-height:1.35;}
 #ef-journal .be.unk .n{color:#84714a;font-style:italic;}
 #ef-journal .tally{text-align:center;font-size:12px;font-style:italic;color:#6d5c3a;margin-top:10px;}
+
+/* ---------- world map tab (MAP addition) ---------- */
+#ef-journal .mapblock{margin:10px 0 2px;filter:drop-shadow(0 3px 9px rgba(40,26,10,.4));}
+#ef-journal .mapfr{padding:9px;background:linear-gradient(150deg,#cdb488,#b89c6d);
+  clip-path:polygon(0.8% 2.2%,5% 0.6%,11% 1.8%,17% 0.4%,24% 2%,31% 0.9%,38% 2.3%,45% 0.5%,
+  52% 1.9%,59% 0.6%,66% 2.2%,73% 0.8%,80% 2.4%,87% 0.6%,94% 1.9%,99.2% 3%,98% 9%,99.5% 16%,
+  98.2% 23%,99.6% 30%,98.3% 37%,99.7% 44%,98.4% 51%,99.5% 58%,98.2% 65%,99.6% 72%,98.3% 79%,
+  99.5% 86%,98.1% 93%,99% 98%,93% 99.4%,86% 98.1%,79% 99.5%,72% 98.3%,65% 99.6%,58% 98.2%,
+  51% 99.5%,44% 98.4%,37% 99.7%,30% 98.3%,23% 99.6%,16% 98.2%,9% 99.4%,3% 98.6%,0.5% 94%,
+  1.8% 87%,0.4% 80%,1.9% 73%,0.6% 66%,2.1% 59%,0.5% 52%,1.8% 45%,0.4% 38%,2% 31%,0.7% 24%,
+  2.2% 17%,0.5% 10%,1.6% 5%);}
+#ef-journal .mapfr canvas{display:block;width:100%;height:auto;
+  box-shadow:inset 0 0 0 1px rgba(90,64,26,.4);}
+#ef-journal .mapcap{text-align:center;font-style:italic;font-size:13px;letter-spacing:.1em;
+  color:#5c4520;margin-top:7px;}
 
 /* ---------- death ---------- */
 #ef-death{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
@@ -787,6 +805,10 @@ body.ef-photo #hud{display:none!important;}
     }
     if (e.code === 'KeyJ') {
       if (!pauseOpen && !deathOpen) toggleJournal();
+      return;
+    }
+    if (e.code === 'KeyM') { // MAP addition: open journal straight to the Map tab
+      openMapTab();
       return;
     }
     if (modalOpen() || (g.paused && !pauseOpen)) return;
@@ -1389,9 +1411,13 @@ body.ef-photo #hud{display:none!important;}
   function renderJournal() {
     let html = '<div class="ef-x" id="ef-j-x">✕</div><h2>JOURNAL</h2><div class="ef-rule"></div>';
     html += `<div class="tabs"><button class="tab${journalTab === 'quests' ? ' on' : ''}" data-t="quests">Quests</button>` +
-      `<button class="tab${journalTab === 'bestiary' ? ' on' : ''}" data-t="bestiary">Bestiary</button></div>`;
+      `<button class="tab${journalTab === 'bestiary' ? ' on' : ''}" data-t="bestiary">Bestiary</button>` +
+      `<button class="tab${journalTab === 'map' ? ' on' : ''}" data-t="map">Map</button></div>`;
     if (journalTab === 'bestiary') {
       html += renderBestiary();
+    } else if (journalTab === 'map') {
+      // map canvas is a persistent subtree — appended after innerHTML below so
+      // the cached terrain paint survives tab switches / re-opens.
     } else {
       html += '<h3>Active Quests</h3>';
       if (journal.active.size === 0) html += '<div class="none">No active quests. Seek out the folk of Emberhollow.</div>';
@@ -1423,6 +1449,7 @@ body.ef-photo #hud{display:none!important;}
         renderJournal();
       });
     });
+    if (journalTab === 'map') { elJournal.appendChild(mapWrap); drawMap(); }
   }
   function esc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1440,6 +1467,187 @@ body.ef-photo #hud{display:none!important;}
     journalOpen = false;
     elJournal.classList.remove('on');
     refreshModal();
+  }
+
+  // ==========================================================================
+  // WORLD MAP — journal tab (scoped MAP addition)
+  // Terrain is sampled ONCE on first open (256×256 grid of core.terrainHeight
+  // + biomeAt over x −1600..1600, z −2200..1200 — Drakespire included) into a
+  // cached offscreen 512×512 canvas: muted biome palette, hillshade from the
+  // same central-difference normal scheme core.terrainNormal uses (taken off
+  // the sampled grid, eps = one map cell), inked coastline, then a sepia
+  // wash + aged-edge vignette + paper grain so it reads as an in-world chart.
+  // Overlays (discovered POIs, quest/hunt/compass markers, player arrow) are
+  // redrawn every frame while the tab is open. Undiscovered POIs stay
+  // unlabeled ("fogged"); the terrain itself is fully visible.
+  // ==========================================================================
+  const MAP_S = 512;
+  const MAP_X0 = -1600, MAP_X1 = 1600, MAP_Z0 = -2200, MAP_Z1 = 1200;
+  const mapPx = (x) => (x - MAP_X0) / (MAP_X1 - MAP_X0) * MAP_S;
+  const mapPy = (z) => (z - MAP_Z0) / (MAP_Z1 - MAP_Z0) * MAP_S; // north (−z) = up
+  let mapTerrain = null; // cached terrain paint (built lazily, once)
+
+  const mapWrap = document.createElement('div');
+  mapWrap.className = 'mapblock';
+  mapWrap.innerHTML =
+    '<div class="mapfr"><canvas width="512" height="512"></canvas></div>' +
+    '<div class="mapcap">— Here be the Vale of Elderfall —</div>';
+  const mapCanvas = mapWrap.querySelector('canvas');
+  const mapCtx = mapCanvas.getContext('2d');
+
+  function buildMapTerrain() {
+    const G = 256;
+    const W = MAP_X1 - MAP_X0, D = MAP_Z1 - MAP_Z0;
+    const cw = W / G, cd = D / G;
+    const hs = new Float32Array(G * G);
+    for (let j = 0; j < G; j++) {
+      const z = MAP_Z0 + (j + 0.5) / G * D;
+      for (let i = 0; i < G; i++) hs[j * G + i] = terrainHeight(MAP_X0 + (i + 0.5) / G * W, z);
+    }
+    const small = document.createElement('canvas');
+    small.width = small.height = G;
+    const sc = small.getContext('2d');
+    const img = sc.createImageData(G, G);
+    const px = img.data;
+    // muted palette, tuned to sit on parchment
+    const C_ROCK = [122, 116, 104], C_SNOW = [228, 224, 213];
+    const C_SAND = [158, 139, 97], C_MARSH = [94, 101, 66];
+    const C_FOREST = [64, 81, 55], C_MEADOW = [113, 121, 72], C_MEADOW_LO = [131, 134, 84];
+    const LX = -0.62, LY = 0.72, LZ = -0.32; // light out of the north-west
+    for (let j = 0; j < G; j++) {
+      const z = MAP_Z0 + (j + 0.5) / G * D;
+      for (let i = 0; i < G; i++) {
+        const x = MAP_X0 + (i + 0.5) / G * W;
+        const h = hs[j * G + i];
+        let r, gr, b, shade = 1;
+        if (h < WATER_LEVEL) {
+          const t = Math.min(1, (WATER_LEVEL - h) / 22); // deeper → darker, around #1a2c3e
+          r = lerp(44, 13, t); gr = lerp(70, 27, t); b = lerp(84, 43, t);
+        } else {
+          const bio = biomeAt(x, z, h);
+          let base;
+          if (bio === BIOME.SAND) base = C_SAND;
+          else if (bio === BIOME.MARSH) base = C_MARSH;
+          else if (bio === BIOME.FOREST) base = C_FOREST;
+          else {
+            const t = smoothstep(-2, 52, h); // low meadows warmer, highlands cooler
+            base = [lerp(C_MEADOW_LO[0], C_MEADOW[0], t),
+              lerp(C_MEADOW_LO[1], C_MEADOW[1], t),
+              lerp(C_MEADOW_LO[2], C_MEADOW[2], t)];
+          }
+          const rk = smoothstep(48, 66, h), sn = smoothstep(88, 104, h);
+          r = lerp(lerp(base[0], C_ROCK[0], rk), C_SNOW[0], sn);
+          gr = lerp(lerp(base[1], C_ROCK[1], rk), C_SNOW[1], sn);
+          b = lerp(lerp(base[2], C_ROCK[2], rk), C_SNOW[2], sn);
+          // hillshade — core.terrainNormal's central-difference scheme on the grid
+          const hL = hs[j * G + (i > 0 ? i - 1 : i)], hR = hs[j * G + (i < G - 1 ? i + 1 : i)];
+          const hN = hs[(j > 0 ? j - 1 : j) * G + i], hS = hs[(j < G - 1 ? j + 1 : j) * G + i];
+          const nx = hL - hR, ny = 2 * cw, nz = (hN - hS) * (cw / cd);
+          const nl = Math.hypot(nx, ny, nz);
+          shade = clamp(0.52 + 0.48 * ((nx * LX + ny * LY + nz * LZ) / nl) / LY, 0.55, 1.16);
+          // ink the coastline for a drawn-chart feel
+          if (hL < WATER_LEVEL || hR < WATER_LEVEL || hN < WATER_LEVEL || hS < WATER_LEVEL) shade *= 0.6;
+        }
+        const dn = (hash2(i, j * 7 + 3) - 0.5) * 7; // dither breaks banding
+        const o = (j * G + i) * 4;
+        px[o] = clamp(r * shade + dn, 0, 255);
+        px[o + 1] = clamp(gr * shade + dn, 0, 255);
+        px[o + 2] = clamp(b * shade + dn, 0, 255);
+        px[o + 3] = 255;
+      }
+    }
+    sc.putImageData(img, 0, 0);
+    mapTerrain = document.createElement('canvas');
+    mapTerrain.width = mapTerrain.height = MAP_S;
+    const mc = mapTerrain.getContext('2d');
+    mc.imageSmoothingEnabled = true;
+    mc.drawImage(small, 0, 0, MAP_S, MAP_S); // 256 → 512 (smoothed)
+    // sepia wash + aged-edge vignette + paper grain
+    mc.globalCompositeOperation = 'overlay';
+    mc.fillStyle = 'rgba(198,160,106,0.30)';
+    mc.fillRect(0, 0, MAP_S, MAP_S);
+    mc.globalCompositeOperation = 'multiply';
+    const vg = mc.createRadialGradient(MAP_S / 2, MAP_S / 2, MAP_S * 0.30, MAP_S / 2, MAP_S / 2, MAP_S * 0.74);
+    vg.addColorStop(0, '#ffffff');
+    vg.addColorStop(1, '#c3a878');
+    mc.fillStyle = vg;
+    mc.fillRect(0, 0, MAP_S, MAP_S);
+    mc.globalCompositeOperation = 'source-over';
+    const grng = makeRng(7);
+    for (let k = 0; k < 1100; k++) {
+      mc.fillStyle = k & 1 ? 'rgba(56,40,18,0.05)' : 'rgba(255,240,205,0.05)';
+      mc.fillRect(grng() * MAP_S, grng() * MAP_S, 1.6, 1.6);
+    }
+  }
+
+  function mapHalo(txt, x, y, ink, font) {
+    const c = mapCtx;
+    c.font = font;
+    c.strokeStyle = 'rgba(236,224,195,0.85)';
+    c.lineWidth = 3;
+    c.strokeText(txt, x, y);
+    c.fillStyle = ink;
+    c.fillText(txt, x, y);
+  }
+
+  function drawMap() {
+    if (!mapTerrain) buildMapTerrain();
+    const c = mapCtx;
+    c.drawImage(mapTerrain, 0, 0); // opaque — doubles as clear
+    c.textAlign = 'center';
+    c.lineJoin = 'round';
+    // discovered POIs only — the same glyphs the compass uses
+    const disc = g.flags.discovered || {};
+    for (const poi of POIS) {
+      if (!disc[poi.id]) continue;
+      const x = mapPx(poi.x), y = mapPy(poi.z);
+      mapHalo(POI_GLYPH[poi.id] || '◆', x, y + 5, '#3a2a12', '15px Georgia,serif');
+      mapHalo(poi.name, x, y + 19, '#4a3517', 'italic 11px Georgia,serif');
+    }
+    // generic compass markers (the hunt mirrors into these as id 'hunt' — drawn below)
+    for (const m of g.compassMarkers) {
+      if (!m || m.id === 'hunt') continue;
+      const x = clamp(mapPx(m.x), 10, MAP_S - 10), y = clamp(mapPy(m.z), 14, MAP_S - 8);
+      mapHalo(m.icon || '✦', x, y + 5, '#2e556e', '14px Georgia,serif');
+      if (m.label) mapHalo(m.label, x, y + 18, '#2e556e', 'italic 10px Georgia,serif');
+    }
+    // active hunt bounty
+    const hunt = g.enemies && g.enemies.activeHunt;
+    if (hunt) {
+      const x = clamp(mapPx(hunt.x), 10, MAP_S - 10), y = clamp(mapPy(hunt.z), 14, MAP_S - 8);
+      mapHalo('☠', x, y + 5, '#5a1d13', '15px Georgia,serif');
+      if (hunt.name) mapHalo(hunt.name, x, y + 19, '#5a1d13', 'italic 10px Georgia,serif');
+    }
+    // gold quest marker
+    const mpos = g.quests && g.quests.markerPos ? g.quests.markerPos() : null;
+    if (mpos) {
+      const x = clamp(mapPx(mpos.x), 10, MAP_S - 10), y = clamp(mapPy(mpos.z), 14, MAP_S - 8);
+      mapHalo('▼', x, y + 4, '#8a5c10', '16px Georgia,serif');
+    }
+    // player arrow — position + facing, live while the map is open
+    const p = g.player;
+    if (p && p.position) {
+      c.save();
+      c.translate(clamp(mapPx(p.position.x), 8, MAP_S - 8), clamp(mapPy(p.position.z), 8, MAP_S - 8));
+      c.rotate(-(p.yaw || 0)); // heading 0 = north = map-up (compass convention)
+      c.beginPath();
+      c.moveTo(0, -8.5); c.lineTo(5.6, 6.5); c.lineTo(0, 3); c.lineTo(-5.6, 6.5);
+      c.closePath();
+      c.fillStyle = '#8a2318'; // wax-seal red
+      c.strokeStyle = 'rgba(240,228,196,0.9)';
+      c.lineWidth = 1.4;
+      c.fill();
+      c.stroke();
+      c.restore();
+    }
+  }
+
+  function openMapTab() { // desktop M / direct opens
+    if (pauseOpen || deathOpen || dlgOpen) return;
+    if (journalOpen && journalTab === 'map') { closeJournal(); return; }
+    journalTab = 'map';
+    if (journalOpen) renderJournal();
+    else openJournal();
   }
 
   // ==========================================================================
@@ -1691,7 +1899,7 @@ body.ef-photo #hud{display:none!important;}
   // ==========================================================================
   elHint.textContent = IS_COARSE
     ? 'Left thumb: move  ·  Right thumb: look'
-    : 'WASD move · Mouse look · LMB attack · RMB block · C dodge · E interact · Q wheel · J journal · Esc menu';
+    : 'WASD move · Mouse look · LMB attack · RMB block · C dodge · E interact · Q wheel · J journal · M map · Esc menu';
   setTimeout(() => elHint.classList.add('off'), 16000);
 
   // ==========================================================================
@@ -1726,6 +1934,9 @@ body.ef-photo #hud{display:none!important;}
       updateBars(performance.now() * 0.001);
       updateCompass();
     }
+
+    // MAP addition: live overlays (player arrow etc.) while the map tab is open
+    if (journalOpen && journalTab === 'map') drawMap();
 
     // Interactable proximity scan (~8/s)
     interTimer += rdt;

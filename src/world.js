@@ -205,13 +205,13 @@ const ROADS = [
 function roadDirt(wx, wz) {
   if (wx < -45 || wx > 105 || wz < -135 || wz > 90) return 0;
   // plaza disc (r 21) is worn to dirt, feathered at the rim
-  let w = 1 - smoothstep(16, 24, dist2d(wx, wz, 0, 0));
+  let w = 1 - smoothstep(14, 24, dist2d(wx, wz, 0, 0));
   for (let i = 0; i < ROADS.length; i++) {
     const R = ROADS[i];
     const dx = R[2] - R[0], dz = R[3] - R[1];
     const t = clamp(((wx - R[0]) * dx + (wz - R[1]) * dz) / (dx * dx + dz * dz), 0, 1);
     const d = dist2d(wx, wz, R[0] + dx * t, R[1] + dz * t);
-    const k = 1 - smoothstep(R[4] * 0.5 + 0.5, R[4] * 0.5 + 2.8, d);
+    const k = 1 - smoothstep(R[4] * 0.5 + 1.6, R[4] * 0.5 + 4.6, d);
     if (k > w) w = k;
   }
   return w;
@@ -1361,7 +1361,8 @@ varying vec3 vSplatA;
 varying vec3 vSplatB;
 varying vec3 vTerrPos;
 varying vec3 vTerrN;
-vec3 g_tnrm; // tangent-space splat normal, filled during albedo pass
+vec3 g_tnrm;   // tangent-space splat normal, filled during albedo pass
+vec3 g_wdelta; // world-space normal delta from triplanar rock side-projections
 // Anti-tiling: two offset copies of each texture blended by a low-frequency
 // phase from noise.jpg — breaks the repeat grid with zero seams.
 vec2 terrOff(float i) { return sin(vec2(3.0, 7.0) * i) * 3.71; }
@@ -1381,19 +1382,48 @@ void terrTap(sampler2D dT, sampler2D nT, vec2 uv, vec2 oa, vec2 ob, float bf,
   vec3 alb = vec3(0.0);
   vec3 tn = vec3(0.0);
   float ws = 0.0;
+  g_wdelta = vec3(0.0);
+  // sharpen interpolated weights → crisp material borders, no muddy 50/50
+  vec3 sA = vSplatA * vSplatA;
+  vec3 sB = vSplatB * vSplatB;
+  vec3 wNc = normalize(vTerrN);
   // ~1/6u tiling (rock/snow larger so strata & drifts read at scale)
-  if (vSplatA.x > 0.004) terrTap(uD0, uN0, tp * 0.166, oa, ob, bf, vSplatA.x, alb, tn, ws);
-  if (vSplatA.y > 0.004) terrTap(uD1, uN1, tp * 0.166, oa, ob, bf, vSplatA.y, alb, tn, ws);
-  if (vSplatA.z > 0.004) terrTap(uD2, uN2, tp * 0.110, oa, ob, bf, vSplatA.z, alb, tn, ws);
-  if (vSplatB.x > 0.004) terrTap(uD3, uN3, tp * 0.166, oa, ob, bf, vSplatB.x, alb, tn, ws);
-  if (vSplatB.y > 0.004) terrTap(uD4, uN4, tp * 0.125, oa, ob, bf, vSplatB.y, alb, tn, ws);
-  if (vSplatB.z > 0.004) terrTap(uD5, uN5, tp * 0.166, oa, ob, bf, vSplatB.z, alb, tn, ws);
+  if (sA.x > 0.002) terrTap(uD0, uN0, tp * 0.166, oa, ob, bf, sA.x, alb, tn, ws);
+  if (sA.y > 0.002) terrTap(uD1, uN1, tp * 0.166, oa, ob, bf, sA.y, alb, tn, ws);
+  if (sA.z > 0.002) {
+    // rock is TRIPLANAR: planar XZ smears to mush on near-vertical faces,
+    // side projections keep real strata + cracks on cliffs.
+    vec3 bw = pow(abs(wNc), vec3(4.0));
+    bw /= (bw.x + bw.y + bw.z);
+    float rs = 0.110;
+    if (bw.y > 0.01) terrTap(uD2, uN2, tp * rs, oa, ob, bf, sA.z * bw.y, alb, tn, ws);
+    if (bw.x > 0.01) {
+      float w = sA.z * bw.x;
+      vec2 ux = vTerrPos.zy * rs;
+      alb += texture2D(uD2, ux).rgb * w;
+      vec3 nx = texture2D(uN2, ux).rgb * 2.0 - 1.0;
+      g_wdelta += vec3(0.0, nx.y, nx.x * sign(wNc.x)) * w;
+      ws += w;
+    }
+    if (bw.z > 0.01) {
+      float w = sA.z * bw.z;
+      vec2 uz = vTerrPos.xy * rs;
+      alb += texture2D(uD2, uz).rgb * w;
+      vec3 nz = texture2D(uN2, uz).rgb * 2.0 - 1.0;
+      g_wdelta += vec3(nz.x * sign(wNc.z), nz.y, 0.0) * w;
+      ws += w;
+    }
+  }
+  if (sB.x > 0.002) terrTap(uD3, uN3, tp * 0.166, oa, ob, bf, sB.x, alb, tn, ws);
+  if (sB.y > 0.002) terrTap(uD4, uN4, tp * 0.125, oa, ob, bf, sB.y, alb, tn, ws);
+  if (sB.z > 0.002) terrTap(uD5, uN5, tp * 0.166, oa, ob, bf, sB.z, alb, tn, ws);
   float wk = 1.0 / max(ws, 1e-4);
   alb *= wk;
   tn *= wk;
+  g_wdelta *= wk;
   // macro normal breaks up large-scale flatness (1/90u)
   vec3 mac = texture2D(uMacroN, tp * (1.0 / 90.0)).rgb * 2.0 - 1.0;
-  tn.xy += mac.xy * 0.55;
+  tn.xy = tn.xy * 1.35 + mac.xy * 0.55;
   g_tnrm = tn;
   // vertex color kept as a subtle 20% tint (painted AO + macro palette drift)
   vec3 vtint = clamp(vColor.rgb * 2.4, 0.0, 1.5);
@@ -1411,7 +1441,7 @@ void terrTap(sampler2D dT, sampler2D nT, vec2 uv, vec2 oa, vec2 ob, float bf,
   vec3 wT = normalize(cross(wN, vec3(0.0, 0.0, 1.0)));
   vec3 wB = cross(wT, wN);
   vec3 tsn = normalize(vec3(g_tnrm.xy, max(g_tnrm.z, 0.30)));
-  vec3 wPN = normalize(wT * tsn.x + wB * tsn.y + wN * tsn.z);
+  vec3 wPN = normalize(wT * tsn.x + wB * tsn.y + wN * tsn.z + g_wdelta);
   normal = normalize((viewMatrix * vec4(wPN, 0.0)).xyz);
 }`);
     };
@@ -1436,14 +1466,19 @@ void terrTap(sampler2D dT, sampler2D nT, vec2 uv, vec2 oa, vec2 ob, float bf,
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
     paintTerrainGeometry(geo, 0, 0, segs);
     // Regrade vs near chunks: distance haze makes the shell read chalky, so
-    // darken ~15% and push saturation up so far terrain matches the palette.
+    // darken and push saturation so far terrain matches the near palette.
+    // Desktop: the textured splat ground is considerably darker and less
+    // yellow than the old vertex colors, so the shell drops further to meet
+    // it (screenshot-matched against the meadow splat at noon).
     {
       const ca = geo.attributes.color.array;
+      const mr = DESKTOP ? 0.55 : 0.86, mg = DESKTOP ? 0.62 : 0.86, mb = DESKTOP ? 0.60 : 0.86;
+      const sat = DESKTOP ? 1.22 : 1.15;
       for (let i = 0; i < ca.length; i += 3) {
         const lum = ca[i] * 0.30 + ca[i + 1] * 0.55 + ca[i + 2] * 0.15;
-        ca[i] = clamp((lum + (ca[i] - lum) * 1.15) * 0.86, 0, 1);
-        ca[i + 1] = clamp((lum + (ca[i + 1] - lum) * 1.15) * 0.86, 0, 1);
-        ca[i + 2] = clamp((lum + (ca[i + 2] - lum) * 1.15) * 0.86, 0, 1);
+        ca[i] = clamp((lum + (ca[i] - lum) * sat) * mr, 0, 1);
+        ca[i + 1] = clamp((lum + (ca[i + 1] - lum) * sat) * mg, 0, 1);
+        ca[i + 2] = clamp((lum + (ca[i + 2] - lum) * sat) * mb, 0, 1);
       }
     }
     geo.computeBoundingSphere();
