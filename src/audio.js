@@ -94,7 +94,7 @@ export function createAudio(g) {
   let rainGain = null, rainLP = null;          // wave-4 rain bed
   let dreadGain = null;                        // wave-5 dread-drone bed (crypt / Undergloom)
   let gloomMotifGain = null;                   // wave-5 Undergloom doom-motif bus
-  let AC = null;                               // wave-6 acoustics engine (./acoustics.js)
+  let ACO = null;                              // wave-6 acoustics engine (./acoustics.js)
 
   // ---- bookkeeping ---------------------------------------------------------
   const MAX_VOICES = 16;
@@ -676,8 +676,8 @@ export function createAudio(g) {
     if (prev !== undefined && t - prev < 0.03) return;
     lastPlay.set(name, t);
     let spat = null;
-    if (opts && opts.at && AC) {
-      try { spat = AC.acquire(opts.at); } catch (e) { spat = null; }
+    if (opts && opts.at && ACO) {
+      try { spat = ACO.acquire(opts.at); } catch (e) { spat = null; }
     }
     if (spat) {
       const saved = sfxBus;
@@ -1464,8 +1464,8 @@ export function createAudio(g) {
     // wave-6: ray-driven acoustics — pooled HRTF panners, occlusion, zone
     // convolvers and early reflections all hang off the world-SFX bus (music /
     // dread / ambience buses connect straight to comp and stay dry). Fully
-    // feature-detected: any failure leaves AC null and the legacy path intact.
-    try { AC = createAcoustics(g, ctx, sfxBus, comp); } catch (e) { AC = null; }
+    // feature-detected: any failure leaves ACO null and the legacy path intact.
+    try { ACO = createAcoustics(g, ctx, sfxBus, comp); } catch (e) { ACO = null; }
 
     // Pre-rendered noise buffers (seeded — cheap and deterministic).
     const nrng = makeRng((WORLD_SEED ^ 0xabad1dea) >>> 0);
@@ -1513,6 +1513,7 @@ export function createAudio(g) {
     // wave-4 clocks ride ctx.currentTime (wall time) so cadence holds even
     // when frames run long — rawDt is clamped and would starve the polls.
     const tw = ctx.currentTime;
+    if (ACO) ACO.update(tw);      // wave-6 acoustics (self-throttled 30/10/5/2 Hz)
     if (tw - lastPollAt >= 2) { lastPollAt = tw; pollRegion(); }      // region themes
     if (tw - lastTierAt >= 0.3) { lastTierAt = tw; updateCombatTier(); } // combat tiers
     updateDeckFade(tw);                                               // 6 s theme fade
@@ -1557,6 +1558,8 @@ export function createAudio(g) {
       whisperCount, skitterCount, hornCount,
       whisperIn: Math.max(0, nextWhisperAt - now()),
       skitterIn: Math.max(0, nextSkitterAt - now()),
+      // wave-6 acoustics (panner pool / occlusion / reverb zones / reflections)
+      acoustics: ACO ? ACO.debug() : null,
     };
   }
 
@@ -1565,9 +1568,18 @@ export function createAudio(g) {
   // ==========================================================================
   const E = g.events;
   E.on('attackSwing', (d) => play(d && d.heavy ? 'swingHeavy' : 'swing'));
-  E.on('hitLanded', (d) => play('hitFlesh', { heavy: !!(d && d.heavy), kill: !!(d && d.kill) }));
+  // wave-6: events that carry world positions feed the spatial pool (opts.at).
+  // hitLanded pos = the wound (spatializes ranged hits; melee is deduped by
+  // the 30 ms guard against combat's direct play — correct: it's at your nose).
+  E.on('hitLanded', (d) => play('hitFlesh', { heavy: !!(d && d.heavy), kill: !!(d && d.kill), at: d && d.pos ? d.pos : undefined }));
   E.on('parry', () => play('parry'));
-  E.on('enemyKilled', () => play('kill'));
+  E.on('enemyKilled', (d) => play('kill', d && d.pos ? { at: d.pos } : undefined));
+  // Loot lands with a positional chime where it fell (collect chime stays on
+  // the 'pickup' event below, at the player as ever).
+  E.on('spawnLoot', (d) => {
+    if (!d || !d.pos) return;
+    play(d.kind === 'gold' ? 'pickupCoin' : 'pickupItem', { at: d.pos });
+  });
   E.on('playerDamaged', () => play('hurt'));
   E.on('playerDied', () => play('death'));
   E.on('pickup', (d) => play(d && d.kind === 'gold' ? 'pickupCoin' : 'pickupItem'));

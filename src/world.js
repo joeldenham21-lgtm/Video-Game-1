@@ -1166,7 +1166,7 @@ function sunAxisAt(f) { // beam axis: toward the sun, lifted so shafts stay read
 
 function buildGodRayGeometry(axis) {
   const P = [], C = [], I = [];
-  const ROW_A = [0.0, 0.55, 0.85, 0.28]; // ground → canopy alpha profile (soft top: no sky pillars)
+  const ROW_A = [0.0, 0.6, 0.8, 0.12]; // ground → canopy alpha profile (soft top: no sky pillars)
   const q = new THREE.Quaternion().setFromUnitVectors(UP, axis);
   const v = new THREE.Vector3();
   let si = 0;

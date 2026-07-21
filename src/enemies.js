@@ -554,9 +554,9 @@ export function createEnemies(g) {
     const head = pivot(torso, 0, 1.62, 0.12);
     part(head, GEO.box, M.gloomDark, 0, 0.28, -0.05, 0.9, 0.8, 0.95);
     part(head, GEO.cone, M.gloomDark, 0, 0.9, -0.18, 0.85, 0.85, 0.9);
-    part(head, GEO.box, M.gloomDark, 0, 0.05, 0.3, 0.7, 0.5, 0.4);          // cowl lip shadowing the face
-    const eyeL = part(head, GEO.orb, M.gloomEye, -0.19, 0.22, 0.42, 0.55, 0.42, 0.4);
-    const eyeR = part(head, GEO.orb, M.gloomEye, 0.19, 0.22, 0.42, 0.55, 0.42, 0.4);
+    part(head, GEO.box, M.gloomDark, 0, 0.52, 0.28, 0.86, 0.26, 0.55, 0.18); // overhanging brow — the eyes burn beneath it
+    const eyeL = part(head, GEO.orb, M.gloomEye, -0.19, 0.24, 0.52, 0.85, 0.6, 0.5);
+    const eyeR = part(head, GEO.orb, M.gloomEye, 0.19, 0.24, 0.52, 0.85, 0.6, 0.5);
     eyeL.castShadow = eyeR.castShadow = false;
     // arms: too long, knuckles near the ground, oversized fists
     const armL = pivot(torso, -1.2, 1.28, 0);
