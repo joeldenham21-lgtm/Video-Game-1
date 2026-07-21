@@ -1122,8 +1122,8 @@ function pushFogDisc(P, C, I, cx, y, cz, r, alpha, seed, axis = 0, ry = 1) {
 
 function buildFogBankGeometry(layerB) {
   const P = [], C = [], I = [];
-  const LIFT = [1.5, 4.5, 8.0];         // stacked plane heights
-  const AL = [0.55, 0.42, 0.30];        // fading with height
+  const LIFT = [1.5, 5.0, 9.0];         // stacked plane heights
+  const AL = [0.60, 0.46, 0.33];        // fading with height
   let si = 0;
   for (const b of FOG_BANKS) {
     const cx = b.x + (layerB ? 35 : 0), cz = b.z + (layerB ? -25 : 0);
@@ -1134,9 +1134,9 @@ function buildFogBankGeometry(layerB) {
     }
     // Crossed vertical curtains: sheets vanish edge-on from ground level, so
     // these carry the bank when seen from a hill at grazing angles (squashed
-    // to ~9% height → a low lens of mist, not a wall).
-    pushFogDisc(P, C, I, cx, y + 5.5, cz, r * 0.92, 0.34, si * 7 + 3, 1, 0.09);
-    pushFogDisc(P, C, I, cx, y + 5.5, cz, r * 0.92, 0.34, si * 7 + 4, 2, 0.09);
+    // to ~22% height → a low lens of mist, not a wall).
+    pushFogDisc(P, C, I, cx, y + 6.0, cz, r * 0.92, 0.46, si * 7 + 3, 1, 0.22);
+    pushFogDisc(P, C, I, cx, y + 6.0, cz, r * 0.92, 0.46, si * 7 + 4, 2, 0.22);
     si++;
   }
   const geo = new THREE.BufferGeometry();
@@ -1166,13 +1166,13 @@ function sunAxisAt(f) { // beam axis: toward the sun, lifted so shafts stay read
 
 function buildGodRayGeometry(axis) {
   const P = [], C = [], I = [];
-  const ROW_A = [0.0, 0.5, 0.85, 0.6]; // ground → canopy alpha profile
+  const ROW_A = [0.0, 0.55, 0.85, 0.28]; // ground → canopy alpha profile (soft top: no sky pillars)
   const q = new THREE.Quaternion().setFromUnitVectors(UP, axis);
   const v = new THREE.Vector3();
   let si = 0;
   for (const [sx, sz] of RAY_SPOTS) {
     const h = terrainHeight(sx, sz);
-    const L = 17 + hash2(si, 1, 811) * 6;
+    const L = 12 + hash2(si, 1, 811) * 4; // short: beams stay inside the canopy
     const inten = 0.7 + hash2(si, 2, 811) * 0.3;
     const yaw0 = hash2(si, 3, 811) * TAU;
     for (let pl = 0; pl < 2; pl++) {
@@ -1181,7 +1181,7 @@ function buildGodRayGeometry(axis) {
       const v0 = P.length / 3;
       for (let j = 0; j <= 3; j++) { // rows bottom → top
         const t = j / 3;
-        const hw = lerp(3.0, 1.4, t); // beam narrows toward the canopy
+        const hw = lerp(3.4, 1.2, t); // beam narrows toward the canopy
         for (let i = -1; i <= 1; i++) {
           v.set(i * hw * cy, t * L, i * hw * sy).applyQuaternion(q);
           P.push(sx + v.x, h + 0.4 + v.y, sz + v.z);
@@ -1996,8 +1996,8 @@ export function createWorld(g) {
       fogLayerA.visible = fogLayerB.visible = true;
       fogLayerA.position.set(Math.sin(t * 0.021) * 26, 0, Math.cos(t * 0.017) * 18);
       fogLayerB.position.set(Math.sin(-t * 0.016 + 2.1) * 30, 0, Math.sin(t * 0.019 + 0.7) * 22);
-      fogMatA.opacity = fogVis * (0.42 + 0.10 * Math.sin(t * 0.11));
-      fogMatB.opacity = fogVis * (0.34 + 0.10 * Math.sin(t * 0.13 + 1.7));
+      fogMatA.opacity = fogVis * (0.50 + 0.10 * Math.sin(t * 0.11));
+      fogMatB.opacity = fogVis * (0.40 + 0.10 * Math.sin(t * 0.13 + 1.7));
       if (sky && sky.horizonColor) { // pale rose-grey, tinted by the dawn sky
         fogMatA.color.copy(sky.horizonColor).lerp(_white, 0.55);
         fogMatB.color.copy(fogMatA.color);

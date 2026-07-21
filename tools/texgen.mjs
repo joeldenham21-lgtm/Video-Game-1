@@ -444,15 +444,18 @@ async function genRock() {
     const ridge = rfbm(wu, wv, 4, 3, 0.55, 618);
     const fine = fbm(u, v, 90, 3, 0.5, 619);
     let h = strata * 0.4 + chunk * 0.42 + ridge * 0.3 + fine * 0.2;
-    // Crack veins: Worley cell borders (constant width) under domain warp.
-    const [cu, cv] = warp(u, v, 0.06, 4, 3, 631);
-    const e1 = worleyEdge(cu, cv, 6, 645);
-    const e2 = worleyEdge(cu, cv, 13, 647);
-    const vein1 = 1 - sstep(0.012, 0.05, e1);
-    const vein2 = (1 - sstep(0.01, 0.04, e2)) * 0.6;
+    // Crack veins: Worley cell borders, heavily masked so only partial
+    // networks appear (real cliffs are not mosaic).
+    const [cu, cv] = warp(u, v, 0.09, 4, 3, 631);
+    const e1 = worleyEdge(cu, cv, 4, 645);
+    const e2 = worleyEdge(cu, cv, 9, 647);
+    const m1 = sstep(0.42, 0.62, fbm(u, v, 3, 3, 0.5, 671));
+    const m2 = sstep(0.55, 0.72, fbm(u, v, 4, 3, 0.5, 673));
+    const vein1 = (1 - sstep(0.012, 0.055, e1)) * m1;
+    const vein2 = (1 - sstep(0.01, 0.04, e2)) * m2 * 0.55;
     const vein = Math.min(1, vein1 + vein2);
     veinF[y * S + x] = vein;
-    h -= vein1 * 0.3 + vein2 * 0.18;
+    h -= vein1 * 0.3 + vein2 * 0.16;
     return h;
   });
 
@@ -500,37 +503,46 @@ async function genDirt() {
     return grain * 0.35 + rough * 0.3 + (1 - Math.abs(rut - 0.5) * 2) * -0.25;
   });
 
-  const dry = [104, 86, 62], mid = [86, 70, 50], wet = [58, 47, 34];
+  const dry = [112, 93, 68], mid = [88, 72, 52], wet = [56, 45, 33];
   for (let y = 0; y < S; y++) {
     const v = y / S;
     for (let x = 0; x < S; x++) {
       const u = x / S;
-      const g = fbm(u, v, 90, 3, 0.5, 711);
-      const moist = fbm(u, v, 4, 4, 0.5, 713);
-      const band = afbm(u, v, 2, 8, 2, 0.5, 703); // echo the ruts in tone
-      let c = mix3(mid, dry, g);
-      c = mix3(c, wet, sstep(0.5, 0.78, moist) * 0.7);
-      c = mix3(c, wet, sstep(0.55, 0.8, band) * 0.35);
+      const g = fbm(u, v, 180, 3, 0.6, 711);       // fine grain
+      const [cu, cv] = warp(u, v, 0.08, 6, 2, 721);
+      const g2 = fbm(cu, cv, 26, 3, 0.55, 715);    // clod clumps (warped)
+      const [wu, wv] = warp(u, v, 0.2, 3, 2, 719);
+      const moist = fbm(wu, wv, 4, 4, 0.5, 713);
+      const band = afbm(u, v, 2, 8, 2, 0.5, 703);  // echo the ruts in tone
+      let c = mix3(mid, dry, clamp01(g * 0.75 + g2 * 0.45 - 0.1));
+      c = mix3(c, wet, sstep(0.52, 0.85, moist) * 0.42);
+      c = mix3(c, wet, sstep(0.58, 0.85, band) * 0.25);
+      // Per-pixel grit: packed earth is granular at arm's length.
+      const grit = hash2(x, y, 7);
+      const k = (0.78 + g * 0.42) * (0.9 + grit * 0.2);
+      hgt[y * S + x] += (grit - 0.5) * 0.14 + (g - 0.5) * 0.3;
       const i = (y * S + x) * 3;
-      alb[i] = c[0]; alb[i + 1] = c[1]; alb[i + 2] = c[2];
+      alb[i] = c[0] * k; alb[i + 1] = c[1] * k; alb[i + 2] = c[2] * k;
     }
   }
 
-  // Embedded pebbles: rounded bumps, slightly grey.
-  for (let n = 0; n < 420; n++) {
-    const r = 1.4 + rnd() * 3.4;
+  // Embedded pebbles: shadowed rounded stones, mostly midtone.
+  for (let n = 0; n < 480; n++) {
+    const r = 1.6 + rnd() * 3.2;
     const cx = rnd() * S, cy = rnd() * S;
-    const b = 0.75 + rnd() * 0.5;
-    splatColor(alb, cx, cy, r, [98 * b, 90 * b, 78 * b], 0.8, 0.5);
-    splatHeight(hgt, cx, cy, r, 0.5 + rnd() * 0.4, 0.3);
+    const b = 0.55 + rnd() * 0.55;
+    splatColor(alb, cx + r * 0.5, cy + r * 0.55, r * 1.05, [38, 32, 24], 0.45, 0.35);
+    splatColor(alb, cx, cy, r, [104 * b, 94 * b, 80 * b], 0.85, 0.55);
+    splatColor(alb, cx - r * 0.25, cy - r * 0.3, r * 0.45, [122 * b, 112 * b, 96 * b], 0.5, 0.4);
+    splatHeight(hgt, cx, cy, r, 0.55 + rnd() * 0.4, 0.3);
   }
-  // Tiny gravel.
-  for (let n = 0; n < 2400; n++) {
+  // Tiny gravel flecks.
+  for (let n = 0; n < 3200; n++) {
     const cx = rnd() * S, cy = rnd() * S;
-    const b = 0.7 + rnd() * 0.7;
-    splatColor(alb, cx, cy, 0.9 + rnd() * 0.8, [96 * b, 84 * b, 66 * b], 0.6, 0.4);
+    const b = 0.5 + rnd() * 0.8;
+    splatColor(alb, cx, cy, 0.8 + rnd() * 1.1, [98 * b, 86 * b, 68 * b], 0.65, 0.4);
   }
-  await emitSet('dirt', alb, hgt, 2.6);
+  await emitSet('dirt', alb, hgt, 3.0);
 }
 
 // ================================================================== SNOW
@@ -539,32 +551,35 @@ async function genSnow() {
   RSEED = 2026;
   const alb = newAlbedo(), hgt = newHeight();
 
-  fillHeight(hgt, (u, v) => {
-    const [wu, wv] = warp(u, v, 0.12, 3, 3, 801);
-    const ripple = afbm(wu, wv, 8, 2, 3, 0.5, 803);   // wind ripples, stretched
+  fillHeight(hgt, (u, v, x, y) => {
+    const [wu, wv] = warp(u, v, 0.1, 3, 3, 801);
+    // Wind ripples: wavy sine crests with fbm phase jitter (soft asym profile).
+    const ph = wu * 9 + fbm(wu, wv, 3, 3, 0.5, 811) * 2.2;
+    const ampM = 0.35 + 0.65 * fbm(u, v, 4, 3, 0.5, 813); // ripples fade in/out
+    const rip = Math.pow(0.5 + 0.5 * Math.sin(ph * Math.PI * 2), 1.35) * ampM;
     const dune = fbm(wu, wv, 3, 3, 0.5, 807);
-    const fine = fbm(u, v, 90, 2, 0.5, 809);
-    return ripple * 0.6 + dune * 0.5 + fine * 0.08;
+    const fine = fbm(u, v, 60, 3, 0.5, 809);
+    return rip * 0.42 + dune * 0.5 + fine * 0.12 + (hash2(x, y, 33) - 0.5) * 0.03;
   });
 
-  const white = [228, 231, 235], shade = [172, 184, 204], deep = [148, 162, 188];
+  const white = [237, 239, 243], shade = [206, 214, 226], deep = [176, 187, 206];
   for (let y = 0; y < S; y++) {
     const v = y / S;
     for (let x = 0; x < S; x++) {
       const u = x / S;
       const h = clamp01(hgt[y * S + x]);
-      let c = mix3(deep, white, clamp01(h * 1.15));
+      let c = mix3(deep, white, clamp01(h * 0.55 + 0.5));
       const g = fbm(u, v, 130, 2, 0.5, 821);
-      c = mix3(c, shade, (1 - h) * 0.25 * g);
+      c = mix3(c, shade, (1 - h) * 0.3 * g);
       // Sparkle flecks ~1%.
-      const s = vnoise(u * 512, v * 512, 512, 512, 823);
-      if (s > 0.99) c = [252, 252, 255];
-      else if (s > 0.975) c = mix3(c, [246, 248, 252], 0.7);
+      const s = hash2(x, y, 823);
+      if (s > 0.993) c = [253, 253, 255];
+      else if (s > 0.982) c = mix3(c, [247, 249, 252], 0.6);
       const i = (y * S + x) * 3;
       alb[i] = c[0]; alb[i + 1] = c[1]; alb[i + 2] = c[2];
     }
   }
-  await emitSet('snow', alb, hgt, 2.2);
+  await emitSet('snow', alb, hgt, 2.6);
 }
 
 // ================================================================== SAND
@@ -573,28 +588,33 @@ async function genSand() {
   RSEED = 555;
   const alb = newAlbedo(), hgt = newHeight();
 
-  fillHeight(hgt, (u, v) => {
-    const [wu, wv] = warp(u, v, 0.06, 4, 3, 901);
-    const rip = afbm(wu, wv, 16, 5, 3, 0.5, 903);     // fine shore ripples
-    const grain = fbm(u, v, 120, 2, 0.5, 907);
-    const low = fbm(u, v, 4, 3, 0.5, 909);
-    return rip * 0.55 + low * 0.3 + grain * 0.12;
+  fillHeight(hgt, (u, v, x, y) => {
+    const [wu, wv] = warp(u, v, 0.07, 4, 3, 901);
+    // Crisp shore ripples: wavy sine crests, horizontal, phase-jittered.
+    const ph = wv * 20 + fbm(wu, wv, 4, 3, 0.5, 915) * 2.6;
+    const ampM = 0.3 + 0.7 * fbm(u, v, 3, 3, 0.5, 921);  // ripples fade in/out
+    const rip = Math.pow(0.5 + 0.5 * Math.sin(ph * Math.PI * 2), 1.5) * ampM;
+    const grain = fbm(u, v, 200, 2, 0.55, 907);
+    const low = fbm(wu, wv, 3, 3, 0.5, 909);
+    return rip * 0.48 + low * 0.32 + grain * 0.16 + (hash2(x, y, 44) - 0.5) * 0.05;
   });
 
-  const dry = [150, 134, 102], mid = [122, 108, 80], wet = [82, 72, 52];
+  const dry = [148, 132, 100], mid = [120, 106, 78], wet = [78, 68, 50];
   for (let y = 0; y < S; y++) {
     const v = y / S;
     for (let x = 0; x < S; x++) {
       const u = x / S;
       const h = clamp01(hgt[y * S + x]);
-      // Moisture bands: broad, stretched darkening.
-      const band = afbm(u, v, 2, 5, 2, 0.5, 911);
+      // Moisture patches: broad, irregular (warped) darkening.
+      const [bu, bv] = warp(u, v, 0.15, 3, 2, 917);
+      const band = fbm(bu, bv, 4, 4, 0.5, 911);
       const g = fbm(u, v, 140, 2, 0.5, 913);
-      let c = mix3(wet, dry, clamp01(h * 1.2));
+      let c = mix3(wet, dry, clamp01(h * 0.6 + 0.3));
       c = mix3(c, mid, 0.3 * g);
-      c = mix3(c, wet, sstep(0.52, 0.8, band) * 0.55);
+      c = mix3(c, wet, sstep(0.52, 0.8, band) * 0.38);
+      const k = 0.91 + hash2(x, y, 919) * 0.18;    // per-pixel sand grain
       const i = (y * S + x) * 3;
-      alb[i] = c[0]; alb[i + 1] = c[1]; alb[i + 2] = c[2];
+      alb[i] = c[0] * k; alb[i + 1] = c[1] * k; alb[i + 2] = c[2] * k;
     }
   }
   // Shell / pebble flecks.

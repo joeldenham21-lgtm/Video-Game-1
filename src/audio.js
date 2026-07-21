@@ -45,12 +45,27 @@
 //   falls (dayFrac crossing 0.78) on ~30 % of days, panned toward the
 //   village; Undergloom bossBar → the boss choir stands down and the dread
 //   drone + a restrained 2-note minor-2nd doom motif (A1 → Bb1) take over.
+//
+// Wave 6 (ACOUSTICS) — ray-driven spatial audio via ./acoustics.js (built at
+// unlock, sharing THIS AudioContext; fully feature-detected and inert on
+// failure, mobile keeps cheap stereo panning):
+// - play(name, {at:{x,y,z}}) routes the one-shot through a pooled HRTF panner
+//   (desktop) with ray occlusion (terrain + g.colliders → lowpass + gain dip),
+//   air absorption, 4 convolver reverb zones (field/forest/village/crypt,
+//   crossfaded by player location) and 6-ray early reflections. Without
+//   opts.at the legacy stereo path is byte-for-byte unchanged.
+// - Wired here: enemyKilled → 'kill' at the corpse, hitLanded → 'hitFlesh'
+//   at the wound (ranged hits — melee dedupes against combat's direct call),
+//   spawnLoot → positional coin/item chime where the loot lands.
+// - The legacy generative music defers while the film score is active
+//   (g.score + g.flags.scoreActive — a composer agent owns g.score).
 // ============================================================================
 
 import {
   makeRng, WORLD_SEED, WATER_LEVEL, POI, BIOME, biomeAt,
   clamp, lerp, dist2d, snoise,
 } from './core.js';
+import { createAcoustics } from './acoustics.js';
 
 export function createAudio(g) {
   // ---- lazily created audio state -----------------------------------------
@@ -79,6 +94,7 @@ export function createAudio(g) {
   let rainGain = null, rainLP = null;          // wave-4 rain bed
   let dreadGain = null;                        // wave-5 dread-drone bed (crypt / Undergloom)
   let gloomMotifGain = null;                   // wave-5 Undergloom doom-motif bus
+  let AC = null;                               // wave-6 acoustics engine (./acoustics.js)
 
   // ---- bookkeeping ---------------------------------------------------------
   const MAX_VOICES = 16;
