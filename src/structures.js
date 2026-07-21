@@ -182,6 +182,14 @@ export function createStructures(g) {
     return it;
   }
   const notify = (text, sub) => g.events.emit('notify', sub ? { text, sub } : { text });
+  // Fire hazards: every open flame registers {x, z, r, dps} here — combat/boss
+  // systems wire the actual player damage. Standing in a fire should hurt.
+  g.hazards = g.hazards || [];
+  function addHazard(x, z, r, dps) {
+    const h = { x, z, r, dps };
+    g.hazards.push(h);
+    return h;
+  }
 
   // ---- real-asset placement (async: logic now, meshes on load) --------------
   // Everything gameplay-relevant (colliders, interactables, chest logic) is
@@ -502,6 +510,7 @@ export function createStructures(g) {
     addEmitter(flames, x, gy + 0.35, z, Math.round(8 * scale), 0.85 * scale, 1.2 * scale, 0.55, 0.35);
     // REAL firelight — the flame particles dance over an actual point light
     lamp(x, gy + 1.0, z, { color: 0xff8844, intensity: 1.3 + 0.5 * scale, radius: 11, flicker: 0.6, nightOnly: false });
+    addHazard(x, z, 0.9 * scale, 8); // open flame burns
     return gy;
   }
 
@@ -628,6 +637,7 @@ export function createStructures(g) {
       addEmitter(flames, hx, gy + 0.55, hz, 6, 0.55, 0.7, 0.5, 0.3);
       // the forge hearth burns day and night — real light, always on
       lamp(hx, gy + 1.1, hz, { color: 0xff7733, intensity: 1.6, radius: 8, flicker: 0.5, nightOnly: false });
+      addHazard(hx, hz, 0.9, 8); // the ember bed sears careless boots
       chimneys.push(addEmitter(smoke, bx - fx * 0.8, gy + 0.98 * s - 0.6, bz - fz * 0.8, 6, 0.9, 3.6, 2.4, 1.0));
       hexBarrels.push({ x: bx + fx * 4.6 + 1.0, y: terrainHeight(bx + fx * 4.6 + 1.0, bz + fz * 4.6), z: bz + fz * 4.6, ry: 0.5, s: 5 });
     }
@@ -984,6 +994,11 @@ export function createStructures(g) {
   // ==========================================================================
   // BARROWDEEP RUINS — broken column circle + sunken barrow crypt chamber
   // ==========================================================================
+  // Crypt mound cap (walk-clamped in update — set by buildRuins)
+  const CRY = { x: 0, z: 0, capY: 0, on: false };
+  // Mirrormere pier decks (walk-clamped in update — filled by buildDocks)
+  const DOCKS = [];
+
   function colRow(x1, z1, x2, z2, r, spacing) {
     const n = Math.max(1, Math.round(Math.hypot(x2 - x1, z2 - z1) / spacing));
     for (let i = 0; i <= n; i++) addCol(x1 + (x2 - x1) * i / n, z1 + (z2 - z1) * i / n, r);
@@ -1069,6 +1084,15 @@ export function createStructures(g) {
     b.add(TPL.box, cx - 5.4, gy + 0.9, cz, 2.6, 2.6, 9.6, 0, 0, 0.5, 0x5e5a46, 0.12);
     b.add(TPL.box, cx + 5.4, gy + 0.9, cz, 2.6, 2.6, 9.6, 0, 0, -0.5, 0x5e5a46, 0.12);
     b.add(TPL.box, cx, gy + 0.9, cz + 5.4, 9.6, 2.6, 2.6, -0.5, 0, 0, 0x5e5a46, 0.12);
+    // ...and the berms are solid earth, not ghosts (QA: walk-through)
+    for (let k = -1; k <= 1; k++) {
+      addCol(cx - 5.4, cz + k * 2.6, 1.4);
+      addCol(cx + 5.4, cz + k * 2.6, 1.4);
+      addCol(cx + k * 2.6, cz + 5.4, 1.4);
+    }
+    // the mound cap is solid from ABOVE too: landing on the barrow must not
+    // phase through the roof slabs into the chamber (clamp lives in update)
+    CRY.x = cx; CRY.z = cz; CRY.capY = gy + 4.75; CRY.on = true;
     // sunken entrance corridor (walls rise toward the door)
     b.add(TPL.box, cx - 1.8, gy + 0.95, cz - 7.2, 0.6, 1.9, 6.4, 0.09, 0, 0, C_MOSS, 0.13);
     b.add(TPL.box, cx + 1.8, gy + 0.95, cz - 7.2, 0.6, 1.9, 6.4, 0.09, 0, 0, C_MOSS, 0.13);
@@ -1097,6 +1121,8 @@ export function createStructures(g) {
     }
     fireB.add(TPL.sphere, cx - 3.1, gy + 0.25, cz + 3.1, 0.55, 0.25, 0.55, 0, 0, 0, 0xff8226, 0.05);
     fireB.add(TPL.sphere, cx + 3.1, gy + 0.25, cz + 3.1, 0.55, 0.25, 0.55, 0, 0, 0, 0xff8226, 0.05);
+    addHazard(cx - 3.1, cz + 3.1, 0.8, 8); // ember bowls in the back corners
+    addHazard(cx + 3.1, cz + 3.1, 0.8, 8);
     // wall colliders (door gap kept clear)
     colRow(cx - 3.6, cz + 3.95, cx + 3.6, cz + 3.95, 1.0, 1.5);
     colRow(cx - 3.95, cz - 3.4, cx - 3.95, cz + 3.4, 1.0, 1.5);
@@ -1252,14 +1278,23 @@ export function createStructures(g) {
   // ==========================================================================
   // GREYWATCH TOWER — climb/descend teleports + quest beacon brazier
   // ==========================================================================
-  const TW = { x: POI.tower.x, z: POI.tower.z, topY: 0 };
+  const TW = { x: POI.tower.x, z: POI.tower.z, topY: 0, hx: 0, hz: 0 };
   let beaconFlame = null, beaconFlameEm = null, beaconSmokeEm = null;
+  let beaconHazard = null;
 
   function syncBeacon() {
     const lit = !!g.flags.beaconLit;
     if (beaconFlame) beaconFlame.visible = lit;
     if (beaconFlameEm) beaconFlameEm.active = lit;
     if (beaconSmokeEm) beaconSmokeEm.active = lit;
+    // the burning brazier is a hazard only while it burns
+    if (lit && !beaconHazard) {
+      beaconHazard = addHazard(TW.hx, TW.hz, 1.1, 8);
+    } else if (!lit && beaconHazard) {
+      const i = g.hazards.indexOf(beaconHazard);
+      if (i >= 0) g.hazards.splice(i, 1);
+      beaconHazard = null;
+    }
   }
 
   function buildTower() {
@@ -1298,6 +1333,7 @@ export function createStructures(g) {
     addCol(bfx, bfz, 0.4);
     // beacon brazier
     const bx2 = x + 1.3, bz2 = z;
+    TW.hx = bx2; TW.hz = bz2; // hazard spot once lit (syncBeacon)
     b.add(TPL.cyl, bx2, topY + 0.45, bz2, 1.0, 0.9, 1.0, 0, 0, 0, 0x4a4a50, 0.05);
     b.add(TPL.cyl, bx2, topY + 1.05, bz2, 1.9, 0.55, 1.9, 0, 0, 0, 0x3c3c42, 0.05);
     b.add(TPL.sphere, bx2, topY + 1.3, bz2, 1.3, 0.5, 1.3, 0, 0, 0, 0x2c241c, 0.16);
@@ -1846,6 +1882,9 @@ export function createStructures(g) {
       const yaw = Math.atan2(dirx, dirz);
       const b = new Builder(700 + count);
       const deckY = WATER_LEVEL + 0.85;
+      // the pier is walkable: same deck-clamp pattern as the Stonebridge span
+      // (QA: players sank through the planks to the lakebed)
+      DOCKS.push({ x: sx, z: sz, ux: dirx, uz: dirz, len: 10.5, y: deckY });
       for (let i = 0; i < 5; i++) {
         const px = sx + dirx * (i * 2.1 + 1.0), pz = sz + dirz * (i * 2.1 + 1.0);
         b.add(TPL.box, px, deckY, pz, 1.9, 0.14, 2.2, 0, yaw, 0, C_WOOD, 0.14);
@@ -2186,6 +2225,32 @@ export function createStructures(g) {
             if (p.velocity.y < 0) p.velocity.y = 0;
             p.onGround = true;
           }
+        }
+      }
+      // Mirrormere pier decks: stand on the boards, not the lakebed
+      for (let di = 0; di < DOCKS.length; di++) {
+        const dk = DOCKS[di];
+        const ddx = p.position.x - dk.x, ddz = p.position.z - dk.z;
+        const t = ddx * dk.ux + ddz * dk.uz;
+        if (t < -0.2 || t > dk.len) continue;
+        const lat = ddx * dk.uz - ddz * dk.ux;
+        if (lat < -1.05 || lat > 1.05) continue;
+        if (p.position.y > dk.y - 3.4 && p.position.y < dk.y) {
+          p.position.y = dk.y;
+          if (p.velocity.y < 0) p.velocity.y = 0;
+          p.onGround = true;
+        }
+      }
+      // Barrowdeep mound cap: landing on the barrow stands ON it instead of
+      // phasing through the roof slabs into the crypt (window sits above any
+      // interior jump apex, so the chamber below is unaffected)
+      if (CRY.on) {
+        const kdx = p.position.x - CRY.x, kdz = p.position.z - CRY.z;
+        if (kdx > -4.5 && kdx < 4.5 && kdz > -4.5 && kdz < 4.5 &&
+            p.position.y > CRY.capY - 2.3 && p.position.y < CRY.capY) {
+          p.position.y = CRY.capY;
+          if (p.velocity.y < 0) p.velocity.y = 0;
+          p.onGround = true;
         }
       }
       // The Ember Hearth platform clamp: player.js snaps position.y up to

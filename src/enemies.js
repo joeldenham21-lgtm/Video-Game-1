@@ -3317,6 +3317,11 @@ export function createEnemies(g) {
     const w = Math.sin(t * flap) * amp;
     P.wingL.rotation.z = w + (e.fly ? 0.15 : 1.05);
     P.wingR.rotation.z = -w - (e.fly ? 0.15 : 1.05);
+    // perched/grounded: wings sweep back and fold along the flanks — a
+    // resting membrane, never a straight spar jutting from the shoulders
+    const foldY = e.fly ? 0 : 0.85;
+    P.wingL.rotation.y += (-foldY - P.wingL.rotation.y) * Math.min(1, 3 * dt);
+    P.wingR.rotation.y += (foldY - P.wingR.rotation.y) * Math.min(1, 3 * dt);
     P.tail.rotation.y = Math.sin(t * 2.1) * 0.25;
     P.tail.rotation.x = Math.sin(t * 1.4 + 2) * 0.08;
     P.neck.rotation.x = breath ? 0.35 :
