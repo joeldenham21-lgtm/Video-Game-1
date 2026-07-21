@@ -1465,20 +1465,61 @@ void terrTap(sampler2D dT, sampler2D nT, vec2 uv, vec2 oa, vec2 ob, float bf,
     geo.rotateX(-Math.PI / 2);
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
     paintTerrainGeometry(geo, 0, 0, segs);
-    // Regrade vs near chunks: distance haze makes the shell read chalky, so
-    // darken and push saturation so far terrain matches the near palette.
-    // Desktop: the textured splat ground is considerably darker and less
-    // yellow than the old vertex colors, so the shell drops further to meet
-    // it (screenshot-matched against the meadow splat at noon).
     {
       const ca = geo.attributes.color.array;
-      const mr = DESKTOP ? 0.55 : 0.86, mg = DESKTOP ? 0.62 : 0.86, mb = DESKTOP ? 0.60 : 0.86;
-      const sat = DESKTOP ? 1.22 : 1.15;
-      for (let i = 0; i < ca.length; i += 3) {
-        const lum = ca[i] * 0.30 + ca[i + 1] * 0.55 + ca[i + 2] * 0.15;
-        ca[i] = clamp((lum + (ca[i] - lum) * sat) * mr, 0, 1);
-        ca[i + 1] = clamp((lum + (ca[i + 1] - lum) * sat) * mg, 0, 1);
-        ca[i + 2] = clamp((lum + (ca[i + 2] - lum) * sat) * mb, 0, 1);
+      if (DESKTOP) {
+        // Palette-match the shell to the textured near ground BY CONSTRUCTION:
+        // rebuild every vertex color as splat-weights × per-set mean albedo ×
+        // the same 20% vertex tint / wet band / underwater sink the splat
+        // shader applies. Means measured from assets/terrain/*_d.jpg in
+        // linear space — so where the shell pokes through between chunks it
+        // reads as the same material, just untextured.
+        const AVG = [
+          0.095, 0.116, 0.030,   // grass
+          0.049, 0.031, 0.013,   // forest
+          0.107, 0.101, 0.094,   // rock
+          0.117, 0.076, 0.038,   // dirt
+          0.727, 0.757, 0.824,   // snow
+          0.166, 0.127, 0.066,   // sand
+        ];
+        const pa = geo.attributes.position.array;
+        const n = segs + 1, step = 4400 / segs;
+        for (let iz = 0; iz < n; iz++) {
+          for (let ix = 0; ix < n; ix++) {
+            const i = iz * n + ix;
+            const wx = pa[i * 3], h = pa[i * 3 + 1], wz = pa[i * 3 + 2];
+            const hL = pa[(ix > 0 ? i - 1 : i) * 3 + 1], hR = pa[(ix < segs ? i + 1 : i) * 3 + 1];
+            const hD = pa[(iz > 0 ? i - n : i) * 3 + 1], hU = pa[(iz < segs ? i + n : i) * 3 + 1];
+            const runX = step * ((ix > 0 ? 1 : 0) + (ix < segs ? 1 : 0));
+            const runZ = step * ((iz > 0 ? 1 : 0) + (iz < segs ? 1 : 0));
+            const gx = (hR - hL) / runX, gz = (hU - hD) / runZ;
+            const w = terrainSplat(wx, wz, h, Math.hypot(gx, gz), 1 / Math.sqrt(gx * gx + gz * gz + 1));
+            let r = 0, g2 = 0, b2 = 0;
+            for (let k = 0; k < 6; k++) {
+              r += w[k] * AVG[k * 3]; g2 += w[k] * AVG[k * 3 + 1]; b2 += w[k] * AVG[k * 3 + 2];
+            }
+            r *= 0.8 + 0.2 * clamp(ca[i * 3] * 2.4, 0, 1.5);
+            g2 *= 0.8 + 0.2 * clamp(ca[i * 3 + 1] * 2.4, 0, 1.5);
+            b2 *= 0.8 + 0.2 * clamp(ca[i * 3 + 2] * 2.4, 0, 1.5);
+            const wet = 1 - smoothstep(WATER_LEVEL + 0.25, WATER_LEVEL + 1.1, h);
+            const wk = 1 - wet * 0.30;
+            r *= wk; g2 *= wk; b2 *= wk;
+            const uw = 1 - smoothstep(WATER_LEVEL - 7.0, WATER_LEVEL + 0.4, h);
+            ca[i * 3] = lerp(r, 0.05, uw);
+            ca[i * 3 + 1] = lerp(g2, 0.13, uw);
+            ca[i * 3 + 2] = lerp(b2, 0.15, uw);
+          }
+        }
+      } else {
+        // Mobile: legacy regrade, byte-identical to the pre-splat build —
+        // distance haze makes the shell read chalky, so darken ~15% and push
+        // saturation up so far terrain matches the palette.
+        for (let i = 0; i < ca.length; i += 3) {
+          const lum = ca[i] * 0.30 + ca[i + 1] * 0.55 + ca[i + 2] * 0.15;
+          ca[i] = clamp((lum + (ca[i] - lum) * 1.15) * 0.86, 0, 1);
+          ca[i + 1] = clamp((lum + (ca[i + 1] - lum) * 1.15) * 0.86, 0, 1);
+          ca[i + 2] = clamp((lum + (ca[i + 2] - lum) * 1.15) * 0.86, 0, 1);
+        }
       }
     }
     geo.computeBoundingSphere();

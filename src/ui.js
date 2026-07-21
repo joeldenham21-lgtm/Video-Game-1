@@ -1511,8 +1511,8 @@ body.ef-photo #hud{display:none!important;}
     const px = img.data;
     // muted palette, tuned to sit on parchment
     const C_ROCK = [122, 116, 104], C_SNOW = [228, 224, 213];
-    const C_SAND = [158, 139, 97], C_MARSH = [94, 101, 66];
-    const C_FOREST = [64, 81, 55], C_MEADOW = [113, 121, 72], C_MEADOW_LO = [131, 134, 84];
+    const C_SAND = [158, 139, 97], C_MARSH = [96, 104, 64];
+    const C_FOREST = [80, 97, 58], C_MEADOW = [116, 123, 73], C_MEADOW_LO = [133, 136, 86];
     const LX = -0.62, LY = 0.72, LZ = -0.32; // light out of the north-west
     for (let j = 0; j < G; j++) {
       const z = MAP_Z0 + (j + 0.5) / G * D;
@@ -1521,8 +1521,10 @@ body.ef-photo #hud{display:none!important;}
         const h = hs[j * G + i];
         let r, gr, b, shade = 1;
         if (h < WATER_LEVEL) {
-          const t = Math.min(1, (WATER_LEVEL - h) / 22); // deeper → darker, around #1a2c3e
-          r = lerp(44, 13, t); gr = lerp(70, 27, t); b = lerp(84, 43, t);
+          // muted slate-teal, engraved wave bands — antique-chart water, not ink-black
+          const t = Math.min(1, (WATER_LEVEL - h) / 22);
+          const wave = 1 + 0.05 * Math.sin(j * 0.55 + Math.sin(i * 0.22) * 1.6);
+          r = lerp(88, 40, t) * wave; gr = lerp(110, 62, t) * wave; b = lerp(111, 78, t) * wave;
         } else {
           const bio = biomeAt(x, z, h);
           let base;
@@ -1578,6 +1580,45 @@ body.ef-photo #hud{display:none!important;}
       mc.fillStyle = k & 1 ? 'rgba(56,40,18,0.05)' : 'rgba(255,240,205,0.05)';
       mc.fillRect(grng() * MAP_S, grng() * MAP_S, 1.6, 1.6);
     }
+    // inked neatline — the double border every hand-drawn chart carries
+    mc.strokeStyle = 'rgba(58,42,18,0.5)';
+    mc.lineWidth = 2;
+    mc.strokeRect(7, 7, MAP_S - 14, MAP_S - 14);
+    mc.lineWidth = 1;
+    mc.strokeStyle = 'rgba(58,42,18,0.3)';
+    mc.strokeRect(11.5, 11.5, MAP_S - 23, MAP_S - 23);
+    // compass rose (bottom-right), aged ink on a worn parchment disc
+    mc.save();
+    mc.translate(MAP_S - 58, MAP_S - 60);
+    mc.fillStyle = 'rgba(233,220,190,0.4)';
+    mc.beginPath(); mc.arc(0, 0, 26, 0, Math.PI * 2); mc.fill();
+    mc.strokeStyle = 'rgba(58,42,18,0.7)';
+    mc.lineWidth = 1;
+    mc.beginPath(); mc.arc(0, 0, 21, 0, Math.PI * 2); mc.stroke();
+    mc.fillStyle = 'rgba(58,42,18,0.45)'; // diagonal (half) points first, beneath
+    mc.beginPath();
+    for (let k = 0; k < 4; k++) {
+      const a = (k * 90 + 45) * Math.PI / 180;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      mc.moveTo(ca * 12, sa * 12);
+      mc.lineTo(Math.cos(a + 0.5) * 3.4, Math.sin(a + 0.5) * 3.4);
+      mc.lineTo(Math.cos(a - 0.5) * 3.4, Math.sin(a - 0.5) * 3.4);
+    }
+    mc.fill();
+    mc.fillStyle = 'rgba(58,42,18,0.8)'; // cardinal star
+    mc.beginPath();
+    mc.moveTo(0, -19); mc.lineTo(3.6, -3.6); mc.lineTo(19, 0); mc.lineTo(3.6, 3.6);
+    mc.lineTo(0, 19); mc.lineTo(-3.6, 3.6); mc.lineTo(-19, 0); mc.lineTo(-3.6, -3.6);
+    mc.closePath();
+    mc.fill();
+    mc.font = 'italic 12px Georgia,serif';
+    mc.textAlign = 'center';
+    mc.strokeStyle = 'rgba(236,224,195,0.85)';
+    mc.lineWidth = 3;
+    mc.lineJoin = 'round';
+    mc.strokeText('N', 0, -26);
+    mc.fillText('N', 0, -26);
+    mc.restore();
   }
 
   function mapHalo(txt, x, y, ink, font) {

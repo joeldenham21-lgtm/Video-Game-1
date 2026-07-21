@@ -14,6 +14,11 @@
 // Bosses lock their scale at first engagement (challenge floor = base stats).
 // Plus: elite variants, material drops, the inn Hunt Board, Blood Moon siege
 // nights and the Trial of Echoes at the Shrine of Aldric.
+// DUELIST layer (DUELIST.md): tiered fight-brains on humanoids — projectile
+// evasion (g.combat.getProjectiles), whiff-punish counter-lunges, attack
+// tokens with ring flanking, LOS-denial retreats, in-fight adaptation and
+// pressure reads (potion/stamina/turtling), all behind fairness rails and
+// readable tells. 10Hz staggered, transient (nothing serialized).
 //
 // Contract §5 + ASSETS-ART.md. Only imports: three + core.js. Zero per-frame
 // allocations in update() — all temps are preallocated; query results reuse
@@ -41,17 +46,17 @@ const TYPES = {
   barrowlord: { hp: 260, dmg: 22, speed: 3.2, xp: 150, reach: 2.7, bodyR: 1.00, height: 2.85, sightR: 20, atkCd: 2.3, mass: 0.30, name: 'Barrow Lord' },
   drake:      { hp: 700, dmg: 28, speed: 8.0, xp: 500, reach: 3.4, bodyR: 2.40, height: 3.20, sightR: 90, atkCd: 2.2, mass: 0.10, name: 'Vhastrix' },
   // Nemesis: bandit ×2.2 (per-win +15% applied at spawn)
-  vargr:      { hp: 154, dmg: 31, speed: 5.2, xp: 200, reach: 2.1, bodyR: 0.65, height: 2.05, sightR: 22, atkCd: 1.5, mass: 0.60, name: 'Vargr Redfang' },
+  vargr:      { hp: 154, dmg: 31, speed: 5.2, xp: 200, reach: 2.1, bodyR: 0.65, height: 2.05, sightR: 22, atkCd: 1.5, mass: 0.60, du: 2, name: 'Vargr Redfang' },
   // --- wave 2 roster ---
   wraith:     { hp: 60,  dmg: 13, speed: 3.6, xp: 55,  reach: 2.0, bodyR: 0.55, height: 1.90, sightR: 22, atkCd: 2.6, mass: 0.90, teleT: 0.8, name: 'Wraith', dawnFade: true },
-  thrall:     { hp: 55,  dmg: 12, speed: 5.6, xp: 45,  reach: 1.8, bodyR: 0.55, height: 1.80, sightR: 20, atkCd: 1.5, mass: 0.90, name: 'Vampire Thrall', dawnFade: true },
-  morvane:    { hp: 240, dmg: 20, speed: 5.2, xp: 260, reach: 2.1, bodyR: 0.60, height: 2.02, sightR: 24, atkCd: 1.7, mass: 0.45, teleT: 0.5, name: 'Lord Morvane', dawnFade: true },
-  witch:      { hp: 120, dmg: 15, speed: 3.8, xp: 90,  reach: 2.0, bodyR: 0.55, height: 1.75, sightR: 20, atkCd: 2.4, mass: 0.80, teleT: 0.9, name: 'Grimhilde' },
+  thrall:     { hp: 55,  dmg: 12, speed: 5.6, xp: 45,  reach: 1.8, bodyR: 0.55, height: 1.80, sightR: 20, atkCd: 1.5, mass: 0.90, du: 0, name: 'Vampire Thrall', dawnFade: true },
+  morvane:    { hp: 240, dmg: 20, speed: 5.2, xp: 260, reach: 2.1, bodyR: 0.60, height: 2.02, sightR: 24, atkCd: 1.7, mass: 0.45, teleT: 0.5, du: 2, name: 'Lord Morvane', dawnFade: true },
+  witch:      { hp: 120, dmg: 15, speed: 3.8, xp: 90,  reach: 2.0, bodyR: 0.55, height: 1.75, sightR: 20, atkCd: 2.4, mass: 0.80, teleT: 0.9, du: 1, name: 'Grimhilde' },
   troll:      { hp: 400, dmg: 40, speed: 3.4, xp: 300, reach: 3.0, bodyR: 1.10, height: 4.15, sightR: 20, atkCd: 2.6, mass: 0.15, teleT: 1.0, strikeT: 0.6, name: 'Stonebridge Troll' },
-  werewolf:   { hp: 90,  dmg: 18, speed: 7.2, xp: 80,  reach: 1.9, bodyR: 0.62, height: 2.25, sightR: 26, atkCd: 1.1, mass: 0.85, teleT: 0.45, name: 'Werewolf' },
+  werewolf:   { hp: 90,  dmg: 18, speed: 7.2, xp: 80,  reach: 1.9, bodyR: 0.62, height: 2.25, sightR: 26, atkCd: 1.1, mass: 0.85, teleT: 0.45, du: 1, name: 'Werewolf' },
   // --- TERROR wave: the three horrors (high floors — always frightening) ---
   undergloom: { hp: 1400, dmg: 55, speed: 3.0, xp: 800, reach: 3.2, bodyR: 1.20, height: 5.50, sightR: 26, atkCd: 3.0, mass: 0.08, teleT: 1.2, strikeT: 0.6, name: 'THE UNDERGLOOM' },
-  palerider:  { hp: 900,  dmg: 45, speed: 2.2, xp: 400, reach: 2.2, bodyR: 0.60, height: 2.60, sightR: 95, atkCd: 2.0, mass: 0.20, teleT: 0.8, name: 'The Pale Rider' },
+  palerider:  { hp: 900,  dmg: 45, speed: 2.2, xp: 400, reach: 2.2, bodyR: 0.60, height: 2.60, sightR: 95, atkCd: 2.0, mass: 0.20, teleT: 0.8, du: 2, name: 'The Pale Rider' },
   broodmother:{ hp: 380,  dmg: 26, speed: 4.6, xp: 240, reach: 2.4, bodyR: 1.10, height: 1.40, sightR: 22, atkCd: 2.2, mass: 0.30, teleT: 0.8, strikeT: 0.4, name: 'Broodmother' },
   broodling:  { hp: 25,   dmg: 8,  speed: 6.5, xp: 18,  reach: 1.4, bodyR: 0.38, height: 0.55, sightR: 18, atkCd: 1.2, mass: 1.00, name: 'Broodling' },
 };
@@ -88,8 +93,20 @@ const STRIKE_HIT_T = 0.12;
 const FLINCH_T    = 0.24;
 const STAGGER_T   = 1.2;
 const GUARD_T     = 0.9;
-const DODGE_T     = 0.4;    // thrall sidestep
+const DODGE_T     = 0.4;    // thrall sidestep / duelist roll
 const BLINK_T     = 0.55;   // Morvane teleport-blink
+
+// --- DUELIST layer tuning (DUELIST.md) -------------------------------------
+const DU_TIER_BASE = [0.35, 0.6, 0.85]; // projectile-dodge chance by tier
+const DU_DODGE_CD  = [3.2, 2.4, 1.6];   // dodge cooldown by tier (spam still lands)
+const DU_RECOVER_T = 0.25;  // post-dodge recovery: no attacks, +20% damage taken
+const DU_TOKENS    = 2;     // concurrent melee attackers on the player
+const DU_RING_R    = 5.6;   // flank ring radius
+const DU_FEINT_CD  = 6;     // fairness rail: feints ≤1 per 6s per enemy
+const DU_REAR_CD   = 3;     // fairness rail: max 1 rear attack per 3s
+const DU_FEINT_T   = 0.35;  // feint pause before the true strike
+// 6-point flank ring, angles off the player's facing (±60°..±175°)
+const DU_SLOTS = [1.05, -1.05, 2.09, -2.09, 3.05, -3.05];
 const SINK_AFTER  = 6.0;    // corpse sits, then sinks
 const SINK_T      = 1.4;
 const ACTIVE_CAP  = 12;     // non-boss actives within range (danger-area packs)
@@ -114,6 +131,18 @@ const CS_ON = { inCombat: true };
 const CS_OFF = { inCombat: false };
 const _box = new THREE.Box3();
 const _tv = new THREE.Vector3();
+// DUELIST layer temps — reused module arrays, zero per-frame allocations
+const _proj = [];                        // getProjectiles buffer (caller-owned)
+const _duFighters = [];                  // melee duelist roster per token tick
+const _slotBusy = [0, 0, 0, 0, 0, 0];    // flank ring occupancy
+const _duV = new THREE.Vector3();        // camera-forward scratch
+function duByPd(a, b) { return a.duPd - b.duPd; }
+function angDiff(a, b) {
+  let d = a - b;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return Math.abs(d);
+}
 
 function isNightFrac(f) { return f < 0.23 || f > 0.77; }
 
@@ -1338,8 +1367,19 @@ export function createEnemies(g) {
       drains: type === 'thrall' || type === 'morvane',
       dawnFade: !!T.dawnFade,
       castMove: type === 'witch',
-      dodgeT: 1.2 + Math.random() * 2, dodgeDir: 1,
-      blinkT: 3 + Math.random() * 3, blinkDone: false,
+      dodgeT: 1.2 + Math.random() * 2, dodgeDir: 1, dodgeKind: 0,
+      blinkT: 3 + Math.random() * 3, blinkDone: false, blinkDX: 0, blinkDZ: 0,
+      // DUELIST layer (DUELIST.md) — transient fight brain, never serialized.
+      // Tier: TYPES.du (+1 for elites, capped at master); -1 = null tier.
+      duTier: T.du === undefined ? -1 : Math.min(2, T.du + (elite ? 1 : 0)),
+      duPollT: hash2((x * 3) | 0, (z * 5) | 0, 29) * 0.1, // 10Hz stagger offset
+      duRng: 1, duDodgeCd: 0, duRecoverT: 0, duPressT: 0,
+      duMemMelee: 0, duMemProj: 0, duMemBow: 0, duProjHit: false,
+      duFeint: 0, duFeintCd: 0, duKick: false, duKickCd: 0,
+      duCounter: 0, duTeleOv: 0, duDmgMul: 1, duLunge: 0,
+      duToken: false, duSlot: -1, duFlankX: 0, duFlankZ: 0, duPd: 0,
+      duRetreatT: 0, duRetreatCd: 0, duCoverX: 0, duCoverZ: 0,
+      duKiteX: 0, duKiteZ: 0, duBarkT: 0,
       // drake:
       fly: false, dstate: '', atkT: 0, phaseT: 0, breathTick: 0, roared: false,
       swoopA: null, swoopB: null, swoopC: null, breathTarget: null,
@@ -1531,7 +1571,20 @@ export function createEnemies(g) {
       }
       if (opts && (opts.kind === 'fire' || opts.heavy)) amount *= 1.6; // flame (and committed blows) rend spirit
     }
-    if (e.state === 'guard') { amount *= 0.35; e.blockHit = true; sfx('block'); }
+    // Duelist fairness rail: a punished dodge hurts more (recovery frames)
+    if (e.duRecoverT > 0) amount *= 1.2;
+    // Duelist fight memory: projectile pain drives the LOS-denial retreat
+    if (e.duTier >= 0 && opts && (opts.kind === 'arrow' || opts.kind === 'fire' || opts.kind === 'burn')) {
+      e.duProjHit = true;
+    }
+    if (e.state === 'guard') {
+      if (e.duTier >= 0 && opts && opts.heavy) {
+        // a committed blow breaks the raised blade — full damage, reeling
+        e.state = 'stagger'; e.stateT = 0;
+        duClearAttack(e);
+        sfx('block'); sfx('swingHeavy');
+      } else { amount *= 0.35; e.blockHit = true; sfx('block'); }
+    }
     e.hp -= amount;
     // Boss hp persists in BASE units so saves stay compatible across levels
     if (e.type === 'drake' && !e.echo) bossState.drake.hp = Math.max(0, e.hp / (e.hpScale || 1));
@@ -1573,9 +1626,13 @@ export function createEnemies(g) {
     if (!e.aggro && e.state !== 'flee') startAggro(e, true);
     // Flinch — a heavy hit or parry interrupts the windup, light hits don't
     if (e.state === 'telegraph') {
-      if ((opts && opts.heavy) || (opts && opts.parried)) { e.state = 'flinch'; e.stateT = 0; }
+      if ((opts && opts.heavy) || (opts && opts.parried)) {
+        e.state = 'flinch'; e.stateT = 0;
+        duClearAttack(e); // interrupted counters/feints/kicks lose their edge
+      }
     } else if (e.state !== 'strike' && e.state !== 'stagger' && e.state !== 'dead' &&
                e.state !== 'blink' && !e.fly) {
+      if (e.state === 'feint') duClearAttack(e); // caught mid-feint: punished
       e.state = 'flinch'; e.stateT = 0;
     }
     // Wolves break and flee below 25% hp
@@ -1669,6 +1726,16 @@ export function createEnemies(g) {
   function startAggro(e, silent) {
     if (e.aggro || e.dead) return;
     e.aggro = true;
+    // Duelist: fresh fight brain — seeded per-enemy rng (deterministic per
+    // fight, testable) and clean adaptation reads. Cleared implicitly here on
+    // every re-aggro; nothing of it is ever serialized.
+    if (e.duTier >= 0) {
+      e.duRng = ((e.seed * 4294967296) >>> 0) || 1;
+      e.duMemMelee = e.duMemProj = e.duMemBow = 0;
+      e.duProjHit = false;
+      e.duToken = false; e.duSlot = -1;
+      e.duFeint = 0; e.duCounter = 0;
+    }
     if (e.state !== 'flinch' && e.state !== 'stagger') { e.state = 'chase'; e.stateT = 0; }
     const t = g.time.elapsed;
     if ((e.type === 'wolf' || e.type === 'werewolf') && t - lastHowl > 4) { lastHowl = t; sfx('wolfHowl'); }
@@ -1916,6 +1983,19 @@ export function createEnemies(g) {
     sfx('fireCast');
   }
   function doBlinkJump(e) {
+    // Duelist evasion blink: a committed 4-6u lateral jump out of the shot's
+    // path (blinkDX/DZ set by duDodgeProjectile), not the random re-position.
+    if (e.blinkDX !== 0 || e.blinkDZ !== 0) {
+      const nx = e.pos.x + e.blinkDX, nz = e.pos.z + e.blinkDZ;
+      e.blinkDX = 0; e.blinkDZ = 0;
+      const nh = terrainHeight(nx, nz);
+      if (nh > WATER_LEVEL - 0.5) {
+        e.pos.set(nx, nh, nz);
+        e.vel.set(0, 0, 0);
+      }
+      emitBurst(e.pos.x, e.pos.y + 1.1, e.pos.z, 14, 0.8, 0.1, 0.2, 1);
+      return;
+    }
     const p = g.player.position;
     for (let tries = 0; tries < 4; tries++) {
       const a = Math.random() * Math.PI * 2;
