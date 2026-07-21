@@ -33,6 +33,7 @@ const STAM_REGEN_DELAY = 0.8;  // seconds after last spend
 const STAM_JUMP_COST = 12;
 const STAM_RECOVER_AT = 20;    // exhausted until stamina climbs back here
 
+let lastHazardT = -9;
 let lastFallDmgT = -9;
 const FALL_DMG_SPEED = 16;     // m/s impact threshold (~13m drop starts to hurt)
 const FALL_DMG_SCALE = 3.2;    // hp per m/s over threshold (gentler curve)
@@ -408,6 +409,38 @@ export function createPlayer(g) {
       position.z = c.z + nz * rr;
       const into = velocity.x * nx + velocity.z * nz;
       if (into < 0) { velocity.x -= nx * into; velocity.z -= nz * into; }
+    }
+
+    // ---- soft body-collision with villagers (no more wearing Torvald) ----------
+    const npcs = g.quests && g.quests.npcs;
+    if (npcs) {
+      for (let i = 0; i < npcs.length; i++) {
+        const n = npcs[i];
+        const np = n && (n.pos || (n.group && n.group.position));
+        if (!np) continue;
+        const rr2 = 0.55 + R;
+        let dx = position.x - np.x, dz = position.z - np.z;
+        if (dx > rr2 || dx < -rr2 || dz > rr2 || dz < -rr2) continue;
+        const d2n = dx * dx + dz * dz;
+        if (d2n >= rr2 * rr2 || Math.abs(position.y - np.y) > 2.2) continue;
+        let d = Math.sqrt(d2n);
+        if (d < 1e-4) { dx = 1; dz = 0; d = 1; }
+        position.x = np.x + (dx / d) * rr2;
+        position.z = np.z + (dz / d) * rr2;
+      }
+    }
+
+    // ---- fire hazards (campfires/hearths burn everyone now) --------------------
+    if (g.hazards && g.hazards.length && g.time.elapsed - lastHazardT > 0.5) {
+      for (let i = 0; i < g.hazards.length; i++) {
+        const h = g.hazards[i];
+        const dx = position.x - h.x, dz = position.z - h.z;
+        if (dx * dx + dz * dz < h.r * h.r && position.y < (h.y ?? position.y) + 2.2) {
+          lastHazardT = g.time.elapsed;
+          damage((h.dps || 8) * 0.5, null);
+          break;
+        }
+      }
     }
 
     // ---- ground resolve / landing --------------------------------------------------
