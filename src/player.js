@@ -33,8 +33,9 @@ const STAM_REGEN_DELAY = 0.8;  // seconds after last spend
 const STAM_JUMP_COST = 12;
 const STAM_RECOVER_AT = 20;    // exhausted until stamina climbs back here
 
-const FALL_DMG_SPEED = 12;     // m/s impact threshold
-const FALL_DMG_SCALE = 5;      // hp per m/s over threshold
+let lastFallDmgT = -9;
+const FALL_DMG_SPEED = 16;     // m/s impact threshold (~13m drop starts to hurt)
+const FALL_DMG_SCALE = 3.2;    // hp per m/s over threshold (gentler curve)
 
 const WATER_MOVE_MULT = 0.45;
 const WATER_FLOAT_Y = WATER_LEVEL - 1.15; // buoyancy spring target (feet)
@@ -421,7 +422,11 @@ export function createPlayer(g) {
           addShake(clamp((impact - 6) * 0.02, 0, 0.18));
         }
         // fall damage (water landings are cushioned)
-        if (impact > FALL_DMG_SPEED && gh > WATER_LEVEL && !player.inWater) {
+        // 0.6s cooldown: steep-slope slides re-trigger landings every few
+        // frames and machine-gunned chip damage (griefer finding)
+        if (impact > FALL_DMG_SPEED && gh > WATER_LEVEL && !player.inWater
+            && g.time.elapsed - lastFallDmgT > 0.6) {
+          lastFallDmgT = g.time.elapsed;
           damage((impact - FALL_DMG_SPEED) * FALL_DMG_SCALE);
         }
       }

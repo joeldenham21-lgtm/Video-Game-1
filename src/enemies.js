@@ -2251,19 +2251,24 @@ export function createEnemies(g) {
     const ex = e.pos.x, ey = e.pos.y + e.height * 0.55, ez = e.pos.z;
     for (let i = 0; i < _proj.length; i++) {
       const pr = _proj[i];
-      const rx = ex - pr.x, ry = ey - pr.y, rz = ez - pr.z;
-      const vv = pr.vx * pr.vx + pr.vy * pr.vy + pr.vz * pr.vz;
-      if (vv < 1) continue;
-      const tca = (rx * pr.vx + ry * pr.vy + rz * pr.vz) / vv;
-      if (tca <= 0.02 || tca > win) continue;
-      const cx = pr.x + pr.vx * tca - ex;
-      const cy = pr.y + pr.vy * tca - ey;
-      const cz = pr.z + pr.vz * tca - ez;
-      if (Math.sqrt(cx * cx + cy * cy + cz * cz) > threatR) continue;
+      // BALLISTIC closest approach: arrows arc under 16u/s² gravity — a
+      // linear ray check reads a true shot as "sailing overhead" until it's
+      // too late to roll. Sample the curved flight instead (~20 steps, no
+      // allocation).
+      const grav = pr.kind === 'arrow' ? 16 : 0;
+      let bestT = -1, bestD2 = 1e9, bx = 0, bz = 0;
+      for (let ts = 0.04; ts <= win; ts += 0.06) {
+        const qx = pr.x + pr.vx * ts - ex;
+        const qy = pr.y + (pr.vy - 0.5 * grav * ts) * ts - ey;
+        const qz = pr.z + pr.vz * ts - ez;
+        const d2 = qx * qx + qy * qy + qz * qz;
+        if (d2 < bestD2) { bestD2 = d2; bestT = ts; bx = qx; bz = qz; }
+      }
+      if (bestT <= 0.02 || Math.sqrt(bestD2) > threatR) continue;
       // late reads fail: > 0.55s to impact → full chance, < 0.25s → none
-      const df = clamp((tca - 0.25) / 0.30, 0.05, 1);
+      const df = clamp((bestT - 0.25) / 0.30, 0.05, 1);
       const chance = Math.min(0.95, DU_TIER_BASE[tier] * df * playerScale());
-      if (duRoll(e) < chance) duDodgeProjectile(e, pr, cx, cz);
+      if (duRoll(e) < chance) duDodgeProjectile(e, pr, bx, bz);
       break; // one read per poll — nearest threat only
     }
   }

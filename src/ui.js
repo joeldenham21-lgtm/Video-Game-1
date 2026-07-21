@@ -803,6 +803,7 @@ body.ef-photo #hud{display:none!important;}
       if (!deathOpen) openPause();
       return;
     }
+    if (modalOpen() || (g.paused && !pauseOpen)) return;
     if (e.code === 'KeyJ') {
       if (!pauseOpen && !deathOpen) toggleJournal();
       return;
@@ -811,7 +812,6 @@ body.ef-photo #hud{display:none!important;}
       openMapTab();
       return;
     }
-    if (modalOpen() || (g.paused && !pauseOpen)) return;
 
     if (MOVE_KEYS.has(e.code)) { keys.add(e.code); setMoveFromKeys(); return; }
     switch (e.code) {

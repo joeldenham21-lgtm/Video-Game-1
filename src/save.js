@@ -10,6 +10,8 @@ const VERSION = 1;
 
 export function createSave(g) {
   function save() {
+    // Mid-air save-load erases fall velocity (skydiving immunity) — defer.
+    if (g.player && !g.player.onGround && !g.player.inWater) return false;
     try {
       const data = { version: VERSION };
 

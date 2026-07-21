@@ -43,6 +43,7 @@ const TRAVEL_HOLD = 0.85;      // s, held black while world chunks rebuild
 const TRAVEL_FADE_IN = 0.7;    // s, back to the world
 const TRAVEL_BLOCK_R = 30;     // aggroed enemy within this radius blocks travel
 const TRAVEL_DAY_DIV = 3000;   // dayFrac advance = dist / this (min 0.01)
+let photoDayFrac0 = null;      // dayFrac to restore when photo mode closes
 
 const SENSE_T = 4;             // s, pulse duration
 const SENSE_CD = 8;            // s, cooldown AFTER the pulse ends
@@ -351,6 +352,7 @@ body.ef-photo #ef-sn-tap{display:none;}
   }
 
   function openTravel(from) {
+    if (g.player && !g.player.onGround) { g.events.emit('notify', { text: 'Not while airborne' }); return; }
     if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
     if (trvOpen || g.paused || g.cameraLock || travel.phase !== 'idle') return;
     if (aggroNear()) {
@@ -580,6 +582,7 @@ body.ef-photo #ef-sn-tap{display:none;}
   };
 
   function openPhoto() {
+    photoDayFrac0 = g.time.dayFrac; // time scrub is a lighting PREVIEW — restored on exit
     if (photo.active || g.cameraLock || g.paused || travel.phase !== 'idle') return;
     const pl = g.player;
     if (!pl || !pl.stats || pl.stats.hp <= 0) return;
@@ -609,6 +612,7 @@ body.ef-photo #ef-sn-tap{display:none;}
   }
 
   function closePhoto() {
+    if (photoDayFrac0 !== null) { g.time.dayFrac = photoDayFrac0; photoDayFrac0 = null; }
     if (!photo.active) return;
     photo.active = false;
     elPh.classList.remove('on');
