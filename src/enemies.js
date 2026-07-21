@@ -1377,6 +1377,7 @@ export function createEnemies(g) {
   }
 
   function despawn(e) {
+    e.gone = true; // update loop skips anything removed mid-frame
     if (e.spawner) e.spawner.enemy = null;
     releaseHolder(e.holder);
     const i = list.indexOf(e);
@@ -3487,9 +3488,7 @@ export function createEnemies(g) {
       if (e.type === 'drake') updateDrake(e, dt, t, pd);
       else if (e.type === 'palerider') updateRider(e, dt, t, pd);
       else updateGrounded(e, dt, t, pd);
-      if (e.dead || list.indexOf(e) < 0) { // rider may dissolve mid-update
-        if (list.indexOf(e) < 0) continue;
-      }
+      if (e.gone) continue; // rider may dissolve (despawn) mid-update
 
       animate(e, dt, t, pd);
       updateBillboards(e, pd);
