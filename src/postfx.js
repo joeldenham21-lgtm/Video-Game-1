@@ -111,7 +111,7 @@ const GradeShader = {
     uContrast:   { value: 1.06 },
     uSaturation: { value: 1.05 },
     uVignette:   { value: 0.22 },
-    uGrain:      { value: 0.015 },
+    uGrain:      { value: 0.0 }, // grain disabled — clean, grounded image (user direction)
   },
 
   vertexShader: /* glsl */ `
