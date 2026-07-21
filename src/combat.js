@@ -1766,6 +1766,7 @@ export function createCombat(g) {
         const st = g.player.stats;
         if (st.potions > 0) {
           st.potions--;
+          events.emit('potionUsed', { left: st.potions }); // duelist AI punishes chugging
           g.player.heal(Math.round(WEAPONS.potion.amount * rmult('potionPower')));
           if (g.audio) g.audio.play('potion');
           healSwirlLeft = 14; healSwirlT = 0;
@@ -2091,10 +2092,26 @@ export function createCombat(g) {
   }
 
   // -------------------------------------------------------------------------
+  // Duelist AI support: fill `out` with live player projectiles so agile
+  // enemies can read time-to-impact and dodge. Zero-alloc: caller owns `out`.
+  function getProjectiles(out) {
+    out.length = 0;
+    for (let i = 0; i < arrows.length; i++) {
+      const a = arrows[i];
+      if (a.active && !(a.stuck > 0)) out.push({ x: a.obj.position.x, y: a.obj.position.y, z: a.obj.position.z, vx: a.vel.x, vy: a.vel.y, vz: a.vel.z, kind: 'arrow' });
+    }
+    for (let i = 0; i < fireballs.length; i++) {
+      const f = fireballs[i];
+      if (f.active) out.push({ x: f.obj.position.x, y: f.obj.position.y, z: f.obj.position.z, vx: f.vel.x, vy: f.vel.y, vz: f.vel.z, kind: 'fireball' });
+    }
+    return out;
+  }
+
   const api = {
     update,
     equip,
     tryBlock,
+    getProjectiles,
     useTorch,
     usePotion,
     refreshWeaponLook,
