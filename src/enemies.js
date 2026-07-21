@@ -640,14 +640,33 @@ export function createEnemies(g) {
       shadow: null, bar: null, barFill: null, barW: 1.1,
       // wave-3 looks
       eliteEyes: null, eliteGlowOn: false, ghosted: false, ghostSaved: null,
+      // terror wave: real light bookkeeping (undergloom heart / rider pallor)
+      lightPos: null, lightHandle: null, gloomDeathBurst: false,
     };
     if (type === 'drake') {
       const d = buildDrake();
       holder.root = d.group;
       holder.parts = d.parts;
+    } else if (type === 'undergloom') {
+      const d = buildUndergloom();
+      holder.root = d.group;
+      holder.parts = d.parts;
+    } else if (type === 'broodmother' || type === 'broodling') {
+      const d = buildSpider(type === 'broodling' ? 0.4 : 1);
+      holder.root = d.group;
+      holder.parts = d.parts;
     } else {
       holder.root = new THREE.Group(); // logic-first: empty until GLB resolves
       requestRig(holder, type);
+    }
+    // Real lights: dull-red furnace heart / pale sickly rider glow. Pooled
+    // holders keep their handle; enabled() gates on holder visibility.
+    if (type === 'undergloom' || type === 'palerider') {
+      const lp = { x: 0, y: -9999, z: 0 };
+      holder.lightPos = lp;
+      holder.lightHandle = g.lights.register(type === 'undergloom'
+        ? { pos: lp, color: 0xff2a08, intensity: 2.4, radius: 14, flicker: 0.7, enabled: () => holder.root.visible }
+        : { pos: lp, color: 0x8899bb, intensity: 1.5, radius: 6, flicker: 0.25, enabled: () => holder.root.visible });
     }
     holder.root.visible = false;
     g.scene.add(holder.root);
@@ -660,7 +679,8 @@ export function createEnemies(g) {
     holder.shadow = shadow;
 
     const barW = type === 'drake' ? 3.0 : type === 'barrowlord' ? 1.8 :
-      type === 'troll' ? 2.2 : type === 'morvane' ? 1.7 : 1.1;
+      type === 'troll' ? 2.2 : type === 'morvane' ? 1.7 :
+      type === 'broodmother' ? 2.0 : type === 'palerider' ? 1.4 : 1.1;
     const bar = new THREE.Group();
     const barBg = new THREE.Mesh(GEO.plane, barBgMat);
     barBg.scale.set(barW, 0.13, 1);
@@ -814,6 +834,126 @@ export function createEnemies(g) {
   addSpawner('witch', WITCH_HUT.x + 6, WITCH_HUT.z + 5, { deadFlag: 'witchDead' });
   // The Stonebridge troll, living under the bridge on the ruins road
   addSpawner('troll', STONEBRIDGE.x + 3, STONEBRIDGE.z + 4, { boss: true, deadFlag: 'trollDead' });
+
+  // --- TERROR wave -----------------------------------------------------------
+  // THE UNDERGLOOM waits outside the barrow crypt door once the deep dark has
+  // been disturbed (post-drake, one-time trigger inside the crypt). Persisted
+  // like every flagged boss: g.flags.undergloomWoken gates the spawner,
+  // g.flags.undergloomDead retires it forever.
+  const CRYPT = { x: POI.ruins.x, z: POI.ruins.z - 16 }; // structures.js chamber
+  const gloomSpawner = addSpawner('undergloom', CRYPT.x, CRYPT.z - 14, { boss: true, deadFlag: 'undergloomDead' });
+  // BROODMOTHER DEN — web-shrouded hollow in the drowned western forest.
+  // (Design coord (-460,-240) is under Mirrormere's marsh water; the den sits
+  // on the nearest dry deep-forest ground.)
+  const DEN = { x: -392, z: -200 };
+  addSpawner('broodmother', DEN.x, DEN.z, { boss: true, deadFlag: 'broodmotherDead' });
+  addSpawner('broodling', DEN.x + 5, DEN.z + 3);
+  addSpawner('broodling', DEN.x - 4.5, DEN.z + 4.5);
+  addSpawner('broodling', DEN.x + 2, DEN.z - 5.5);
+  // night: the brood hunts a wider ring around the hollow
+  addSpawner('broodling', DEN.x + 14, DEN.z - 10, { nightOnly: true });
+  addSpawner('broodling', DEN.x - 13, DEN.z - 12, { nightOnly: true });
+
+  // Den dressing: three web-choked dead trees, strung sheet webs, egg sacs.
+  {
+    const webTex = (() => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.strokeStyle = 'rgba(225,225,215,0.85)';
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < 12; i++) {           // radial spokes
+        const a = (i / 12) * Math.PI * 2;
+        ctx.beginPath(); ctx.moveTo(64, 64);
+        ctx.lineTo(64 + Math.cos(a) * 62, 64 + Math.sin(a) * 62); ctx.stroke();
+      }
+      for (let r = 10; r < 62; r += 9) {       // sagging rings
+        ctx.beginPath();
+        for (let i = 0; i <= 12; i++) {
+          const a = (i / 12) * Math.PI * 2;
+          const rr = r * (1 + 0.06 * Math.sin(i * 2.7 + r));
+          const x = 64 + Math.cos(a) * rr, y = 64 + Math.sin(a) * rr;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      return new THREE.CanvasTexture(c);
+    })();
+    const webMat = new THREE.MeshBasicMaterial({
+      map: webTex, transparent: true, opacity: 0.55,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const denGrp = new THREE.Group();
+    const trees = [
+      [DEN.x - 5.5, DEN.z + 2.5, 1.15, 0.4], [DEN.x + 4.8, DEN.z - 2.0, 1.3, 2.1],
+      [DEN.x + 1.0, DEN.z + 6.0, 0.95, 4.0],
+    ];
+    const tops = [];
+    for (let i = 0; i < trees.length; i++) {
+      const [tx, tz, s, ra] = trees[i];
+      const ty = terrainHeight(tx, tz);
+      part(denGrp, GEO.box, M.deadwood, tx, ty + 2.6 * s, tz, 0.55 * s, 5.2 * s, 0.55 * s, 0.05, ra, 0.06);
+      part(denGrp, GEO.box, M.deadwood, tx + 0.7 * s, ty + 3.6 * s, tz, 1.9 * s, 0.16 * s, 0.2 * s, 0, ra, 0.6);
+      part(denGrp, GEO.box, M.deadwood, tx - 0.6 * s, ty + 4.3 * s, tz + 0.2, 1.5 * s, 0.14 * s, 0.18 * s, 0, ra + 0.9, -0.5);
+      part(denGrp, GEO.cone, M.deadwood, tx, ty + 5.4 * s, tz, 0.3 * s, 1.1 * s, 0.3 * s, 0, 0, 0.15);
+      g.colliders.push({ x: tx, z: tz, r: 0.55 * s });
+      tops.push({ x: tx, y: ty + 3.4 * s, z: tz });
+    }
+    // sheet webs strung between the trunks + a low web over the hollow mouth
+    for (const [a, b] of [[0, 1], [1, 2], [2, 0]]) {
+      const A = tops[a], B = tops[b];
+      const w = new THREE.Mesh(GEO.plane, webMat);
+      w.position.set((A.x + B.x) / 2, (A.y + B.y) / 2 - 0.6, (A.z + B.z) / 2);
+      const span = Math.hypot(B.x - A.x, B.z - A.z);
+      w.scale.set(span * 0.92, 3.4, 1);
+      w.lookAt(w.position.x - (B.z - A.z), w.position.y, w.position.z + (B.x - A.x));
+      w.castShadow = false;
+      denGrp.add(w);
+    }
+    {
+      const gw = new THREE.Mesh(GEO.plane, webMat);
+      const gy = terrainHeight(DEN.x, DEN.z);
+      gw.position.set(DEN.x, gy + 0.15, DEN.z);
+      gw.rotation.x = -Math.PI / 2;
+      gw.scale.set(9, 9, 1);
+      gw.castShadow = false;
+      denGrp.add(gw);
+    }
+    // egg sacs slung low in the webbing
+    for (const [sx, sz, sy, ss] of [[DEN.x - 3.2, DEN.z + 1.4, 1.6, 3.4], [DEN.x + 2.6, DEN.z - 0.6, 2.1, 2.6], [DEN.x + 0.2, DEN.z + 3.4, 1.2, 3.0]]) {
+      part(denGrp, GEO.orb, M.eggsac, sx, terrainHeight(sx, sz) + sy, sz, ss, ss * 1.25, ss);
+    }
+    g.scene.add(denGrp);
+  }
+
+  // The one-time trigger at the crypt's deepest point — and, once the horror
+  // is unmade, a warm real light where only the deep dark used to be.
+  {
+    const gy = terrainHeight(CRYPT.x, CRYPT.z);
+    g.interactables.push({
+      pos: new THREE.Vector3(CRYPT.x - 2.6, gy + 1.1, CRYPT.z + 3.0),
+      radius: 2.4,
+      label: 'Disturb the deep dark',
+      onInteract: () => {
+        if (g.flags.undergloomWoken) return;
+        g.flags.undergloomWoken = true;
+        sfx('drakeRoar'); // pitched-low dread cue placeholder (audio agent owns 'dread')
+        sfx('thunder');
+        notify('The deep dark answers', 'Something vast unfolds beyond the barrow door.');
+        if (g.player && g.player.addShake) g.player.addShake(0.7);
+        if (!gloomSpawner.enemy && !gloomSpawner.permaDead) {
+          const e = spawnEnemy('undergloom', gloomSpawner.x, gloomSpawner.z, gloomSpawner);
+          startAggro(e, true);
+        }
+      },
+      enabled: () => !g.paused && !!g.flags.drakeDead && !g.flags.undergloomWoken && !g.flags.undergloomDead,
+    });
+    g.lights.register({
+      pos: { x: CRYPT.x, y: gy + 2.2, z: CRYPT.z },
+      color: 0xffd9a0, intensity: 1.5, radius: 12, flicker: 0.3,
+      enabled: () => !!g.flags.undergloomDead, // the crypt brightens forever
+    });
+  }
 
   // --- wave-3 encounter design: danger areas get bigger, mixed packs --------
   // Redfang Camp: a lookout on the high ground + one more blade in the tents

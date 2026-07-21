@@ -30,6 +30,7 @@ import { createDice } from './dice.js';
 import { createWeather } from './weather.js';
 import { createExplore } from './explore.js';
 import { createLights } from './lights.js';
+import { createScore } from './score.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
@@ -169,6 +170,7 @@ function boot(loadSave) {
       g.dice = createDice(g);
       g.explore = createExplore(g);
       g.postfx = createPostfx(g);
+      g.score = createScore(g);
       if (loadSave) g.save.load();
       titleEl.classList.add('hidden');
       setTimeout(() => titleEl.remove(), 1400);
@@ -236,6 +238,7 @@ function tick(now) {
     g.explore.update(dt);
     g.lights.update(dt);
     g.postfx.update(dt);
+    g.score.update(dt);
     g.ui.input.endFrame();
   } catch (err) {
     if (DEBUG) showErr('TICK: ' + (err.stack || err));
