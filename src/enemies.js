@@ -1631,7 +1631,9 @@ export function createEnemies(g) {
         duClearAttack(e); // interrupted counters/feints/kicks lose their edge
       }
     } else if (e.state !== 'strike' && e.state !== 'stagger' && e.state !== 'dead' &&
-               e.state !== 'blink' && !e.fly) {
+               e.state !== 'blink' && e.state !== 'dodge' && !e.fly) {
+      // ('dodge' is committed motion — hits during it already pay the +20%
+      // recovery surcharge instead of cancelling the evade/counter chain)
       if (e.state === 'feint') duClearAttack(e); // caught mid-feint: punished
       e.state = 'flinch'; e.stateT = 0;
     }
