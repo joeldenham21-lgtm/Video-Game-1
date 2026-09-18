@@ -1,8 +1,9 @@
 # 🔥 HOLLOW CHOIR — a bullet hell in seven verses
 
-> **▶ PLAY IT:** open **`bullethell/index.html`** — on GitHub Pages that is
-> **`https://<your-username>.github.io/Video-Game-1/bullethell/`**. Plain static files, no build step.
-> Portrait on phones, any window on desktop. Headphones recommended.
+> **▶ PLAY IT:** the whole game is **one file: [`bullethell/index.html`](bullethell/index.html)**.
+> Download it and double-click it (works straight from disk, no server needed), or on GitHub Pages open
+> **`https://<your-username>.github.io/Video-Game-1/bullethell/`**.
+> Phone: portrait, drag to move, on-screen buttons. Laptop: keyboard (or drag with the mouse/trackpad). Headphones recommended.
 
 A complete, top-down (vertical) bullet hell. Seven worlds, each with its own **rule of play**, palette, generative soundtrack, enemy roster and multi-phase boss. Three ships, three difficulties, relics between worlds, graze-powered Overdrive, death-bombing, practice mode, high scores, touch + gamepad support.
 
@@ -21,7 +22,9 @@ A complete, top-down (vertical) bullet hell. Seven worlds, each with its own **r
 **Systems** — graze bullets to fill **Overdrive** (bullets crawl, damage spikes) · a ×chain that grows with kills and grazes and halves on death · per-phase boss timers with *silenced* bonuses for clean clears · death-bomb window · power levels · extends · **Relics** (ten run-long upgrades, pick one of three after each world) · Novice / Normal / Lunatic (Lunatic clear = +1,000,000) · practice any world you have reached · saved scores, stats and options.
 
 ```
-bullethell/index.html      shell, CSS, touch buttons
+bullethell/index.html      THE GAME — single self-contained file (generated, do not edit by hand)
+bullethell/dev.html        same shell loading the ES modules below, for development
+tools/build-bullethell.mjs bundles dev.html + src/*.js into index.html
 bullethell/src/main.js     loop, state machine, collisions, stage flow
 bullethell/src/levels.js   the seven worlds: palettes, music, dialogue, mechanics, wave scripts
 bullethell/src/bosses.js   boss framework + seven bosses (30 phases)
@@ -33,7 +36,7 @@ test/bullethell-smoke.mjs  headless Playwright run through all seven worlds
 
 <p align="center"><img src="bullethell/screenshots/1-ember-shoals.png" width="180"> <img src="bullethell/screenshots/2-glass-tide.png" width="180"> <img src="bullethell/screenshots/4-cathedral-of-static.png" width="180"> <img src="bullethell/screenshots/5-grave-of-suns.png" width="180"></p>
 
-Smoke test: `node test/bullethell-smoke.mjs` (add `--quick` for world 1 only). Screenshots land in `test/bh-shots/`.
+Build after editing sources: `node tools/build-bullethell.mjs`. Smoke test (runs the built file): `node test/bullethell-smoke.mjs` (add `--quick` for world 1 only). Screenshots land in `test/bh-shots/`.
 
 ---
 

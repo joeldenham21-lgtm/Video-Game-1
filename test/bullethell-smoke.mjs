@@ -1,4 +1,4 @@
-// Hollow Choir smoke test: boots the game headless, captures console errors,
+// Hollow Choir smoke test: boots the single-file build (bullethell/index.html) headless, captures console errors,
 // drives every stage (waves + boss) with an invulnerable auto-moving pilot,
 // and screenshots each world and boss. Usage: node test/bullethell-smoke.mjs [--quick]
 import http from 'http';

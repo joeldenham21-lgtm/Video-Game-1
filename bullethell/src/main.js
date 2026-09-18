@@ -48,7 +48,7 @@ class Game {
     if (this.debug) window.g = this;
   }
   resize() {
-    const dpr = Math.min(2, devicePixelRatio || 1);
+    const dpr = Math.min(innerWidth < 700 ? 1.5 : 2, devicePixelRatio || 1);
     const s = Math.min(innerWidth / this.W, innerHeight / this.H);
     this.scale = s;
     this.canvas.width = Math.round(this.W * s * dpr); this.canvas.height = Math.round(this.H * s * dpr);
@@ -90,7 +90,7 @@ class Game {
     for (const [s, l] of this.levelDef.intro) this.say(s, l);
     this.audio.playSong(this.levelDef.music);
     this.ui.hide(); this.state = 'playing';
-    this.touchEl.classList.toggle('on', this.input.anyTouch || ('ontouchstart' in window && innerWidth < 900));
+    this.touchEl.classList.toggle('on', this.input.anyTouch || (navigator.maxTouchPoints > 0 && innerWidth < 1100));
   }
   clearWorld() {
     this.bullets.clear(this, false); this.pbullets.clear(this, false); this.items.clear(); this.enemies.length = 0; this.lasers.length = 0;

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#06060c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2713%27 fill=%27%23ff8c42%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%276%27 fill=%27%23fff%27/%3E%3C/svg%3E">
+<title>Hollow Choir — a bullet hell in seven verses</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --acc: #ff8c42; --fg: #eef1f8; --dim: #9aa3b2; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+  html, body { margin: 0; height: 100%; background: #06060c; color: var(--fg); font-family: "Rajdhani", "Segoe UI", system-ui, sans-serif; overflow: hidden; overscroll-behavior: none; touch-action: manipulation; }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, #0b0b16 0%, #06060c 70%); }
+  #wrap { position: relative; }
+  canvas { display: block; touch-action: none; user-select: none; image-rendering: auto; }
+  #ui { position: absolute; inset: 0; display: none; pointer-events: none; }
+  #ui.on { display: block; pointer-events: auto; }
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 22px; text-align: center; background: rgba(4,4,10,0.55); backdrop-filter: blur(2px); overflow-y: auto; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: none; } }
+  .screen.title { background: linear-gradient(180deg, rgba(4,4,10,0.15), rgba(4,4,10,0.7)); justify-content: flex-end; padding-bottom: 60px; }
+  h1 { font-size: 92px; line-height: .82; letter-spacing: .12em; font-weight: 700; margin: 0 0 8px; text-shadow: 0 0 40px rgba(255,140,66,.45), 0 4px 18px rgba(0,0,0,.9); }
+  h1 span { color: var(--acc); }
+  h2 { font-size: 34px; letter-spacing: .14em; margin: 0 0 14px; font-weight: 700; text-shadow: 0 2px 12px rgba(0,0,0,.8); }
+  .kicker { font-size: 12px; letter-spacing: .32em; color: var(--dim); margin-bottom: 14px; }
+  .tag { font-style: italic; color: #d8c8b0; letter-spacing: .12em; margin-bottom: 26px; font-size: 16px; }
+  .sub { color: #cfd6e6; margin: 0 0 18px; font-size: 15px; line-height: 1.35; }
+  .sub small { color: var(--dim); }
+  .foot { margin-top: 26px; font-size: 11px; letter-spacing: .12em; color: var(--dim); }
+  .menu { display: flex; flex-direction: column; gap: 8px; width: min(360px, 100%); }
+  button { font: inherit; color: var(--fg); background: rgba(20,22,36,.85); border: 1px solid rgba(255,255,255,.14); border-radius: 4px; padding: 12px 22px; font-size: 18px; letter-spacing: .16em; font-weight: 600; cursor: pointer; transition: transform .1s, border-color .15s, background .15s, box-shadow .15s; }
+  button:hover, button:focus-visible { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc), 0 0 22px rgba(255,140,66,.25); outline: none; transform: translateY(-1px); }
+  button:active { transform: scale(.98); }
+  button.primary { background: linear-gradient(180deg, rgba(255,140,66,.35), rgba(255,140,66,.12)); border-color: var(--acc); }
+  button.back { margin-top: 18px; font-size: 14px; padding: 8px 18px; color: var(--dim); }
+  button.danger { border-color: rgba(255,80,100,.5); color: #ffb0bc; }
+  button.dim { opacity: .55; }
+  button small { display: block; font-size: 11px; letter-spacing: .1em; color: var(--dim); font-weight: 500; margin-top: 2px; }
+  .cards { display: flex; flex-direction: column; gap: 10px; width: min(420px, 100%); }
+  .card { text-align: left; letter-spacing: .04em; padding: 12px 16px; display: flex; flex-direction: column; gap: 3px; }
+  .card b { font-size: 19px; letter-spacing: .16em; }
+  .card em { font-style: normal; font-size: 11px; letter-spacing: .28em; color: var(--dim); }
+  .card span { font-weight: 500; font-size: 14px; color: #dfe6f4; line-height: 1.3; }
+  .card small { font-size: 12px; color: var(--dim); font-weight: 500; letter-spacing: .02em; }
+  .card i { font-size: 11px; color: #ffd84f; letter-spacing: .12em; font-style: normal; }
+  .stages { display: grid; grid-template-columns: 1fr; gap: 6px; width: min(420px, 100%); }
+  .stage { display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; text-align: left; padding: 8px 12px; letter-spacing: .04em; border-left: 3px solid var(--c, #fff); }
+  .stage b { grid-row: 1 / span 2; font-size: 26px; color: var(--c, #fff); align-self: center; }
+  .stage span { font-size: 15px; letter-spacing: .14em; }
+  .stage em { font-style: italic; font-size: 12px; color: var(--dim); font-weight: 500; letter-spacing: .02em; }
+  .howtext { text-align: left; max-width: 440px; font-size: 14px; line-height: 1.4; font-weight: 500; }
+  .howtext p { margin: 0 0 8px; } .howtext b { color: #fff; letter-spacing: .06em; } .howtext i { color: #ffd84f; font-style: normal; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .tabs button { font-size: 13px; padding: 6px 12px; } .tabs button.on { border-color: var(--acc); color: #fff; }
+  .table { width: min(440px, 100%); }
+  .row { display: grid; grid-template-columns: 24px 1fr 70px 50px 80px; gap: 6px; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 14px; align-items: center; text-align: left; }
+  .row span { color: var(--dim); } .row b { font-size: 17px; } .row em { font-style: normal; color: var(--dim); font-size: 12px; letter-spacing: .1em; } .row i { font-style: normal; color: #ffd84f; font-size: 12px; } .row small { color: var(--dim); font-size: 11px; }
+  .row.empty { display: block; text-align: center; color: var(--dim); }
+  .opts { display: flex; flex-direction: column; gap: 8px; width: min(380px, 100%); margin-bottom: 14px; }
+  .opts label { display: grid; grid-template-columns: 90px 1fr 48px; align-items: center; gap: 10px; font-size: 15px; letter-spacing: .08em; text-align: left; }
+  .opts input[type=range] { width: 100%; accent-color: var(--acc); }
+  .opts label b { text-align: right; color: var(--dim); font-size: 13px; }
+  .toggle { display: flex; justify-content: space-between; font-size: 15px; padding: 9px 14px; }
+  .toggle b { color: var(--acc); }
+  .row2 { display: flex; gap: 8px; }
+  .stats { width: min(380px, 100%); margin: 8px 0 18px; }
+  .srow { display: flex; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 15px; letter-spacing: .06em; }
+  .srow span { color: var(--dim); } .srow.hi b { color: #9be7c9; } .srow.gold b, .srow.gold span { color: #ffd84f; } .srow.total { border-top: 2px solid rgba(255,255,255,.3); margin-top: 6px; } .srow.total b { font-size: 22px; }
+  .story { max-width: 400px; font-size: 15px; line-height: 1.45; font-weight: 500; color: #e6e0d0; font-style: italic; }
+  .credits { margin: 8px 0 18px; font-size: 12px; line-height: 1.6; color: var(--dim); letter-spacing: .1em; }
+  /* touch controls */
+  #touch { position: absolute; inset: 0; pointer-events: none; display: none; }
+  #touch.on { display: block; }
+  #touch button { position: absolute; pointer-events: auto; width: 62px; height: 62px; border-radius: 50%; padding: 0; font-size: 12px; letter-spacing: .1em; background: rgba(20,22,36,.55); border: 1px solid rgba(255,255,255,.35); opacity: .75; }
+  #tb-bomb { right: 14px; bottom: 90px; border-color: #7dff8a; color: #7dff8a; }
+  #tb-over { right: 86px; bottom: 30px; border-color: #fff; }
+  #tb-focus { left: 14px; bottom: 30px; }
+  #tb-focus.on { background: rgba(255,255,255,.35); }
+  #tb-pause { right: 14px; top: 120px; width: 40px; height: 40px; font-size: 14px; }
+  @media (max-height: 700px) { h1 { font-size: 64px; } h2 { font-size: 26px; } button { padding: 9px 16px; font-size: 15px; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="wrap">
+    <canvas id="game"></canvas>
+    <div id="touch">
+      <button id="tb-bomb">BOMB</button>
+      <button id="tb-over">OVER</button>
+      <button id="tb-focus">FOCUS</button>
+      <button id="tb-pause">II</button>
+    </div>
+    <div id="ui"></div>
+  </div>
+</div>
+<!--BUNDLE-->
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
