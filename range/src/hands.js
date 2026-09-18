@@ -88,8 +88,8 @@ export function buildHand(side = 'right', o = {}) {
   // wrist cuff + forearm (sleeve) going back and slightly outward
   const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.030, 0.03, 20), glove);
   cuff.rotation.x = Math.PI / 2; cuff.scale.set(1.35, 1, 0.8); cuff.position.set(0, 0, 0.012); cuff.castShadow = true; hand.add(cuff);
-  const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.036, 0.36, 20), sleeve);
-  forearm.rotation.x = Math.PI / 2; forearm.scale.set(1.25, 1, 0.85); forearm.position.set(0, 0.002, 0.185); forearm.castShadow = true; forearm.name = 'sleeve';
+  const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.035, 0.30, 20), sleeve);
+  forearm.rotation.x = Math.PI / 2; forearm.scale.set(1.25, 1, 0.85); forearm.position.set(0, 0.002, 0.155); forearm.castShadow = true; forearm.name = 'sleeve';
   const armPivot = new THREE.Group(); armPivot.add(forearm); armPivot.position.set(0, 0, 0.02); hand.add(armPivot);
 
   const joints = {};

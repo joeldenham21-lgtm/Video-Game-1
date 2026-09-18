@@ -64,7 +64,7 @@ export function buildWorld(scene, physics, renderer) {
   su.sunPosition.value.copy(sunDir);
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envScene = new THREE.Scene(); const sky2 = new Sky(); sky2.scale.setScalar(60); sky2.material.uniforms.turbidity.value = 2.5; sky2.material.uniforms.rayleigh.value = 2.4; sky2.material.uniforms.mieCoefficient.value = 0.003; sky2.material.uniforms.sunPosition.value.copy(sunDir); envScene.add(sky2);
-  const groundEnv = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshBasicMaterial({ color: 0x4f5a3c })); groundEnv.rotation.x = -Math.PI / 2; groundEnv.position.y = -1; envScene.add(groundEnv);
+  const groundEnv = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshBasicMaterial({ color: 0xa39a80 })); groundEnv.rotation.x = -Math.PI / 2; groundEnv.position.y = -1; envScene.add(groundEnv);
   const envTex = pmrem.fromScene(envScene, 0.02, 0.1, 150).texture;
   scene.environment = envTex;
   scene.fog = new THREE.FogExp2(0xc7d3e0, 0.00045);

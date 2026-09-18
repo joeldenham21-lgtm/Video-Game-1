@@ -34,7 +34,7 @@ console.log('scene', JSON.stringify(info));
 // ADS with the AR, fire 3 rounds semi, then a burst on auto
 await page.evaluate(() => { const g = window.g; g.player.buttons.r = true; g.vm.state.mode = 'semi'; g.vm.weapon.setSelector('semi'); });
 await adv(0.8); await shot('s02-ads-ar');
-await page.evaluate(() => window.g.vm.fireDown()); await adv(0.075); await shot('s03-fire-flash');
+await page.evaluate(() => window.g.vm.fireDown()); await adv(0.062); await shot('s03-fire-flash');
 await page.evaluate(() => window.g.vm.fireUp()); await adv(0.35);
 for (let i = 0; i < 2; i++) { await page.evaluate(() => window.g.vm.fireDown()); await adv(0.09); await page.evaluate(() => window.g.vm.fireUp()); await adv(0.4); }
 await adv(1.2); await shot('s04-after-3');
@@ -53,6 +53,8 @@ await adv(1.0);
 await page.evaluate(() => window.g.vm.reload()); await adv(0.7); await shot('s07-reload-ar'); await adv(1.3); await shot('s07b-reload-ar2'); await adv(1.0);
 st = await page.evaluate(() => { const g = window.g; return { mag: g.vm.state.magRounds, chambered: g.vm.state.chambered, busy: g.vm.busy }; });
 console.log('after reload', JSON.stringify(st));
+// inspect close-up
+await page.evaluate(() => window.g.vm.inspect()); await adv(1.0); await shot('s07c-inspect'); await adv(1.6); await shot('s07d-inspect2'); await adv(1.2);
 // pistol
 await page.evaluate(() => { window.g.vm.equip('pistol'); }); await adv(0.9); await shot('s08-pistol-hip');
 await page.evaluate(() => { window.g.player.buttons.r = true; }); await adv(0.6); await shot('s09-pistol-ads');

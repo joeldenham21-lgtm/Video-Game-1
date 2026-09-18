@@ -207,15 +207,15 @@ export function mat(name, overrides) {
   switch (name) {
     // --- weapon metals ---
     case 'anodized': // hard-coat anodised 7075 receiver: matte, slightly metallic, subtle sheen
-      m = P({ color: 0x1c1d20, metalness: 0.75, roughness: 0.62, normalMap: getTex('machinedN'), normalScale: new THREE.Vector2(0.35, 0.35), roughnessMap: getTex('anodizedR'), clearcoat: 0.08, clearcoatRoughness: 0.6 }); break;
+      m = P({ color: 0x25272b, metalness: 0.75, roughness: 0.58, normalMap: getTex('machinedN'), normalScale: new THREE.Vector2(0.35, 0.35), roughnessMap: getTex('anodizedR'), clearcoat: 0.08, clearcoatRoughness: 0.6, envMapIntensity: 1.5 }); break;
     case 'anodizedFDE':
       m = P({ color: 0x6b5a3e, metalness: 0.7, roughness: 0.66, normalMap: getTex('machinedN'), normalScale: new THREE.Vector2(0.3, 0.3), roughnessMap: getTex('anodizedR') }); break;
     case 'phosphate': // parkerised BCG / barrel: dark grey, dull
-      m = P({ color: 0x2a2c2e, metalness: 0.85, roughness: 0.55, normalMap: getTex('machinedN'), normalScale: new THREE.Vector2(0.5, 0.5) }); break;
+      m = P({ color: 0x2a2c2e, metalness: 0.85, roughness: 0.55, normalMap: getTex('machinedN'), normalScale: new THREE.Vector2(0.5, 0.5), envMapIntensity: 1.4 }); break;
     case 'nitride': // black nitride barrel / slide: darker & a little glossier than parkerising
-      m = P({ color: 0x141517, metalness: 0.9, roughness: 0.42, normalMap: getTex('machinedN'), normalScale: new THREE.Vector2(0.25, 0.25), anisotropy: 0.6, anisotropyRotation: Math.PI / 2 }); break;
+      m = P({ color: 0x141517, metalness: 0.9, roughness: 0.42, normalMap: getTex('machinedN'), normalScale: new THREE.Vector2(0.25, 0.25), anisotropy: 0.6, anisotropyRotation: Math.PI / 2, envMapIntensity: 1.5 }); break;
     case 'blued': // polished blued steel (bolt body, bolt-action receiver)
-      m = P({ color: 0x0f1218, metalness: 1.0, roughness: 0.28, clearcoat: 0.3, clearcoatRoughness: 0.2, anisotropy: 0.7 }); break;
+      m = P({ color: 0x0f1218, metalness: 1.0, roughness: 0.28, clearcoat: 0.3, clearcoatRoughness: 0.2, anisotropy: 0.7, envMapIntensity: 1.6 }); break;
     case 'stainless': // bare polished stainless (bolt lugs, firing pin, extractor)
       m = P({ color: 0xb9bcc0, metalness: 1.0, roughness: 0.32, anisotropy: 0.8 }); break;
     case 'chrome': // chrome-lined bore / shiny bits
@@ -238,13 +238,13 @@ export function mat(name, overrides) {
     case 'greenTip': m = S({ color: 0x1d7a2a, roughness: 0.4 }); break;
     // --- polymers ---
     case 'polymer': // Magpul-style black polymer, stippled
-      m = P({ color: 0x131315, metalness: 0.0, roughness: 0.78, normalMap: getTex('polymerN'), normalScale: new THREE.Vector2(0.6, 0.6), sheen: 0.15, sheenRoughness: 0.9, sheenColor: new THREE.Color(0x222222) }); break;
+      m = P({ color: 0x17171a, metalness: 0.0, roughness: 0.74, normalMap: getTex('polymerN'), normalScale: new THREE.Vector2(0.6, 0.6), sheen: 0.25, sheenRoughness: 0.85, sheenColor: new THREE.Color(0x2a2a2a), envMapIntensity: 1.3 }); break;
     case 'polymerStipple':
-      m = P({ color: 0x121214, metalness: 0.0, roughness: 0.85, normalMap: getTex('stippleN'), normalScale: new THREE.Vector2(0.9, 0.9) }); break;
+      m = P({ color: 0x16161a, metalness: 0.0, roughness: 0.82, normalMap: getTex('stippleN'), normalScale: new THREE.Vector2(0.9, 0.9), envMapIntensity: 1.3 }); break;
     case 'polymerFDE':
       m = P({ color: 0x7a6a4d, metalness: 0.0, roughness: 0.8, normalMap: getTex('polymerN'), normalScale: new THREE.Vector2(0.6, 0.6) }); break;
     case 'polymerGrey': // Glock frame
-      m = P({ color: 0x1a1b1d, metalness: 0.02, roughness: 0.7, normalMap: getTex('polymerN'), normalScale: new THREE.Vector2(0.5, 0.5) }); break;
+      m = P({ color: 0x1c1d20, metalness: 0.02, roughness: 0.68, normalMap: getTex('polymerN'), normalScale: new THREE.Vector2(0.5, 0.5), envMapIntensity: 1.3 }); break;
     case 'rubber':
       m = S({ color: 0x0c0c0d, roughness: 0.95 }); break;
     case 'glassLens': // objective/ocular glass, greenish AR coating
@@ -269,7 +269,7 @@ export function mat(name, overrides) {
     case 'grass':
       m = S({ map: getTex('grassC'), roughness: 1.0, metalness: 0 }); break;
     case 'plywood':
-      m = S({ map: getTex('plywoodC'), roughness: 0.8, metalness: 0 }); break;
+      m = S({ map: getTex('plywoodC'), roughness: 0.8, metalness: 0 }); m.map.repeat.set(2.5, 2.5); break;
     case 'cardboard':
       m = S({ map: getTex('cardboardC'), roughness: 0.9, metalness: 0, side: THREE.DoubleSide }); break;
     case 'paintedSteel':

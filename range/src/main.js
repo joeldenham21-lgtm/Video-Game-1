@@ -65,7 +65,7 @@ async function init() {
   const projectiles = new ProjectileManager({ physics, effects, audio, hooks: { onShotDone: (shot) => hud.shotReport(shot) } });
 
   const weapons = { ar15: buildAR15(), pistol: buildPistol(), bolt: buildBoltRifle() };
-  const hands = { right: buildHand('right'), left: buildHand('left') };
+  const hands = { right: buildHand('right', { glove: 'gloveTan' }), left: buildHand('left', { glove: 'gloveTan' }) };
   const vm = new ViewModel({ camera: viewCam, weapons, hands, hooks: {
     onShot: (info) => {
       projectiles.fire(info); effects.muzzleFlash(info.origin, info.dir, info.weapon.spec, settings.timeScale < 0.9); audio.gunshot(info.weapon.spec);
@@ -75,6 +75,7 @@ async function init() {
     onDropMag: (info) => { const mesh = info.weapon.parts.mag.obj.clone(true); mesh.traverse((o) => { if (o.name === 'topRound') o.visible = info.rounds > 0; }); const L = info.weapon.parts.mag.length; effects.dropMag({ ...info, half: [0.014, L / 2, 0.032], massKg: 0.12 + info.rounds * 0.012 }, mesh); },
     sound: (name, o) => audio.play(name, { gain: (o?.quiet ? 0.35 : 0.8), pitch: 0.95 + Math.random() * 0.1, ...(o || {}) }),
     onDryFire: () => hud.message(vm.state.magRounds === 0 ? 'click — empty. R to reload' : 'click — chamber empty. X to charge', 1800),
+    onSafe: () => hud.message('safety is on — V to select SEMI / AUTO', 1500),
   } });
   const optics = createOptics({ renderer, worldScene: scene, viewmodel: vm, camera });
   for (const w of Object.values(weapons)) optics.attach(w);
@@ -136,7 +137,7 @@ async function init() {
       case '3': vm.equip('bolt'); player.gunLength = 1.15; break;
       case 'r': vm.reload(); break;
       case 'x': vm.chargeAction(); break;
-      case 'z': vm.pressCheck(); break;
+      case 'z': if (vm.seq.pressCheck) vm.pressCheck(); else hud.message('no press check on a bolt gun — lift the bolt (X) to look', 1800); break;
       case 'f': vm.inspect(); break;
       case 'v': vm.toggleMode(); hud.message(`mode: ${vm.state.mode.toUpperCase()}`, 1200); break;
       case 'b': { const c = vm.cycleAmmo(); hud.message(`next magazine: ${c.name}`, 2200); break; }

@@ -25,7 +25,7 @@ import { solveZeroAngle, STD_ATMOSPHERE, MRAD, MOA, gaussian } from './ballistic
 
 const noise = new SimplexNoise();
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
-const _shoulderR = new THREE.Vector3(0.22, -0.40, 0.08), _shoulderL = new THREE.Vector3(-0.22, -0.40, 0.08), _zAxis = new THREE.Vector3(0, 0, 1);
+const _elbowR = new THREE.Vector3(), _elbowL = new THREE.Vector3(), _zAxis = new THREE.Vector3(0, 0, 1);
 const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
 
 export class ViewModel {
@@ -174,7 +174,7 @@ export class ViewModel {
   fireDown() {
     this.triggerHeld = true;
     if (this.busy) return;
-    if (this.state.mode === 'safe') { this.hooks.sound?.('safeClick'); return; }
+    if (this.state.mode === 'safe') { this.hooks.sound?.('safeClick'); this.hooks.onSafe?.(); return; }
     this.pulling = true;
   }
   fireUp() { this.triggerHeld = false; this.pulling = false; }
@@ -332,7 +332,10 @@ export class ViewModel {
   aimForearms() {
     this.holder.updateMatrixWorld(true);
     const camInv = _m.copy(this.camera.matrixWorld).invert();
-    for (const [hand, shoulder] of [[this.hands.right, _shoulderR], [this.hands.left, _shoulderL]]) {
+    const pistol = this.weapon.spec.action === 'recoil';
+    // elbow positions in camera space: pistol = both arms extended (isosceles), rifle = right elbow down, left elbow under the handguard
+    if (pistol) { _elbowR.set(0.24, -0.38, -0.02); _elbowL.set(-0.24, -0.38, -0.02); } else { _elbowR.set(0.26, -0.36, 0.14); _elbowL.set(-0.30, -0.58, -0.22); }
+    for (const [hand, shoulder] of [[this.hands.right, _elbowR], [this.hands.left, _elbowL]]) {
       const wrist = _v.setFromMatrixPosition(hand.group.matrixWorld).applyMatrix4(camInv);       // wrist in camera space
       const dirCam = _v2.subVectors(shoulder, wrist).normalize();
       // camera space → hand local: dir_local = inv(handWorldQuat) * camQuat * dirCam

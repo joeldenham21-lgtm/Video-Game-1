@@ -133,10 +133,10 @@ export function createEffects(scene, physics) {
       flash.visible = true; flash.position.copy(pos).addScaledVector(dir, 0.03);
       flash.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
       const big = weaponSpec.caliber === '.308' || weaponSpec.caliber === '6.5' ? 1.5 : weaponSpec.caliber === '9mm' ? 0.55 : 1.0;
-      for (const p of flashPlanes) { const s = (0.22 + Math.random() * 0.14) * big; p.scale.set(s, s, 1); p.rotation.z = Math.random() * Math.PI * 2; p.position.set(0, 0, -Math.random() * 0.06 * big); }
+      for (const p of flashPlanes) { const s = (0.30 + Math.random() * 0.18) * big; p.scale.set(s, s, 1); p.rotation.z = Math.random() * Math.PI * 2; p.position.set(0, 0, -Math.random() * 0.06 * big); }
       flashPlanes[0].rotation.set(0, 0, Math.random() * 6); flashPlanes[1].rotation.set(0, Math.PI / 2, Math.random() * 6); flashPlanes[2].rotation.set(Math.PI / 2, 0, Math.random() * 6);
-      flashT = 0; flashDur = 0.028 * (slowmo ? 1 : 1);
-      flashLight.visible = true; flashLight.position.copy(pos).addScaledVector(dir, 0.15); flashLight.intensity = 90 * big;
+      flashT = 0; flashDur = 0.042; void slowmo;
+      flashLight.visible = true; flashLight.position.copy(pos).addScaledVector(dir, 0.15); flashLight.intensity = 140 * big;
       // smoke
       for (let i = 0; i < 10; i++) { _v.copy(dir).multiplyScalar(4 + Math.random() * 6).add(new THREE.Vector3((Math.random() - 0.5) * 1.5, (Math.random()) * 1.2, (Math.random() - 0.5) * 1.5)); smoke.emit(pos, _v, 0.9 + Math.random() * 0.8, 0.05, 0.45 * big, 0.55, 0.55, 0.55, 0.28, -0.4, 3.5); }
       for (let i = 0; i < 12; i++) { _v.copy(dir).multiplyScalar(12 + Math.random() * 25).add(new THREE.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6)); sparks.emit(pos, _v, 0.05 + Math.random() * 0.12, 0.012, 0.004, 1.0, 0.75, 0.35, 0.9, 6, 2); }
