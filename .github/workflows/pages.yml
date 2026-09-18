@@ -2,7 +2,7 @@ name: Deploy Elderfall to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/open-world-mobile-rpg-njfkvp]
+    branches: [main, claude/open-world-mobile-rpg-njfkvp, claude/bullet-hell-game-8cft93]
   workflow_dispatch:
 
 permissions:

@@ -1,3 +1,42 @@
+# 🔥 HOLLOW CHOIR — a bullet hell in seven verses
+
+> **▶ PLAY IT:** open **`bullethell/index.html`** — on GitHub Pages that is
+> **`https://<your-username>.github.io/Video-Game-1/bullethell/`**. Plain static files, no build step.
+> Portrait on phones, any window on desktop. Headphones recommended.
+
+A complete, top-down (vertical) bullet hell. Seven worlds, each with its own **rule of play**, palette, generative soundtrack, enemy roster and multi-phase boss. Three ships, three difficulties, relics between worlds, graze-powered Overdrive, death-bombing, practice mode, high scores, touch + gamepad support.
+
+| # | World | Its rule | Boss |
+|---|---|---|---|
+| 1 | **Ember Shoals** | Drifting rock is cover for both sides. Shatter it for gems, mind the shards. | **Cinder Warden** — slag spirals, cinder rain, furnace blooms, twin rotating meltdown lasers |
+| 2 | **Glass Tide** | The ice walls *reflect* bullets. A needle that misses tries again. | **Leviathan Choir** — an eleven-segment serpent; waves, frost breath, shatter song, tidal requiem |
+| 3 | **The Bloom** | Spore clouds slow your hull. Seeds ripen into rings. | **Mother Root** — pollen drift, seedbursts, five rotating vine lasers, full bloom |
+| 4 | **Cathedral of Static** | Telegraphed laser grids. Shielded knights open for a moment. Glitching bullets. | **The Archivist** — index curtains, redaction grids, corruption, ambush rings, null sweep |
+| 5 | **Grave of Suns** | Gravity wells bend every bullet, and tug you. | **Umbra Twins** — two orbiting stars: binary rings, eclipse, a tidal-lock link laser, supernova |
+| 6 | **Hourglass Reach** | Amber bubbles slow bullets inside them. Stand in stopped time. | **Chronarch** — second hand, echoes of your own path, rewinding knives, the stopped hour |
+| 7 | **The Choir's Heart** | Everything fires on the beat. Every pulse pushes the bullets. | **The Choir** — six phases that reprise every world, then *Silence* |
+
+**Controls** — arrows/WASD move · auto-fire (or Z/SPACE) · SHIFT focus (shows hitbox) · X bomb · C overdrive · ESC pause. Touch: drag anywhere to move, on-screen BOMB / OVER / FOCUS. Gamepad: stick, A fire, B bomb, X/Y overdrive, triggers focus.
+
+**Systems** — graze bullets to fill **Overdrive** (bullets crawl, damage spikes) · a ×chain that grows with kills and grazes and halves on death · per-phase boss timers with *silenced* bonuses for clean clears · death-bomb window · power levels · extends · **Relics** (ten run-long upgrades, pick one of three after each world) · Novice / Normal / Lunatic (Lunatic clear = +1,000,000) · practice any world you have reached · saved scores, stats and options.
+
+```
+bullethell/index.html      shell, CSS, touch buttons
+bullethell/src/main.js     loop, state machine, collisions, stage flow
+bullethell/src/levels.js   the seven worlds: palettes, music, dialogue, mechanics, wave scripts
+bullethell/src/bosses.js   boss framework + seven bosses (30 phases)
+bullethell/src/patterns.js ring / fan / spiral / seed / curtain / laser pattern library
+bullethell/src/player.js   three hulls, bombs, overdrive, relics
+bullethell/src/audio.js    step-sequenced synth music per world + SFX (no audio files)
+test/bullethell-smoke.mjs  headless Playwright run through all seven worlds
+```
+
+<p align="center"><img src="bullethell/screenshots/1-ember-shoals.png" width="180"> <img src="bullethell/screenshots/2-glass-tide.png" width="180"> <img src="bullethell/screenshots/4-cathedral-of-static.png" width="180"> <img src="bullethell/screenshots/5-grave-of-suns.png" width="180"></p>
+
+Smoke test: `node test/bullethell-smoke.mjs` (add `--quick` for world 1 only). Screenshots land in `test/bh-shots/`.
+
+---
+
 # ⚔️ ELDERFALL — A Tale of Emberhollow
 
 An **open-world, first-person fantasy RPG that runs in your phone's browser**. No install, no app store — just open the link and play. Inspired by Skyrim, The Witcher 3, and Middle-earth.
