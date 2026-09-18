@@ -40,14 +40,18 @@ export class Player {
     // lean & crouch
     const lean = (this.keys.leanR ? 1 : 0) - (this.keys.leanL ? 1 : 0);
     this.leanT += (lean - this.leanT) * Math.min(1, dt * 8);
-    this.crouchT += ((this.keys.crouch ? 1 : 0) - this.crouchT) * Math.min(1, dt * 6);
-    // movement
-    const sprint = this.keys.shift && (this.keys.fwd || this.keys.left || this.keys.right);
+    // movement (keyboard or touch stick)
+    const T = this.touch;
+    const joyMag = T ? Math.hypot(T.joy.x, T.joy.y) : 0;
+    const sprint = (this.keys.shift && (this.keys.fwd || this.keys.left || this.keys.right)) || (T && T.sprint);
+    const crouchKey = this.keys.crouch || (T && T.crouch);
+    this.crouchT += ((crouchKey ? 1 : 0) - this.crouchT) * Math.min(1, dt * 6);
     const speed = (sprint ? 4.2 : 1.5) * (1 - 0.45 * this.crouchT);
     const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)), right = new THREE.Vector3(fwd.z, 0, -fwd.x).negate();
     const wish = new THREE.Vector3();
-    if (this.keys.fwd) wish.add(fwd); if (this.keys.back) wish.sub(fwd); if (this.keys.right) wish.sub(right); if (this.keys.left) wish.add(right);
+    if (this.keys.fwd) wish.add(fwd); if (this.keys.back) wish.sub(fwd); if (this.keys.right) wish.add(right); if (this.keys.left) wish.sub(right);
     if (wish.lengthSq() > 0) wish.normalize().multiplyScalar(speed);
+    else if (joyMag > 0.05) wish.addScaledVector(fwd, -T.joy.y).addScaledVector(right, T.joy.x).multiplyScalar(speed * Math.min(1, joyMag / 0.85));
     const accel = wish.lengthSq() > 0 ? 12 : 16;
     this.vel.lerp(wish, Math.min(1, dt * accel));
     this.pos.addScaledVector(this.vel, dt * ts);
@@ -77,6 +81,7 @@ export class Player {
     return this.input(dt);
   }
   input() {
-    return { ads: this.buttons.r || this.adsToggle, sprint: this.sprinting, moveSpeed: this.moveSpeed, lookDelta: this.lookDelta, breathHold: this.keys.shift && !this.sprinting, crouch: this.keys.crouch, lean: this.leanT, blocked: this.blocked };
+    const T = this.touch;
+    return { ads: this.buttons.r || this.adsToggle, sprint: this.sprinting, moveSpeed: this.moveSpeed, lookDelta: this.lookDelta, breathHold: (this.keys.shift && !this.sprinting) || (T && T.breath), crouch: this.keys.crouch || (T && T.crouch), lean: this.leanT, blocked: this.blocked };
   }
 }

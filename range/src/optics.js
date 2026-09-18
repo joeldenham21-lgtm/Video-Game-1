@@ -86,10 +86,10 @@ void main(){
   gl_FragColor = vec4(col, 1.0);
 }`;
 
-export function createOptics({ renderer, worldScene, viewmodel, camera }) {
+export function createOptics({ renderer, worldScene, viewmodel, camera, rtSize = 1024 }) {
   const redDot = new THREE.ShaderMaterial({ vertexShader: REDDOT_VS, fragmentShader: REDDOT_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide,
     uniforms: { losDir: { value: new THREE.Vector3(0, 0, -1) }, dotRad: { value: 0.00058 }, dotColor: { value: new THREE.Color(1.0, 0.16, 0.08) }, brightness: { value: 1.0 }, on: { value: 1 } } });
-  const RT_SIZE = 1024;
+  const RT_SIZE = rtSize;
   const rt = new THREE.WebGLRenderTarget(RT_SIZE, RT_SIZE, { type: THREE.HalfFloatType, samples: 0 });
   rt.texture.colorSpace = THREE.LinearSRGBColorSpace;
   const scopeCam = new THREE.PerspectiveCamera(2.4, 1, 0.5, 4000);

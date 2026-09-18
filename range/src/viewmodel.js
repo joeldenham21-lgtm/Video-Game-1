@@ -69,7 +69,8 @@ export class ViewModel {
 
   // ------------------------------------------------------------------ equip / state
   equip(id, immediate = false) {
-    if (this.id === id) return;
+    if ((this.nextId || this.id) === id) return;
+    this.nextId = id;
     const doDraw = () => {
       if (this.weapon) { this.holder.remove(this.weapon.group); this.weapon.group.visible = false; }
       this.id = id; this.weapon = this.weapons[id]; this.recoil = this.recoils[id]; this.seq = this.seqs[id];

@@ -120,6 +120,13 @@ ${f(atm.tempC, 0)} °C · ${f(atm.p, 0)} hPa · RH ${f(atm.humidity * 100, 0)} %
   });
   menu.querySelector('#btn-resume').addEventListener('click', () => callbacks.onResume?.());
   menu.querySelector('#btn-reset').addEventListener('click', () => callbacks.onResetTargets?.());
+  menu.querySelector('#btn-full').addEventListener('click', () => {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else if (req) { req.call(el).then?.(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch?.(() => {}); }
+    else message('Full screen is not available in this browser. Add the page to your home screen instead.', 3500);
+  });
 
   return {
     message, updateAmmo, updateTop, shotReport, targetReport, updateCalc, state,

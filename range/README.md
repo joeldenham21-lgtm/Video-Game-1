@@ -80,7 +80,20 @@ Modelled procedurally at real dimensions (metres), with animatable part rigs:
 * Ballistic computer (H): live range card under the current atmosphere, holds in mil, laser
   rangefinder (N), shot report with impact chain, slow motion (T), shot trace replay (L).
 
-## Controls
+## Playing on a phone
+The page detects a touch screen and switches to on-screen controls: left half of the screen is a
+floating movement stick (push it far to sprint), the right half is drag-to-look, and the buttons
+give you FIRE (hold for full auto), AIM (toggle), BREATH (hold while aiming), RELOAD, CHARGE /
+cycle bolt, MODE (safety / semi / auto), SWAP weapon, CROUCH and INSPECT, plus a top bar for the
+menu, slow motion, ballistic computer, rangefinder, traces and help. With the precision rifle
+shouldered, a bottom strip adjusts magnification and the elevation / windage turrets.
+Turn the phone to landscape, tap FULLSCREEN in the menu (Android), or add the page to your home
+screen on iPhone for a full-screen app. Post-processing is off on phones for frame rate.
+The game is a static site, so it runs from GitHub Pages: once this folder is on the branch that
+Pages deploys (`main` for this repo), open
+`https://<user>.github.io/Video-Game-1/range/` on the phone.
+
+## Controls (desktop)
 LMB fire · RMB aim · WASD move · Shift sprint / hold breath · C crouch · Q/E lean · R reload ·
 X charge / cycle bolt · Z press check · V safety / fire mode · B ammo type (next mag) ·
 F inspect · 1 2 3 weapons · [ ] elevation · ; ' windage · wheel magnification · N rangefinder ·

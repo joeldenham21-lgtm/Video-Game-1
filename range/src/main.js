@@ -25,6 +25,7 @@ import { ViewModel } from './viewmodel.js';
 import { createOptics } from './optics.js';
 import { Player } from './player.js';
 import { createHUD } from './hud.js';
+import { createTouchControls, isTouchDevice } from './touch.js';
 import * as B from './ballistics.js';
 
 const params = new URLSearchParams(location.search);
@@ -36,7 +37,9 @@ const settings = {
 async function init() {
   const canvas = document.getElementById('game');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-  const lowq = params.has('lowq');
+  const touchMode = params.has('touch') || (isTouchDevice() && !params.has('notouch'));
+  const lowq = params.has('lowq') || touchMode;
+  if (touchMode) { settings.postfx = false; settings.fov = 72; }
   renderer.setPixelRatio(lowq ? 1 : Math.min(window.devicePixelRatio, 1.5)); renderer.setSize(innerWidth, innerHeight);
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.85;
@@ -77,7 +80,7 @@ async function init() {
     onDryFire: () => hud.message(vm.state.magRounds === 0 ? 'click — empty. R to reload' : 'click — chamber empty. X to charge', 1800),
     onSafe: () => hud.message('safety is on — V to select SEMI / AUTO', 1500),
   } });
-  const optics = createOptics({ renderer, worldScene: scene, viewmodel: vm, camera });
+  const optics = createOptics({ renderer, worldScene: scene, viewmodel: vm, camera, rtSize: lowq ? 512 : 1024 });
   for (const w of Object.values(weapons)) optics.attach(w);
 
   const player = new Player(camera, canvas, physics);
@@ -110,7 +113,7 @@ async function init() {
   // ---------------------------------------------------------------- HUD callbacks + menu
   let paused = true;
   Object.assign(hudCb, {
-    onResume: () => { paused = false; hud.showMenu(false); audio.unlock(); player.lock(); },
+    onResume: () => { paused = false; hud.showMenu(false); audio.unlock(); if (!touchMode) player.lock(); touch?.show(true); },
     onResetTargets: () => { targets.resetAll(); effects.clearTraces(); hud.message('targets reset'); },
     onSettings: (name) => {
       env = applyEnvironment(); audio.setEarPro(settings.earPro); effects.setShowTraces(settings.traces); bloom.enabled = settings.postfx; player.sensitivity = 0.0022 * settings.sensitivity;
@@ -122,6 +125,15 @@ async function init() {
   document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement !== canvas && !paused) { paused = true; hud.showMenu(true); } });
 
   // ---------------------------------------------------------------- input mapping
+  const touch = touchMode ? createTouchControls({ canvas, player, vm, hud, settings, actions: {
+    mode: () => { vm.toggleMode(); hud.message(`mode: ${vm.state.mode.toUpperCase()}`, 1200); },
+    swap: () => { const order = ['ar15', 'pistol', 'bolt']; const next = order[(order.indexOf(vm.nextId || vm.id) + 1) % order.length]; vm.equip(next); player.gunLength = next === 'pistol' ? 0.45 : next === 'bolt' ? 1.15 : 0.9; },
+    menu: () => { paused = true; hud.showMenu(true); touch.show(false); },
+    slowmo: () => { settings.timeScale = settings.timeScale < 0.9 ? 1 : 0.08; audio.setTimeScale(settings.timeScale); vm.slowmo = settings.timeScale; },
+    traces: () => { settings.traces = !settings.traces; effects.setShowTraces(settings.traces); hud.syncSettings(); },
+    mag: (d) => { if (!vm.weapon?.spec.scope) return; const S = vm.weapon.spec.scope; vm.state.scopeMag = THREE.MathUtils.clamp(vm.state.scopeMag + d, S.magMin, S.magMax); hud.message(`${vm.state.scopeMag}×`, 600); },
+  } }) : null;
+  if (touch) { touch.show(false); document.body.classList.add('touch'); }
   vm.equip('ar15', true);
   for (const id in vm.ws) vm.ws[id].zeroRange = id === 'bolt' ? 100 : id === 'pistol' ? 25 : settings.zeroRange;
   vm.refreshBallistics();
@@ -129,7 +141,7 @@ async function init() {
   player.onMouse = (button, down) => { if (paused) return; if (button === 0) { if (down) vm.fireDown(); else vm.fireUp(); } };
   player.onKey = (k, down, e) => {
     if (!down) return;
-    if (k === 'escape') { if (paused) hudCb.onResume(); else { paused = true; hud.showMenu(true); player.unlock(); } return; }
+    if (k === 'escape') { if (paused) hudCb.onResume(); else { paused = true; hud.showMenu(true); player.unlock(); touch?.show(false); } return; }
     if (paused) return;
     switch (k) {
       case '1': vm.equip('ar15'); player.gunLength = 0.9; break;
@@ -202,6 +214,7 @@ async function init() {
     // optics (renders the scope RTT if needed)
     optics.update(vm);
     // HUD
+    touch?.update();
     if (frames % 4 === 0) { hud.updateAmmo(vm); hud.updateTop(vm, { atm: B.atmosphere(envOpts.atm) }, env.wind); hud.updateCalc(vm, envOpts); }
   }
   frame();

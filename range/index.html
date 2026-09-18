@@ -2,13 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0d10">
 <title>RANGE — ballistics &amp; gun-handling sandbox</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0d10; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e6e6e6; user-select: none; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: none; }
+  html, body { width: 100%; height: 100dvh; overflow: hidden; background: #0b0d10; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e6e6e6; user-select: none; -webkit-user-select: none; overscroll-behavior: none; touch-action: none; -webkit-tap-highlight-color: transparent; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: none; touch-action: none; }
   #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; font-size: 14px; }
   .panel { position: absolute; background: rgba(10, 12, 16, 0.55); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 8px 12px; backdrop-filter: blur(2px); }
   .hidden { display: none !important; }
@@ -44,6 +48,36 @@
   #settings .toggles { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 6px; } #settings .tog input { accent-color: #ffd166; margin-right: 4px; }
   #menu .foot { margin-top: 14px; font-size: 11px; color: #6d7882; line-height: 1.6; }
   #loading { color: #ffd166; font-size: 13px; letter-spacing: 0.2em; }
+  #rotate { display: none; }
+
+  /* ---------- touch controls ---------- */
+  #touch { position: fixed; inset: 0; z-index: 20; pointer-events: none; font-family: inherit; }
+  #touch button { pointer-events: auto; font: inherit; font-size: 11px; letter-spacing: 0.08em; color: #e8ecf0; background: rgba(14, 18, 24, 0.55); border: 1px solid rgba(255,255,255,0.22); border-radius: 8px; padding: 0 10px; height: 40px; min-width: 64px; margin: 3px; touch-action: none; -webkit-user-select: none; user-select: none; }
+  #touch button.on { background: rgba(255, 209, 102, 0.8); color: #111; border-color: #ffd166; }
+  #touch .tbar { position: absolute; top: max(6px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; }
+  #touch .tbar button { height: 30px; min-width: 44px; font-size: 10px; }
+  #touch .tleft { position: absolute; left: max(10px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
+  #touch .tright { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; }
+  #touch .trow { display: flex; }
+  #touch .fire { width: 112px; height: 112px; border-radius: 50%; font-size: 15px; font-weight: 600; background: rgba(200, 40, 30, 0.55); border-color: rgba(255,120,100,0.7); align-self: flex-end; margin-top: 6px; }
+  #touch .fire.on { background: rgba(255, 70, 50, 0.9); color: #fff; }
+  #touch .tscope { position: absolute; left: 50%; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; flex-direction: row; }
+  #touch .tscope button { min-width: 52px; height: 34px; font-size: 10px; padding: 0 6px; }
+  #touch .tstick { position: absolute; width: 104px; height: 104px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.06); display: none; }
+  #touch .tknob { position: absolute; left: 32px; top: 32px; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.55); }
+  body.touch .ammo { right: max(10px, env(safe-area-inset-right)); top: 44px; bottom: auto; min-width: 0; padding: 5px 8px; }
+  body.touch .ammo .rounds { font-size: 24px; } body.touch .ammo .wname { font-size: 10px; } body.touch .ammo .sub { font-size: 11px; } body.touch .ammo .sub.small { font-size: 9px; }
+  body.touch .report { left: 10px; bottom: 190px; max-width: 46vw; font-size: 10px; line-height: 1.35; padding: 5px 8px; } body.touch .report .small { display: none; }
+  body.touch .topline { top: 42px; font-size: 11px; gap: 10px; padding: 4px 8px; max-width: 52vw; overflow: hidden; }
+  body.touch .calc { left: 8px; right: 8px; top: 44px; width: auto; font-size: 10px; max-height: 60vh; overflow: auto; pointer-events: auto; }
+  body.touch .help { width: 92vw; font-size: 11px; line-height: 1.5; } body.touch .help .cols { flex-direction: column; gap: 6px; }
+  body.touch .msgs { top: 16%; }
+  @media (max-width: 900px) {
+    #menu .box { padding: 14px 16px; } #menu h1 { font-size: 22px; } #menu .tag { font-size: 11px; margin-bottom: 10px; }
+    #menu button { font-size: 13px; padding: 9px 16px; margin: 4px 6px 8px 0; }
+    #settings { grid-template-columns: 1fr; gap: 4px; font-size: 11px; } #menu .foot { font-size: 10px; }
+  }
+  @media (max-width: 900px) and (orientation: portrait) { #rotate { display: block; color: #ffd166; font-size: 12px; margin: 6px 0 10px; } }
 </style>
 <script type="importmap">
   { "imports": { "three": "../vendor/three.module.js" } }
@@ -56,7 +90,8 @@
   <div class="box">
     <h1>RANGE <span>·</span> KD 600</h1>
     <div class="tag">Exterior &amp; terminal ballistics sandbox · M4 carbine · G17 pistol · R700 precision rifle · point-mass G1/G7 trajectories, wind, Coriolis, spin drift, penetration &amp; ricochet · physically simulated recoil and action cycling</div>
-    <button id="btn-resume">▶ SHOOT</button><button class="secondary" id="btn-reset">RESET TARGETS</button>
+    <button id="btn-resume">▶ SHOOT</button><button class="secondary" id="btn-reset">RESET TARGETS</button><button class="secondary" id="btn-full">⛶ FULLSCREEN</button>
+    <div id="rotate">📱 Turn your phone sideways (landscape) for the range. On iPhone, Share → “Add to Home Screen” gives a full-screen app.</div>
     <span id="loading">LOADING…</span>
     <div id="settings"></div>
     <div class="foot">Mouse: look · LMB fire · RMB aim · R reload · X charge/cycle · V safety · B ammo · F inspect · Z press check · Q/E lean · Shift breathe/sprint · [ ] ; ' turrets · N rangefinder · H ballistic computer · T slow motion · L traces · P ear pro · K reset · F1 help · Esc menu<br>All geometry, textures and sounds are generated procedurally at load. No assets are downloaded.</div>
