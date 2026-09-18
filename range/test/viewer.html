@@ -6,6 +6,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { RoomEnvironment } from '../vendor/addons/environments/RoomEnvironment.js';
+import { RGBELoader } from '../vendor/addons/loaders/RGBELoader.js';
 import { buildAR15 } from '../src/weapons/ar15.js';
 import { buildPistol } from '../src/weapons/pistol.js';
 import { buildBoltRifle } from '../src/weapons/bolt.js';
@@ -21,9 +22,27 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x3a3f46);
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+window.sunDir = null;
+if (q.get('hdr')) {
+  const tex = await new RGBELoader().loadAsync('../assets/' + q.get('hdr') + '.hdr');
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  scene.environment = pmrem.fromEquirectangular(tex).texture;
+  if (q.get('bg')) scene.background = tex;
+  // brightest-direction estimate (sun) from the float data
+  const d = tex.image.data, w = tex.image.width, h = tex.image.height; let best = -1, bi = 0;
+  const isHalf = tex.type === THREE.HalfFloatType; const toF = (x) => isHalf ? THREE.DataUtils.fromHalfFloat(x) : x;
+  for (let i = 0; i < w * h; i++) { const l = toF(d[i * 4]) * 0.3 + toF(d[i * 4 + 1]) * 0.6 + toF(d[i * 4 + 2]) * 0.1; if (l > best) { best = l; bi = i; } }
+  const px = bi % w, py = Math.floor(bi / w);
+  const u = (px + 0.5) / w, v0 = (py + 0.5) / h; const v = tex.flipY ? 1 - v0 : v0;
+  const phi = (u - 0.5) * Math.PI * 2, theta = (v - 0.5) * Math.PI;
+  window.sunDir = [Math.cos(theta) * Math.cos(phi), Math.sin(theta), Math.cos(theta) * Math.sin(phi)];
+  window.sunInfo = { best, px, py, w, h, flipY: tex.flipY, type: tex.type };
+  const marker = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff00ff })); marker.position.set(...window.sunDir).multiplyScalar(30); scene.add(marker);
+}
 const sun = new THREE.DirectionalLight(0xfff2e0, 2.2); sun.position.set(1.5, 2.5, 1.2); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.near = 0.1; sun.shadow.camera.far = 10;
 sun.shadow.camera.left = sun.shadow.camera.bottom = -1; sun.shadow.camera.right = sun.shadow.camera.top = 1; sun.shadow.bias = -0.0002; sun.shadow.normalBias = 0.002;
+if (window.sunDir) sun.position.set(...window.sunDir).multiplyScalar(3);
 scene.add(sun, new THREE.HemisphereLight(0xcfd8e6, 0x3a3630, 0.6));
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.MeshStandardMaterial({ color: 0x555a60, roughness: 0.9 }));
 floor.rotation.x = -Math.PI / 2; floor.position.y = -0.25; floor.receiveShadow = true; scene.add(floor);
@@ -47,6 +66,7 @@ const views = {
   port: { pos: [1, 0.35, -0.2], dist: 0.32, look: [0.02, 0.0, -0.12] }, grip: { pos: [0.8, -0.2, 0.7], dist: 0.35, look: [0, -0.07, 0] },
   muzzle: { pos: [0.8, 0.4, -1], dist: 0.3, look: 'muzzle' }, optic: { pos: [-0.7, 0.6, 0.8], dist: 0.35, look: 'sight' },
   ads: { pos: [0, 0, 1], dist: 0, look: 'ads' },
+  sunview: { pos: [0, 0.2, 1], dist: 0, look: 'sun' },
   portR: { pos: [1, 0.05, 0], dist: 0.22, look: [0.02, 0.0, -0.124] }, portRb: { pos: [1, 0.05, 0], dist: 0.22, look: [0.02, 0.0, -0.02] },
   slideTop: { pos: [0.3, 1, -0.2], dist: 0.25, look: [0, 0.01, -0.02] },
 };
@@ -58,7 +78,8 @@ window.snap = (name) => {
   else if (v.look === 'sight') look.set(0, weapon.anchors.sightAxis.y, weapon.anchors.sightAxis.z);
   const maxDim = Math.max(size.x, size.y, size.z);
   const dist = v.dist * (v.look ? 1 : maxDim * 1.25);
-  if (v.look === 'ads') { camera.position.set(0, weapon.anchors.sightAxis.y, weapon.anchors.eyeZ); camera.lookAt(0, weapon.anchors.sightAxis.y, -100); camera.fov = 30; }
+  if (v.look === 'sun' && window.sunDir) { camera.position.set(0, 0.3, 0); camera.lookAt(window.sunDir[0] * 10, window.sunDir[1] * 10, window.sunDir[2] * 10); camera.fov = 60; }
+  else if (v.look === 'ads') { camera.position.set(0, weapon.anchors.sightAxis.y, weapon.anchors.eyeZ); camera.lookAt(0, weapon.anchors.sightAxis.y, -100); camera.fov = 30; }
   else { camera.position.copy(look).add(new THREE.Vector3(...v.pos).normalize().multiplyScalar(dist)); camera.lookAt(look); camera.fov = 35; }
   camera.updateProjectionMatrix();
   renderer.render(scene, camera);

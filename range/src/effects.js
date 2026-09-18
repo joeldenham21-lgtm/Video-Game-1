@@ -126,6 +126,22 @@ export function createEffects(scene, physics) {
   }
   const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(1, 1, 1), _v = new THREE.Vector3();
   const mags = []; // dropped magazines { body, mesh }
+  // in-flight bullets: one InstancedMesh per cartridge holding just the projectile (jacket + tip), oriented along the velocity
+  const bulletPools = {};
+  function bulletPool(cartId) {
+    if (bulletPools[cartId]) return bulletPools[cartId];
+    const model = cartridgeModel(CARTRIDGES[cartId], brassMats, { withBullet: true });
+    const geos = []; model.updateMatrixWorld(true);
+    model.traverse((o) => { if (o.isMesh && o.name !== 'case' && o.name !== 'primer') { const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld); geos.push(g); } });
+    const merged = geos.length > 1 ? mergeAll(geos) : geos[0];
+    // the bullet sits with its base at the case mouth; shift so the geometry is centred on its own length
+    const cl = CARTRIDGES[cartId].case.len / 1000, bl = (CARTRIDGES[cartId].oalMm - CARTRIDGES[cartId].case.len) / 1000;
+    merged.translate(0, 0, cl + bl * 0.5);
+    const mesh = new THREE.InstancedMesh(merged, mat('copper'), 64); mesh.count = 0; mesh.frustumCulled = false; scene.add(mesh);
+    return (bulletPools[cartId] = mesh);
+  }
+  const _fwd = new THREE.Vector3(0, 0, -1), _dir = new THREE.Vector3();
+  const bulletCounts = {};
 
   const api = {
     sparks, dust, smoke, showTraces: () => showTraces, setShowTraces(v) { showTraces = v; for (const t of traces) t.visible = v; },
@@ -162,6 +178,18 @@ export function createEffects(scene, physics) {
         for (let i = 0; i < 5; i++) { _v.copy(n).multiplyScalar(1 + Math.random() * 2); dust.emit(point, _v, 0.4, 0.01, 0.03, 0.2, 0.2, 0.2, 0.8, 9.81, 0.5); }
       }
       if (outcome.type === 'ricochet') for (let i = 0; i < 8; i++) { _v.set(...outcome.dir).multiplyScalar(20 + Math.random() * 30).add(new THREE.Vector3((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8)); sparks.emit(point, _v, 0.2 + Math.random() * 0.2, 0.02, 0.005, 1, 0.85, 0.5, 1, 9.81, 1); }
+    },
+    /** draw the live projectiles (called once per frame with the manager's bullet list) */
+    drawBullets(bullets) {
+      for (const k in bulletCounts) bulletCounts[k] = 0;
+      for (const b of bullets) {
+        const id = b.tag.cart.id; const mesh = bulletPool(id); const i = bulletCounts[id] || 0; if (i >= 64) continue;
+        _p.set(b.pos[0], b.pos[1], b.pos[2]); _dir.set(b.vel[0], b.vel[1], b.vel[2]).normalize();
+        _q.setFromUnitVectors(_fwd, _dir);
+        if (b.deformed) _q.multiply(new THREE.Quaternion().setFromAxisAngle(_dir, b.t * 200)); // tumbling
+        _m.compose(_p, _q, _s); mesh.setMatrixAt(i, _m); bulletCounts[id] = i + 1;
+      }
+      for (const id in bulletPools) { bulletPools[id].count = bulletCounts[id] || 0; bulletPools[id].instanceMatrix.needsUpdate = true; }
     },
     /** per-bullet streak between two points (fades each frame) */
     streak(id, a, b, brightness = 1) {

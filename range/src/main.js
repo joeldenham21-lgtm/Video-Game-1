@@ -55,6 +55,7 @@ async function init() {
   const world = buildWorld(scene, physics, renderer);
   if (lowq) { world.sun.shadow.mapSize.set(1024, 1024); }
   viewScene.environment = world.envTex;
+  world.envReady.then((t) => { viewScene.environment = t; });
   // viewmodel lighting: sun clone with a tight shadow frustum that follows the camera
   const vSun = new THREE.DirectionalLight(0xfff1dc, 3.0); vSun.castShadow = true; vSun.shadow.mapSize.set(lowq ? 1024 : 2048, lowq ? 1024 : 2048); vSun.shadow.camera.near = 0.05; vSun.shadow.camera.far = 8;
   vSun.shadow.camera.left = vSun.shadow.camera.bottom = -1.6; vSun.shadow.camera.right = vSun.shadow.camera.top = 1.6; vSun.shadow.bias = -0.0002; vSun.shadow.normalBias = 0.004;
@@ -200,7 +201,7 @@ async function init() {
     player.update && void 0;
     camera.updateMatrixWorld(true);
     viewCam.position.copy(camera.position); viewCam.quaternion.copy(camera.quaternion); viewCam.updateMatrixWorld(true);
-    vSun.position.copy(camera.position).addScaledVector(world.sunDir, 3); vSun.target.position.copy(camera.position); vSun.target.updateMatrixWorld();
+    vSun.intensity = world.sun.intensity; vSun.position.copy(camera.position).addScaledVector(world.sunDir, 3); vSun.target.position.copy(camera.position); vSun.target.updateMatrixWorld();
     // sims
     const sub = dt > 1 / 55 ? 2 : 1; for (let i = 0; i < sub; i++) physics.step(dt / sub);
     projectiles.update(dt);

@@ -29,7 +29,7 @@ for (const w of WEAPONS) {
   for (const v of views) {
     const info = await page.evaluate((v) => window.snap(v), v);
     await page.screenshot({ path: `${OUT}/${w}-${v}.png` });
-    if (v === views[0]) console.log(w, JSON.stringify(info));
+    if (v === views[0]) console.log(w, JSON.stringify(info), JSON.stringify(await page.evaluate(() => window.sunInfo || null)));
   }
 }
 console.log('errors:', errors.length ? errors : 'none');

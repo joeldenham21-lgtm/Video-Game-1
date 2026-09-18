@@ -103,7 +103,7 @@ export function getTex(name) {
       t = normalFromHeight(256, 256, (u, v, x, y) => Math.sin(v * Math.PI * 200) * 0.05 + fbm(x / 14, y / 14, 3, 21) * 0.35 + (hash(x, y, 5) > 0.985 ? 0.6 : 0), 0.7);
       break;
     case 'anodizedR': // roughness variation for anodised aluminium
-      t = grayTexture(256, 256, (u, v, x, y) => 0.55 + fbm(x / 30, y / 30, 4, 31) * 0.25 + (hash(x, y, 8) > 0.99 ? -0.3 : 0));
+      t = grayTexture(256, 256, (u, v, x, y) => 0.62 + fbm(x / 18, y / 18, 4, 31) * 0.07 + (hash(x, y, 8) > 0.995 ? -0.2 : 0));
       break;
     case 'wearMask': // edge wear mask (bright = worn)
       t = grayTexture(256, 256, (u, v, x, y) => Math.pow(fbm(x / 40, y / 40, 5, 41), 3) * 1.4);

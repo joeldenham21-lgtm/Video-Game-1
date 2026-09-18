@@ -23,6 +23,8 @@ page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message + '\n' + (e.stac
 const t0 = Date.now();
 await page.goto('http://localhost:8935/range/index.html?nopost&lowq', { waitUntil: 'load' });
 await page.waitForFunction(() => !!window.g, null, { timeout: 120000 });
+await page.evaluate(() => window.g.world.envReady);
+console.log('hdri', JSON.stringify(await page.evaluate(() => ({ sunElevDeg: +(window.g.world.sunElevation * 180 / Math.PI).toFixed(1), sunDir: window.g.world.sunDir.toArray().map(n => +n.toFixed(2)) }))));
 console.log('booted in', ((Date.now() - t0) / 1000).toFixed(1), 's');
 await page.screenshot({ path: `${OUT}/s00-menu.png` });
 await page.evaluate(() => { window.g.resume(); window.g.settings.timeScale = 1; window.g.dbg.manual = true; });

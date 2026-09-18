@@ -5,9 +5,14 @@ three things: **realistic exterior/terminal ballistics**, **detailed weapon mode
 **physically driven gun-handling animation**. The setting is deliberately plain: a covered
 firing line and a known-distance range out to 600 m.
 
-Open `range/index.html` from any static web server (for example `npx serve .` in the repo
-root, then `http://localhost:3000/range/`). Everything — geometry, textures, sounds — is
-generated procedurally at load; nothing is downloaded.
+**Single-file version:** `range/dist/range.html` is the whole game in one 5 MB HTML file
+(three.js, the Rapier physics engine, the HDRI and all game code inlined). Download it and
+double-click it; it runs from `file://` with no server. Rebuild it with `node range/build.mjs`
+(needs esbuild: `npm i -g esbuild`, or the script falls back to `npx esbuild`).
+
+Otherwise open `range/index.html` from any static web server (for example `npx serve .` in the
+repo root, then `http://localhost:3000/range/`). Geometry, textures and sounds are generated
+procedurally at load; the only asset file is the HDRI in `range/assets/`.
 
 ## What is simulated
 
@@ -67,6 +72,12 @@ Modelled procedurally at real dimensions (metres), with animatable part rigs:
   muzzle-blocked lowering, lean/cant, crouch.
 * Articulated gloved hands with finger poses that follow the trigger and the reload.
 
+### Lighting
+Image-based lighting from Poly Haven's CC0 **Quarry 01** HDRI (mirrored in the three.js repo):
+the environment map lights and reflects in every material, the map is rolled at load so its sun
+sits behind the shooter, and the shadow-casting sun and the sky shader are aligned to the sun
+found in the HDRI data.
+
 ### Range, physics, effects, audio
 * Rapier (WASM) rigid bodies: every ejected case is a physical cylinder, dropped magazines are
   boxes, gongs hang on revolute joints and swing with the hit, the spinner spins, the popper
@@ -122,7 +133,11 @@ range/
   src/audio.js        synthesised sound engine
   src/player.js       controller
   src/hud.js          overlay + ballistic computer
-  test/               node ballistics checks, geometry checks, Playwright smoke test & viewers
+  src/touch.js        phone controls
+  build.mjs           bundles everything into dist/range.html (single file)
+  dist/range.html     the downloadable single-file build
+  assets/             Quarry 01 HDRI (CC0, Poly Haven)
+  test/               node ballistics checks, geometry checks, Playwright smoke / mobile / file:// tests & viewers
   vendor/             three.js addons (r160) and rapier3d-compat
 ```
 
@@ -131,5 +146,7 @@ range/
 node range/test/ballistics.mjs                                  # trajectory / penetration sanity vs. published data
 node --import ./range/test/register.mjs range/test/geometry.mjs # geometry helper conventions
 node range/test/smoke.mjs                                       # headless Playwright: boots, shoots, reloads, screenshots
+node range/test/mobile.mjs                                      # phone emulation: touch stick, look, buttons
+node range/test/dist.mjs                                        # the single-file build from file://
 node range/test/shots.mjs   / node range/test/fpshots.mjs        # weapon and first-person viewers → screenshots
 ```

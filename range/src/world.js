@@ -7,6 +7,7 @@
 // ============================================================================
 import * as THREE from 'three';
 import { Sky } from '../vendor/addons/objects/Sky.js';
+import { RGBELoader } from '../vendor/addons/loaders/RGBELoader.js';
 import { mat, getTex } from './materials.js';
 
 export const RANGE = { width: 26, length: 620, lines: [10, 25, 50, 100, 200, 300, 400, 500, 600], roofZ0: 8, roofZ1: -2, eyeHeight: 1.65 };
@@ -59,14 +60,40 @@ export function buildWorld(scene, physics, renderer) {
   // ---------------------------------------------------------------- sky, sun, environment
   const sky = new Sky(); sky.scale.setScalar(2800); scene.add(sky);
   const su = sky.material.uniforms; su.turbidity.value = 2.5; su.rayleigh.value = 2.4; su.mieCoefficient.value = 0.003; su.mieDirectionalG.value = 0.8;
-  const sunEl = 42 * Math.PI / 180, sunAz = 150 * Math.PI / 180; // sun behind-left of the shooter
+  const sunEl = 42 * Math.PI / 180, sunAz = 335 * Math.PI / 180; // sun behind the shooter (slightly left), so target faces are lit
   const sunDir = new THREE.Vector3(Math.cos(sunEl) * Math.sin(sunAz), Math.sin(sunEl), Math.cos(sunEl) * Math.cos(sunAz)).normalize();
   su.sunPosition.value.copy(sunDir);
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envScene = new THREE.Scene(); const sky2 = new Sky(); sky2.scale.setScalar(60); sky2.material.uniforms.turbidity.value = 2.5; sky2.material.uniforms.rayleigh.value = 2.4; sky2.material.uniforms.mieCoefficient.value = 0.003; sky2.material.uniforms.sunPosition.value.copy(sunDir); envScene.add(sky2);
   const groundEnv = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshBasicMaterial({ color: 0xa39a80 })); groundEnv.rotation.x = -Math.PI / 2; groundEnv.position.y = -1; envScene.add(groundEnv);
-  const envTex = pmrem.fromScene(envScene, 0.02, 0.1, 150).texture;
+  let envTex = pmrem.fromScene(envScene, 0.02, 0.1, 150).texture;
   scene.environment = envTex;
+  // Real image-based lighting: Poly Haven's CC0 "Quarry 01" HDRI (1k), rolled so its sun sits behind the
+  // shooter's left shoulder; the shadow-casting sun and the sky shader are aligned to it once it loads.
+  const hdrUrl = (typeof window !== 'undefined' && window.__RANGE_HDR__) || './assets/quarry_01_1k.hdr';
+  const envReady = new RGBELoader().loadAsync(hdrUrl).then((tex) => {
+    const d = tex.image.data, w = tex.image.width, h = tex.image.height;
+    const isHalf = tex.type === THREE.HalfFloatType; const toF = (x) => isHalf ? THREE.DataUtils.fromHalfFloat(x) : x;
+    let best = -1, bi = 0;
+    for (let i = 0; i < w * h; i++) { const l = toF(d[i * 4]) * 0.3 + toF(d[i * 4 + 1]) * 0.6 + toF(d[i * 4 + 2]) * 0.1; if (l > best) { best = l; bi = i; } }
+    const px = bi % w, py = Math.floor(bi / w);
+    const uSun = (px + 0.5) / w, v = tex.flipY ? 1 - (py + 0.5) / h : (py + 0.5) / h;
+    const elev = Math.max(30 * Math.PI / 180, (v - 0.5) * Math.PI); // the quarry's sun is ~10° up; keep the shadow light high enough that the roof does not shade the 10 m line
+    // roll the columns so the sun's azimuth becomes ours (three's equirect convention: u = atan2(z, x) / 2π + 0.5)
+    const uTarget = Math.atan2(Math.sin(sunAz), Math.cos(sunAz)) / (Math.PI * 2) + 0.5;
+    const shift = Math.round((uTarget - uSun) * w);
+    const rolled = new d.constructor(d.length);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const sx = ((x - shift) % w + w) % w; const si = (y * w + sx) * 4, di = (y * w + x) * 4; rolled[di] = d[si]; rolled[di + 1] = d[si + 1]; rolled[di + 2] = d[si + 2]; rolled[di + 3] = d[si + 3]; }
+    const rt = new THREE.DataTexture(rolled, w, h, tex.format, tex.type); rt.flipY = tex.flipY; rt.colorSpace = tex.colorSpace; rt.mapping = THREE.EquirectangularReflectionMapping; rt.needsUpdate = true;
+    envTex = pmrem.fromEquirectangular(rt).texture; rt.dispose(); tex.dispose();
+    scene.environment = envTex;
+    // align sun + sky to the HDRI's sun
+    sunDir.set(Math.cos(elev) * Math.sin(sunAz), Math.sin(elev), Math.cos(elev) * Math.cos(sunAz)).normalize();
+    su.sunPosition.value.copy(sunDir); sun.position.copy(sunDir).multiplyScalar(60);
+    sun.intensity = 2.6; hemi.intensity = 0.55;
+    api.envTex = envTex; api.sunElevation = elev;
+    return envTex;
+  }).catch((e) => { console.warn('HDRI unavailable, using the procedural environment', e); return envTex; });
   scene.fog = new THREE.FogExp2(0xc7d3e0, 0.00045);
 
   const sun = new THREE.DirectionalLight(0xfff1dc, 3.2);
@@ -155,7 +182,7 @@ export function buildWorld(scene, physics, renderer) {
   }
 
   const api = {
-    group, sun, hemi, sky, envTex, sunDir, flags,
+    group, sun, hemi, sky, envTex, envReady, sunDir, flags,
     /** animate flags from the wind vector (world space) */
     update(t, wind) {
       const speed = Math.hypot(wind[0], wind[2]);

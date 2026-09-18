@@ -74,4 +74,4 @@ Dev: `node test/smoke.mjs` boots the game headless and screenshots it.
 
 ## 🎯 RANGE — ballistics & gun-handling sandbox
 
-A separate three.js first-person shooting range lives in [`range/`](range/README.md): real G1/G7 exterior ballistics with wind, Coriolis and spin drift, Poncelet penetration and ricochet, procedurally modelled M4 / G17 / R700 with simulated recoil and action cycling, a collimated reflex sight and a render-to-texture scope. Open `range/index.html` from any static server (`npx serve .` → `/range/`).
+A separate three.js first-person shooting range lives in [`range/`](range/README.md): real G1/G7 exterior ballistics with wind, Coriolis and spin drift, Poncelet penetration and ricochet, procedurally modelled M4 / G17 / R700 with simulated recoil and action cycling, a collimated reflex sight and a render-to-texture scope. Open `range/index.html` from any static server (`npx serve .` → `/range/`), or download the single-file build `range/dist/range.html` and double-click it. Works on phones with touch controls.

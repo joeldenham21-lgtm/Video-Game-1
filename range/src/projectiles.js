@@ -37,6 +37,7 @@ export class ProjectileManager {
 
   update(dt) {
     const env = this.env;
+    this.effects.drawBullets?.(this.bullets);
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const p = this.bullets[i];
       let remaining = dt;
