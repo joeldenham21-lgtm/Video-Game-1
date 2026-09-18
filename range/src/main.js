@@ -202,7 +202,7 @@ async function init() {
     // optics (renders the scope RTT if needed)
     optics.update(vm);
     // HUD
-    if (frames % 4 === 0) { hud.updateAmmo(vm); hud.updateTop(vm, { atm: B.atmosphere(envOpts.atm) }, env.wind); hud.updateCalc(vm, envOpts); if (hud.state.lrf && !vm.card) hud.updateCalc(vm, envOpts, true); }
+    if (frames % 4 === 0) { hud.updateAmmo(vm); hud.updateTop(vm, { atm: B.atmosphere(envOpts.atm) }, env.wind); hud.updateCalc(vm, envOpts); }
   }
   frame();
 

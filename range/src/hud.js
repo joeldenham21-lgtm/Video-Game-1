@@ -80,8 +80,9 @@ export function createHUD(root, settings, callbacks) {
     if (last.shot) shotReport(last.shot);
   }
   function updateCalc(vm, envOpts, force) {
-    if (!state.calcOpen || !vm.weapon) return;
-    const key = [vm.state.ammoId, vm.state.zeroRange, vm.state.elevClicks, vm.state.windClicks, JSON.stringify(envOpts)].join('|');
+    if (!vm.weapon) return;
+    if (!state.calcOpen && !force && !state.lrf) return;
+    const key = [vm.state.ammoId, vm.state.zeroRange, vm.state.elevClicks, vm.state.windClicks, state.calcOpen, JSON.stringify(envOpts)].join('|');
     if (key === state.lastCalcKey && !force) return; state.lastCalcKey = key;
     const w = vm.weapon.spec, c = vm.cart; const atm = B.atmosphere(envOpts.atm); const env = B.makeEnv({ ...envOpts, atm });
     const mv = muzzleVelocity(c, w.barrelIn);
@@ -91,6 +92,7 @@ export function createHUD(root, settings, callbacks) {
     // windage clicks shift the LOS horizontally → equivalent lateral offset
     for (const r of card) r.drift -= Math.tan(vm.state.windClicks * click) * r.range * -1;
     vm.card = card;
+    if (!state.calcOpen) return;
     let rows = '';
     for (const r of card) if (r.range % 50 === 0 && r.range > 0) rows += `<tr><td>${r.range}</td><td>${f(r.drop * 100, 1)}</td><td>${f(r.drop / r.range * 1000, 2)}</td><td>${f(r.drift * 100, 1)}</td><td>${f(r.drift / r.range * 1000, 2)}</td><td>${f(r.v, 0)}</td><td>${f(r.e, 0)}</td><td>${f(r.tof, 3)}</td><td>${f(r.mach, 2)}</td></tr>`;
     calc.innerHTML = `<h3>Ballistic computer</h3>
