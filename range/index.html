@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RANGE — ballistics &amp; gun-handling sandbox</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0d10; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e6e6e6; user-select: none; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: none; }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; font-size: 14px; }
+  .panel { position: absolute; background: rgba(10, 12, 16, 0.55); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; padding: 8px 12px; backdrop-filter: blur(2px); }
+  .hidden { display: none !important; }
+  .ammo { right: 18px; bottom: 18px; min-width: 250px; text-align: right; }
+  .ammo .wname { font-size: 13px; letter-spacing: 0.06em; color: #b9c2cc; text-transform: uppercase; }
+  .ammo .rounds { font-size: 34px; font-weight: 300; line-height: 1.1; }
+  .ammo .rounds .ch { font-size: 15px; color: #9aa; margin-left: 4px; }
+  .ammo .sub { color: #c8cfd6; font-size: 13px; } .ammo .sub.small { font-size: 11px; color: #8d959c; }
+  .topline { left: 50%; top: 14px; transform: translateX(-50%); display: flex; gap: 18px; font-size: 13px; color: #d7dde3; white-space: nowrap; }
+  .topline .lrf { color: #ff5a3c; font-weight: 600; } .topline .hold { color: #ffd166; } .topline .arrow { display: inline-block; margin-left: 6px; color: #7fd1ff; }
+  .topline .atm { color: #8d959c; }
+  .report { left: 18px; bottom: 18px; max-width: 460px; font-size: 13px; color: #d0d6dc; line-height: 1.5; }
+  .report .title { color: #ffd166; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; } .report .small { font-size: 11px; color: #9aa3ab; }
+  .calc { right: 18px; top: 14px; width: 560px; font-size: 12px; color: #d8dde3; max-height: 80vh; overflow: hidden; }
+  .calc h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #ffd166; margin-bottom: 4px; }
+  .calc .small { font-size: 11px; color: #a4acb4; line-height: 1.45; margin-bottom: 6px; }
+  .calc table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; } .calc th, .calc td { text-align: right; padding: 2px 5px; border-bottom: 1px solid rgba(255,255,255,0.06); } .calc th { color: #9fb3c8; font-weight: 500; }
+  .msgs { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; }
+  .msg { background: rgba(0,0,0,0.5); padding: 6px 14px; border-radius: 3px; margin-top: 6px; font-size: 14px; transition: opacity .6s; } .msg.fade { opacity: 0; }
+  .crosshair { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: rgba(255,255,255,0.75); box-shadow: 0 0 2px #000; display: none; }
+  .slowmo { position: absolute; left: 50%; top: 60px; transform: translateX(-50%); font-size: 12px; letter-spacing: 0.4em; color: #7fd1ff; }
+  .help { left: 50%; top: 50%; transform: translate(-50%, -50%); width: 720px; font-size: 13px; line-height: 1.7; color: #d8dde3; }
+  .help h3 { color: #ffd166; margin-bottom: 8px; } .help .cols { display: flex; gap: 30px; } .help b { color: #fff; display: inline-block; min-width: 0; }
+  #menu { position: fixed; inset: 0; z-index: 100; background: rgba(6, 8, 11, 0.78); display: flex; align-items: center; justify-content: center; }
+  #menu .box { width: min(760px, 94vw); max-height: 92vh; overflow: auto; background: #12161c; border: 1px solid #2b333d; border-radius: 6px; padding: 26px 30px; }
+  #menu h1 { font-size: 30px; font-weight: 300; letter-spacing: 0.25em; } #menu h1 span { color: #ffd166; }
+  #menu .tag { color: #93a0ad; margin: 4px 0 16px; font-size: 13px; }
+  #menu button { font: inherit; font-size: 15px; letter-spacing: 0.1em; padding: 10px 26px; margin: 8px 8px 16px 0; background: #ffd166; color: #111; border: 0; border-radius: 3px; cursor: pointer; }
+  #menu button.secondary { background: #2b333d; color: #e6e6e6; }
+  #settings { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; font-size: 12px; color: #c5ccd3; }
+  #settings label { display: block; } #settings .val { float: right; color: #ffd166; font-variant-numeric: tabular-nums; }
+  #settings input[type=range] { width: 100%; accent-color: #ffd166; }
+  #settings .toggles { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 6px; } #settings .tog input { accent-color: #ffd166; margin-right: 4px; }
+  #menu .foot { margin-top: 14px; font-size: 11px; color: #6d7882; line-height: 1.6; }
+  #loading { color: #ffd166; font-size: 13px; letter-spacing: 0.2em; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "../vendor/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"></div>
+<div id="menu">
+  <div class="box">
+    <h1>RANGE <span>·</span> KD 600</h1>
+    <div class="tag">Exterior &amp; terminal ballistics sandbox · M4 carbine · G17 pistol · R700 precision rifle · point-mass G1/G7 trajectories, wind, Coriolis, spin drift, penetration &amp; ricochet · physically simulated recoil and action cycling</div>
+    <button id="btn-resume">▶ SHOOT</button><button class="secondary" id="btn-reset">RESET TARGETS</button>
+    <span id="loading">LOADING…</span>
+    <div id="settings"></div>
+    <div class="foot">Mouse: look · LMB fire · RMB aim · R reload · X charge/cycle · V safety · B ammo · F inspect · Z press check · Q/E lean · Shift breathe/sprint · [ ] ; ' turrets · N rangefinder · H ballistic computer · T slow motion · L traces · P ear pro · K reset · F1 help · Esc menu<br>All geometry, textures and sounds are generated procedurally at load. No assets are downloaded.</div>
+  </div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

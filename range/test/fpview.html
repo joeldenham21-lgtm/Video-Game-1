@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>first-person viewer</title>
+<style>html,body{margin:0;background:#3a3f46;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{ "imports": { "three": "../../vendor/three.module.js" } }</script>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from '../vendor/addons/environments/RoomEnvironment.js';
+import { buildAR15 } from '../src/weapons/ar15.js';
+import { buildPistol } from '../src/weapons/pistol.js';
+import { buildBoltRifle } from '../src/weapons/bolt.js';
+import { buildHand } from '../src/hands.js';
+import { ViewModel } from '../src/viewmodel.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x8fa3b8);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const sun = new THREE.DirectionalLight(0xfff2e0, 2.0); sun.position.set(2, 4, 1); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 0.1; sun.shadow.camera.far = 20; sun.shadow.camera.left = sun.shadow.camera.bottom = -3; sun.shadow.camera.right = sun.shadow.camera.top = 3; sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.003;
+scene.add(sun, new THREE.HemisphereLight(0xdde6f0, 0x4a4438, 0.7));
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x6b6f72, roughness: 0.95 }));
+floor.rotation.x = -Math.PI / 2; floor.position.y = -1.6; floor.receiveShadow = true; scene.add(floor);
+// a target board 25 m out for aiming reference
+const board = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.02), new THREE.MeshStandardMaterial({ color: 0xd8c8a0 })); board.position.set(0, 0, -25); scene.add(board);
+const bull = new THREE.Mesh(new THREE.CircleGeometry(0.1, 32), new THREE.MeshStandardMaterial({ color: 0x111111 })); bull.position.set(0, 0, -24.98); scene.add(bull);
+for (let i = 0; i < 12; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.5, 0.3), new THREE.MeshStandardMaterial({ color: 0x777777 })); p.position.set(-6 + i * 1.1, -0.35, -8 - i * 0.7); scene.add(p); }
+
+const camera = new THREE.PerspectiveCamera(parseFloat(new URLSearchParams(location.search).get('fov') || '60'), innerWidth / innerHeight, 0.01, 200);
+camera.position.set(0, 0, 0); scene.add(camera);
+const weapons = { ar15: buildAR15(), pistol: buildPistol(), bolt: buildBoltRifle() };
+for (const w of Object.values(weapons)) { const ret = w.parts.reticle?.obj || w.parts.scope?.ocular; if (ret) ret.material = new THREE.MeshStandardMaterial({ color: 0x0a2030, roughness: 0.05, metalness: 0.3 }); }
+const hands = { right: buildHand('right'), left: buildHand('left') };
+const log = [];
+const vm = new ViewModel({ camera, weapons, hands, hooks: { sound: (n) => log.push('snd:' + n), onShot: (i) => log.push('shot'), onEject: (i) => log.push('eject'), onDropMag: () => log.push('dropMag'), onDryFire: () => log.push('dry') } });
+const q = new URLSearchParams(location.search);
+vm.equip(q.get('w') || 'ar15', true);
+if (q.get('nosleeve')) for (const h of Object.values(hands)) h.group.traverse(o => { if (o.name === 'sleeve') o.visible = false; });
+const input = { ads: false, sprint: false, moveSpeed: 0, lookDelta: { yaw: 0, pitch: 0 }, breathHold: false, crouch: false, lean: 0, blocked: 0 };
+window.vm = vm; window.input = input; window.log = log;
+window.step = (sec, dt = 1 / 120) => { let n = Math.round(sec / dt); while (n-- > 0) vm.update(dt, input); };
+window.render = () => { camera.rotation.set(vm.viewKick.pitch, vm.viewKick.yaw, vm.viewKick.roll); renderer.render(scene, camera); return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; };
+window.ready = true;
+</script></body></html>
