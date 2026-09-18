@@ -100,7 +100,7 @@ async function init() {
   const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: lowq ? 0 : 4 }));
   const worldPass = new RenderPass(scene, camera); worldPass.clear = true;
   const viewPass = new RenderPass(viewScene, viewCam); viewPass.clear = false; viewPass.clearDepth = true;
-  const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.22, 0.5, 1.05);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.14, 0.45, 1.35);
   const output = new OutputPass();
   composer.addPass(worldPass); composer.addPass(viewPass); composer.addPass(bloom); composer.addPass(output);
   bloom.enabled = settings.postfx;
