@@ -6,3 +6,9 @@ package.json
 !ringfall/package.json
 !ringfall/package-lock.json
 ringfall/test/shots/
+
+# RINGFALL score toolchain: downloaded CC0 sample libraries and render scratch
+ringfall/tools/score/samples
+ringfall/tools/score/cache/
+ringfall/tools/score/out/
+ringfall/tools/score/probe/

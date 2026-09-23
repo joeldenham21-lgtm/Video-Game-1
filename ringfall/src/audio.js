@@ -1,8 +1,11 @@
+import SCORE from '../music/manifest.json';
+
 // ============================================================================
 // RINGFALL — audio.js
-// Procedural audio engine: synthesized SFX + generative adaptive music.
-// No audio files — everything is built from oscillators, shared noise buffers
-// and filters with the Web Audio API. No imports; nothing runs at import time.
+// Audio engine: synthesized SFX, a recorded orchestral score (pre-rendered
+// adaptive stems in ../music, built from CC0 orchestral samples) and a
+// generative procedural score used as the fallback when the files can't load.
+// Nothing runs at import time; music.prefetch() starts downloading the score.
 //
 //   import { audio } from './audio.js';
 //   audio.init()                  // from a user gesture (idempotent, also resumes)
@@ -2078,7 +2081,9 @@ function init() {
       S.ready = true;
       applyVolumes(true);
       applyFx(true);
-      if (M.want) { const w = M.want; M.want = null; musicPlay(w); }
+      recAttach();
+      if (R.want) { const w = R.want; R.want = null; musicPlay(w); }
+      else if (M.want) { const w = M.want; M.want = null; musicPlay(w); }
       if (M.overdrive || M.lowHealth) kickSeq();
     }
     resumeCtx();
@@ -2416,6 +2421,16 @@ function tick() {
 }
 
 function musicPlay(name) {
+  if (recPlay(name)) {
+    // recorded score took it: retire any procedural track still sounding
+    if (S.ready && M.cur && !M.cur.dead) { try { M.cur.fadeOut(S.ctx.currentTime, 1.2); } catch (e) { /* ignore */ } M.cur = null; }
+    M.want = null;
+    return;
+  }
+  procPlay(name);
+}
+
+function procPlay(name) {
   try {
     if (!STYLES[name]) { warnOnce('music:' + name); return; }
     if (!S.ready) { M.want = name; return; }
@@ -2443,6 +2458,7 @@ function musicPlay(name) {
 }
 
 function musicStop(fade) {
+  try { if (S.ready) recStop(finite(fade, 1.5)); else R.want = null; } catch (e) { /* ignore */ }
   try {
     M.want = null;
     if (!S.ready || !M.cur) return;
@@ -2455,6 +2471,7 @@ function setOverdrive(on) {
   try {
     on = !!on;
     if (on === M.overdrive) return;
+    recOverdrive(on);
     M.overdrive = on;
     if (!S.ready) return;
     const now = S.ctx.currentTime;
@@ -2476,6 +2493,7 @@ function setLowHealth(on) {
 }
 
 function stinger(name) {
+  try { if (recStinger(name)) return; } catch (e) { /* fall through */ }
   try {
     if (!S.ready) return;
     const fn = STINGERS[name];
@@ -2502,6 +2520,206 @@ function spawnStinger(G, fn, t, key) {
   fn(v, key);
   if (v.srcs === 0) vFree(v);
   return v;
+}
+
+
+/* ---------------------------- recorded score ------------------------------- */
+// Orchestral stems rendered offline (see music/manifest.json). Every file opens with a
+// sync click at SCORE.markAt, so loop points are found sample-exactly whatever delay the
+// browser's MP3 decoder adds. Layers per track: bed (always), pulse, drive (by intensity).
+// Only the current and the next prepared track stay decoded (phones have little memory).
+
+const REC_TRIM = 0.46;                       // stems are mastered at about -17 LUFS; the mix wants them lower
+const REC_STING_GAIN = { waveStart: 0.55, sectorClear: 0.8, bossDefeated: 0.9, death: 0.85, augment: 0.75 };
+const R = {
+  ok: !!(SCORE && SCORE.tracks), failed: false,
+  bytes: new Map(), bufs: new Map(),
+  cur: null, live: [], want: null, prepared: null,
+  bus: null, duck: null, od: false, ix: 0, applied: 0,
+};
+const recFiles = (name) => Object.values((SCORE.tracks[name] || {}).stems || {});
+const recUrl = (f) => 'music/' + f;
+
+function recFetch(file) {
+  if (R.bytes.has(file)) return R.bytes.get(file);
+  const p = fetch(recUrl(file)).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    .then((ab) => { R.bytes.set(file, ab); return ab; })
+    .catch((e) => { R.bytes.delete(file); throw e; });
+  R.bytes.set(file, p);
+  return p;
+}
+
+function recDecode(file) {
+  const have = R.bufs.get(file);
+  if (have) return have instanceof Promise ? have : Promise.resolve(have);
+  const p = Promise.resolve(R.bytes.get(file) || recFetch(file)).then((ab) => new Promise((res, rej) => {
+    const copy = ab.slice(0);                  // decodeAudioData detaches its input; keep the bytes cached
+    const q = S.ctx.decodeAudioData(copy, res, rej);
+    if (q && q.then) q.then(res, rej);
+  })).then((buf) => {
+    // find the sync click: the loudest sample in the leading silence
+    const d = buf.getChannelData(0), n = Math.min(d.length, Math.floor(buf.sampleRate * (SCORE.mark + 0.2)));
+    let pk = 0, at = 0;
+    for (let i = 0; i < n; i++) { const a = d[i] < 0 ? -d[i] : d[i]; if (a > pk) { pk = a; at = i; } }
+    buf._t0 = at / buf.sampleRate - SCORE.markAt + SCORE.mark;   // time of the first real sample
+    R.bufs.set(file, buf);
+    return buf;
+  });
+  R.bufs.set(file, p);
+  p.catch(() => R.bufs.delete(file));
+  return p;
+}
+
+function recPrepare(name) {
+  if (!R.ok || R.failed || !S.ready || !SCORE.tracks[name]) return Promise.reject(new Error('n/a'));
+  return Promise.all(recFiles(name).map(recDecode));
+}
+
+// keep decoded: the playing track, the one being prepared, the stingers
+function recTrim() {
+  const keep = new Set([...(R.cur ? recFiles(R.cur.name) : []), ...(R.prepared ? recFiles(R.prepared) : []), ...(R.want ? recFiles(R.want) : []), ...Object.values(SCORE.stingers || {})]);
+  for (const f of [...R.bufs.keys()]) if (!keep.has(f) && !(R.bufs.get(f) instanceof Promise)) R.bufs.delete(f);
+}
+
+const recSmooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+function layerLevel(role, x) {
+  if (role === 'pulse') return recSmooth(0.2, 0.5, x);
+  if (role === 'drive') return recSmooth(0.58, 0.86, x);
+  return 1;
+}
+
+function recStart(name) {
+  const def = SCORE.tracks[name], G = S.G, ctx = S.ctx;
+  const now = ctx.currentTime, when = now + 0.06;
+  const prev = R.cur;
+  const out = G.gain(0, R.duck);
+  const inst = { name, out, stems: [], fading: false };
+  const rate = R.od ? Math.pow(2, -90 / 1200) : 1;
+  for (const [role, file] of Object.entries(def.stems)) {
+    const buf = R.bufs.get(file);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = G.gain(layerLevel(role, R.ix), out);
+    src.connect(g);
+    src.playbackRate.value = rate;
+    const ls = buf._t0 + (def.loop ? SCORE.pre : 0);
+    if (def.loop) { src.loop = true; src.loopStart = ls; src.loopEnd = ls + def.len; }
+    src.start(when, ls);
+    inst.stems.push({ role, src, g, lvl: g.gain.value });
+  }
+  const fadeIn = prev ? 1.6 : 1.0;
+  out.gain.setValueAtTime(0, now);
+  out.gain.linearRampToValueAtTime(1, when + fadeIn);
+  if (prev) recFade(prev, prev.name === 'menu' ? 1.2 : 2.2);
+  R.cur = inst;
+  R.live.push(inst);
+  R.applied = R.ix;
+  recTrim();
+}
+
+function recFade(inst, dur) {
+  if (!inst || inst.fading) return;
+  inst.fading = true;
+  const now = S.ctx.currentTime;
+  inst.out.gain.cancelScheduledValues(now);
+  inst.out.gain.setValueAtTime(inst.out.gain.value, now);
+  inst.out.gain.linearRampToValueAtTime(0, now + dur);
+  for (const st of inst.stems) { try { st.src.stop(now + dur + 0.1); } catch (e) { /* stopped */ } }
+  setTimeout(() => {
+    for (const st of inst.stems) { try { st.src.disconnect(); st.g.disconnect(); } catch (e) { /* gone */ } }
+    try { inst.out.disconnect(); } catch (e) { /* gone */ }
+    R.live = R.live.filter((x) => x !== inst);
+  }, (dur + 0.4) * 1000);
+  if (R.cur === inst) R.cur = null;
+}
+
+// returns true when the recorded score handles the request
+function recPlay(name) {
+  if (!R.ok || R.failed || !SCORE.tracks[name]) return false;
+  R.want = name;
+  if (!S.ready) return true;
+  if (R.cur && R.cur.name === name && !R.cur.fading) return true;
+  recPrepare(name).then(() => {
+    if (R.want !== name || (R.cur && R.cur.name === name)) return;
+    recStart(name);
+  }).catch(() => {
+    // files unavailable (offline / file://): hand this and every later request to the procedural score
+    R.failed = true;
+    if (R.want === name) procPlay(name);
+  });
+  return true;
+}
+
+function recIntensity(x) {
+  R.ix = x;
+  if (!R.cur || !S.ready) return;
+  if (Math.abs(x - R.applied) < 0.015) return;   // setIntensity arrives every frame: only move on real change
+  R.applied = x;
+  const now = S.ctx.currentTime;
+  for (const st of R.cur.stems) {
+    const t = layerLevel(st.role, x);
+    if (Math.abs(t - st.lvl) < 0.01) continue;
+    const up = t > st.lvl;
+    st.lvl = t;
+    st.g.gain.cancelScheduledValues(now);
+    st.g.gain.setTargetAtTime(t, now, up ? 0.6 : 1.5);
+  }
+}
+
+function recOverdrive(on) {
+  R.od = on;
+  if (!S.ready) return;
+  const now = S.ctx.currentTime, rate = on ? Math.pow(2, -90 / 1200) : 1;
+  for (const inst of R.live) for (const st of inst.stems) { st.src.playbackRate.cancelScheduledValues(now); st.src.playbackRate.setTargetAtTime(rate, now, 0.25); }
+}
+
+function recStinger(name) {
+  if (!R.ok || R.failed) return false;
+  const ctxName = R.cur ? R.cur.name : R.want;
+  const file = [`${name}_${ctxName}`, name, `${name}_combat`].map((k) => SCORE.stingers[k]).find(Boolean);
+  if (!file) return false;
+  if (!S.ready) return true;
+  recDecode(file).then((buf) => {
+    if (S.ctx.state !== 'running' || S.userPaused) return;
+    const now = S.ctx.currentTime;
+    const src = S.ctx.createBufferSource();
+    src.buffer = buf;
+    const g = S.G.gain(REC_STING_GAIN[name] ?? 0.8, R.bus);
+    src.connect(g);
+    src.onended = () => { try { src.disconnect(); g.disconnect(); } catch (e) { /* gone */ } };
+    src.start(now + 0.02, buf._t0);
+    if (name === 'death') { recFade(R.cur, 1.8); R.want = null; return; }
+    // dip the score under the cue
+    const d = R.duck.gain;
+    d.cancelScheduledValues(now);
+    d.setTargetAtTime(name === 'waveStart' ? 0.7 : 0.5, now, 0.08);
+    d.setTargetAtTime(1, now + Math.min(3, buf.duration * 0.55), 0.6);
+  }).catch(() => {});
+  return true;
+}
+
+function recStop(fade) {
+  R.want = null;
+  if (R.cur) recFade(R.cur, Math.max(0.05, fade));
+}
+
+function recAttach() {
+  if (!R.ok || R.bus) return;
+  R.bus = S.G.gain(REC_TRIM, S.G.musicVol);
+  R.duck = S.G.gain(1, R.bus);
+  // stingers are tiny: decode them all up front
+  for (const f of Object.values(SCORE.stingers || {})) recDecode(f).catch(() => {});
+}
+
+// download order: what's heard first, first
+function recPrefetch(names) {
+  if (!R.ok || R.failed || typeof fetch !== 'function') return;
+  const list = names || ['menu', 'combat', 'boss', 'combat2', 'final', 'victory'];
+  let chain = Promise.resolve();
+  const sting = Object.values(SCORE.stingers || {});
+  list.forEach((n, i) => {
+    chain = chain.then(() => Promise.all(recFiles(n).map(recFetch))).then(() => (i === 0 ? Promise.all(sting.map(recFetch)) : null)).catch(() => {});
+  });
 }
 
 /* ---------------------------- pause / resume ------------------------------- */
@@ -2730,11 +2948,15 @@ export const audio = {
     play(track) { musicPlay(track); },
     stop(fade = 1.5) { musicStop(fade); },
     setIntensity(x) {
-      try { M.intensity = clamp(finite(x, M.intensity), 0, 1); if (M.tracks.length) kickSeq(); } catch (e) { /* ignore */ }
+      try { M.intensity = clamp(finite(x, M.intensity), 0, 1); recIntensity(M.intensity); if (M.tracks.length) kickSeq(); } catch (e) { /* ignore */ }
     },
     setOverdrive(on) { setOverdrive(on); },
     setLowHealth(on) { setLowHealth(on); },
     stinger(name) { stinger(name); },
+    prefetch(names) { try { recPrefetch(names); } catch (e) { /* ignore */ } },
+    prepare(name) { try { if (S.ready && R.ok && !R.failed && SCORE.tracks[name]) { R.prepared = name; recPrepare(name).then(recTrim, () => {}); } } catch (e) { /* ignore */ } },
+    get recorded() { return R.ok && !R.failed; },
+    get track() { return R.cur ? R.cur.name : (M.cur && !M.cur.dead ? M.cur.name : null); },
     get bpm() {
       try {
         if (M.cur && !M.cur.dead) return M.cur.bpm;

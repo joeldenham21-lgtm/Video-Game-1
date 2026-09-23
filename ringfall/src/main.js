@@ -100,11 +100,13 @@ async function boot() {
       unlocked = true;
     }
     audio.init();
-    if (G.mode === 'title') audio.music.play('menu');
+    if (G.mode === 'title') { audio.music.play('menu'); audio.music.prepare?.('combat'); }
     // high-altitude wind bed under everything
     if (!G._wind && audio.ready) G._wind = audio.loop('wind', { volume: 0.7, persistent: true });
   };
   for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) window.addEventListener(ev, unlock, { passive: true });
+  // start downloading the orchestral score now (title piece first); decoding waits for the first tap
+  audio.music.prefetch?.();
   // no pinch-zoom or double-tap zoom mid-fight (iOS ignores user-scalable)
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   document.addEventListener('dblclick', (e) => e.preventDefault());
@@ -169,6 +171,7 @@ function enterTitle() {
     titleDisplay.push(e);
   }
   G.audio.music.play('menu');
+  G.audio.music.prepare?.('combat');
   G.menus.showTitle();
 }
 

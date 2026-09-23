@@ -1,0 +1,80 @@
+{
+ "v": 1790199118665,
+ "mark": 0.25,
+ "markAt": 0.05,
+ "pre": 0.3,
+ "tracks": {
+  "menu": {
+   "len": 141.1764705882353,
+   "loop": true,
+   "bpm": 68,
+   "stems": {
+    "main": "menu.mp3"
+   }
+  },
+  "combat": {
+   "len": 75,
+   "loop": true,
+   "bpm": 128,
+   "stems": {
+    "bed": "combat_bed.mp3",
+    "pulse": "combat_pulse.mp3",
+    "drive": "combat_drive.mp3"
+   }
+  },
+  "combat2": {
+   "len": 73.04347826086956,
+   "loop": true,
+   "bpm": 138,
+   "stems": {
+    "bed": "combat2_bed.mp3",
+    "pulse": "combat2_pulse.mp3",
+    "drive": "combat2_drive.mp3"
+   }
+  },
+  "boss": {
+   "len": 66.66666666666667,
+   "loop": true,
+   "bpm": 144,
+   "stems": {
+    "bed": "boss_bed.mp3",
+    "pulse": "boss_pulse.mp3",
+    "drive": "boss_drive.mp3"
+   }
+  },
+  "final": {
+   "len": 96,
+   "loop": true,
+   "bpm": 80,
+   "stems": {
+    "bed": "final_bed.mp3",
+    "pulse": "final_pulse.mp3",
+    "drive": "final_drive.mp3"
+   }
+  },
+  "victory": {
+   "len": 80,
+   "loop": true,
+   "bpm": 72,
+   "stems": {
+    "main": "victory.mp3"
+   }
+  }
+ },
+ "stingers": {
+  "waveStart_combat": "waveStart_combat.mp3",
+  "waveStart_combat2": "waveStart_combat2.mp3",
+  "waveStart_boss": "waveStart_boss.mp3",
+  "waveStart_final": "waveStart_final.mp3",
+  "sectorClear_combat": "sectorClear_combat.mp3",
+  "sectorClear_combat2": "sectorClear_combat2.mp3",
+  "bossDefeated_boss": "bossDefeated_boss.mp3",
+  "bossDefeated_final": "bossDefeated_final.mp3",
+  "death": "death.mp3",
+  "augment_combat": "augment_combat.mp3",
+  "augment_combat2": "augment_combat2.mp3",
+  "augment_boss": "augment_boss.mp3",
+  "augment_final": "augment_final.mp3"
+ },
+ "credit": "Orchestral samples: VS Chamber Orchestra 2 Community Edition and Versilian Community Sample Library (Versilian Studios, CC0)."
+}

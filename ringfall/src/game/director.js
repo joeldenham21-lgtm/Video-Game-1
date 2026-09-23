@@ -85,6 +85,16 @@ function endlessFloor(n) {
   return { layout: pick(layouts), title: `ENDLESS · DEPTH ${level}`, sector: 3, elites: Math.min(0.6, 0.3 + level * 0.03), waves };
 }
 
+// which piece of the score a floor uses
+function musicFor(def, n) {
+  if (!def) return 'combat';
+  if (def.boss === 'heart') return 'final';
+  if (def.boss) return 'boss';
+  if (def.sector === 2) return 'combat2';
+  if (def.sector === 3) return n % 2 ? 'combat2' : 'combat';
+  return 'combat';
+}
+
 export function createDirector() {
   const queue = [];
   const D = {
@@ -147,8 +157,10 @@ export function createDirector() {
       G.renderer.post.uFade.value = 1;
       G.renderer.post.uFadeColor.value.set(0xffffff);
       G.hud?.floorCard(n, def);
-      G.audio?.music.play(def.boss ? 'boss' : n >= FLOORS.length ? 'final' : 'combat');
+      G.audio?.music.play(musicFor(def, n));
       G.audio?.music.setIntensity(0.15);
+      // decode the next floor's score while this one plays
+      G.audio?.music.prepare?.(musicFor(n < FLOORS.length ? FLOORS[n] : { sector: 3, boss: (n + 1) % 5 === 0 ? ((n + 1) % 10 === 0 ? 'heart' : 'conductor') : null }, n + 1));
       if (def.story) G.story.say(def.story, { delay: 1.2 });
       if (D.pendingTip) {
         const tip = D.pendingTip;

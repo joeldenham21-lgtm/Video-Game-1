@@ -52,12 +52,26 @@ Quality is picked from the GPU on first run: RTX/Radeon-class laptops and deskto
 
 ## Audio
 
-Everything is synthesised live with Web Audio; there are no samples.
+**Music:** an orchestral score played by real instruments. Every note comes from recordings of real players: string sections, horns, trumpets, trombones, tuba, woodwinds, harp, a Steinway grand, pipe organ, timpani and orchestral percussion. The recordings are the CC0 [VS Chamber Orchestra 2 Community Edition](https://github.com/sgossner/VSCO-2-CE) and [Versilian Community Sample Library](https://github.com/sgossner/VCSL).
 
-- **Sound effects:** built from noise bursts, body resonances, mechanical clicks and a room tail, so they sound physical rather than "synth". Repeats get small random variations in pitch and filtering.
-- **Music:** evolving pads, sub pulses and sparse percussion that thicken with combat intensity. Bosses get taiko-style drums and choir pads.
-- **Mix:** a limiter and a gentle high-shelf keep sustained fire from getting harsh.
-- **Loop safety:** loops are capped per sound and stop themselves if the game stops updating them.
+The pieces are written out note by note and rendered offline (see `tools/score/`):
+
+| Piece | Where | Key / tempo | Writing |
+|---|---|---|---|
+| Halcyon | title | D minor, 68 | Cello theme under a violin halo, then the horn with a violin descant |
+| Aperture | sector 1 | E minor, 128 | Spiccato ostinato; the horns turn the title motif into a battle theme |
+| Choir Nave | sector 2 | C♯ minor, 6/8 | Pipe organ, a horn chant over a trombone chorale, Phrygian darkening |
+| The Conductor | first boss | G minor, 144 | 16th-note violin engine, horn and trumpet fanfare |
+| Heart of the Choir | final boss | D minor, 80 | Organ and full orchestra; timpani heartbeat; the title theme returns |
+| Halcyon, Restored | victory | D major, 72 | The theme in major, then a bittersweet G → Gm → D ending |
+
+- **Adaptive layers:** each combat and boss piece is three stems (bed, pulse, drive) that fade in and out with the fight's intensity.
+- **Stingers:** in the key of whatever is playing, for wave starts, sector clears, boss defeats, augment picks and death.
+- **Loops:** sample-accurate. Each file carries a sync click that absorbs the MP3 decoder's delay.
+- **Loading:** files are downloaded in the order they're heard. Only the current and next pieces stay decoded, which saves memory on phones.
+- **Fallback:** if the files can't load (for example when the page is opened from disk), a procedural score takes over.
+
+**Sound effects:** synthesised live with Web Audio. They are built from noise bursts, body resonances, mechanical clicks and a room tail. A limiter and a gentle high-shelf keep sustained fire from getting harsh. Loops are capped per sound and stop themselves if the game stops updating them.
 
 ## Building
 
@@ -78,7 +92,9 @@ src/game/              player, weapons + viewmodels, enemies + models, bosses, p
                        augments, style meter, director (floors/waves), story, settings
 src/fx/                instanced particles, beams, point-light pool, decals, debris
 src/ui/                HUD, menus, styles
-src/audio.js           procedural Web Audio SFX + adaptive generative music
+src/audio.js           Web Audio engine: synthesised SFX, recorded-score player (adaptive stems), procedural fallback score
+music/                 rendered score (MP3 stems + stingers) and its manifest
+tools/score/           the score: note-by-note compositions, sampler/reverb renderer, analysis tools
 test/                  headless screenshot + bot playtest scripts (Playwright)
 ```
 
@@ -86,4 +102,4 @@ Tests: `node test/playtest.mjs --god --seconds=120` has a bot play the game head
 
 ## Credits
 
-Code, art and sound: procedural, written for this project. Rendering: [three.js](https://threejs.org) r160 (MIT), bundled. UI type: Chakra Petch and Share Tech Mono (Google Fonts, SIL OFL), with system fallbacks offline.
+Code, art, sound effects and score: written for this project. Orchestral samples: VS Chamber Orchestra 2 CE and Versilian Community Sample Library by Versilian Studios (CC0). Rendering: [three.js](https://threejs.org) r160 (MIT), bundled. UI type: Chakra Petch and Share Tech Mono (Google Fonts, SIL OFL), with system fallbacks offline.

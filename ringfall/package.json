@@ -3,14 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "RINGFALL — a first-person roguelite arena shooter for phone and laptop browsers",
+  "description": "RINGFALL \u2014 a first-person roguelite arena shooter for phone and laptop browsers",
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs --dev --serve",
-    "test": "node test/playtest.mjs"
+    "test": "node test/playtest.mjs",
+    "score:samples": "sh tools/score/fetch-samples.sh",
+    "score": "node tools/score/render.mjs menu combat combat2 boss final victory stingers && node tools/score/export.mjs"
   },
   "devDependencies": {
     "esbuild": "0.24.0",
-    "three": "0.160.0"
+    "three": "0.160.0",
+    "@breezystack/lamejs": "1.2.7"
   }
 }
