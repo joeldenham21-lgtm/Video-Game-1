@@ -358,4 +358,18 @@ function setupDebug() {
   };
 }
 
-boot().catch(e => { console.error(e); bootError(String(e && e.message || e)); });
+// When the hosted page is updated while someone is mid-run, carry the run across the reload.
+const hot = window.claude?.hot;
+try {
+  hot?.snapshot?.(() => (G.run && G.mode !== 'title' && G.mode !== 'dead' && G.mode !== 'victory') ? {
+    resume: {
+      difficulty: G.run.difficulty, floor: G.run.floor, weapons: G.weapons.owned.slice(), augments: G.augments.list.slice(),
+      score: G.style.score, seen: [...G.run.seen],
+    },
+  } : {});
+} catch { /* hosting API unavailable */ }
+const launch = (data) => {
+  if (data && data.resume && data.resume.floor) G.hotResume = data.resume;
+  boot().catch(e => { console.error(e); bootError(String(e && e.message || e)); });
+};
+if (hot?.ready) hot.ready(launch); else launch(hot?.data ?? {});

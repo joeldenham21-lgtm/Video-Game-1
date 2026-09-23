@@ -203,7 +203,9 @@ export function createHud(root) {
     tip(key, dur = 6) {
       const t = TIPS[key];
       if (!t) return;
-      tipEl.innerHTML = t[G.input.source] || t.kbm;
+      let html = t[G.input.source] || t.kbm;
+      if (G.input.source === 'touch' && G.settings.leftHanded) html = html.replace('Left thumb moves · right thumb aims', 'Right thumb moves · left thumb aims');
+      tipEl.innerHTML = html;
       tipEl.classList.add('on');
       tipT = dur;
     },

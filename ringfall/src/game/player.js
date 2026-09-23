@@ -160,8 +160,9 @@ export function createPlayer() {
           G.events.emit('overdrive', false);
         }
       } else if (input.pressed('overdrive') && p.od >= 100) {
-        p.odActive = p.odDuration + (G.augments?.mods.odDuration ?? 0);
-        p.odDuration = p.odActive;
+        const dur = 7 + (G.augments?.mods.odDuration ?? 0);
+        p.odActive = dur;
+        p.odDuration = dur;
         G.audio?.play('overdriveStart');
         G.audio?.music.setOverdrive(true);
         G.renderer.post.uFlash.value = 0.5;

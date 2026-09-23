@@ -277,8 +277,15 @@ export function createInput(canvas, touchRoot) {
   }
 
   function vibrate(ms) {
-    if (!G.settings?.haptics || state.source !== 'touch') return;
-    try { navigator.vibrate && navigator.vibrate(ms); } catch { /* ignore */ }
+    if (!G.settings?.haptics) return;
+    try {
+      if (state.source === 'touch') navigator.vibrate && navigator.vibrate(ms);
+      else if (state.source === 'pad') {
+        const gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find(p => p && p.connected);
+        const k = Math.min(1, ms / 40);
+        gp?.vibrationActuator?.playEffect?.('dual-rumble', { duration: ms * 2, strongMagnitude: k * 0.8, weakMagnitude: 0.3 + k * 0.5 })?.catch?.(() => {});
+      }
+    } catch { /* ignore */ }
   }
 
   // ---------------- per-frame ----------------

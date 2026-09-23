@@ -143,7 +143,7 @@ void main() {
 const QUALITY = {
   // maxPixels: internal render budget (megapixels); dpr: canvas pixel ratio cap
   low:    { maxPixels: 0.55, dpr: 1.25, msaa: 0, bloomLevels: 4, shadows: 0,    lights: 2, particles: 0.6 },
-  medium: { maxPixels: 1.0,  dpr: 1.75, msaa: 4, bloomLevels: 5, shadows: 1024, lights: 3, particles: 0.85 },
+  medium: { maxPixels: 1.0,  dpr: 1.75, msaa: 4, bloomLevels: 5, shadows: 1024, lights: 2, particles: 0.85 },
   high:   { maxPixels: 2.1,  dpr: 2.0,  msaa: 4, bloomLevels: 5, shadows: 2048, lights: 4, particles: 1 },
   ultra:  { maxPixels: 3.8,  dpr: 2.0,  msaa: 4, bloomLevels: 6, shadows: 2048, lights: 4, particles: 1 },
 };
@@ -182,7 +182,11 @@ export function createRenderer(canvas) {
     uFadeColor: { value: new THREE.Color(0, 0, 0) }, uFlashColor: { value: new THREE.Color(1, 1, 1) },
   });
 
-  const halfFloat = THREE.HalfFloatType;
+  // HDR targets need float colour-buffer support; very old mobile GPUs fall back to 8-bit (bloom threshold lowered)
+  const ext = gl.extensions;
+  const hdrOK = ext.has('EXT_color_buffer_float') || ext.has('EXT_color_buffer_half_float');
+  const halfFloat = hdrOK ? THREE.HalfFloatType : THREE.UnsignedByteType;
+  if (!hdrOK) { prefilterMat.uniforms.uThreshold.value = 0.82; prefilterMat.uniforms.uKnee.value = 0.3; }
   let sceneRT = null;
   let down = [], up = [];
   let q = QUALITY.high;
@@ -249,6 +253,8 @@ export function createRenderer(canvas) {
     q = QUALITY[qualityName];
     renderScale = 1;
     gl.shadowMap.enabled = q.shadows > 0;
+    // soft PCF only where there's GPU to spare
+    gl.shadowMap.type = q.shadows >= 2048 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     G.events.emit('quality', { name: qualityName, q });
     resize();
   }

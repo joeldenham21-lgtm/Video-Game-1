@@ -108,6 +108,7 @@ export function createMenus(root) {
         <div class="panel title-menu">
           <div class="kick">UNIT SEVEN · REACTIVATED</div>
           <button class="btn primary" id="t-play">DESCEND<small>Start a new run · 10 floors, 2 bosses</small><span class="arrow">▶</span></button>
+          ${G.hotResume ? `<button class="btn primary" id="t-hot">RESUME RUN<small>Floor ${G.hotResume.floor} · ${G.hotResume.difficulty.toUpperCase()} · the game updated mid-run</small></button>` : ''}
           ${cp ? `<button class="btn" id="t-cont">RESUME AT THE GARDEN<small>Floor 6 · ${cp.difficulty.toUpperCase()} · ${cp.augments.length} augments kept</small></button>` : ''}
           <div class="row2" style="margin-top:8px"><button class="btn" id="t-set">SETTINGS</button><button class="btn" id="t-ctl">CONTROLS</button></div>
           ${canFs ? '<button class="btn" id="t-fs">FULLSCREEN<small>Recommended on phones</small></button>' : ''}
@@ -118,6 +119,7 @@ export function createMenus(root) {
     layer.firstElementChild.style.background = 'linear-gradient(90deg, rgba(3,5,10,.82) 0%, rgba(3,5,10,.35) 55%, rgba(3,5,10,.6) 100%)';
     on('#t-play', () => showDifficulty());
     on('#t-cont', () => { start(cp.difficulty, true); });
+    on('#t-hot', () => { const h = G.hotResume; G.hotResume = null; start(h.difficulty, h); });
     on('#t-set', () => showSettings(showTitle));
     on('#t-ctl', () => showControls(showTitle));
     on('#t-fs', () => { requestFullscreen(); setTimeout(showTitle, 300); });

@@ -200,7 +200,18 @@ export const CSS = /* css */`
 #touch .stick-hint span::before { content: ''; display: block; width: calc(var(--stick) * .9); height: calc(var(--stick) * .9); border-radius: 50%; border: 1.5px dashed rgba(160,220,255,.3); margin: 0 auto 8px; }
 #touch .look-hint { right: 48%; bottom: calc(var(--u) * 40 + var(--safe-b)); }
 #touch .gone { opacity: 0; }
-#touch.lefty .tbtn:not(.btn-pause) { right: auto; }
+/* left-handed: mirror the button cluster to the left, stick to the right */
+#touch.lefty .tbtn { right: auto; }
+#touch.lefty .btn-fire { left: calc(var(--u) * 13 + var(--safe-l)); }
+#touch.lefty .btn-jump { left: calc(var(--u) * 3 + var(--safe-l)); }
+#touch.lefty .btn-dash { left: calc(var(--u) * 23 + var(--safe-l)); }
+#touch.lefty .btn-melee { left: calc(var(--u) * 35 + var(--safe-l)); }
+#touch.lefty .btn-reload { left: calc(var(--u) * 29 + var(--safe-l)); }
+#touch.lefty .btn-swap { left: calc(var(--u) * 5 + var(--safe-l)); }
+#touch.lefty .btn-overdrive { left: calc(var(--u) * 45 + var(--safe-l)); }
+#touch.lefty .btn-pause { left: auto; right: calc(12px + var(--safe-r)); }
+#touch.lefty .stick-hint { left: auto; right: calc(var(--u) * 14 + var(--safe-r)); }
+#touch.lefty .look-hint { right: auto; left: 48%; }
 
 /* ---------------- menus ---------------- */
 .menu { position: absolute; inset: 0; pointer-events: auto; display: flex; align-items: center; justify-content: center; padding: max(16px, var(--safe-t)) max(16px, var(--safe-r)) max(16px, var(--safe-b)) max(16px, var(--safe-l)); overflow-y: auto; }

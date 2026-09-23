@@ -114,13 +114,14 @@ export function createDirector() {
       G.style.reset();
       G.story.reset();
       if (opts.checkpoint) {
-        const cp = G.meta.checkpoint;
+        // true = the saved Garden checkpoint; an object = an explicit snapshot (e.g. restored after an update)
+        const cp = opts.checkpoint === true ? G.meta.checkpoint : opts.checkpoint;
         G.run.floor = cp.floor;
         for (const w of cp.weapons) if (!G.weapons.owned.includes(w)) G.weapons.owned.push(w);
         G.augments.restore(cp.augments);
         G.style.score = cp.score || 0;
         G.run.seen = new Set(cp.seen || []);
-        G.story.say('checkpoint');
+        if (opts.checkpoint === true) G.story.say('checkpoint');
       }
       D.startFloor(G.run.floor);
     },
