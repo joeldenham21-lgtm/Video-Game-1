@@ -1,5 +1,7 @@
 # ⚔️ ELDERFALL — A Tale of Emberhollow
 
+> **Also in this repo: [RINGFALL](ringfall/README.md)**, a first-person roguelite arena shooter for phone and laptop. It's a single self-contained file: open `ringfall/index.html`.
+
 An **open-world, first-person fantasy RPG that runs in your phone's browser**. No install, no app store — just open the link and play. Inspired by Skyrim, The Witcher 3, and Middle-earth.
 
 > **▶ PLAY IT:** enable GitHub Pages for this repo (Settings → Pages → Source: *GitHub Actions*), push, and open

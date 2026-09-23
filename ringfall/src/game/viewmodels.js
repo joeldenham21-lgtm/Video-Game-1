@@ -8,7 +8,7 @@ export function vmMaterials() {
   if (MATS) return MATS;
   MATS = {
     metal: new THREE.MeshStandardMaterial({ color: 0x30343c, metalness: 0.85, roughness: 0.3, envMapIntensity: 1.2 }),
-    panel: new THREE.MeshStandardMaterial({ color: 0xc7ccd4, metalness: 0.25, roughness: 0.42, envMapIntensity: 1.0 }),
+    panel: new THREE.MeshStandardMaterial({ color: 0x9aa2ae, metalness: 0.45, roughness: 0.38, envMapIntensity: 0.9 }),
     rubber: new THREE.MeshStandardMaterial({ color: 0x17191e, metalness: 0.05, roughness: 0.85 }),
     glove: new THREE.MeshStandardMaterial({ color: 0x23262d, metalness: 0.3, roughness: 0.65, envMapIntensity: 0.7 }),
     armor: new THREE.MeshStandardMaterial({ color: 0x8d949f, metalness: 0.6, roughness: 0.38, envMapIntensity: 1.0 }),
@@ -122,7 +122,7 @@ export function buildCarbine() {
   const readout = makeReadout('#7fe6ff');
   const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.025), readout.mat);
   scr.position.set(0, 0.1, 0.051); group.add(scr);
-  return { group, mag, readout, muzzle: new THREE.Vector3(0, 0.015, -0.62), accent: acc, color: 0x7fe6ff, rest: new THREE.Vector3(0.22, -0.21, -0.4) };
+  return { group, mag, readout, muzzle: new THREE.Vector3(0, 0.015, -0.62), accent: acc, color: 0x7fe6ff, rest: new THREE.Vector3(0.2, -0.19, -0.5), sightY: 0.118 };
 }
 
 export function buildScatter() {
@@ -159,7 +159,7 @@ export function buildScatter() {
   const readout = makeReadout('#ffb070');
   const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.025), readout.mat);
   scr.position.set(0, 0.09, 0.151); group.add(scr);
-  return { group, pump, readout, muzzle: new THREE.Vector3(0, 0.02, -0.54), accent: acc, color: 0xffa24a, rest: new THREE.Vector3(0.21, -0.2, -0.34) };
+  return { group, pump, readout, muzzle: new THREE.Vector3(0, 0.02, -0.54), accent: acc, color: 0xffa24a, rest: new THREE.Vector3(0.2, -0.19, -0.46), sightY: 0.12 };
 }
 
 export function buildLance() {
@@ -197,7 +197,7 @@ export function buildLance() {
   const readout = makeReadout('#d8c0ff');
   const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.045, 0.022), readout.mat);
   scr.position.set(0, 0.1, 0.101); group.add(scr);
-  return { group, core, readout, muzzle: new THREE.Vector3(0, 0.01, -0.72), accent: acc, color: 0xc6a0ff, rest: new THREE.Vector3(0.19, -0.19, -0.34) };
+  return { group, core, readout, muzzle: new THREE.Vector3(0, 0.01, -0.72), accent: acc, color: 0xc6a0ff, rest: new THREE.Vector3(0.19, -0.185, -0.55), sightY: 0.1 };
 }
 
 export function buildNova() {
@@ -233,7 +233,7 @@ export function buildNova() {
   const readout = makeReadout('#9dffbe');
   const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.035, 0.018), readout.mat);
   scr.position.set(0, 0.085, 0.041); group.add(scr);
-  return { group, drum, orb, readout, muzzle: new THREE.Vector3(0, 0.015, -0.47), accent: acc, color: 0x6dff9a, rest: new THREE.Vector3(0.2, -0.2, -0.33) };
+  return { group, drum, orb, readout, muzzle: new THREE.Vector3(0, 0.015, -0.47), accent: acc, color: 0x6dff9a, rest: new THREE.Vector3(0.2, -0.19, -0.46), sightY: 0.1 };
 }
 
 // Kinetic gauntlet for melee (left arm)

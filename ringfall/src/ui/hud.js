@@ -321,8 +321,14 @@ export function createHud(root) {
         if (active) {
           if (rankEl.textContent !== r.l) { rankEl.textContent = r.l; rnameEl.textContent = r.name; styleEl.style.color = r.color; }
           sbar.style.transform = `scaleX(${clamp(S.bar / 100, 0, 1)})`;
-          const html = S.feed.map(f => `<div class="${f.gold ? 'gold' : ''}" style="opacity:${Math.min(1, f.t)}">${f.label}<em>+${f.pts}</em></div>`).join('');
-          if (feedEl._h !== html) { feedEl.innerHTML = html; feedEl._h = html; }
+          // rebuild only when entries change; fade existing rows in place
+          const key = S.feed.map(f => f.label + f.pts).join('|');
+          if (feedEl._k !== key) {
+            feedEl._k = key;
+            feedEl.innerHTML = S.feed.map(f => `<div class="${f.gold ? 'gold' : ''}">${f.label}<em>+${f.pts}</em></div>`).join('');
+          }
+          const rows = feedEl.children;
+          for (let i = 0; i < rows.length && i < S.feed.length; i++) rows[i].style.opacity = Math.min(1, S.feed[i].t).toFixed(2);
         }
       }
 

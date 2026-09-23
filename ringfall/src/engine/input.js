@@ -132,11 +132,15 @@ export function createInput(canvas, touchRoot) {
       });
     } catch { lockFailedOnce(); }
   }
+  let selfUnlock = false; // unlocks we asked for (menus) must not read as "player pressed Esc"
   document.addEventListener('pointerlockchange', () => {
     const was = state.pointerLocked;
     state.pointerLocked = document.pointerLockElement === canvas;
-    if (state.pointerLocked) { everLocked = true; lockFails = 0; state.lockFailed = false; }
-    if (was && !state.pointerLocked && state.enabled) G.events.emit('pointerUnlocked');
+    if (state.pointerLocked) { everLocked = true; lockFails = 0; state.lockFailed = false; selfUnlock = false; }
+    if (was && !state.pointerLocked) {
+      if (!selfUnlock && state.enabled) G.events.emit('pointerUnlocked');
+      selfUnlock = false;
+    }
   });
   document.addEventListener('pointerlockerror', lockFailedOnce);
   window.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') { lastTouch = performance.now(); setSource('touch'); } }, { capture: true });
@@ -172,6 +176,7 @@ export function createInput(canvas, touchRoot) {
     } else {
       pointers.set(e.pointerId, { kind: 'look', lx: e.clientX, ly: e.clientY, t: e.timeStamp });
       lookPointers.add(e.pointerId);
+      touch.lookUsed();
     }
   }, { passive: false });
 
@@ -321,7 +326,7 @@ export function createInput(canvas, touchRoot) {
 
   Object.assign(state, {
     update, endFrame, setEnabled, requestLock, vibrate, touch,
-    exitLock() { if (document.pointerLockElement) document.exitPointerLock?.(); },
+    exitLock() { if (document.pointerLockElement) { selfUnlock = true; document.exitPointerLock?.(); } },
   });
   return state;
 }
@@ -363,6 +368,7 @@ function buildTouchUI(root) {
     hideStick() { stickBase.style.display = 'none'; },
     setActive(on) { root.classList.toggle('active', !!on); },
     hideHints() { stickHint.classList.add('gone'); lookHint.classList.add('gone'); },
+    lookUsed() { lookHint.classList.add('gone'); },
     showHints() { stickHint.classList.remove('gone'); lookHint.classList.remove('gone'); },
   };
 }

@@ -427,7 +427,7 @@ export function createWeapons() {
     if (W.meleeT >= 0) ml = Math.sin(clamp(W.meleeT / 0.4, 0, 1) * Math.PI);
 
     const rest = m.rest;
-    const adsX = lerp(rest.x, 0, adsK), adsY = lerp(rest.y, -0.13, adsK), adsZ = lerp(rest.z, -0.3, adsK);
+    const adsX = lerp(rest.x, 0, adsK), adsY = lerp(rest.y, -(m.sightY || 0.11), adsK), adsZ = lerp(rest.z, -0.32, adsK);
     const px = springs.px.update(rawDt), py = springs.py.update(rawDt), pz = springs.pz.update(rawDt);
     const rx = springs.rx.update(rawDt), ry = springs.ry.update(rawDt), rz = springs.rz.update(rawDt);
     const dashTilt = player.dashTimer > 0 ? 0.12 : 0;
@@ -438,8 +438,8 @@ export function createWeapons() {
     );
     m.group.rotation.set(
       rx * 0.03 + rl * 0.35 + sw * 0.6 + sway.y * 0.5,
-      ry * 0.02 + sway.x * 0.8 + ml * 0.4,
-      rz + -rl * 0.55 + dashTilt + player.roll * 1.5 + ml * 0.3,
+      ry * 0.02 + sway.x * 0.8 + ml * 0.4 + 0.12 * (1 - adsK),
+      rz + -rl * 0.55 + dashTilt + player.roll * 1.5 + ml * 0.3 - 0.05 * (1 - adsK),
     );
     // weapon-specific parts
     if (m.pump) m.pump.position.z = -0.3 + Math.max(0, W.cool * WEAPONS.scatter.rate - 0.45) * 0.14;

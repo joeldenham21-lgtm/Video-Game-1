@@ -149,6 +149,8 @@ export function createMenus(root) {
   function start(difficulty, checkpoint) {
     hide();
     G.audio?.init();
+    // phones: go fullscreen when the run starts (ignored where the browser or frame refuses)
+    if (G.isTouch && document.fullscreenEnabled && !document.fullscreenElement) requestFullscreen();
     if (G.input.source === 'kbm') G.input.requestLock();
     G.events.emit('startRun', { difficulty, checkpoint });
   }
@@ -343,8 +345,7 @@ export function createMenus(root) {
         <div class="rankbig" style="color:${peak.color}">${peak.l}</div>
         ${runStats()}
         <p class="quote">"...Listen. Silence. Real silence. Thank you, Seven." — VESPER</p>
-        <button class="btn primary" id="v-endless">KEEP DESCENDING<small>Endless mode · the echoes get stronger</small></button>
-        <button class="btn" id="v-title">TITLE</button>
+        <div class="row2" style="margin-top:8px"><button class="btn primary" id="v-endless">KEEP DESCENDING<small>Endless mode</small></button><button class="btn" id="v-title">TITLE<small>Back to the ring</small></button></div>
       </div>`, { name: 'victory' });
     on('#v-endless', () => { hide(); G.events.emit('endless'); });
     on('#v-title', () => G.events.emit('quitToTitle'));

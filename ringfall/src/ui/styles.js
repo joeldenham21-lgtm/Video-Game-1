@@ -130,7 +130,7 @@ export const CSS = /* css */`
 .card { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); text-align: center; opacity: 0; pointer-events: none; }
 .card.show { animation: card 3.6s ease forwards; }
 .card .k { font: 500 12px var(--mono); letter-spacing: .5em; color: var(--signal); }
-.card h1 { font-weight: 700; font-size: clamp(30px, 6.5vw, 64px); letter-spacing: .18em; text-indent: .18em; margin-top: 6px; text-shadow: 0 0 30px rgba(127,230,255,.35); }
+.card h1 { font-weight: 700; font-size: clamp(24px, 4.4vw, 52px); letter-spacing: .16em; text-indent: .16em; margin-top: 6px; white-space: nowrap; text-shadow: 0 0 30px rgba(127,230,255,.35); }
 .card .rule { width: 0; height: 1px; background: var(--signal); margin: 12px auto 0; box-shadow: 0 0 8px var(--signal); animation: rule 1.2s .3s ease forwards; }
 @keyframes rule { to { width: 240px; } }
 @keyframes card { 0% { opacity: 0; transform: translate(-50%, -46%); } 15% { opacity: 1; transform: translate(-50%, -50%); } 78% { opacity: 1; } 100% { opacity: 0; } }
@@ -161,9 +161,9 @@ export const CSS = /* css */`
 .touch .style .rank { font-size: 40px; }
 .touch .style .feed { display: none; }
 .touch .score { right: calc(70px + var(--safe-r)); top: calc(12px + var(--safe-t)); }
-.touch .subs { bottom: auto; top: calc(64px + var(--safe-t)); width: min(520px, 56vw); }
+.touch .subs { bottom: auto; top: calc(92px + var(--safe-t)); width: min(460px, 50vw); }
 .touch .subs .txt { font-size: 13px; }
-.touch .tip { top: calc(26% + var(--safe-t)); white-space: normal; text-align: center; width: max-content; max-width: min(460px, 52vw); line-height: 1.5; }
+.touch .tip { top: auto; bottom: calc(5% + var(--safe-b)); white-space: normal; text-align: center; width: max-content; max-width: 32vw; line-height: 1.45; font-size: 11px; padding: 6px 10px; }
 .touch .topc { width: min(420px, 44vw); }
 
 /* ---------------- touch controls ---------------- */
@@ -314,7 +314,10 @@ export const CSS = /* css */`
   .title-menu .btn { padding: 9px 12px; margin-top: 6px; font-size: 13px; }
   .title-menu .btn small { display: none; }
   .aug-wrap h2 { margin: 2px 0; } .aug-wrap .sub { display: none; }
-  .end h1 { font-size: 26px; } .end .rankbig { font-size: 40px; }
+  .end h1 { font-size: 24px; } .end .rankbig { font-size: 34px; margin-top: 0; }
+  .end .quote { display: none; }
+  .end.panel { padding-block: 14px; }
+  .end .btn small { display: none; }
   .set { grid-template-columns: 1fr 1fr; column-gap: 26px; max-height: 60vh; }
   .set h4 { grid-column: 1 / -1; }
   .stats { margin: 8px 0 4px; } .stats b { font-size: 16px; } .stats div { padding: 6px 10px; }

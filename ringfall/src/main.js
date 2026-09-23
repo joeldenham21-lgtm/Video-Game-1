@@ -98,6 +98,8 @@ async function boot() {
     }
     audio.init();
     if (G.mode === 'title') audio.music.play('menu');
+    // high-altitude wind bed under everything
+    if (!G._wind && audio.ready) G._wind = audio.loop('wind', { volume: 0.7 });
   };
   for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) window.addEventListener(ev, unlock, { passive: true });
   // no pinch-zoom or double-tap zoom mid-fight (iOS ignores user-scalable)
@@ -181,6 +183,7 @@ function startRun({ difficulty, checkpoint }) {
 
 function pause() {
   if (G.mode !== 'playing') return;
+  if (DEBUG) (window.__pauseTrace = window.__pauseTrace || []).push(new Error('pause').stack.split('\n').slice(1, 5).join(' <- '));
   G.mode = 'paused';
   G.input.setEnabled(false);
   G.input.exitLock();
