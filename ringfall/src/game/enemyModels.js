@@ -1,26 +1,32 @@
 // Choir constructs: porcelain shells, ice-glow seams, hot cores (always the weak point).
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { G, fxLayer } from '../state.js';
 
 let S = null;
 function shared() {
   if (S) return S;
+  const physical = !!G.renderer?.q?.physical;
+  // glazed porcelain: a clear lacquer coat over a soft diffuse body
+  const porcelain = physical
+    ? new THREE.MeshPhysicalMaterial({ color: 0xc4c7cc, roughness: 0.5, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.08, envMapIntensity: 0.9, sheen: 0.12, sheenColor: new THREE.Color(0xdfe8ff), sheenRoughness: 0.6 })
+    : new THREE.MeshStandardMaterial({ color: 0xc2c6cc, roughness: 0.3, metalness: 0.05, envMapIntensity: 0.95 });
   S = {
-    porcelain: new THREE.MeshStandardMaterial({ color: 0xe4e8ee, roughness: 0.26, metalness: 0.05, envMapIntensity: 1.25 }),
-    inner: new THREE.MeshStandardMaterial({ color: 0x15171d, roughness: 0.4, metalness: 0.8, envMapIntensity: 0.8 }),
-    glow: new THREE.MeshBasicMaterial({ color: new THREE.Color(0x9fe8ff).multiplyScalar(2.6), toneMapped: false }),
-    glowElite: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc857).multiplyScalar(3.2), toneMapped: false }),
-    core: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff4a2a).multiplyScalar(4.5), toneMapped: false }),
+    porcelain,
+    inner: new THREE.MeshStandardMaterial({ color: 0x15171d, roughness: 0.35, metalness: 0.85, envMapIntensity: 1.0 }),
+    glow: new THREE.MeshBasicMaterial({ color: new THREE.Color(0x9fe8ff).multiplyScalar(1.45), toneMapped: false }),
+    glowElite: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc857).multiplyScalar(2.0), toneMapped: false }),
+    core: new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff4a2a).multiplyScalar(2.8), toneMapped: false }),
     geo: {
       miteBody: new THREE.OctahedronGeometry(0.32, 0).scale(1, 0.7, 1.55),
       fin: new THREE.BoxGeometry(0.025, 0.3, 0.34),
-      coreS: new THREE.SphereGeometry(0.11, 12, 8),
-      coreM: new THREE.SphereGeometry(0.2, 14, 10),
-      coreL: new THREE.SphereGeometry(0.36, 16, 12),
-      band: new THREE.TorusGeometry(0.27, 0.018, 6, 20),
-      ico: new THREE.IcosahedronGeometry(0.52, 0),
-      petal: new RoundedBoxGeometry(0.46, 0.46, 0.1, 2, 0.03),
-      halo: new THREE.TorusGeometry(0.88, 0.03, 6, 40),
+      coreS: new THREE.SphereGeometry(0.11, 16, 12),
+      coreM: new THREE.SphereGeometry(0.2, 20, 14),
+      coreL: new THREE.SphereGeometry(0.36, 24, 16),
+      band: new THREE.TorusGeometry(0.27, 0.018, 8, 28),
+      ico: new THREE.IcosahedronGeometry(0.52, physical ? 3 : 1),
+      petal: new RoundedBoxGeometry(0.46, 0.46, 0.1, 3, 0.04),
+      halo: new THREE.TorusGeometry(0.88, 0.03, 8, 64),
       crystal: new THREE.OctahedronGeometry(0.5, 0).scale(0.62, 2.4, 0.62),
       seam: new THREE.BoxGeometry(0.03, 2.2, 0.03),
       shard: new THREE.OctahedronGeometry(0.14, 0).scale(0.6, 1.6, 0.6),
@@ -178,7 +184,21 @@ export function buildBubble() {
   });
   const m = new THREE.Mesh(s.geo.bubble, mat);
   m.renderOrder = 15;
+  fxLayer(m);
   return m;
 }
 
 export function enemyMaterials() { return shared(); }
+
+// Free GPU buffers of everything a model owns (per-instance clones and one-off geometry), keep shared assets
+export function disposeModel(root) {
+  const s = shared();
+  const sharedGeo = new Set(Object.values(s.geo));
+  const sharedMat = new Set([s.porcelain, s.inner, s.glow, s.glowElite, s.core]);
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    if (o.geometry && !sharedGeo.has(o.geometry)) o.geometry.dispose();
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) if (m && !sharedMat.has(m)) m.dispose();
+  });
+}

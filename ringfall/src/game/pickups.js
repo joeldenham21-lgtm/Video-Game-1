@@ -1,6 +1,6 @@
 // Pickups: repair orbs (health), shield cells, overdrive sparks. Magnetised toward the player.
 import * as THREE from 'three';
-import { G } from '../state.js';
+import { G, fxLayer } from '../state.js';
 import { rand, chance, TAU } from '../util.js';
 
 const KINDS = {
@@ -17,7 +17,7 @@ export function createPickups() {
   mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3);
   mesh.frustumCulled = false;
   mesh.count = 0;
-  G.scene.add(mesh);
+  G.scene.add(fxLayer(mesh));
   const items = [];
   const dummy = new THREE.Object3D();
   const c = new THREE.Color();
@@ -62,6 +62,7 @@ export function createPickups() {
           const s = 14 + (range - Math.min(d, range)) * 3;
           it.vx = dx / d * s; it.vy = dy / d * s; it.vz = dz / d * s;
         } else {
+          it.magnet = false; // topped off mid-flight: let it fall and settle instead of drifting through walls
           it.vy -= 16 * dt;
           it.vx *= Math.exp(-2 * dt); it.vz *= Math.exp(-2 * dt);
         }

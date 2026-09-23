@@ -1,6 +1,6 @@
 // GPU-instanced billboard particles (CPU simulated). One draw call per blend mode.
 import * as THREE from 'three';
-import { G } from '../state.js';
+import { G, fxLayer } from '../state.js';
 import { rand, TAU } from '../util.js';
 
 const VERT = /* glsl */`
@@ -117,7 +117,7 @@ class ParticleSystem {
       const dr = Math.exp(-this.drag[i] * dt);
       this.vx[i] *= dr; this.vy[i] = this.vy[i] * dr - this.grav[i] * dt; this.vz[i] *= dr;
       this.px[i] += this.vx[i] * dt; this.py[i] += this.vy[i] * dt; this.pz[i] += this.vz[i] * dt;
-      if (this.floor[i] && G.world) {
+      if (this.floor[i] && this.vy[i] <= 0 && G.world) {
         const gy = G.world.groundHeight(this.px[i], this.pz[i], 0.01, this.py[i] + 0.3);
         if (this.py[i] < gy) { this.py[i] = gy; this.vy[i] *= -0.35; this.vx[i] *= 0.6; this.vz[i] *= 0.6; }
       }
@@ -152,7 +152,7 @@ function rgb(hex, i = 1) { col.set(hex); return [col.r * i, col.g * i, col.b * i
 export function createParticles(scene, quality = 1) {
   const add = new ParticleSystem(Math.round(2400 * quality), true);
   const smoke = new ParticleSystem(Math.round(500 * quality), false);
-  scene.add(add.mesh, smoke.mesh);
+  scene.add(fxLayer(add.mesh), fxLayer(smoke.mesh));
   const Q = () => G.renderer?.q?.particles ?? 1;
   const cnt = (n) => Math.max(1, Math.round(n * Q()));
 

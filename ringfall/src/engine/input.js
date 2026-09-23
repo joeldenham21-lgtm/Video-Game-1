@@ -331,8 +331,17 @@ export function createInput(canvas, touchRoot) {
 
   G.events.on('inputSource', (s) => touch.setActive(state.enabled && s === 'touch'));
 
+  // forget pending presses and adopt the pad's current button state, so a
+  // button used to close a menu doesn't also fire in-game on the next frame
+  function clearEdges() {
+    edges.clear();
+    const gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find(p => p && p.connected);
+    prevButtons = gp ? gp.buttons.map(b => b.pressed) : [];
+    held.jump = false;
+  }
+
   Object.assign(state, {
-    update, endFrame, setEnabled, requestLock, vibrate, touch,
+    update, endFrame, setEnabled, requestLock, vibrate, touch, clearEdges,
     exitLock() { if (document.pointerLockElement) { selfUnlock = true; document.exitPointerLock?.(); } },
   });
   return state;

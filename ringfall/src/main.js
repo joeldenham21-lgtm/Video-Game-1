@@ -1,11 +1,11 @@
 // RINGFALL — entry point: boot, game-state flow, main loop, time control.
 import * as THREE from 'three';
-import { G } from './state.js';
-import { createRenderer } from './engine/renderer.js';
+import { G, FX_LAYER } from './state.js';
+import { createRenderer, detectGpuTier } from './engine/renderer.js';
 import { createInput } from './engine/input.js';
 import audio from './audio.js';
 import { createSky } from './world/sky.js';
-import { initStage, loadStage, updateStage } from './world/stage.js';
+import { initStage, loadStage, updateStage, rebuildEnvironment } from './world/stage.js';
 import { createPlayer } from './game/player.js';
 import { createWeapons } from './game/weapons.js';
 import { createEnemies } from './game/enemies.js';
@@ -56,13 +56,16 @@ async function boot() {
     bootError('WebGL is unavailable on this device or browser. Try updating the browser or enabling hardware acceleration.');
     throw e;
   }
+  watchContext(canvas);
   G.scene = new THREE.Scene();
   G.camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.05, 1600);
+  G.camera.layers.enable(FX_LAYER);
   G.vmScene = new THREE.Scene();
   G.vmCamera = new THREE.PerspectiveCamera(54, 16 / 9, 0.01, 20);
   G.vmScene.add(G.vmCamera);
 
-  const q = G.settings.quality === 'auto' ? (G.isTouch ? 'medium' : 'high') : G.settings.quality;
+  G.gpu = detectGpuTier(G.isTouch);
+  const q = G.settings.quality === 'auto' ? G.gpu.tier : G.settings.quality;
   G.renderer.setQuality(q, G.settings.quality === 'auto');
 
   G.sky = createSky(q);
@@ -99,7 +102,7 @@ async function boot() {
     audio.init();
     if (G.mode === 'title') audio.music.play('menu');
     // high-altitude wind bed under everything
-    if (!G._wind && audio.ready) G._wind = audio.loop('wind', { volume: 0.7 });
+    if (!G._wind && audio.ready) G._wind = audio.loop('wind', { volume: 0.7, persistent: true });
   };
   for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) window.addEventListener(ev, unlock, { passive: true });
   // no pinch-zoom or double-tap zoom mid-fight (iOS ignores user-scalable)
@@ -148,6 +151,8 @@ function warmUp() {
 function enterTitle() {
   G.mode = 'title';
   G.run = null;
+  G.player.endOverdrive();
+  if (G.player._low) { G.player._low = false; G.audio.music.setLowHealth(false); }
   G.input.setEnabled(false);
   G.input.exitLock();
   G.hud.show(false);
@@ -196,6 +201,7 @@ function resume() {
   G.menus.hide();
   G.mode = 'playing';
   G.input.setEnabled(true);
+  G.input.clearEdges();
   G.audio.resume();
   if (G.input.source === 'kbm') G.input.requestLock();
 }
@@ -213,6 +219,10 @@ function wireFlow() {
     G.dyingT = 2.2;
     G.slowmo = 2;
     G.input.setEnabled(false);
+    G.player.endOverdrive();
+    G.enemies.silence?.();
+    G.boss.silence?.();
+    G.player._low = false; G.audio.music.setLowHealth(false);
     G.audio.music.stinger('death');
     G.audio.play('death');
     G.story.say('death');
@@ -246,19 +256,47 @@ let titleT = 0;
 // ?debug&sim=N runs N fixed simulation steps per rendered frame (fast headless playtests)
 const SIM = DEBUG ? +(location.search.match(/sim=(\d+)/)?.[1] || 1) : 1;
 
+// One bad frame must never take the whole game down: log it, keep going.
+let errorCount = 0, lastErrorAt = 0;
+function guard(fn, ...args) {
+  try { fn(...args); }
+  catch (e) {
+    errorCount++;
+    const now = performance.now();
+    if (now - lastErrorAt > 2000) console.error('[RINGFALL] frame error', e);
+    lastErrorAt = now;
+  }
+}
+
 function frame(now) {
   requestAnimationFrame(frame);
   const frameMs = now - last;
   last = now;
+  if (contextLost) return;
   if (SIM > 1) {
-    for (let i = 0; i < SIM; i++) { step(1 / 30); if (i < SIM - 1) G.input.endFrame(); }
+    for (let i = 0; i < SIM; i++) { guard(step, 1 / 30); if (i < SIM - 1) G.input.endFrame(); }
   } else {
     G.renderer.adapt(frameMs);
-    step(Math.min(0.05, Math.max(0, frameMs / 1000)));
+    guard(step, Math.min(0.05, Math.max(0, frameMs / 1000)));
   }
-  G.renderer.render(G.scene, G.camera, G.weapons.root.visible ? G.vmScene : null, G.vmCamera);
-  G.hud.update(SIM > 1 ? 1 / 30 * SIM : Math.min(0.05, frameMs / 1000));
+  guard(() => G.renderer.render(G.scene, G.camera, G.weapons.root.visible ? G.vmScene : null, G.vmCamera));
+  guard(() => G.hud.update(SIM > 1 ? 1 / 30 * SIM : Math.min(0.05, frameMs / 1000)));
   G.input.endFrame();
+}
+
+// Mobile browsers can drop the GPU context (backgrounding, memory pressure): pause and rebuild targets on restore
+let contextLost = false;
+function watchContext(canvas) {
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    contextLost = true;
+    if (G.mode === 'playing') pause();
+  });
+  canvas.addEventListener('webglcontextrestored', () => {
+    contextLost = false;
+    G.renderer.setQuality(G.renderer.quality, G.settings.quality === 'auto');
+    try { rebuildEnvironment(); } catch (e) { console.warn('environment rebuild failed', e); }
+  });
 }
 
 function step(raw) {

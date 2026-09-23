@@ -57,7 +57,8 @@ export function createMenus(root) {
   const rotate = document.createElement('div');
   rotate.className = 'rotate';
   rotate.innerHTML = '<div><div class="ph"></div><p>ROTATE TO LANDSCAPE</p><p style="font-size:12px;color:var(--muted);margin-top:8px;letter-spacing:.1em">RINGFALL plays best sideways with both thumbs.</p><button id="rot-dismiss">PLAY IN PORTRAIT</button></div>';
-  root.appendChild(rotate);
+  // lives on <body> above the touch layer so thumbs can't fire through it
+  document.body.appendChild(rotate);
   let portraitOk = false;
   rotate.querySelector('#rot-dismiss').addEventListener('click', () => { portraitOk = true; rotate.classList.remove('on'); });
 
@@ -214,7 +215,7 @@ export function createMenus(root) {
           ${toggle('leftHanded', 'Left-handed layout')}
           ${toggle('haptics', 'Vibration')}
           <h4>VIDEO</h4>
-          ${select('quality', 'Graphics quality', [['auto', 'Auto (adaptive)'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']])}
+          ${select('quality', 'Graphics quality', [['auto', G.gpu?.tier ? `Auto (${G.gpu.tier[0].toUpperCase() + G.gpu.tier.slice(1)} for this GPU)` : 'Auto (adaptive)'], ['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']])}
           ${range('fov', 'Field of view', 80, 115, 1, (v) => v + '°')}
           ${range('shake', 'Screen shake', 0, 1.5, 0.05, pct)}
           ${toggle('damageNumbers', 'Damage numbers')}
@@ -254,7 +255,7 @@ export function createMenus(root) {
   function apply(id) {
     const s = G.settings;
     if (id === 'quality') {
-      const q = s.quality === 'auto' ? (G.isTouch ? 'medium' : 'high') : s.quality;
+      const q = s.quality === 'auto' ? (G.gpu?.tier || (G.isTouch ? 'medium' : 'high')) : s.quality;
       G.renderer.setQuality(q, s.quality === 'auto');
     }
     if (id === 'musicVol' || id === 'sfxVol') G.audio?.setVolumes({ music: s.musicVol, sfx: s.sfxVol });
@@ -299,7 +300,7 @@ export function createMenus(root) {
         <h2>CHOOSE AN AUGMENT</h2>
         <div class="sub">Your frame can integrate one upgrade before the next descent.</div>
         ${weapon}
-        <div class="augs">${cards}</div>
+        <div class="augs">${cards || '<button class="aug" data-id=""><h4>CONTINUE</h4><p>Every augment is fully integrated.</p></button>'}</div>
         ${owned.length ? `<div class="owned">${owned.map(id => `<span>${nameOf(id)}</span>`).join('')}</div>` : ''}
       </div>`, { name: 'augment' });
     layer.querySelectorAll('.aug').forEach(b => b.addEventListener('click', () => pickAug(b.dataset.id)));
@@ -309,7 +310,9 @@ export function createMenus(root) {
     const cb = augCb; augCb = null;
     const el = layer.querySelector(`.aug[data-id="${id}"]`);
     if (el) { el.style.transform = 'scale(1.05)'; el.style.borderColor = '#fff'; }
-    setTimeout(() => { hide(); cb(id); if (G.weapons.owned.includes('lance') && id) {} }, 260);
+    // re-grab the mouse while we still have the click's user gesture
+    if (G.input.source === 'kbm') G.input.requestLock();
+    setTimeout(() => { hide(); cb(id); }, 260);
   }
 
   // ---------------- end screens ----------------
@@ -385,15 +388,21 @@ export function createMenus(root) {
   function update() {
     // portrait prompt on phones
     const portrait = window.innerHeight > window.innerWidth * 1.05;
-    rotate.classList.toggle('on', G.isTouch && portrait && !portraitOk);
-    if (!current) { padPrev = []; return; }
+    const rot = G.isTouch && portrait && !portraitOk;
+    if (rot !== rotate.classList.contains('on')) {
+      rotate.classList.toggle('on', rot);
+      if (rot && G.mode === 'playing') G.events.emit('focusLost');
+    }
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     const gp = [...pads].find(p => p && p.connected);
-    if (!gp) return;
+    if (!gp) { padPrev = []; return; }
     const b = gp.buttons.map(x => x.pressed);
-    const edge = (i) => b[i] && !padPrev[i];
     const ay = gp.axes[1] || 0, ax = gp.axes[0] || 0;
     const stick = Math.abs(ay) > 0.6 ? Math.sign(ay) : Math.abs(ax) > 0.6 ? Math.sign(ax) : 0;
+    // track button state even with no menu open, so the press that opened a
+    // menu (Start → pause) isn't read as a fresh press on the next frame
+    if (!current) { padPrev = b; padPrev.stick = stick !== 0; return; }
+    const edge = (i) => b[i] && !padPrev[i];
     if (edge(13) || edge(15) || (stick > 0 && !padPrev.stick)) moveFocus(1);
     if (edge(12) || edge(14) || (stick < 0 && !padPrev.stick)) moveFocus(-1);
     if (edge(0)) activate();

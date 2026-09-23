@@ -3,12 +3,13 @@
 import * as THREE from 'three';
 import { G } from '../state.js';
 import { clamp, rand, pick, chance, TAU, distSqPointSegment, damp } from '../util.js';
-import { enemyMaterials, buildBubble } from './enemyModels.js';
+import { enemyMaterials, buildBubble, disposeModel } from './enemyModels.js';
 import { P } from './player.js';
 
 const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Vector3();
 
-function glowMat(hex, i) { return new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).multiplyScalar(i), toneMapped: false }); }
+// boss glow is authored at the old neon strengths; scale down to sit with the filmic grade
+function glowMat(hex, i) { return new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).multiplyScalar(i * 0.58), toneMapped: false }); }
 
 // ------------------------------------------------------------------ models
 function buildConductor() {
@@ -145,7 +146,8 @@ export function createBoss() {
         spawnPylons();
       }
       G.audio?.play('bossRoar');
-      B.hum = G.audio?.loop('bossHum', { pos: B.e.pos, volume: 0.8 });
+      B.hum?.stop(0.1);
+      B.hum = G.audio?.loop('bossHum', { pos: B.e.pos, volume: 0.8, persistent: true });
       G.particles?.warpIn(B.e.pos, 12, 0xff8fa0);
       G.lights?.flash(B.e.pos, 0xff6a8a, 60, 40, 1.2);
       G.player.addTrauma(0.5);
@@ -153,13 +155,15 @@ export function createBoss() {
     },
 
     clear() {
-      if (B.e) { E.group.remove(B.e.root); }
+      if (B.e) { E.group.remove(B.e.root); disposeModel(B.e.root); }
       if (B.sweep) { for (const b of B.sweep.beams) b.dead = true; B.sweep = null; }
       for (const p of B.pylons) if (p.tether) p.tether.dead = true;
       B.hum?.stop(0.3); B.hum = null;
       B.active = false; B.e = null; B.pylons = [];
       G.hud?.bossBar(false);
     },
+
+    silence() { B.hum?.stop(0.6); B.hum = null; },
 
     update(dt) {
       if (!B.active || !B.e) return;
@@ -239,7 +243,7 @@ export function createBoss() {
     if (e.staggered) {
       e.staggerT -= dt;
       const f = Math.sin(G.time * 18) > 0;
-      e.model.coreMat.color.setRGB(f ? 8 : 3, f ? 6 : 1.5, f ? 4 : 0.6);
+      e.model.coreMat.color.setRGB(f ? 5 : 1.9, f ? 3.8 : 0.9, f ? 2.5 : 0.4);
       if (e.staggerT <= 0) { e.staggered = false; resetCore(e); B.attack = null; B.cool = 1.2; }
       return;
     }
@@ -258,7 +262,7 @@ export function createBoss() {
     } else runAttack(e, dt);
   });
 
-  function resetCore(e) { e.model.coreMat.color.set(0xff4a2a).multiplyScalar(4.5); }
+  function resetCore(e) { e.model.coreMat.color.set(0xff4a2a).multiplyScalar(2.8); }
 
   function phaseChange(e, ph) {
     B.phase = ph;
@@ -287,7 +291,8 @@ export function createBoss() {
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       const g = G.world.groundHeight(x, z, 0.4, 20);
       const y = (g > -1e6 ? g : 0) + (type === 'mite' ? rand(3, 6) : type === 'lancer' ? 7 : 3);
-      setTimeout(() => { if (B.active && G.mode === 'playing') E.spawn(type, x, y, z); }, d * 1000);
+      const owner = B.e;
+      setTimeout(() => { if (B.active && B.dying <= 0 && B.e === owner && owner?.alive && G.mode === 'playing') E.spawn(type, x, y, z); }, d * 1000);
       d += 0.25;
     }
   }
@@ -398,7 +403,8 @@ export function createBoss() {
         B.slammed = true;
         const g = 0;
         G.projectiles.shockwave(e.pos.x, g, e.pos.z, 32, 15, 20 * e.dmgMul, 0xff4a6a);
-        setTimeout(() => { if (B.active && B.e) G.projectiles.shockwave(B.e.pos.x, 0, B.e.pos.z, 32, 10, 20 * B.e.dmgMul, 0xff4a6a); }, 550);
+        const owner = B.e;
+        setTimeout(() => { if (B.active && B.dying <= 0 && B.e === owner && owner.alive && G.mode === 'playing') G.projectiles.shockwave(owner.pos.x, 0, owner.pos.z, 32, 10, 20 * owner.dmgMul, 0xff4a6a); }, 550);
         G.audio?.play('bruteSlam', { pos: e.pos, volume: 1 });
         G.particles?.explosion({ x: e.pos.x, y: 0.5, z: e.pos.z }, 5, 0xff8a6a, true);
         G.player.addTrauma(0.5);
@@ -444,7 +450,7 @@ export function createBoss() {
     if (e.staggered) {
       e.staggerT -= dt;
       const f = Math.sin(G.time * 18) > 0;
-      e.model.coreMat.color.setRGB(f ? 8 : 3, f ? 6 : 1.5, f ? 4 : 0.6);
+      e.model.coreMat.color.setRGB(f ? 5 : 1.9, f ? 3.8 : 0.9, f ? 2.5 : 0.4);
       if (e.staggerT <= 0) { e.staggered = false; resetCore(e); rebuild(e); }
       return;
     }
@@ -506,7 +512,7 @@ export function createBoss() {
         G.audio?.play('bossSpiral', { pos: e.pos, volume: 0.8 });
         B.shots++;
       }
-      if (t > rings * 1.1 + 1) { B.attack = null; B.cool = rand(1.5, 2.6) - cyc * 0.3; }
+      if (t > rings * 1.1 + 1) { B.attack = null; B.cool = Math.max(0.9, rand(1.5, 2.6) - cyc * 0.3); }
     } else if (B.attack === 'rain') {
       const drops = 10 + cyc * 4;
       if (!B.targets) {
@@ -613,7 +619,7 @@ export function createBoss() {
     e.model.parts.body.rotation.y += dt * 0.6;
     e.cool -= dt;
     if (e.cool <= 0 && H.hasLOS(e, dt)) {
-      e.cool = rand(3, 4.2) - B.cycle * 0.5;
+      e.cool = Math.max(1.6, rand(3, 4.2) - B.cycle * 0.5);
       H.localToWorld(e, e.hitSpheres[2], tmp3);
       H.leadTarget(tmp3, 14, tmp, 0.6);
       tmp.sub(tmp3).normalize().multiplyScalar(14);
@@ -666,6 +672,7 @@ export function createBoss() {
       G.renderer.post.uFlashColor.value.set(0xffffff);
       G.player.addTrauma(0.8);
       E.group.remove(e.root);
+      disposeModel(e.root);
       const type = B.type;
       B.active = false; B.e = null;
       if (type === 'conductor') G.story.say('conductorDown', { delay: 0.8 });

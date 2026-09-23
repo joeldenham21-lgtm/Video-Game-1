@@ -1,6 +1,6 @@
 // Beams (tracers, lasers, arcs), pooled point lights, impact decals, and physical debris shards.
 import * as THREE from 'three';
-import { G } from '../state.js';
+import { G, fxLayer } from '../state.js';
 import { rand, TAU } from '../util.js';
 import { makeScorchTexture } from '../world/textures.js';
 
@@ -61,6 +61,7 @@ function createBeams(scene, max = 160) {
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = 25;
+  fxLayer(mesh);
   scene.add(mesh);
 
   const list = [];
@@ -176,6 +177,7 @@ function createDecals(scene, max = 90) {
   mesh.frustumCulled = false;
   mesh.count = 0;
   mesh.renderOrder = 5;
+  fxLayer(mesh);
   scene.add(mesh);
   let next = 0, used = 0;
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), n = new THREE.Vector3();

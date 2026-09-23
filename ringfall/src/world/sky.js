@@ -1,7 +1,7 @@
 // Procedural space sky: gas giant with rings, nebula, twinkling stars, hot white star.
 // Rendered live as the scene backdrop, and once into a PMREM for metallic reflections.
 import * as THREE from 'three';
-import { G } from '../state.js';
+import { G, fxLayer } from '../state.js';
 
 const VERT = /* glsl */`
 varying vec3 vDir;
@@ -171,6 +171,7 @@ export function createSky(quality = 'high') {
   const mesh = new THREE.Mesh(geo, material);
   mesh.frustumCulled = false;
   mesh.renderOrder = -1000;
+  fxLayer(mesh);
 
   let theme = null;
   let envRT = null;
@@ -198,7 +199,7 @@ export function createSky(quality = 'high') {
     uniforms.uSunBoost.value = 0.05;
     uniforms.uStarBoost.value = 0.0;
     const prev = renderer.getRenderTarget();
-    if (envRT) envRT.dispose();
+    // no dispose of the previous map: stage.js caches one per theme and owns their lifetime
     envRT = pmrem.fromScene(envScene, 0.02, 1, 2000);
     renderer.setRenderTarget(prev);
     uniforms.uSunBoost.value = 1;

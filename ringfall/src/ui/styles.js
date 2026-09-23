@@ -164,7 +164,7 @@ export const CSS = /* css */`
 .touch .subs { bottom: auto; top: calc(92px + var(--safe-t)); width: min(460px, 50vw); }
 .touch .subs .txt { font-size: 13px; }
 .touch .tip { top: auto; bottom: calc(5% + var(--safe-b)); white-space: normal; text-align: center; width: max-content; max-width: 32vw; line-height: 1.45; font-size: 11px; padding: 6px 10px; }
-.touch .topc { width: min(420px, 44vw); }
+.touch .topc { width: clamp(200px, calc(100vw - 2 * (74px + min(230px, 30vw))), 420px); }
 
 /* ---------------- touch controls ---------------- */
 #touch .tbtn { position: absolute; border-radius: 50%; display: grid; place-items: center; color: rgba(235,248,255,.92);
@@ -299,7 +299,7 @@ export const CSS = /* css */`
 .end .rankbig { text-align: center; font-weight: 700; font-style: italic; font-size: 64px; line-height: 1; margin-top: 4px; text-shadow: 0 0 24px currentColor; }
 .end .quote { text-align: center; font-size: 14px; color: #b8c8d8; margin: 10px auto 0; max-width: 46ch; line-height: 1.5; }
 
-.rotate { position: absolute; inset: 0; display: none; place-items: center; background: rgba(4,6,11,.94); pointer-events: auto; text-align: center; z-index: 5; padding: 24px; }
+.rotate { position: fixed; inset: 0; display: none; place-items: center; background: rgba(4,6,11,.94); pointer-events: auto; text-align: center; z-index: 40; padding: 24px; font-family: var(--display); color: var(--text); touch-action: none; }
 .rotate.on { display: grid; }
 .rotate .ph { width: 56px; height: 92px; border: 3px solid var(--signal); border-radius: 10px; margin: 0 auto 18px; animation: rot 1.8s ease-in-out infinite; }
 @keyframes rot { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }

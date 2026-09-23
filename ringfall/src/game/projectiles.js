@@ -1,6 +1,6 @@
 // Projectiles: enemy plasma orbs (deflectable), player Nova grenades, ground shockwaves, boss volleys.
 import * as THREE from 'three';
-import { G } from '../state.js';
+import { G, fxLayer } from '../state.js';
 import { clamp, rand, distSqPointSegment, TAU, DEG } from '../util.js';
 import { P } from './player.js';
 
@@ -30,7 +30,7 @@ export function createProjectiles() {
   mesh.geometry.setAttribute('iColor', colors);
   mesh.frustumCulled = false;
   mesh.count = 0;
-  G.scene.add(mesh);
+  G.scene.add(fxLayer(mesh));
 
   // shockwave rings
   const ringGeo = new THREE.CylinderGeometry(1, 1, 1, 64, 1, true);
@@ -72,7 +72,7 @@ export function createProjectiles() {
       m.material.uniforms.uColor.value.set(color).multiplyScalar(3);
       m.position.set(x, y, z);
       m.scale.set(0.1, height, 0.1);
-      G.scene.add(m);
+      G.scene.add(fxLayer(m));
       rings.push({ x, y, z, r: 0.2, maxR, speed, dmg, height, mesh: m, hit: false });
       G.audio?.play('shockwave', { pos: { x, y, z } });
     },

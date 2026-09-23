@@ -1,4 +1,9 @@
 // Shared game context. Every system registers itself here so modules never import each other in cycles.
+
+// Render layer for glowing effects and the sky: drawn by the main camera, skipped by the depth/AO prepass
+export const FX_LAYER = 2;
+export function fxLayer(obj) { obj.layers.set(FX_LAYER); return obj; }
+
 export const G = {
   // engine
   renderer: null,   // engine/renderer.js wrapper

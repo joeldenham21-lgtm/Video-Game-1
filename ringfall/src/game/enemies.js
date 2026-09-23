@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { G } from '../state.js';
 import { clamp, damp, rand, pick, chance, raySphere, TAU, wrapAngle, DEG } from '../util.js';
-import { buildMite, buildSentinel, buildLancer, buildBrute, buildWarden, buildBubble } from './enemyModels.js';
+import { buildMite, buildSentinel, buildLancer, buildBrute, buildWarden, buildBubble, disposeModel } from './enemyModels.js';
 import { P } from './player.js';
 
 export const TYPES = {
@@ -29,6 +29,7 @@ export function createEnemies() {
   const group = new THREE.Group();
   G.scene.add(group);
   const list = [];
+  let lastWarpSfx = -1;
   const hitList = [];
 
   function spawn(type, x, y, z, opts = {}) {
@@ -57,7 +58,8 @@ export function createEnemies() {
     if (!opts.silent) {
       G.particles?.warpIn({ x, y: y - def.hover * 0.6, z }, 3 + def.radius * 2, elite ? 0xffd070 : 0xbfe8ff);
       G.beams?.add(x, y - 3, z, x, y + 5, z, elite ? 0xffc050 : 0x9fe8ff, 3, 0.35 + def.radius * 0.3, 0.9 + e.delay, 'fade', 0);
-      G.audio?.play('enemyWarpIn', { pos: e.pos, volume: 0.8 });
+      // a wave warps in several at once: one arrival sound per burst, not one per body
+      if (G.time - lastWarpSfx > 0.35) { lastWarpSfx = G.time; G.audio?.play('enemyWarpIn', { pos: e.pos, volume: 0.7 }); }
       G.lights?.flash(e.pos, 0x9fe8ff, 12, 10, 0.4);
     }
     G.events.emit('enemySpawned', e);
@@ -213,10 +215,18 @@ export function createEnemies() {
     if (e.def.stagger && !e.staggerUsed && e.hp <= e.maxHp * e.def.stagger) {
       e.staggered = true; e.staggerUsed = true; e.staggerT = 3.6;
       e.state = 'stagger';
-      if (e.lancerBeam) { e.lancerBeam.dead = true; e.lancerBeam = null; }
+      endAim(e);
       G.events.emit('enemyStaggered', e);
     }
     return { dealt, killed: false, shielded };
+  }
+
+  // A Lancer's lock-on line and its charge sound always end together
+  function endAim(e) {
+    if (e.lancerBeam) { e.lancerBeam.dead = true; e.lancerBeam = null; }
+    if (e.chargeLoop) { e.chargeLoop.stop(0.08); e.chargeLoop = null; }
+    if (e.chargeSfx) { e.chargeSfx.stop?.(); e.chargeSfx = null; }
+    if (e.model?.parts?.tip) e.model.parts.tip.scale.setScalar(1);
   }
 
   // Aggregated per-shot feedback (hitmarkers, numbers, sounds)
@@ -239,13 +249,12 @@ export function createEnemies() {
     G.debris?.burst(e.pos, big ? 26 : e.type === 'mite' ? 6 : 14, 0xe4e8ee, big ? 9 : 7, big ? 0.22 : 0.13, 0xff5a2a);
     G.lights?.flash(e.pos, 0xbfe8ff, big ? 40 : 18, big ? 16 : 10, 0.25);
     G.audio?.play(big ? 'enemyDeathBig' : 'enemyDeath', { pos: e.pos });
-    G.audio?.play('kill', { volume: 0.8 });
-    if (info.crit) G.audio?.play('crit', { volume: 0.5 });
+    G.audio?.play('kill', { volume: 0.6 });
     if (e.bubble) popBubble(e);
-    if (e.lancerBeam) { e.lancerBeam.dead = true; e.lancerBeam = null; }
+    endAim(e);
     if (e.tethers) for (const t of e.tethers) t.beam.dead = true;
     for (const o of list) if (o.bubbleOwner === e && o.bubble) popBubble(o);
-    if (!e.def.keepRoot) group.remove(e.root);
+    if (!e.def.keepRoot) { group.remove(e.root); disposeModel(e.root); }
     G.player.kills++;
     G.player.addOverdrive(e.type === 'mite' ? 4 : big ? 14 : 8);
     const ctx = { enemy: e, source: info.source, crit: !!info.crit, shatter: !!info.shatter, airborne: !G.player.grounded, deflect: info.source === 'deflect', pos: p, elite: e.elite };
@@ -259,8 +268,9 @@ export function createEnemies() {
     if (!e.alive) return;
     const p = e.aimPoint.clone();
     if (e.def.boss) {
-      // bosses take a heavy chunk instead of dying outright
-      e.staggered = false; e.staggerT = 0;
+      // bosses take a heavy chunk instead of dying outright; the boss AI runs its own stagger exit next frame
+      if (e.staggerT <= 0) return;
+      e.staggerT = 0;
       G.hitstop = Math.max(G.hitstop, 0.1);
       G.slowmo = Math.max(G.slowmo, 0.35);
       G.audio?.play('shatter');
@@ -402,7 +412,7 @@ export function createEnemies() {
         const ty = pl.pos.y + 2.5 + Math.sin(G.worldTime * 1.3 + e.id * 9) * 1.5;
         steer(e, tx, ty, tz, e.def.speed * 0.8 * e.speedMul, dt, 2.5);
         // only a few dive at once
-        const diving = list.filter(o => o.alive && o.type === 'mite' && (o.state === 'windup' || o.state === 'dive')).length;
+        const diving = divingMites;
         if (e.t <= 0 && diving < 2 + Math.floor((G.run?.floor || 1) / 3)) {
           e.state = 'windup'; e.t = 0.55;
           G.audio?.play('miteScreech', { pos: e.pos, volume: 0.8 });
@@ -410,7 +420,7 @@ export function createEnemies() {
       } else if (e.state === 'windup') {
         e.vel.multiplyScalar(Math.exp(-4 * dt));
         e.root.position.x += rand(-0.03, 0.03);
-        e.model.coreMat.color.setRGB(6, 2.5, 1.2);
+        e.model.coreMat.color.setRGB(3.8, 1.6, 0.8);
         if (e.t <= 0) {
           e.state = 'dive'; e.t = 1.6;
           leadTarget(e.pos, 18, tmpV, 0.5);
@@ -430,7 +440,7 @@ export function createEnemies() {
           kill(e, { source: 'self' });
           return;
         }
-        if (e.t <= 0) { e.state = 'orbit'; e.t = rand(1.5, 3); e.model.coreMat.color.set(0xff4a2a).multiplyScalar(4.5); }
+        if (e.t <= 0) { e.state = 'orbit'; e.t = rand(1.5, 3); e.model.coreMat.color.set(0xff4a2a).multiplyScalar(2.8); }
       }
       integrate(e, dt, false);
       const g = groundBelow(e.pos.x, e.pos.z, e.pos.y);
@@ -469,7 +479,7 @@ export function createEnemies() {
       }
       if (e.state === 'windup') {
         e.t -= dt; open = 1 - e.t / 0.65;
-        e.model.coreMat.color.setRGB(4.5 + open * 4, 1.3 + open * 2, 0.8 + open);
+        e.model.coreMat.color.setRGB(2.8 + open * 2.6, 0.8 + open * 1.3, 0.5 + open * 0.6);
         if (e.t <= 0) { e.state = 'burst'; e.shots = e.elite ? 5 : 3; e.t = 0; }
       } else if (e.state === 'burst') {
         open = 1;
@@ -483,7 +493,7 @@ export function createEnemies() {
           tmpV.x += rand(-0.03, 0.03); tmpV.y += rand(-0.02, 0.02);
           G.projectiles?.orb(tmpV2, tmpV.normalize().multiplyScalar(15), 11 * e.dmgMul, e);
           G.audio?.play('orbFire', { pos: tmpV2, volume: 0.7 });
-          if (e.shots <= 0) { e.state = 'idle'; e.cool = rand(2.2, 3.2); e.model.coreMat.color.set(0xff4a2a).multiplyScalar(4.5); }
+          if (e.shots <= 0) { e.state = 'idle'; e.cool = rand(2.2, 3.2); e.model.coreMat.color.set(0xff4a2a).multiplyScalar(2.8); }
         }
       }
       for (const p of parts.petals) p.rotation.x = -0.35 - open * 0.55;
@@ -519,7 +529,7 @@ export function createEnemies() {
         localToWorld(e, { x: 0, y: 1.25 * e.scale, z: 0 }, tmpV2);
         e.lancerBeam = G.beams?.add(tmpV2.x, tmpV2.y, tmpV2.z, e.aimAt.x, e.aimAt.y, e.aimAt.z, 0xff2040, 1.2, 0.02, 1, 'hold');
         e.chargeLoop = G.audio?.loop('lancerBeam', { pos: e.pos, volume: 0.9 });
-        G.audio?.play('lancerCharge', { pos: e.pos, volume: 1 });
+        e.chargeSfx = G.audio?.play('lancerCharge', { pos: e.pos, volume: 1 });
         G.events.emit('lancerAiming', e);
       }
       if (e.state === 'aim') {
@@ -542,7 +552,7 @@ export function createEnemies() {
         e.chargeLoop?.setPitch?.(0.8 + k * 0.8);
         e.chargeLoop?.setPos?.(e.pos);
         parts.tip.scale.setScalar(1 + k * 1.5);
-        e.model.coreMat.color.setRGB(4 + k * 5, 1 + k * 2, 1 + k);
+        e.model.coreMat.color.setRGB(1.9 + k * 2.4, 0.45 + k * 0.9, 0.45 + k * 0.45);
         if (e.t <= 0) {
           // fire along the locked line
           tmpV.subVectors(e.aimAt, tmpV2).normalize();
@@ -562,9 +572,9 @@ export function createEnemies() {
           if (wh) G.particles?.sparks(wh, { x: wh.nx, y: wh.ny, z: wh.nz }, 0xff4060, 10, 8, 3);
           if (hitP) G.player.damage(26 * e.dmgMul, e.pos, 'lancer');
           if (e.lancerBeam) { e.lancerBeam.dead = true; e.lancerBeam = null; }
-          e.chargeLoop?.stop(0.05); e.chargeLoop = null;
+          e.chargeLoop?.stop(0.05); e.chargeLoop = null; e.chargeSfx = null;
           parts.tip.scale.setScalar(1);
-          e.model.coreMat.color.set(0xff4a2a).multiplyScalar(4.5);
+          e.model.coreMat.color.set(0xff4a2a).multiplyScalar(2.8);
           e.state = chance(0.55) ? 'relocate' : 'idle';
           e.cool = rand(2.6, 3.6);
         }
@@ -588,8 +598,8 @@ export function createEnemies() {
         e.root.rotation.z = Math.sin(G.time * 20) * 0.04;
         parts.shield.position.y = 0.05 - 0.35;
         parts.shield.rotation.x = 0.5;
-        e.model.coreMat.color.setRGB(7, 3, 1.5);
-        if (e.stunT <= 0) { parts.shield.position.y = 0.05; parts.shield.rotation.x = 0; e.state = 'idle'; e.cool = 1.5; e.model.coreMat.color.set(0xff4a2a).multiplyScalar(4.5); }
+        e.model.coreMat.color.setRGB(4.4, 1.9, 0.9);
+        if (e.stunT <= 0) { parts.shield.position.y = 0.05; parts.shield.rotation.x = 0; e.state = 'idle'; e.cool = 1.5; e.model.coreMat.color.set(0xff4a2a).multiplyScalar(2.8); }
         integrate(e, dt);
         return;
       }
@@ -709,7 +719,10 @@ export function createEnemies() {
     },
   };
 
+  let divingMites = 0;
   function update(dt) {
+    divingMites = 0;
+    for (const o of list) if (o.alive && o.type === 'mite' && (o.state === 'windup' || o.state === 'dive')) divingMites++;
     for (let i = list.length - 1; i >= 0; i--) {
       const e = list[i];
       if (!e.alive) { list.splice(i, 1); continue; }
@@ -730,11 +743,11 @@ export function createEnemies() {
         e.vel.y -= 1.5 * dt;
         integrate(e, dt, true);
         const f = Math.sin(G.time * 18) > 0;
-        e.model.coreMat.color.setRGB(f ? 8 : 3, f ? 6 : 1.5, f ? 4 : 0.6);
+        e.model.coreMat.color.setRGB(f ? 5 : 1.9, f ? 3.8 : 0.9, f ? 2.5 : 0.4);
         e.root.rotation.z = Math.sin(G.time * 9 + e.id) * 0.15;
         if (e.staggerT <= 0) {
           e.staggered = false; e.state = 'idle'; e.cool = 1.5; e.root.rotation.z = 0;
-          e.model.coreMat.color.set(0xff4a2a).multiplyScalar(4.5);
+          e.model.coreMat.color.set(0xff4a2a).multiplyScalar(2.8);
         }
       } else {
         AI[e.type](e, dt, helpers);
@@ -768,12 +781,15 @@ export function createEnemies() {
   function clear() {
     for (const e of list) {
       group.remove(e.root);
-      if (e.lancerBeam) e.lancerBeam.dead = true;
-      e.chargeLoop?.stop(0.05);
+      if (!e.def.keepRoot) disposeModel(e.root);
+      endAim(e);
       if (e.tethers) for (const t of e.tethers) t.beam.dead = true;
     }
     list.length = 0;
   }
+
+  // stop every enemy sound loop (death screen, quitting)
+  function silence() { for (const e of list) endAim(e); }
 
   const helpers = { steer, integrate, faceYaw, hasLOS, leadTarget, groundBelow, kill, spawn, localToWorld, updateAimPoint, list };
 
@@ -786,7 +802,7 @@ export function createEnemies() {
 
   return {
     list, group, spawn, update, clear, raycast, raycastAll, damage: (e, a, i) => damage(e, a, i), reportHit,
-    findStaggered, meleeSweep, shatter, kill, damageRadius, localToWorld, register, helpers,
+    findStaggered, meleeSweep, shatter, kill, damageRadius, localToWorld, register, helpers, silence,
     get alive() { let n = 0; for (const e of list) if (e.alive) n++; return n; },
   };
 }

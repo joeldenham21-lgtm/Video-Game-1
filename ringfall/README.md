@@ -39,16 +39,25 @@ Five enemy types: Mites (dive-bombing swarm), Sentinels (orb turrets), Lancers (
 
 Touch devices get aim assist (slowdown and a gentle pull toward targets) and bullet magnetism. Auto-fire, sensitivity, left-handed layout, FOV, graphics quality and volumes are all in Settings.
 
-## Performance
+## Graphics and performance
 
-The renderer targets 60 fps on mid-range phones:
+Quality is picked from the GPU on first run: RTX/Radeon-class laptops and desktops get **Ultra**, recent flagship phones (Adreno 7xx/8xx, Apple GPUs, Mali-G7xx+) get **High**, and everything else gets Medium or Low. You can change it any time in Settings → Graphics quality.
 
-- HDR pipeline (MSAA, dual-filter bloom, ACES tone mapping, chromatic aberration, vignette), with every pass sized for mobile GPUs.
-- **Adaptive resolution:** internal resolution drops when frames run long and recovers when they're steady. On *Auto* it steps quality down as a last resort.
-- Static arena geometry is merged per material; particles, beams, decals, debris, projectiles and pickups are instanced (one draw call each).
-- All shaders are compiled at boot so the first fight doesn't hitch.
+- **Frame pipeline:** half-res depth prepass → SSAO with a depth-aware blur → HDR world render with MSAA → viewmodel → dual-filter bloom → sun shafts → AgX filmic tone mapping with light grain and vignette.
+- **Materials and lighting:** procedural PBR plating (albedo, normal, roughness and metalness), with clear-coated decks and glazed porcelain constructs on High and Ultra. Reflections come from a capture of the arena itself, not just the sky. Warm practical lights sit on the pillars, and shadows go up to 4096².
+- **Bloom:** restrained and thresholded, so only the brightest cores, muzzle flashes and the star glow.
+- **Adaptive resolution:** internal resolution drops when frames run long and recovers when they're steady. On *Auto*, quality steps down only after several seconds of sustained slowdown. One-off hitches (tab switch, GC) are ignored.
+- **Draw calls:** static arena geometry is merged per material. Particles, beams, decals, debris, projectiles and pickups are instanced, one draw call each.
+- **No first-fight hitch:** all shaders are compiled at boot. The light count is fixed, so nothing recompiles mid-fight.
 
-Quality presets: Low / Medium / High / Ultra (Settings → Graphics quality). Phones start on Medium, desktops on High.
+## Audio
+
+Everything is synthesised live with Web Audio; there are no samples.
+
+- **Sound effects:** built from noise bursts, body resonances, mechanical clicks and a room tail, so they sound physical rather than "synth". Repeats get small random variations in pitch and filtering.
+- **Music:** evolving pads, sub pulses and sparse percussion that thicken with combat intensity. Bosses get taiko-style drums and choir pads.
+- **Mix:** a limiter and a gentle high-shelf keep sustained fire from getting harsh.
+- **Loop safety:** loops are capped per sound and stop themselves if the game stops updating them.
 
 ## Building
 

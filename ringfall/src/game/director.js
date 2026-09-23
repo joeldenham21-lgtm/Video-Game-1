@@ -279,6 +279,8 @@ export function createDirector() {
   function floorCleared(boss = false) {
     D.state = 'clear'; D.stateT = 0;
     queue.length = 0;
+    G.projectiles.clear();
+    G.player.iframes = Math.max(G.player.iframes, 4);
     G.pickups.vacuum();
     G.slowmo = Math.max(G.slowmo, boss ? 1.4 : 0.6);
     G.player.heal(boss ? 60 : 25);
@@ -311,6 +313,8 @@ export function createDirector() {
       G.story.say(weapon === 'lance' ? 'lanceUnlock' : 'novaUnlock', { delay: 0.4 });
     }
     const choices = G.augments.offer(def.boss ? 'boss' : 'normal');
+    // every augment already maxed (long endless runs): nothing to draft
+    if (!choices?.length && !weapon) { transition(() => D.startFloor(n + 1)); return; }
     G.mode = 'augment';
     G.input.setEnabled(false);
     G.input.exitLock();

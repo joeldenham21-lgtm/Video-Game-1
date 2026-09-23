@@ -309,8 +309,9 @@ export function createHud(root) {
       const tbm = G.input?.touch?.buttons;
       if (tbm) {
         tbm.fire.classList.toggle('auto', !!G.settings.autoFire);
-        const mc = tbm.melee.querySelector('.cool');
-        mc.style.setProperty('--p', `${clamp(W.meleeCool / 0.5, 0, 1) * 100}%`);
+        const mc = tbm.melee._cool || (tbm.melee._cool = tbm.melee.querySelector('.cool'));
+        const mp = `${(clamp(W.meleeCool / 0.5, 0, 1) * 100).toFixed(0)}%`;
+        if (mc && mc._p !== mp) { mc._p = mp; mc.style.setProperty('--p', mp); }
       }
 
       // score & style
@@ -383,7 +384,8 @@ export function createHud(root) {
         const x = cx + Math.sin(ang) * rx, y = cy - Math.cos(ang) * ry;
         const o = offEls[oi++];
         o.style.display = 'block';
-        o.className = t.e.state === 'aim' ? 'lancer' : '';
+        const cls = t.e.state === 'aim' ? 'lancer' : '';
+        if (o.className !== cls) o.className = cls;
         const sc = clamp(1.4 - t.d / 40, 0.6, 1.3);
         o.style.transform = `translate3d(${x.toFixed(0)}px, ${y.toFixed(0)}px, 0) translate(-50%, -50%) rotate(${ang}rad) scale(${sc.toFixed(2)})`;
       }
@@ -402,7 +404,6 @@ export function createHud(root) {
         subLine = s.text; subChar = 0; subT = Math.max(2.8, s.text.length * 0.06) + 0.6;
         subWho.textContent = s.who;
         subs.classList.add('on');
-        G.audio?.play('uiHover', { volume: 0.4 });
       }
       if (tipT > 0) { tipT -= dt; if (tipT <= 0) tipEl.classList.remove('on'); }
 

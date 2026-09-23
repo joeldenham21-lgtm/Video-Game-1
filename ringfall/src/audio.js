@@ -49,7 +49,7 @@ const MAX_VOICES = 48;        // global one-shot voice cap
 const MAX_LOOPS = 16;         // global loop cap
 const REF_DIST = 4;           // meters: full volume inside this radius
 const ROLLOFF = 0.82;         // inverse-distance rolloff (≈0.08 at 60 m)
-const MUSIC_TRIM = 0.1;       // music sits under SFX
+const MUSIC_TRIM = 0.125;      // music sits under SFX
 const LOOKAHEAD = 0.12;       // sequencer horizon (s)
 const TICK_MS = 25;           // sequencer timer
 
@@ -211,8 +211,8 @@ function buildGraph(ctx, deferVerb = false) {
   G.gain = gain;
 
   const lim = ctx.createDynamicsCompressor();
-  lim.threshold.value = -6; lim.knee.value = 2; lim.ratio.value = 12;
-  lim.attack.value = 0.002; lim.release.value = 0.16;
+  lim.threshold.value = -4; lim.knee.value = 3; lim.ratio.value = 12;
+  lim.attack.value = 0.002; lim.release.value = 0.12;
   const clip = ctx.createWaveShaper();
   clip.curve = softClipCurve();
   G.limiter = lim;
@@ -226,11 +226,19 @@ function buildGraph(ctx, deferVerb = false) {
   G.fx.Q.value = 0.7;
   G.fx.connect(G.world);
 
-  G.sfx = gain(1, G.fx);
+  // Gentle high-shelf cut (-3 dB above ~8 kHz) tames harsh highs on SFX and UI.
+  const shelf = (to) => {
+    const f = ctx.createBiquadFilter();
+    f.type = 'highshelf'; f.frequency.value = Math.min(8000, G.nyq); f.gain.value = -3;
+    f.connect(to);
+    return f;
+  };
+  G.sfxShelf = shelf(G.fx);
+  G.sfx = gain(1, G.sfxShelf);
   G.duck = gain(1, G.fx);
   G.musicVol = gain(1, G.duck);
   G.musicIn = gain(MUSIC_TRIM, G.musicVol);
-  G.ui = gain(1, G.master);
+  G.ui = gain(1, shelf(G.master));
   G.heart = gain(1, G.world);
 
   G.verb = ctx.createConvolver();
@@ -354,7 +362,7 @@ function T(v, o) {
   else if (o.f1) glide(osc.frequency, t, o.f, [[o.st || o.d || 0.2, o.f1]], p);
   else osc.frequency.setValueAtTime(o.f * p, t);
   if (o.det) osc.detune.setValueAtTime(o.det, t);
-  if (o.dsrc) o.dsrc.connect(osc.detune);
+  if (o.dsrc) { o.dsrc.connect(osc.detune); (v.hooks || (v.hooks = [])).push([o.dsrc, osc.detune]); }
   const node = filters(v, o, osc, t, 1);
   const { g, end } = envOut(v, o, node, t);
   vSrc(v, osc, t, end + 0.02);
@@ -374,7 +382,7 @@ function N(v, o) {
   if (o.rate) src.playbackRate.setValueAtTime(o.rate * p, t);
   const node = filters(v, o, src, t, p);
   const { g, end } = envOut(v, o, node, t);
-  vSrc(v, src, t, end + 0.02, Math.random() * 1.8);
+  vSrc(v, src, t, end + 0.02, o.off !== undefined ? o.off : Math.random() * 1.8);   // o.off: fixed timbre
   return { src, g, end };
 }
 
@@ -425,7 +433,13 @@ function RES(v, o) {
     src.connect(bp);
     bp.connect(sum);
   }
-  const { g, end } = envOut(v, o, sum, t);
+  let node = sum;
+  if (o.lp) {
+    const lp = vNode(v, v.ctx.createBiquadFilter());
+    lp.type = 'lowpass'; lp.frequency.value = Math.min(o.lp, v.G.nyq);
+    sum.connect(lp); node = lp;
+  }
+  const { g, end } = envOut(v, o, node, t);
   vSrc(v, src, t, end + 0.05, Math.random() * 1.8);
   return { g, end };
 }
@@ -433,23 +447,62 @@ function RES(v, o) {
 /* -------------------------------------------------------------------------- */
 /* Shared SFX building blocks                                                  */
 /* -------------------------------------------------------------------------- */
+// Sound design direction: shaped noise transients, low-mid body, mechanical
+// clicks, modal (struck ceramic / metal) resonances and an air/room tail.
+// Tonal oscillators are used sparingly — mostly for sub weight.
 
-/** Big explosion: pitch-dropping boom, wide noise burst, crunch, debris, rumble. */
-function explosion(v, t, s = 1, peak = 1) {
-  T(v, { t, f: 120 / s, f1: 30 / s, st: 0.6 * s, peak: 1 * peak, d: 0.9 * s });
-  T(v, { t, type: 'triangle', f: 75 / s, f1: 28, st: 0.4 * s, sh: 4, peak: 0.3 * peak, d: 0.5 * s });
-  N(v, { t, k: 'wide', lp: 7000, lp1: 280, fT: 0.8 * s, peak: 0.95 * peak, d: 1.0 * s });
-  N(v, { t, k: 'pink', bp: 620 / s, q: 0.8, peak: 0.6 * peak, d: 0.4 * s });
-  N(v, { t: t + 0.04, k: 'grit', bp: 2400, q: 0.6, a: 0.02, peak: 0.55 * peak, d: 1.1 * s });
-  N(v, { t, k: 'brown', lp: 240, a: 0.01, peak: 0.7 * peak, d: 1.5 * s });
+/** Transient crack: a very short band-limited noise burst. */
+function crack(v, t, peak, hp = 2000, lp = 9000, d = 0.012, k = 'white') {
+  N(v, { t, k, hp, lp, a: 0.0004, peak, d });
 }
 
-/** Crystalline break: bright noise shard, inharmonic bells, glass rain. */
+/** Low-mid body: short sine thump + lowpassed brown noise. */
+function thump(v, t, peak, f0 = 120, f1 = 48, d = 0.12, nlp = 450) {
+  T(v, { t, f: f0, f1, st: d * 0.6, a: 0.001, peak, d });
+  N(v, { t, k: 'brown', lp: nlp, a: 0.002, peak: peak * 0.8, d: d * 0.9 });
+}
+
+/** Air / room tail: lowpassed pink noise that darkens as it decays. */
+function airTail(v, t, peak, d = 0.4, lp = 2500, lp1 = 500) {
+  N(v, { t, k: 'pink', lp, lp1, fT: d, a: 0.004, peak, d });
+}
+
+/** Mechanical click: a short resonant band of noise. */
+function mech(v, t, peak, f = 2800, q = 4, d = 0.02) {
+  N(v, { t, bp: f, q, a: 0.0005, peak, d });
+}
+
+/** Whoosh: band-passed pink noise sweeping f0 → f1 with a swell. */
+function whoosh(v, t, peak, f0, f1, d, q = 1) {
+  N(v, { t, k: 'pink', bp: f0, bp1: f1, fT: d, q, a: d * 0.45, peak, d: d * 0.55 });
+}
+
+/** Additive modal partials (struck ceramic / metal): sines with their own decays. */
+function modes(v, t, f, ratios, decays, peak, amps) {
+  for (let i = 0; i < ratios.length; i++) {
+    T(v, { t, f: f * ratios[i], a: 0.0008, peak: peak * (amps ? amps[i] : 1 / (i + 1)), d: decays[i] });
+  }
+}
+const CERAMIC = [1, 1.72, 2.63, 3.64];
+const METAL = [1, 2.76, 5.4, 8.93];
+
+/** Big explosion: low boom, noise blast, crunch, debris crackle, long air tail. */
+function explosion(v, t, s = 1, peak = 1) {
+  T(v, { t, f: 78 / s, f1: 28 / s, st: 0.7 * s, a: 0.002, peak: 1 * peak, d: 1.0 * s });       // sub boom
+  N(v, { t, k: 'brown', lp: 260, a: 0.004, peak: 0.9 * peak, d: 1.4 * s });                   // rumble
+  N(v, { t, k: 'wide', lp: 6000, lp1: 250, fT: 0.8 * s, peak: 0.95 * peak, d: 0.9 * s });     // blast
+  N(v, { t, k: 'pink', bp: 700 / s, q: 0.7, peak: 0.6 * peak, d: 0.35 * s });                  // crunch
+  N(v, { t: t + 0.03, k: 'grit', bp: 2400, q: 0.6, lp: 6000, a: 0.02, peak: 0.55 * peak, d: 1.2 * s }); // debris
+  N(v, { t: t + 0.06, k: 'crackle', hp: 1500, lp: 7000, a: 0.05, peak: 0.5 * peak, d: 0.9 * s });
+  airTail(v, t + 0.02, 0.3 * peak, 1.8 * s, 1400, 200);
+}
+
+/** Crystalline / ceramic break: shard crack, crunch, modal chips, glass rain. */
 function glassBreak(v, t, s = 1, peak = 1, rain = 0.85) {
-  N(v, { t, k: 'wide', hp: 2200 / s, peak: 0.75 * peak, d: 0.18 * s });
-  FM(v, { t, f: 1760 / s, ratio: 2.76, idx: 2.4, idx1: 0.1, peak: 0.26 * peak, d: 0.55 * s });
-  FM(v, { t, f: 2637 / s, ratio: 3.33, idx: 1.8, idx1: 0.1, peak: 0.18 * peak, d: 0.45 * s });
-  RES(v, { t: t + 0.03, freqs: [3100 / s, 4300 / s, 5200 / s, 6700 / s], q: 34, k: 'crackle', a: 0.03, peak: 6 * peak, d: rain * s });
+  crack(v, t, 0.45 * peak, 1500 / s, 8500, 0.03, 'wide');
+  N(v, { t, k: 'pink', bp: 1200 / s, q: 0.7, peak: 0.5 * peak, d: 0.16 * s });                 // crunch
+  RES(v, { t, freqs: [1500 / s, 2300 / s, 3100 / s, 4400 / s], q: 22, k: 'white', a: 0.0008, peak: 1.6 * peak, d: 0.22 * s });
+  RES(v, { t: t + 0.03, freqs: [2800 / s, 3900 / s, 5200 / s, 6600 / s], q: 30, k: 'crackle', a: 0.03, peak: 4 * peak, d: rain * s, lp: 7500 });
 }
 
 /** Two-beat heartbeat thump (lub-dub). */
@@ -460,9 +513,23 @@ function heartbeat(v, t, peak = 1) {
   T(v, { t: t + 0.21, type: 'triangle', f: 80, f1: 50, st: 0.1, lp: 300, a: 0.006, peak: 0.25 * peak, d: 0.12, fixed: true });
 }
 
-/** Short bell note (FM) used by chimes and stingers. */
+/** Soft bell / pluck note (music only). */
 function bell(v, t, f, peak, d = 0.5, ratio = 3.5, idx = 1.4, to) {
-  FM(v, { t, f, ratio, idx, idx1: 0.05, a: 0.002, peak, d, to });
+  FM(v, { t, f, ratio, idx, idx1: 0.05, a: 0.002, peak, d, to, lp: 3500 });
+}
+
+/** Soft brass-like swell: detuned saws through a lowpass that opens and closes. */
+function brass(v, t, freqs, peak, a, hold, d, cut = 900, fixed = true, dsrc = null) {
+  const lp = vNode(v, v.ctx.createBiquadFilter());
+  const t0 = v.t + t;
+  lp.type = 'lowpass'; lp.Q.value = 0.8;
+  lp.frequency.setValueAtTime(220, t0);
+  lp.frequency.exponentialRampToValueAtTime(cut, t0 + a);
+  lp.frequency.exponentialRampToValueAtTime(260, t0 + a + hold + d);
+  lp.connect(v.out);
+  for (const f of freqs) {
+    for (const det of [-9, 8]) T(v, { t, type: 'sawtooth', f, det, a, peak, hold, d, to: lp, fixed, dsrc });
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -479,419 +546,400 @@ function sfx(name, meta, fn) {
 
 /* ---------------------------------- Weapons -------------------------------- */
 
-sfx('carbineShot', { g: 1.28, verb: 0.08, max: 6, prio: 2, gap: 0.03, len: 0.4 }, (v) => {
-  N(v, { hp: 2600, a: 0.0005, peak: 0.55, d: 0.014 });                                   // transient click
-  FM(v, { f: 1150, f1: 260, st: 0.07, ratio: 1.5, idx: 2.2, idx1: 0.3, type: 'triangle', peak: 0.3, d: 0.085 }); // zap
-  T(v, { f: 175, f1: 52, st: 0.06, peak: 0.8, d: 0.075 });                                // low thump
-  N(v, { k: 'pink', bp: 2400, bp1: 800, fT: 0.09, q: 0.9, a: 0.002, peak: 0.5, d: 0.09 }); // noisy tail
+sfx('carbineShot', { g: 1.5, verb: 0.07, max: 5, prio: 2, gap: 0.03, len: 0.5 }, (v) => {
+  // Fires 10.5/s: punchy, mostly noise, every shot slightly different.
+  const r = rand(0.85, 1.18), l = rand(0.85, 1);
+  crack(v, 0, 0.2 * l, 1700 * r, 7000, 0.008, 'pink');                                     // crack
+  N(v, { k: 'pink', bp: 1400 * r, q: 0.9, a: 0.0008, peak: 0.65 * l, d: 0.05 });           // snap body
+  T(v, { f: 125 * r, f1: 55, st: 0.05, a: 0.0015, peak: 0.28 * l, d: 0.06 });              // low thump
+  N(v, { k: 'brown', lp: 500, a: 0.001, peak: 0.3 * l, d: 0.055 });
+  airTail(v, 0.004, 0.12 * l, 0.13, 2600 * r, 700);                                         // air
+  if (Math.random() < 0.6) mech(v, 0.012, 0.08, 3300 * r, 6, 0.012);                       // bolt tick
+  T(v, { type: 'triangle', f: 780 * r, f1: 360, st: 0.03, peak: 0.03, d: 0.035 });         // faint energy
 });
 
-sfx('scatterShot', { g: 0.836, verb: 0.26, max: 3, prio: 2, len: 1.0 }, (v) => {
-  N(v, { k: 'wide', hp: 1800, peak: 0.8, d: 0.03 });
-  T(v, { f: 150, f1: 38, st: 0.22, peak: 1, d: 0.42 });                                   // boom
-  T(v, { type: 'triangle', f: 95, f1: 42, st: 0.18, sh: 3, peak: 0.4, d: 0.25 });         // grit body
-  N(v, { k: 'wide', lp: 6500, lp1: 500, fT: 0.3, peak: 0.95, d: 0.38 });                  // wide blast
-  N(v, { k: 'pink', bp: 900, q: 1.1, peak: 0.55, d: 0.22 });
-  // mechanical rack
-  N(v, { t: 0.3, bp: 1400, bp1: 2600, fT: 0.06, q: 2, a: 0.012, peak: 0.22, d: 0.06 });
-  N(v, { t: 0.41, bp: 3200, q: 4, peak: 0.45, d: 0.035 });
-  T(v, { t: 0.41, type: 'square', f: 1250, lp: 3000, peak: 0.06, d: 0.03 });
-  T(v, { t: 0.41, f: 150, f1: 90, peak: 0.25, d: 0.05 });
+sfx('scatterShot', { g: 0.531, verb: 0.24, max: 3, prio: 2, len: 1.2 }, (v) => {
+  crack(v, 0, 0.6, 1100, 8500, 0.022, 'wide');
+  N(v, { k: 'wide', lp: 5200, lp1: 380, fT: 0.26, a: 0.001, peak: 1, d: 0.3 });           // blast
+  T(v, { f: 92, f1: 38, st: 0.22, a: 0.001, peak: 1, d: 0.34 });                            // body
+  N(v, { k: 'brown', lp: 320, a: 0.002, peak: 0.8, d: 0.36 });
+  N(v, { k: 'pink', bp: 360, q: 0.8, peak: 0.6, d: 0.18 });                                // chest punch
+  airTail(v, 0.01, 0.26, 0.75, 1500, 280);
+  // mechanical rack: slide back, slam forward
+  N(v, { t: 0.31, k: 'pink', bp: 1300, bp1: 2400, fT: 0.06, q: 1.6, a: 0.015, peak: 0.2, d: 0.05 });
+  mech(v, 0.4, 0.45, 2300, 3, 0.035);
+  N(v, { t: 0.4, k: 'brown', lp: 800, peak: 0.35, d: 0.05 });
+  mech(v, 0.415, 0.2, 3600, 5, 0.02);
 });
 
-sfx('lanceShot', { g: 1.1, verb: 0.34, max: 2, prio: 2, len: 1.3 }, (v) => {
-  N(v, { k: 'wide', hp: 3500, peak: 0.9, d: 0.035 });                                    // crack
-  FM(v, { f: 2600, f1: 900, st: 0.05, ratio: 2.1, idx: 3, peak: 0.22, d: 0.06 });        // snap
-  T(v, { type: 'sawtooth', f: 2400, f1: 140, st: 0.38, lp: 7000, lp1: 1200, fT: 0.4, peak: 0.3, d: 0.42 }); // descending zap
-  T(v, { f: 95, f1: 32, st: 0.3, peak: 0.9, d: 0.35 });                                  // body
-  N(v, { t: 0.025, k: 'crackle', bp: 3200, q: 0.8, a: 0.01, peak: 1.2, d: 0.55 });      // crackle tail
-  N(v, { t: 0.01, k: 'pink', bp: 1500, bp1: 500, fT: 0.4, q: 0.7, peak: 0.3, d: 0.45 });
+sfx('lanceShot', { g: 0.888, verb: 0.32, max: 2, prio: 2, len: 1.4 }, (v) => {
+  crack(v, 0, 0.7, 2600, 9500, 0.02, 'wide');                                              // railgun crack
+  N(v, { k: 'pink', bp: 2000, q: 0.7, peak: 0.7, d: 0.06 });
+  thump(v, 0, 0.8, 85, 38, 0.26, 320);
+  N(v, { t: 0.02, k: 'crackle', bp: 3000, q: 0.7, lp: 7000, a: 0.01, peak: 1.1, d: 0.6 }); // electric crackle
+  N(v, { t: 0.01, k: 'crackle', rate: 1.5, hp: 4500, lp: 8000, peak: 0.45, d: 0.28 });
+  FM(v, { f: 1700, f1: 280, st: 0.22, ratio: 1.5, idx: 1.2, idx1: 0.2, peak: 0.06, d: 0.24, lp: 3000 }); // a little tone
+  airTail(v, 0.02, 0.2, 0.9, 2200, 350);
 });
 
-sfx('lanceCharge', { g: 0.323, verb: 0.15, max: 2, len: 0.5 }, (v) => {
-  T(v, { type: 'sawtooth', f: 380, f1: 1900, st: 0.16, lp: 2400, lp1: 5000, fT: 0.16, a: 0.12, peak: 0.3, d: 0.06 });
-  T(v, { f: 760, f1: 3800, st: 0.16, a: 0.13, peak: 0.16, d: 0.05 });
-  N(v, { k: 'crackle', rate: 1.5, hp: 2000, a: 0.12, peak: 0.5, d: 0.05 });
+sfx('lanceCharge', { g: 1.88, verb: 0.15, max: 2, len: 0.5 }, (v) => {
+  N(v, { k: 'pink', bp: 700, bp1: 3000, fT: 0.16, q: 3, rise: 0.15, peak: 0.4, cut: 0.03 }); // servo spin-up
+  T(v, { f: 420, f1: 1100, st: 0.16, rise: 0.15, peak: 0.06, cut: 0.03 });
+  N(v, { k: 'crackle', rate: 1.4, hp: 2500, lp: 7000, rise: 0.15, peak: 0.35, cut: 0.03 });
 });
 
-sfx('novaShot', { g: 0.836, verb: 0.2, max: 3, prio: 2, len: 0.6 }, (v) => {
-  N(v, { hp: 1500, peak: 0.4, d: 0.012 });
-  T(v, { f: 240, f1: 62, st: 0.13, peak: 1, d: 0.26 });                                  // thoonk
-  T(v, { type: 'triangle', f: 420, f1: 150, st: 0.1, peak: 0.35, d: 0.14 });             // 'oonk'
-  N(v, { k: 'brown', lp: 900, lp1: 250, fT: 0.2, peak: 0.8, d: 0.22 });
-  N(v, { t: 0.02, k: 'pink', bp: 700, q: 3, peak: 0.3, d: 0.12 });                        // tube resonance
+sfx('novaShot', { g: 0.411, verb: 0.2, max: 3, prio: 2, len: 0.8 }, (v) => {
+  mech(v, 0, 0.3, 2000, 2, 0.015);
+  T(v, { f: 150, f1: 52, st: 0.14, a: 0.001, peak: 1, d: 0.22 });                          // thoonk
+  N(v, { k: 'brown', lp: 700, lp1: 220, fT: 0.2, a: 0.001, peak: 0.85, d: 0.22 });
+  N(v, { t: 0.01, k: 'pink', bp: 480, q: 2.2, peak: 0.4, d: 0.12 });                        // tube resonance
+  whoosh(v, 0.02, 0.18, 1400, 450, 0.32, 1.2);                                                // projectile air
 });
 
-sfx('novaExplode', { g: 0.85, verb: 0.5, max: 3, prio: 3, duck: true, len: 2.4 }, (v) => {
+sfx('novaExplode', { g: 0.389, verb: 0.48, max: 3, prio: 3, duck: true, len: 2.6 }, (v) => {
   explosion(v, 0, 1, 1);
-  N(v, { k: 'crackle', bp: 3000, q: 0.7, t: 0.02, peak: 0.6, d: 0.5 });
 });
 
-sfx('reload', { g: 0.717, verb: 0.1, max: 2, len: 0.8 }, (v) => {
-  N(v, { bp: 2600, q: 3, peak: 0.55, d: 0.025 });                                         // latch
-  T(v, { type: 'square', f: 1400, lp: 3000, peak: 0.05, d: 0.02 });
-  T(v, { t: 0.1, type: 'triangle', f: 1300, f1: 280, st: 0.25, peak: 0.18, d: 0.28 });   // cell out
-  N(v, { t: 0.1, k: 'pink', bp: 1600, bp1: 700, fT: 0.15, q: 1.5, a: 0.02, peak: 0.35, d: 0.14 });
-  N(v, { t: 0.33, bp: 3400, q: 4, peak: 0.5, d: 0.022 });                                 // click
-  T(v, { t: 0.33, f: 900, peak: 0.1, d: 0.04 });
+sfx('reload', { g: 2.34, verb: 0.08, max: 2, len: 0.8 }, (v) => {
+  mech(v, 0, 0.5, 2500, 4, 0.022);                                                           // latch
+  N(v, { t: 0.004, k: 'brown', lp: 600, peak: 0.25, d: 0.04 });
+  N(v, { t: 0.08, bp: 1100, bp1: 2300, fT: 0.14, q: 6, a: 0.02, peak: 0.12, d: 0.12 });     // servo
+  whoosh(v, 0.1, 0.25, 700, 1300, 0.16, 1.4);                                                 // cell slides out
+  N(v, { t: 0.2, k: 'brown', lp: 500, peak: 0.3, d: 0.05 });
+  mech(v, 0.34, 0.45, 3200, 5, 0.018);                                                       // click
 });
 
-sfx('reloadDone', { g: 0.629, verb: 0.12, max: 2, len: 0.6 }, (v) => {
-  T(v, { f: 170, f1: 60, st: 0.08, peak: 0.6, d: 0.11 });                                 // cell slam
-  N(v, { bp: 2100, q: 2, peak: 0.6, d: 0.04 });
-  N(v, { t: 0.004, hp: 5000, peak: 0.2, d: 0.01 });
-  FM(v, { t: 0.05, f: 520, f1: 1040, st: 0.12, ratio: 2, idx: 1.2, a: 0.02, peak: 0.16, d: 0.18 }); // charged blip
+sfx('reloadDone', { g: 0.506, verb: 0.1, max: 2, len: 0.6 }, (v) => {
+  thump(v, 0, 0.5, 120, 60, 0.08, 700);                                                      // cell slam
+  mech(v, 0, 0.55, 2000, 2, 0.035);
+  mech(v, 0.03, 0.2, 3600, 6, 0.012);
+  N(v, { t: 0.05, bp: 1500, q: 9, a: 0.02, peak: 0.12, d: 0.15 });                           // charged servo
+  T(v, { t: 0.05, f: 220, a: 0.02, peak: 0.05, d: 0.2 });                                    // soft energy hum
 });
 
-sfx('swap', { g: 0.802, verb: 0.1, max: 2, len: 0.5 }, (v) => {
-  N(v, { k: 'pink', bp: 700, bp1: 2600, fT: 0.14, q: 1.2, a: 0.05, peak: 0.4, d: 0.12 }); // whoosh
-  N(v, { t: 0.06, bp: 3000, q: 3, peak: 0.5, d: 0.03 });                                  // clack
-  T(v, { t: 0.06, type: 'square', f: 950, lp: 2500, peak: 0.06, d: 0.03 });
-  T(v, { t: 0.06, f: 140, f1: 70, peak: 0.3, d: 0.06 });
+sfx('swap', { g: 1.59, verb: 0.08, max: 2, len: 0.5 }, (v) => {
+  whoosh(v, 0, 0.35, 600, 1800, 0.12, 1.2);                                                   // cloth / arm
+  mech(v, 0.07, 0.45, 2600, 3, 0.03);                                                        // clack
+  N(v, { t: 0.07, k: 'brown', lp: 500, peak: 0.3, d: 0.05 });
 });
 
-sfx('dryFire', { g: 2.9, verb: 0.06, max: 2, gap: 0.05, len: 0.3 }, (v) => {
-  N(v, { bp: 4200, q: 5, peak: 0.7, d: 0.016 });
-  T(v, { type: 'triangle', f: 2100, peak: 0.08, d: 0.015 });
-  N(v, { t: 0.05, bp: 2600, q: 4, peak: 0.3, d: 0.012 });
+sfx('dryFire', { g: 1.96, verb: 0.05, max: 2, gap: 0.05, len: 0.3 }, (v) => {
+  mech(v, 0, 0.6, 3000, 4, 0.016);
+  mech(v, 0.045, 0.3, 2200, 4, 0.012);
 });
 
 /* ---------------------------------- Player --------------------------------- */
 
-sfx('melee', { g: 0.709, verb: 0.08, max: 3, len: 0.5 }, (v) => {
-  N(v, { k: 'pink', bp: 450, bp1: 2200, fT: 0.12, q: 1.3, a: 0.05, peak: 0.6, d: 0.1 });
-  T(v, { t: 0.07, f: 120, f1: 50, st: 0.1, peak: 0.45, d: 0.12 });
+sfx('melee', { g: 2.12, verb: 0.07, max: 3, len: 0.5 }, (v) => {
+  whoosh(v, 0, 0.6, 350, 1600, 0.16, 1);
+  N(v, { t: 0.02, bp: 900, q: 6, a: 0.03, peak: 0.08, d: 0.1 });                            // servo
 });
 
-sfx('meleeHit', { g: 0.978, verb: 0.14, max: 3, prio: 2, len: 0.6 }, (v) => {
-  T(v, { f: 160, f1: 45, st: 0.14, peak: 1, d: 0.2 });
-  N(v, { k: 'pink', lp: 1800, lp1: 400, fT: 0.12, peak: 0.8, d: 0.13 });
-  N(v, { bp: 1900, q: 1.2, peak: 0.5, d: 0.05 });
-  T(v, { type: 'triangle', f: 90, f1: 55, sh: 3, peak: 0.28, d: 0.12 });
+sfx('meleeHit', { g: 0.462, verb: 0.12, max: 3, prio: 2, len: 0.7 }, (v) => {
+  thump(v, 0, 1, 110, 45, 0.16, 500);
+  N(v, { k: 'pink', bp: 900, q: 0.9, peak: 0.55, d: 0.08 });                                 // crunch
+  crack(v, 0, 0.35, 1800, 7000, 0.015);
+  RES(v, { freqs: [1900, 2700, 3400], q: 18, k: 'white', a: 0.0008, peak: 0.9, d: 0.14 });  // ceramic armour
 });
 
-sfx('deflect', { g: 0.397, verb: 0.3, max: 3, len: 1.2 }, (v) => {
-  FM(v, { f: 1850, ratio: 2.76, idx: 3, idx1: 0.2, peak: 0.42, d: 0.7 });                // metallic ping
-  T(v, { f: 4300, peak: 0.08, d: 0.35 });
-  N(v, { hp: 4000, peak: 0.4, d: 0.02 });
-  N(v, { t: 0.05, bp: 2500, bp1: 5000, fT: 0.25, q: 1.2, rise: 0.24, peak: 0.26 });      // reversed swell
-  T(v, { t: 0.05, f: 2775, rise: 0.24, peak: 0.05 });
+sfx('deflect', { g: 0.832, verb: 0.28, max: 3, len: 1.2 }, (v) => {
+  crack(v, 0, 0.4, 3000, 9000, 0.012);
+  modes(v, 0, 1450, METAL, [0.55, 0.35, 0.22, 0.15], 0.14, [1, 0.6, 0.35, 0.2]);          // metallic ping
+  N(v, { t: 0.04, bp: 2200, bp1: 4200, fT: 0.22, q: 1.4, rise: 0.22, peak: 0.22, cut: 0.03 }); // reversed swell
+  N(v, { k: 'brown', lp: 400, peak: 0.25, d: 0.06 });
 });
 
-sfx('hit', { g: 0.806, verb: 0.02, max: 5, gap: 0.035, len: 0.25 }, (v) => {
-  T(v, { f: 1900, a: 0.0008, peak: 0.42, d: 0.05 });
-  T(v, { f: 3800, peak: 0.1, d: 0.025 });
-  N(v, { hp: 6000, peak: 0.12, d: 0.006 });
+sfx('hit', { g: 1.97, verb: 0.02, max: 4, gap: 0.035, len: 0.25 }, (v) => {
+  // Plays constantly: a soft, dull tick.
+  N(v, { k: 'pink', bp: 1300 * rand(0.9, 1.1), q: 1.8, lp: 3200, a: 0.0006, peak: 0.6, d: 0.022 });
+  T(v, { f: 540, a: 0.0008, peak: 0.07, d: 0.025 });
 });
 
-sfx('crit', { g: 0.492, verb: 0.08, max: 4, gap: 0.035, len: 0.4 }, (v) => {
-  FM(v, { f: 2800, ratio: 3.01, idx: 1.4, idx1: 0.1, peak: 0.35, d: 0.14 });
-  T(v, { f: 5600, peak: 0.06, d: 0.06 });
-  T(v, { t: 0.035, f: 4200, peak: 0.09, d: 0.1 });
-  T(v, { t: 0.065, f: 6300, peak: 0.06, d: 0.12 });
-  N(v, { hp: 6000, peak: 0.25, d: 0.006 });
+sfx('crit', { g: 1.19, verb: 0.06, max: 4, gap: 0.035, len: 0.35 }, (v) => {
+  // Slightly brighter ceramic tick.
+  N(v, { bp: 2400, q: 2.5, lp: 5500, a: 0.0006, peak: 0.45, d: 0.018 });
+  RES(v, { freqs: [2600, 3700], q: 24, k: 'white', a: 0.0006, peak: 0.6, d: 0.07 });
+  T(v, { f: 720, a: 0.0008, peak: 0.06, d: 0.03 });
 });
 
-sfx('kill', { g: 0.741, verb: 0.18, max: 4, prio: 2, gap: 0.03, len: 0.6 }, (v) => {
-  T(v, { f: 320, f1: 75, st: 0.1, peak: 0.85, d: 0.14 });                                 // deep pop
-  N(v, { hp: 3500, peak: 0.35, d: 0.1 });
-  FM(v, { t: 0.01, f: 2100, ratio: 2.41, idx: 2, idx1: 0.1, peak: 0.18, d: 0.22 });
-  RES(v, { t: 0.01, freqs: [3300, 4700, 6100], q: 30, k: 'crackle', rate: 1.2, peak: 4, d: 0.25 });
+sfx('kill', { g: 0.49, verb: 0.16, max: 4, prio: 2, gap: 0.03, len: 0.7 }, (v) => {
+  // Muted porcelain crunch.
+  thump(v, 0, 0.45, 120, 60, 0.08, 500);
+  N(v, { k: 'pink', bp: 1100, q: 0.8, peak: 0.6, d: 0.06 });                                // crunch
+  crack(v, 0, 0.3, 2400, 6000, 0.03);
+  RES(v, { freqs: [1700, 2500, 3300, 4200], q: 16, k: 'white', a: 0.0008, peak: 1.2, d: 0.16, lp: 5000 });
+  N(v, { t: 0.02, k: 'grit', bp: 2200, q: 0.7, lp: 5000, peak: 0.4, d: 0.22 });            // fragments
 });
 
-sfx('shatter', { g: 0.85, verb: 0.45, max: 3, prio: 3, duck: true, len: 1.6 }, (v) => {
-  glassBreak(v, 0, 1, 1.1, 0.9);
-  N(v, { k: 'wide', bp: 5200, q: 0.6, peak: 0.4, d: 0.4 });
-  T(v, { f: 3520, peak: 0.08, d: 0.4 });
-  T(v, { f: 170, f1: 34, st: 0.5, peak: 1, d: 0.7 });                                     // bass drop
-  T(v, { type: 'triangle', f: 85, f1: 30, st: 0.45, peak: 0.35, d: 0.5 });
-  RES(v, { t: 0.12, freqs: [2400, 3600, 5800, 7600], q: 40, k: 'crackle', rate: 0.7, a: 0.05, peak: 5, d: 0.75 }); // more rain
+sfx('shatter', { g: 0.563, verb: 0.42, max: 3, prio: 3, duck: true, len: 1.7 }, (v) => {
+  crack(v, 0, 0.6, 1400, 8500, 0.04, 'wide');
+  thump(v, 0, 0.7, 100, 40, 0.35, 320);
+  N(v, { k: 'pink', bp: 1100, q: 0.7, peak: 0.55, d: 0.2 });
+  RES(v, { freqs: [1500, 2300, 3100, 4400, 5600], q: 20, k: 'white', a: 0.0008, peak: 1.5, d: 0.35 });
+  RES(v, { t: 0.04, freqs: [2800, 3900, 5200, 6600], q: 30, k: 'crackle', a: 0.03, peak: 4.5, d: 0.9, lp: 7500 }); // glass rain
+  T(v, { f: 130, f1: 34, st: 0.55, a: 0.004, peak: 0.7, d: 0.65 });                        // bass drop
+  airTail(v, 0.02, 0.2, 1.0, 3000, 400);
 });
 
-sfx('footstep', { g: 0.572, verb: 0.04, max: 3, prio: 0, gap: 0.08, len: 0.3 }, (v) => {
-  const r = rand(0.85, 1.2);
-  T(v, { f: 95 * r, f1: 60 * r, st: 0.05, peak: 0.45, d: 0.07 });
-  N(v, { k: 'pink', bp: 1100 * r, q: 1.4, peak: 0.4, d: 0.055 });
-  T(v, { t: 0.004, f: rand(560, 820), peak: 0.03, d: 0.09 });                             // faint metal ring
+sfx('footstep', { g: 0.481, verb: 0.03, max: 3, prio: 0, gap: 0.08, len: 0.3 }, (v) => {
+  // Soft metallic deck step; every step picks a slightly different plate.
+  const r = rand(0.82, 1.2);
+  N(v, { k: 'brown', lp: 320 * r, a: 0.002, peak: 0.5, d: 0.05 });                          // heel
+  T(v, { f: 78 * r, f1: 55, st: 0.04, a: 0.002, peak: 0.25, d: 0.05 });
+  RES(v, { freqs: [410 * r, 1130 * r, 2350 * r], q: 12, k: 'pink', a: 0.001, peak: 0.45, d: 0.07 }); // deck plate
+  N(v, { t: 0.006, k: 'pink', bp: 2600 * r, q: 0.8, peak: 0.08, d: 0.03 });                 // scuff
 });
 
-sfx('jump', { g: 1.31, verb: 0.05, max: 2, len: 0.4 }, (v) => {
-  N(v, { k: 'pink', bp: 850, bp1: 380, fT: 0.12, q: 1, a: 0.012, peak: 0.5, d: 0.12 });
-  T(v, { f: 180, f1: 115, st: 0.06, peak: 0.22, d: 0.06 });
+sfx('jump', { g: 1.15, verb: 0.04, max: 2, len: 0.4 }, (v) => {
+  N(v, { k: 'pink', bp: 750, bp1: 420, fT: 0.1, q: 0.9, a: 0.01, peak: 0.45, d: 0.1 });    // air puff
+  N(v, { bp: 3000, q: 0.6, lp: 6000, a: 0.005, peak: 0.08, d: 0.06 });                      // cloth
+  N(v, { t: 0.01, bp: 1000, q: 8, a: 0.02, peak: 0.06, d: 0.08 });                           // servo
 });
 
-sfx('doubleJump', { g: 0.8, verb: 0.12, max: 2, len: 0.6 }, (v) => {
-  N(v, { bp: 1500, bp1: 600, fT: 0.22, q: 0.7, a: 0.01, peak: 0.55, d: 0.25 });           // thruster burst
-  N(v, { k: 'brown', lp: 420, a: 0.01, peak: 0.55, d: 0.2 });
-  T(v, { type: 'sawtooth', f: 115, f1: 80, st: 0.2, lp: 500, peak: 0.2, d: 0.2 });
-  N(v, { hp: 5000, peak: 0.2, d: 0.012 });
+sfx('doubleJump', { g: 0.385, verb: 0.1, max: 2, len: 0.6 }, (v) => {
+  N(v, { k: 'wide', lp: 3000, lp1: 700, fT: 0.25, a: 0.008, peak: 0.55, d: 0.26 });        // thruster burst
+  N(v, { k: 'brown', lp: 420, a: 0.008, peak: 0.55, d: 0.24 });
+  N(v, { k: 'crackle', hp: 1800, lp: 6000, a: 0.01, peak: 0.3, d: 0.16 });                  // sputter
 });
 
-sfx('land', { g: 0.725, verb: 0.08, max: 2, gap: 0.06, len: 0.5 }, (v) => {
-  T(v, { f: 110, f1: 45, st: 0.1, peak: 0.9, d: 0.15 });
-  N(v, { k: 'pink', lp: 900, peak: 0.6, d: 0.12 });
-  N(v, { bp: 2200, q: 3, peak: 0.22, d: 0.05 });                                          // metal clank
+sfx('land', { g: 0.346, verb: 0.07, max: 2, gap: 0.06, len: 0.5 }, (v) => {
+  thump(v, 0, 0.9, 90, 42, 0.13, 420);
+  RES(v, { freqs: [300, 780, 1650], q: 10, k: 'pink', a: 0.001, peak: 0.5, d: 0.1 });      // deck clank
+  N(v, { t: 0.02, bp: 900, q: 5, a: 0.02, peak: 0.08, d: 0.1 });                             // servo absorb
 });
 
-sfx('dash', { g: 0.757, verb: 0.1, max: 2, len: 0.6 }, (v) => {
-  N(v, { k: 'pink', bp: 400, bp1: 3000, fT: 0.2, q: 1.1, a: 0.03, peak: 0.65, d: 0.2 });  // whoosh
-  N(v, { hp: 3000, a: 0.01, peak: 0.25, d: 0.2 });                                        // thruster hiss
-  T(v, { type: 'sawtooth', f: 92, f1: 60, st: 0.15, lp: 420, peak: 0.22, d: 0.15 });
+sfx('dash', { g: 0.692, verb: 0.08, max: 2, len: 0.6 }, (v) => {
+  whoosh(v, 0, 0.65, 500, 2500, 0.22, 1.1);
+  N(v, { k: 'wide', hp: 2500, lp: 7000, a: 0.01, peak: 0.18, d: 0.2 });                    // thruster hiss
+  N(v, { k: 'brown', lp: 260, a: 0.01, peak: 0.4, d: 0.2 });                                // rumble
 });
 
-sfx('jumpPad', { g: 0.639, verb: 0.25, max: 2, len: 0.9 }, (v) => {
-  T(v, { type: 'sawtooth', f: 150, f1: 900, st: 0.35, lp: 800, lp1: 5000, fT: 0.35, det: -9, a: 0.02, peak: 0.22, d: 0.45 });
-  T(v, { type: 'sawtooth', f: 150, f1: 900, st: 0.35, lp: 800, lp1: 5000, fT: 0.35, det: 9, a: 0.02, peak: 0.22, d: 0.45 });
-  N(v, { bp: 500, bp1: 2500, fT: 0.35, q: 0.8, a: 0.02, peak: 0.55, d: 0.4 });           // air blast
-  T(v, { f: 120, f1: 50, st: 0.12, peak: 0.6, d: 0.15 });
+sfx('jumpPad', { g: 0.468, verb: 0.22, max: 2, len: 0.9 }, (v) => {
+  N(v, { k: 'wide', bp: 400, bp1: 2000, fT: 0.4, q: 0.8, a: 0.02, peak: 0.6, d: 0.42 });   // air blast
+  N(v, { k: 'brown', lp: 350, a: 0.01, peak: 0.5, d: 0.3 });
+  T(v, { f: 120, f1: 360, st: 0.4, a: 0.05, peak: 0.08, d: 0.35 });                         // soft rise
+  thump(v, 0, 0.55, 110, 48, 0.14, 400);
 });
 
-sfx('playerHurt', { g: 0.886, verb: 0.12, max: 2, prio: 3, duck: true, gap: 0.06, len: 0.7 }, (v) => {
-  T(v, { f: 130, f1: 50, st: 0.2, sh: 6, lp: 1400, peak: 0.6, d: 0.25 });                // distorted low hit
-  T(v, { f: 75, f1: 38, st: 0.2, peak: 0.6, d: 0.25 });
-  N(v, { k: 'crackle', bp: 2500, q: 0.7, peak: 0.8, d: 0.3 });                           // static crackle
-  N(v, { bp: 1200, q: 0.8, sh: 4, peak: 0.25, d: 0.15 });
+sfx('playerHurt', { g: 0.556, verb: 0.1, max: 2, prio: 3, duck: true, gap: 0.06, len: 0.7 }, (v) => {
+  T(v, { f: 95, f1: 42, st: 0.18, sh: 3, lp: 900, a: 0.001, peak: 0.6, d: 0.22 });         // distorted low hit
+  N(v, { k: 'brown', lp: 600, a: 0.001, peak: 0.6, d: 0.2 });
+  N(v, { k: 'crackle', bp: 2400, q: 0.7, lp: 6000, peak: 0.7, d: 0.28 });                   // static
+  RES(v, { freqs: [600, 1450, 2300], q: 12, k: 'white', a: 0.0008, peak: 0.5, d: 0.12 });  // armour clank
 });
 
-sfx('shieldBreak', { g: 0.713, verb: 0.3, max: 2, prio: 3, len: 1.2 }, (v) => {
-  glassBreak(v, 0, 0.85, 0.9, 0.5);
-  N(v, { t: 0.02, k: 'crackle', hp: 3000, rate: 1.4, peak: 0.6, d: 0.5 });              // electric fizz
-  T(v, { type: 'sawtooth', f: 800, f1: 100, st: 0.3, lp: 2500, peak: 0.16, d: 0.3 });
+sfx('shieldBreak', { g: 0.757, verb: 0.28, max: 2, prio: 3, len: 1.2 }, (v) => {
+  glassBreak(v, 0, 0.9, 0.9, 0.5);
+  N(v, { t: 0.02, k: 'crackle', hp: 2500, lp: 7000, rate: 1.3, peak: 0.55, d: 0.5 });      // electric fizz
+  thump(v, 0, 0.35, 100, 50, 0.12, 400);
 });
 
-sfx('shieldRegen', { g: 0.37, verb: 0.3, max: 2, len: 1.4 }, (v) => {
-  T(v, { f: 400, f1: 1600, st: 0.5, a: 0.3, peak: 0.22, d: 0.5 });                        // rising charge
-  T(v, { type: 'triangle', f: 800, f1: 3200, st: 0.5, a: 0.3, peak: 0.06, d: 0.4 });
-  bell(v, 0.45, 1600, 0.22, 0.55, 2, 1.2);                                                // chime
+sfx('shieldRegen', { g: 1.16, verb: 0.25, max: 2, len: 1.0 }, (v) => {
+  N(v, { k: 'pink', bp: 400, bp1: 2000, fT: 0.45, q: 2, rise: 0.45, peak: 0.28, cut: 0.08 }); // subtle charge
+  T(v, { f: 300, f1: 600, st: 0.45, a: 0.3, peak: 0.05, d: 0.25 });
+  N(v, { t: 0.45, bp: 3200, q: 2, lp: 6000, peak: 0.08, d: 0.06 });                          // settle
 });
 
-sfx('pickupHealth', { g: 0.42, verb: 0.2, max: 3, gap: 0.05, len: 0.8 }, (v) => {
-  T(v, { type: 'triangle', f: 659, peak: 0.32, d: 0.3 });
-  T(v, { f: 1318, peak: 0.08, d: 0.2 });
-  T(v, { t: 0.09, type: 'triangle', f: 880, peak: 0.34, d: 0.4 });
-  T(v, { t: 0.09, f: 1760, peak: 0.08, d: 0.3 });
+sfx('pickupHealth', { g: 0.359, verb: 0.18, max: 3, gap: 0.05, len: 0.7 }, (v) => {
+  T(v, { type: 'triangle', f: 330, lp: 1300, a: 0.02, peak: 0.25, d: 0.3 });                 // warm, muted
+  T(v, { t: 0.06, type: 'triangle', f: 495, lp: 1300, a: 0.02, peak: 0.2, d: 0.34 });
+  N(v, { k: 'pink', bp: 1500, q: 1.2, a: 0.03, peak: 0.08, d: 0.15 });
 });
 
-sfx('pickupShield', { g: 0.337, verb: 0.25, max: 3, gap: 0.05, len: 0.8 }, (v) => {
-  bell(v, 0, 1320, 0.26, 0.4, 3.5, 1.2);
-  bell(v, 0.07, 1760, 0.24, 0.5, 3.5, 1.2);
-  T(v, { t: 0.07, f: 3520, peak: 0.04, d: 0.3 });
+sfx('pickupShield', { g: 0.821, verb: 0.2, max: 3, gap: 0.05, len: 0.7 }, (v) => {
+  N(v, { bp: 3200, q: 4, lp: 6000, a: 0.04, peak: 0.25, d: 0.18 });                         // cool shimmer
+  T(v, { f: 660, a: 0.02, peak: 0.07, d: 0.3 });
+  RES(v, { freqs: [1800, 2700], q: 28, k: 'white', a: 0.01, peak: 0.5, d: 0.2 });
 });
 
-sfx('pickupOrb', { g: 0.533, verb: 0.15, max: 4, prio: 0, gap: 0.04, len: 0.4 }, (v) => {
-  T(v, { f: 2600, peak: 0.2, d: 0.08 });
-  T(v, { t: 0.03, f: 3900, peak: 0.15, d: 0.1 });
+sfx('pickupOrb', { g: 1.12, verb: 0.12, max: 4, prio: 0, gap: 0.04, len: 0.3 }, (v) => {
+  N(v, { bp: 3600 * rand(0.9, 1.15), q: 5, lp: 6000, a: 0.002, peak: 0.3, d: 0.04 });
+  T(v, { f: 1250 * rand(0.95, 1.1), a: 0.002, peak: 0.05, d: 0.06 });
 });
 
-sfx('overdriveReady', { g: 0.42, verb: 0.2, max: 1, len: 1.0 }, (v) => {
-  [440, 587.3, 880].forEach((f, i) => {
-    const d = i === 2 ? 0.5 : 0.16;
-    T(v, { t: i * 0.1, type: 'square', f, lp: 2400, peak: 0.12, hold: 0.04, d });
-    T(v, { t: i * 0.1, f: f * 2, peak: 0.14, hold: 0.03, d });
+sfx('overdriveReady', { g: 0.575, verb: 0.2, max: 1, len: 1.0 }, (v) => {
+  // Three soft rising pulses, muted.
+  [220, 277, 330].forEach((f, i) => {
+    T(v, { t: i * 0.11, type: 'sawtooth', f, lp: 700, a: 0.012, peak: 0.16, d: i === 2 ? 0.45 : 0.14 });
+    T(v, { t: i * 0.11, f: f / 2, a: 0.01, peak: 0.25, d: 0.14 });
   });
+  N(v, { k: 'pink', bp: 600, bp1: 2400, fT: 0.35, q: 1.5, rise: 0.33, peak: 0.12, cut: 0.1 });
 });
 
-sfx('overdriveStart', { g: 0.599, verb: 0.45, max: 1, prio: 3, len: 1.8 }, (v) => {
-  T(v, { f: 95, f1: 28, st: 0.8, peak: 1, d: 0.9 });                                      // massive whoomp
-  N(v, { k: 'brown', lp: 700, lp1: 150, fT: 0.6, peak: 0.8, d: 0.7 });
-  N(v, { k: 'wide', lp: 4000, lp1: 300, fT: 0.3, peak: 0.5, d: 0.35 });
-  N(v, { t: 0.08, bp: 1800, bp1: 4200, fT: 0.4, q: 0.9, rise: 0.42, peak: 0.32 });       // reversed swell
-  T(v, { type: 'sawtooth', f: 800, f1: 60, st: 1.0, lp: 2600, lp1: 300, fT: 1.0, peak: 0.2, d: 1.1 }); // time-slow sweep
-  T(v, { type: 'sawtooth', f: 806, f1: 60.4, st: 1.0, lp: 2600, lp1: 300, fT: 1.0, peak: 0.16, d: 1.1 });
+sfx('overdriveStart', { g: 0.389, verb: 0.42, max: 1, prio: 3, len: 1.9 }, (v) => {
+  T(v, { f: 70, f1: 28, st: 0.8, a: 0.003, peak: 1, d: 1.0 });                               // whoomp
+  N(v, { k: 'brown', lp: 400, a: 0.003, peak: 0.8, d: 0.8 });
+  N(v, { k: 'wide', lp: 3000, lp1: 200, fT: 0.4, peak: 0.5, d: 0.45 });
+  N(v, { t: 0.06, k: 'pink', bp: 600, bp1: 3000, fT: 0.4, q: 1, rise: 0.4, peak: 0.3, cut: 0.05 }); // reversed swell
+  N(v, { t: 0.1, k: 'pink', bp: 2500, bp1: 150, fT: 1.1, q: 1.6, a: 0.05, peak: 0.35, d: 1.1 });    // time-slow sweep down
 });
 
-sfx('overdriveEnd', { g: 0.804, verb: 0.3, max: 1, len: 1.0 }, (v) => {
-  T(v, { type: 'sawtooth', f: 80, f1: 900, st: 0.5, lp: 400, lp1: 4000, fT: 0.5, a: 0.05, peak: 0.25, d: 0.55 });
-  N(v, { bp: 300, bp1: 3000, fT: 0.5, q: 0.9, a: 0.1, peak: 0.4, d: 0.45 });
-  N(v, { t: 0.5, hp: 4000, peak: 0.3, d: 0.02 });
-  T(v, { t: 0.5, f: 180, f1: 90, peak: 0.4, d: 0.1 });
+sfx('overdriveEnd', { g: 0.776, verb: 0.28, max: 1, len: 1.0 }, (v) => {
+  N(v, { k: 'pink', bp: 200, bp1: 3000, fT: 0.5, q: 1.2, rise: 0.5, peak: 0.45, cut: 0.05 }); // time resumes
+  thump(v, 0.5, 0.4, 150, 70, 0.1, 500);
+  crack(v, 0.5, 0.15, 3000, 8000, 0.012);
 });
 
-sfx('lowHealth', { g: 0.442, verb: 0.02, max: 1, gap: 0.3, len: 0.7 }, (v) => {
+sfx('lowHealth', { g: 0.282, verb: 0.02, max: 1, gap: 0.3, len: 0.7 }, (v) => {
   heartbeat(v, 0, 1);
 });
 
-sfx('weaponUnlock', { g: 0.479, verb: 0.45, max: 1, prio: 2, len: 2.0 }, (v) => {
-  const chord = [146.8, 220, 293.7, 370, 440];                                            // D major, heroic
-  const lp = vNode(v, v.ctx.createBiquadFilter());
-  lp.type = 'lowpass';
-  lp.frequency.setValueAtTime(5000, v.t);
-  lp.frequency.exponentialRampToValueAtTime(900, v.t + 1.2);
-  lp.connect(v.out);
-  for (const f of chord) {
-    T(v, { type: 'sawtooth', f, det: -8, a: 0.005, peak: 0.13, d: 1.3, to: lp });
-    T(v, { type: 'sawtooth', f, det: 8, a: 0.005, peak: 0.13, d: 1.3, to: lp });
-  }
-  T(v, { f: 73.4, a: 0.004, peak: 0.6, d: 0.9 });
-  N(v, { k: 'wide', lp: 5000, lp1: 400, fT: 0.4, peak: 0.45, d: 0.4 });
-  bell(v, 0.02, 1174.7, 0.12, 1.0, 2, 1);
+sfx('weaponUnlock', { g: 0.385, verb: 0.42, max: 1, prio: 2, len: 2.2 }, (v) => {
+  brass(v, 0, [73.4, 110, 146.8, 220, 293.7, 370], 0.06, 0.06, 0.5, 1.1, 1600, false); // D major brass hit
+  thump(v, 0, 0.6, 80, 36, 0.6, 250);
+  N(v, { k: 'wide', lp: 4000, lp1: 300, fT: 0.4, peak: 0.35, d: 0.4 });
+  airTail(v, 0.02, 0.2, 1.4, 2000, 300);
 });
 
 /* ---------------------------------- Enemies -------------------------------- */
 
-sfx('enemyWarpIn', { g: 0.301, verb: 0.4, max: 4, len: 1.4 }, (v) => {
-  FM(v, { f: 600, f1: 2400, st: 0.6, ratio: 1.5, idx: 3, idx1: 1, a: 0.5, peak: 0.2, d: 0.2 }); // rising shimmer
-  RES(v, { freqs: [1800, 2700, 3900, 5300], q: 25, k: 'white', rise: 0.55, peak: 1.4, cut: 0.08 });
-  T(v, { t: 0.1, f: 90, f1: 30, st: 0.55, a: 0.05, peak: 0.6, d: 0.6 });                 // sub drop
-  N(v, { t: 0.58, hp: 3000, peak: 0.3, d: 0.05 });                                        // arrival tick
-  bell(v, 0.58, 2093, 0.1, 0.4, 2.76, 2);
-});
-
-sfx('miteScreech', { g: 1.02, verb: 0.15, max: 3, gap: 0.06, len: 0.5 }, (v) => {
-  T(v, { type: 'sawtooth', f: 1200, path: [[0.08, 2700], [0.26, 1400]], bp: 2400, q: 4, a: 0.01, peak: 0.45, d: 0.26 });
-  FM(v, { f: 1800, path: [[0.08, 3300], [0.24, 2000]], ratio: 1.41, idx: 2, idx1: 1, a: 0.01, peak: 0.15, d: 0.24 });
-});
-
-sfx('miteExplode', { g: 1.3, verb: 0.25, max: 4, prio: 2, len: 0.8 }, (v) => {
-  T(v, { f: 420, f1: 100, st: 0.1, peak: 0.7, d: 0.12 });
-  N(v, { lp: 4000, lp1: 500, fT: 0.2, peak: 0.6, d: 0.2 });
-  N(v, { t: 0.02, k: 'crackle', bp: 2800, q: 0.7, peak: 0.8, d: 0.3 });
-  RES(v, { freqs: [2900, 4100], q: 25, peak: 3, d: 0.2 });
-});
-
-sfx('sentinelCharge', { g: 0.345, verb: 0.2, max: 3, len: 0.9 }, (v) => {
-  T(v, { type: 'sawtooth', f: 200, f1: 800, st: 0.5, lp: 900, lp1: 2200, fT: 0.5, a: 0.4, peak: 0.25, d: 0.1 });
-  T(v, { f: 400, f1: 1600, st: 0.5, a: 0.45, peak: 0.18, d: 0.08 });
-  N(v, { k: 'crackle', hp: 2000, a: 0.4, peak: 0.35, d: 0.1 });
-});
-
-sfx('orbFire', { g: 0.644, verb: 0.22, max: 4, len: 0.6 }, (v) => {
-  T(v, { f: 420, f1: 170, st: 0.25, peak: 0.6, d: 0.3 });                                 // bwoom
-  FM(v, { f: 300, f1: 160, st: 0.25, ratio: 0.5, idx: 4, idx1: 0.5, peak: 0.25, d: 0.25 });
-  N(v, { k: 'pink', bp: 800, q: 1.2, peak: 0.35, d: 0.18 });
-});
-
-sfx('orbImpact', { g: 0.849, verb: 0.25, max: 4, len: 0.6 }, (v) => {
-  N(v, { bp: 1500, bp1: 400, fT: 0.3, q: 0.9, peak: 0.6, d: 0.3 });                       // plasma splash
-  T(v, { f: 260, f1: 60, st: 0.2, peak: 0.6, d: 0.2 });
-  N(v, { t: 0.01, k: 'crackle', bp: 2500, q: 0.8, peak: 0.6, d: 0.25 });
-});
-
-sfx('lancerCharge', { g: 0.452, verb: 0.25, max: 3, prio: 2, len: 1.8 }, (v) => {
-  // Rising whine with an accelerating pulse — an unmistakable warning.
-  const pulse = vNode(v, v.ctx.createGain());
-  pulse.gain.value = 0.65;
-  pulse.connect(v.out);
-  const lfo = vNode(v, v.ctx.createOscillator());
-  const lfoAmt = vNode(v, v.ctx.createGain());
-  lfo.type = 'square';
-  lfo.frequency.setValueAtTime(5, v.t);
-  lfo.frequency.exponentialRampToValueAtTime(26, v.t + 1.4);
-  lfoAmt.gain.value = 0.35;
-  lfo.connect(lfoAmt);
-  lfoAmt.connect(pulse.gain);
-  vSrc(v, lfo, v.t, v.t + 1.5);
-  T(v, { type: 'sawtooth', f: 300, f1: 2400, st: 1.4, lp: 1400, lp1: 4200, fT: 1.4, a: 1.25, peak: 0.34, hold: 0.1, d: 0.05, to: pulse });
-  T(v, { f: 600, f1: 4800, st: 1.4, a: 1.3, peak: 0.12, hold: 0.05, d: 0.05, to: pulse });
-  T(v, { type: 'square', f: 150, f1: 1200, st: 1.4, lp: 900, a: 1.2, peak: 0.1, hold: 0.1, d: 0.05, to: pulse });
-});
-
-sfx('lancerFire', { g: 1.54, verb: 0.3, max: 3, prio: 2, len: 0.8 }, (v) => {
-  N(v, { k: 'wide', hp: 3000, peak: 0.8, d: 0.04 });
-  T(v, { type: 'sawtooth', f: 3200, f1: 400, st: 0.15, lp: 6000, lp1: 1500, fT: 0.15, peak: 0.3, d: 0.2 });
-  T(v, { f: 150, f1: 50, st: 0.15, peak: 0.55, d: 0.15 });
-  N(v, { t: 0.02, k: 'crackle', bp: 3500, q: 0.8, peak: 0.5, d: 0.25 });
-});
-
-sfx('bruteRev', { g: 0.306, verb: 0.2, max: 2, len: 1.2 }, (v) => {
-  const growl = vNode(v, v.ctx.createGain());
-  growl.gain.value = 0.6;
-  growl.connect(v.out);
+/** Smooth amplitude flutter (sine / triangle LFO on a gain — never square: no clicks). */
+function flutter(v, dest, base, depth, r0, r1, dur, type = 'sine') {
+  const g = vNode(v, v.ctx.createGain());
+  g.gain.value = base;
+  g.connect(dest);
   const lfo = vNode(v, v.ctx.createOscillator());
   const amt = vNode(v, v.ctx.createGain());
-  lfo.frequency.setValueAtTime(22, v.t);
-  lfo.frequency.linearRampToValueAtTime(34, v.t + 0.4);
-  lfo.frequency.linearRampToValueAtTime(26, v.t + 0.8);
-  amt.gain.value = 0.4;
-  lfo.connect(amt); amt.connect(growl.gain);
-  vSrc(v, lfo, v.t, v.t + 0.9);
-  T(v, { type: 'sawtooth', f: 45, path: [[0.35, 95], [0.8, 60]], sh: 5, lp: 900, a: 0.05, peak: 0.55, hold: 0.4, d: 0.35, to: growl });
-  T(v, { type: 'square', f: 44, path: [[0.35, 94], [0.8, 59]], lp: 500, a: 0.05, peak: 0.25, hold: 0.4, d: 0.35, to: growl });
-  N(v, { k: 'brown', lp: 350, a: 0.08, peak: 0.5, hold: 0.3, d: 0.4 });
+  lfo.type = type;
+  lfo.frequency.setValueAtTime(r0, v.t);
+  if (r1 !== r0) lfo.frequency.exponentialRampToValueAtTime(r1, v.t + dur);
+  amt.gain.value = depth;
+  lfo.connect(amt); amt.connect(g.gain);
+  vSrc(v, lfo, v.t, v.t + dur + 0.1);
+  return g;
+}
+
+sfx('enemyWarpIn', { g: 0.313, verb: 0.35, max: 3, gap: 0.08, len: 1.0 }, (v) => {
+  // Frequent: soft airy whoosh in, low thud on arrival.
+  N(v, { k: 'pink', bp: 600, bp1: 2000, fT: 0.3, q: 1.1, rise: 0.3, peak: 0.4, cut: 0.06 });
+  RES(v, { freqs: [2400, 3600], q: 20, k: 'white', rise: 0.3, peak: 0.35, cut: 0.06 });   // faint crystal shimmer
+  T(v, { t: 0.3, f: 72, f1: 40, st: 0.15, a: 0.003, peak: 0.55, d: 0.2 });
+  N(v, { t: 0.3, k: 'brown', lp: 220, a: 0.003, peak: 0.45, d: 0.2 });
 });
 
-sfx('bruteCharge', { g: 0.366, verb: 0.2, max: 2, len: 1.4 }, (v) => {
-  N(v, { k: 'brown', lp: 500, lp1: 1300, fT: 0.8, a: 0.1, peak: 0.8, hold: 0.4, d: 0.5 });
-  const growl = vNode(v, v.ctx.createGain());
-  growl.gain.value = 0.6;
-  growl.connect(v.out);
-  const lfo = vNode(v, v.ctx.createOscillator());
-  const amt = vNode(v, v.ctx.createGain());
-  lfo.frequency.value = 18;
-  amt.gain.value = 0.4;
-  lfo.connect(amt); amt.connect(growl.gain);
-  vSrc(v, lfo, v.t, v.t + 1.1);
-  T(v, { type: 'sawtooth', f: 70, f1: 85, st: 0.9, sh: 4, lp: 650, a: 0.08, peak: 0.5, hold: 0.45, d: 0.45, to: growl });
-  N(v, { bp: 800, q: 0.7, a: 0.5, peak: 0.3, hold: 0.2, d: 0.3 });
+sfx('miteScreech', { g: 1.09, verb: 0.14, max: 3, gap: 0.06, len: 0.5 }, (v) => {
+  // Insect-like chitter: two resonant noise chirps.
+  N(v, { bp: 2000, bp1: 3600, fT: 0.1, q: 8, lp: 6000, a: 0.01, peak: 0.6, d: 0.15 });
+  N(v, { t: 0.08, bp: 3300, bp1: 1800, fT: 0.18, q: 8, lp: 6000, a: 0.01, peak: 0.5, d: 0.2 });
+  T(v, { type: 'triangle', f: 1400, path: [[0.08, 2200], [0.25, 1300]], lp: 3000, a: 0.01, peak: 0.04, d: 0.24 });
 });
 
-sfx('bruteSlam', { g: 0.85, verb: 0.4, max: 2, prio: 3, duck: true, len: 1.8 }, (v) => {
-  T(v, { f: 80, f1: 24, st: 0.6, peak: 1, d: 0.8 });                                      // sub boom
+sfx('miteExplode', { g: 0.543, verb: 0.22, max: 4, prio: 2, len: 0.8 }, (v) => {
+  thump(v, 0, 0.6, 180, 60, 0.1, 600);
+  N(v, { k: 'wide', lp: 3200, lp1: 500, fT: 0.16, peak: 0.6, d: 0.18 });
+  N(v, { t: 0.02, k: 'crackle', bp: 2600, q: 0.7, lp: 6500, peak: 0.7, d: 0.3 });
+  RES(v, { freqs: [1900, 2800, 3900], q: 18, k: 'white', a: 0.0008, peak: 0.8, d: 0.12 });
+});
+
+sfx('sentinelCharge', { g: 0.367, verb: 0.18, max: 3, len: 0.9 }, (v) => {
+  T(v, { type: 'triangle', f: 110, f1: 220, st: 0.5, lp: 700, a: 0.4, peak: 0.3, d: 0.1 });  // low hum
+  N(v, { k: 'pink', bp: 400, bp1: 1800, fT: 0.5, q: 4, rise: 0.5, peak: 0.4, cut: 0.06 });   // rising air
+  N(v, { k: 'crackle', hp: 2000, lp: 6500, rise: 0.5, peak: 0.3, cut: 0.05 });
+});
+
+sfx('orbFire', { g: 0.331, verb: 0.2, max: 4, len: 0.6 }, (v) => {
+  T(v, { f: 180, f1: 85, st: 0.22, a: 0.003, peak: 0.7, d: 0.25 });                          // bwoom
+  N(v, { k: 'brown', lp: 800, a: 0.003, peak: 0.55, d: 0.24 });
+  whoosh(v, 0, 0.3, 900, 400, 0.28, 1.5);
+});
+
+sfx('orbImpact', { g: 0.569, verb: 0.24, max: 4, len: 0.7 }, (v) => {
+  N(v, { k: 'pink', bp: 1200, bp1: 300, fT: 0.3, q: 0.9, peak: 0.6, d: 0.32 });             // plasma splash
+  thump(v, 0, 0.5, 120, 50, 0.18, 400);
+  N(v, { t: 0.01, k: 'crackle', bp: 2500, q: 0.8, lp: 6500, peak: 0.6, d: 0.3 });
+  N(v, { k: 'wide', hp: 3500, lp: 7500, a: 0.01, peak: 0.1, d: 0.35 });                       // sizzle
+});
+
+sfx('lancerCharge', { g: 0.507, verb: 0.22, max: 2, prio: 2, len: 1.8 }, (v) => {
+  // Clear warning without a piercing whine: rising servo/air with a soft tonal core
+  // and a smooth, accelerating pulse.
+  const pulse = flutter(v, v.out, 0.72, 0.28, 4, 14, 1.45);
+  N(v, { k: 'pink', bp: 420, bp1: 2800, fT: 1.4, q: 5, a: 1.3, peak: 0.55, hold: 0.05, d: 0.08, to: pulse });
+  T(v, { type: 'triangle', f: 170, f1: 680, st: 1.4, lp: 1600, a: 1.25, peak: 0.28, hold: 0.1, d: 0.06, to: pulse });
+  T(v, { f: 85, f1: 340, st: 1.4, a: 1.2, peak: 0.2, hold: 0.1, d: 0.06, to: pulse });
+  N(v, { k: 'crackle', hp: 2200, lp: 6500, a: 1.3, peak: 0.25, hold: 0.05, d: 0.06 });
+});
+
+sfx('lancerFire', { g: 0.683, verb: 0.28, max: 3, prio: 2, len: 0.9 }, (v) => {
+  crack(v, 0, 0.55, 2500, 9000, 0.028, 'wide');
+  N(v, { k: 'pink', bp: 1800, q: 0.8, peak: 0.7, d: 0.07 });
+  thump(v, 0, 0.6, 110, 45, 0.2, 400);
+  N(v, { t: 0.02, k: 'crackle', bp: 3300, q: 0.8, lp: 7000, peak: 0.55, d: 0.35 });
+  T(v, { type: 'triangle', f: 1400, f1: 300, st: 0.12, lp: 3000, peak: 0.05, d: 0.12 });
+  airTail(v, 0.01, 0.15, 0.6, 2400, 400);
+});
+
+sfx('bruteRev', { g: 0.427, verb: 0.18, max: 2, len: 1.2 }, (v) => {
+  const growl = flutter(v, v.out, 0.6, 0.35, 22, 30, 0.9, 'triangle');
+  T(v, { type: 'sawtooth', f: 45, path: [[0.35, 90], [0.8, 58]], lp: 420, sh: 2, a: 0.05, peak: 0.5, hold: 0.4, d: 0.35, to: growl });
+  N(v, { k: 'brown', lp: 350, lp1: 700, fT: 0.35, a: 0.08, peak: 0.6, hold: 0.3, d: 0.4, to: growl });
+  N(v, { k: 'pink', bp: 500, q: 1.5, a: 0.1, peak: 0.2, hold: 0.25, d: 0.35 });
+});
+
+sfx('bruteCharge', { g: 0.452, verb: 0.18, max: 2, len: 1.4 }, (v) => {
+  N(v, { k: 'brown', lp: 450, lp1: 1100, fT: 0.8, a: 0.1, peak: 0.8, hold: 0.4, d: 0.5 });
+  const growl = flutter(v, v.out, 0.6, 0.35, 16, 16, 1.1, 'triangle');
+  T(v, { type: 'sawtooth', f: 62, f1: 76, st: 0.9, lp: 480, sh: 2, a: 0.08, peak: 0.45, hold: 0.45, d: 0.45, to: growl });
+  N(v, { k: 'pink', bp: 700, q: 0.8, a: 0.5, peak: 0.3, hold: 0.2, d: 0.3 });
+});
+
+sfx('bruteSlam', { g: 0.403, verb: 0.38, max: 2, prio: 3, duck: true, len: 1.8 }, (v) => {
+  T(v, { f: 70, f1: 24, st: 0.6, a: 0.002, peak: 1, d: 0.8 });                               // sub boom
   N(v, { k: 'wide', lp: 3000, lp1: 200, fT: 0.5, peak: 0.85, d: 0.6 });
-  N(v, { t: 0.03, k: 'grit', bp: 1500, q: 0.6, a: 0.02, peak: 0.6, d: 0.8 });             // debris
-  T(v, { type: 'triangle', f: 55, f1: 30, sh: 4, lp: 800, peak: 0.35, d: 0.5 });
-  N(v, { hp: 1500, peak: 0.4, d: 0.03 });
+  N(v, { t: 0.03, k: 'grit', bp: 1500, q: 0.6, lp: 5000, a: 0.02, peak: 0.6, d: 0.8 });     // debris
+  RES(v, { freqs: [180, 460, 1020], q: 8, k: 'white', a: 0.001, peak: 0.6, d: 0.3 });        // deck resonance
+  crack(v, 0, 0.35, 1500, 7000, 0.03);
+  airTail(v, 0.02, 0.25, 1.2, 1500, 200);
 });
 
-sfx('shockwave', { g: 0.869, verb: 0.35, max: 3, len: 1.1 }, (v) => {
-  N(v, { k: 'pink', bp: 2000, bp1: 280, fT: 0.6, q: 1.1, a: 0.02, peak: 0.7, d: 0.65 }); // expanding whoosh
-  FM(v, { f: 220, f1: 110, st: 0.6, ratio: 1.41, idx: 2.5, idx1: 0.3, peak: 0.2, d: 0.7 }); // ring
-  T(v, { f: 70, f1: 40, st: 0.3, peak: 0.4, d: 0.3 });
+sfx('shockwave', { g: 0.978, verb: 0.32, max: 3, len: 1.1 }, (v) => {
+  N(v, { k: 'pink', bp: 1800, bp1: 250, fT: 0.6, q: 1.1, a: 0.02, peak: 0.7, d: 0.65 });   // expanding whoosh
+  N(v, { k: 'brown', lp: 300, a: 0.02, peak: 0.5, d: 0.5 });
+  RES(v, { freqs: [220, 330, 470], q: 25, k: 'pink', a: 0.02, peak: 0.6, d: 0.6 });          // low ring
 });
 
-sfx('wardenShield', { g: 0.392, verb: 0.3, max: 2, len: 1.1 }, (v) => {
-  T(v, { type: 'sawtooth', f: 110, f1: 220, st: 0.4, lp: 400, lp1: 2000, fT: 0.4, a: 0.3, peak: 0.25, d: 0.5 });
-  T(v, { f: 440, f1: 880, st: 0.4, a: 0.3, peak: 0.14, d: 0.5 });
-  FM(v, { t: 0.2, f: 1320, ratio: 1.5, idx: 1.5, a: 0.15, peak: 0.1, d: 0.5 });
+sfx('wardenShield', { g: 0.295, verb: 0.28, max: 2, len: 1.1 }, (v) => {
+  T(v, { type: 'triangle', f: 180, f1: 260, st: 0.4, lp: 700, a: 0.3, peak: 0.25, d: 0.5 }); // hum-up
+  T(v, { f: 90, f1: 130, st: 0.4, a: 0.3, peak: 0.25, d: 0.5 });
+  N(v, { bp: 3000, q: 4, lp: 6000, rise: 0.4, peak: 0.14, cut: 0.2 });
+  RES(v, { t: 0.3, freqs: [1400, 2100], q: 25, k: 'white', a: 0.01, peak: 0.4, d: 0.3 });
 });
 
-sfx('shieldHit', { g: 0.593, verb: 0.2, max: 4, gap: 0.04, len: 0.5 }, (v) => {
-  FM(v, { f: 1500, ratio: 1.41, idx: 2, idx1: 0.2, peak: 0.4, d: 0.25 });
-  N(v, { bp: 3000, q: 1.5, peak: 0.4, d: 0.04 });
-  T(v, { f: 800, f1: 600, st: 0.15, peak: 0.15, d: 0.15 });
+sfx('shieldHit', { g: 1.02, verb: 0.18, max: 4, gap: 0.04, len: 0.5 }, (v) => {
+  RES(v, { freqs: [1300, 1950, 2900], q: 26, k: 'white', a: 0.0008, peak: 1, d: 0.16 });   // energy deflection
+  N(v, { bp: 2500, q: 1.5, lp: 6000, peak: 0.3, d: 0.03 });
+  T(v, { f: 200, f1: 120, st: 0.06, peak: 0.15, d: 0.07 });
 });
 
-sfx('enemyHurt', { g: 0.744, verb: 0.08, max: 4, gap: 0.035, len: 0.3 }, (v) => {
-  FM(v, { f: 2200 * rand(0.9, 1.15), ratio: 2.7, idx: 1.6, idx1: 0.1, peak: 0.3, d: 0.08 });
-  N(v, { hp: 4000, peak: 0.25, d: 0.02 });
+sfx('enemyHurt', { g: 1.47, verb: 0.06, max: 4, gap: 0.035, len: 0.3 }, (v) => {
+  const r = rand(0.88, 1.15);
+  RES(v, { freqs: [2100 * r, 3200 * r], q: 18, k: 'white', a: 0.0008, peak: 0.7, d: 0.06 }); // ceramic chip
+  N(v, { k: 'pink', bp: 1800 * r, q: 1, lp: 5000, peak: 0.3, d: 0.02 });
 });
 
-sfx('enemyDeath', { g: 0.6, verb: 0.3, max: 4, prio: 2, len: 1.0 }, (v) => {
+sfx('enemyDeath', { g: 0.589, verb: 0.28, max: 4, prio: 2, len: 1.0 }, (v) => {
   glassBreak(v, 0, 1, 0.8, 0.45);
-  T(v, { f: 220, f1: 60, st: 0.22, peak: 0.55, d: 0.25 });
-  // electrical death rattle
-  const rattle = vNode(v, v.ctx.createGain());
-  rattle.gain.value = 0.5;
-  rattle.connect(v.out);
-  const lfo = vNode(v, v.ctx.createOscillator());
-  const amt = vNode(v, v.ctx.createGain());
-  lfo.type = 'square';
-  lfo.frequency.setValueAtTime(32, v.t);
-  lfo.frequency.linearRampToValueAtTime(12, v.t + 0.5);
-  amt.gain.value = 0.5;
-  lfo.connect(amt); amt.connect(rattle.gain);
-  vSrc(v, lfo, v.t, v.t + 0.55);
-  T(v, { type: 'square', f: 90, f1: 30, st: 0.5, lp: 1200, peak: 0.22, d: 0.5, to: rattle });
-  N(v, { t: 0.03, k: 'crackle', bp: 2500, q: 0.7, peak: 0.6, d: 0.45, to: rattle });
+  thump(v, 0, 0.45, 160, 55, 0.2, 500);
+  // electrical death rattle (smooth LFO: no clicks)
+  const rattle = flutter(v, v.out, 0.5, 0.45, 28, 10, 0.5, 'triangle');
+  N(v, { t: 0.03, k: 'crackle', bp: 2400, q: 0.7, lp: 6500, peak: 0.7, d: 0.45, to: rattle });
+  N(v, { t: 0.03, k: 'brown', lp: 500, peak: 0.25, d: 0.4, to: rattle });
 });
 
-sfx('enemyDeathBig', { g: 0.444, verb: 0.4, max: 3, prio: 3, len: 1.8 }, (v) => {
+sfx('enemyDeathBig', { g: 0.432, verb: 0.38, max: 3, prio: 3, len: 1.9 }, (v) => {
   glassBreak(v, 0, 1.5, 1, 0.9);
-  explosion(v, 0.02, 0.8, 0.6);
-  T(v, { f: 150, f1: 35, st: 0.4, peak: 0.6, d: 0.5 });
-  N(v, { t: 0.05, k: 'crackle', bp: 2200, q: 0.6, peak: 0.7, d: 0.8 });
+  explosion(v, 0.02, 0.8, 0.55);
+  N(v, { t: 0.05, k: 'crackle', bp: 2200, q: 0.6, lp: 6500, peak: 0.6, d: 0.8 });
 });
 
-sfx('bossRoar', { g: 0.501, verb: 0.5, max: 1, prio: 3, duck: true, len: 3.0 }, (v) => {
-  // Alien choir scream: dissonant saws → formant bank, vibrato, sub.
+sfx('bossRoar', { g: 0.437, verb: 0.48, max: 1, prio: 3, duck: true, len: 3.0 }, (v) => {
+  // Alien choir scream: dissonant saws → formant bank, vibrato, breath, sub.
   const bank = vNode(v, v.ctx.createGain());
-  bank.gain.value = 1;
-  const formants = [[700, 6, 1], [1150, 8, 0.7], [2600, 10, 0.35]];
-  for (const [f, q, gn] of formants) {
+  for (const [f, q, gn] of [[700, 6, 1], [1150, 8, 0.6], [2600, 10, 0.25]]) {
     const bp = vNode(v, v.ctx.createBiquadFilter());
     bp.type = 'bandpass'; bp.Q.value = q;
     bp.frequency.setValueAtTime(f * 0.8, v.t);
-    bp.frequency.linearRampToValueAtTime(f * 1.25, v.t + 0.8);   // 'ah' → 'ee'-ish
+    bp.frequency.linearRampToValueAtTime(f * 1.2, v.t + 0.8);
     bp.frequency.linearRampToValueAtTime(f * 0.9, v.t + 2.0);
     const g = vNode(v, v.ctx.createGain());
     g.gain.value = gn;
@@ -899,185 +947,179 @@ sfx('bossRoar', { g: 0.501, verb: 0.5, max: 1, prio: 3, duck: true, len: 3.0 }, 
   }
   const vib = vNode(v, v.ctx.createOscillator());
   const vibAmt = vNode(v, v.ctx.createGain());
-  vib.frequency.value = 6.5;
-  vibAmt.gain.value = 35;
+  vib.frequency.value = 6;
+  vibAmt.gain.value = 30;
   vib.connect(vibAmt);
   vSrc(v, vib, v.t, v.t + 2.2);
   for (const f of [110, 116.5, 164.8, 233]) {
-    const r = T(v, { type: 'sawtooth', f, path: [[0.35, f * 1.35], [2.0, f * 0.8]], a: 0.12, peak: 0.28, hold: 0.9, d: 0.9, to: bank });
+    const r = T(v, { type: 'sawtooth', f, path: [[0.35, f * 1.3], [2.0, f * 0.8]], a: 0.12, peak: 0.26, hold: 0.9, d: 0.9, to: bank });
     vibAmt.connect(r.osc.detune);
   }
-  T(v, { f: 46, f1: 36, st: 1.8, a: 0.08, peak: 0.8, hold: 0.8, d: 1.0 });               // sub
-  N(v, { k: 'pink', bp: 1500, q: 0.8, a: 0.15, peak: 0.3, hold: 0.7, d: 0.9 });          // breath
-  FM(v, { f: 330, path: [[0.35, 440], [2, 260]], ratio: 1.414, idx: 3, idx1: 1, a: 0.1, peak: 0.12, hold: 0.8, d: 0.9 }); // ring edge
+  T(v, { f: 46, f1: 36, st: 1.8, a: 0.08, peak: 0.8, hold: 0.8, d: 1.0 });                  // sub
+  N(v, { k: 'pink', bp: 1400, q: 0.8, a: 0.15, peak: 0.35, hold: 0.7, d: 0.9 });            // breath
+  N(v, { k: 'brown', lp: 400, a: 0.1, peak: 0.4, hold: 0.8, d: 0.9 });                       // growl body
 });
 
-sfx('bossLaser', { g: 0.321, verb: 0.3, max: 2, prio: 3, len: 2.2 }, (v) => {
+sfx('bossLaser', { g: 0.371, verb: 0.28, max: 2, prio: 3, len: 2.2 }, (v) => {
   const lp = vNode(v, v.ctx.createBiquadFilter());
-  lp.type = 'lowpass'; lp.Q.value = 4;
-  lp.frequency.value = 2200;
+  lp.type = 'lowpass'; lp.Q.value = 2;
+  lp.frequency.value = 1200;
   lp.connect(v.out);
   const wob = vNode(v, v.ctx.createOscillator());
   const wobAmt = vNode(v, v.ctx.createGain());
-  wob.frequency.value = 12;
-  wobAmt.gain.value = 900;
+  wob.frequency.value = 9;
+  wobAmt.gain.value = 400;
   wob.connect(wobAmt); wobAmt.connect(lp.frequency);
   vSrc(v, wob, v.t, v.t + 1.7);
-  T(v, { type: 'sawtooth', f: 180, f1: 220, st: 0.15, a: 0.08, peak: 0.3, hold: 1.1, d: 0.3, to: lp });
-  T(v, { type: 'sawtooth', f: 181.5, f1: 221.5, st: 0.15, a: 0.08, peak: 0.3, hold: 1.1, d: 0.3, to: lp });
-  T(v, { type: 'square', f: 90, f1: 110, st: 0.15, a: 0.08, peak: 0.18, hold: 1.1, d: 0.3, to: lp });
-  N(v, { bp: 4200, q: 1.5, a: 0.08, peak: 0.3, hold: 1.1, d: 0.3 });                      // sizzle
+  T(v, { type: 'sawtooth', f: 90, f1: 110, st: 0.15, a: 0.08, peak: 0.3, hold: 1.1, d: 0.3, to: lp });
+  T(v, { type: 'sawtooth', f: 90.8, f1: 110.8, st: 0.15, a: 0.08, peak: 0.3, hold: 1.1, d: 0.3, to: lp });
+  N(v, { k: 'pink', bp: 2400, q: 1.2, lp: 6000, a: 0.08, peak: 0.35, hold: 1.1, d: 0.3 }); // beam sizzle
+  N(v, { k: 'crackle', hp: 2000, lp: 7000, a: 0.08, peak: 0.4, hold: 1.1, d: 0.3 });
   T(v, { f: 55, a: 0.08, peak: 0.5, hold: 1.1, d: 0.3 });
-  N(v, { k: 'wide', hp: 2000, peak: 0.5, d: 0.05 });
+  crack(v, 0, 0.5, 2000, 8000, 0.04, 'wide');
 });
 
-sfx('bossSpiral', { g: 0.74, verb: 0.3, max: 2, len: 1.0 }, (v) => {
-  // One oscillator, re-triggered six times: a rapid volley of plasma launches.
-  const osc = vNode(v, v.ctx.createOscillator());
+sfx('bossSpiral', { g: 0.403, verb: 0.28, max: 2, len: 1.0 }, (v) => {
+  // One noise source and one sub oscillator, gated six times: a rapid volley.
+  const src = vNode(v, v.ctx.createBufferSource());
+  src.buffer = v.G.buf.pink; src.loop = true;
+  const bp = vNode(v, v.ctx.createBiquadFilter());
+  bp.type = 'bandpass'; bp.Q.value = 1.4;
   const g = vNode(v, v.ctx.createGain());
-  osc.type = 'triangle';
   g.gain.value = 0;
-  osc.connect(g); g.connect(v.out);
+  src.connect(bp); bp.connect(g); g.connect(v.out);
+  const osc = vNode(v, v.ctx.createOscillator());
+  const og = vNode(v, v.ctx.createGain());
+  og.gain.value = 0;
+  osc.connect(og); og.connect(v.out);
   for (let i = 0; i < 6; i++) {
     const t = v.t + i * 0.06;
-    osc.frequency.setValueAtTime(1000 * v.p * (1 + i * 0.05), t);
-    osc.frequency.exponentialRampToValueAtTime(300 * v.p, t + 0.055);
+    bp.frequency.setValueAtTime(1600 * v.p * (1 + i * 0.05), t);
+    bp.frequency.exponentialRampToValueAtTime(500 * v.p, t + 0.055);
     g.gain.setValueAtTime(0.001, t);
-    g.gain.linearRampToValueAtTime(0.4, t + 0.004);
+    g.gain.linearRampToValueAtTime(0.8, t + 0.004);
     g.gain.exponentialRampToValueAtTime(0.01, t + 0.056);
+    osc.frequency.setValueAtTime(140 * v.p, t);
+    osc.frequency.exponentialRampToValueAtTime(70 * v.p, t + 0.05);
+    og.gain.setValueAtTime(0.001, t);
+    og.gain.linearRampToValueAtTime(0.4, t + 0.004);
+    og.gain.exponentialRampToValueAtTime(0.01, t + 0.056);
   }
+  vSrc(v, src, v.t, v.t + 0.42, Math.random());
   vSrc(v, osc, v.t, v.t + 0.42);
-  T(v, { f: 300, f1: 120, st: 0.3, peak: 0.45, d: 0.35 });
-  N(v, { k: 'pink', bp: 900, q: 1, peak: 0.3, d: 0.35 });
+  thump(v, 0, 0.4, 120, 50, 0.3, 400);
 });
 
-sfx('bossPhase', { g: 0.471, verb: 0.55, max: 1, prio: 3, len: 3.2 }, (v) => {
-  T(v, { f: 55, f1: 34, st: 1.2, peak: 1, d: 1.5 });                                      // deep hit
+sfx('bossPhase', { g: 0.367, verb: 0.52, max: 1, prio: 3, len: 3.2 }, (v) => {
+  T(v, { f: 55, f1: 34, st: 1.2, a: 0.003, peak: 1, d: 1.5 });                              // deep hit
   N(v, { k: 'brown', lp: 400, peak: 0.6, d: 0.8 });
-  FM(v, { f: 110, ratio: 1.41, idx: 5, idx1: 0.3, iT: 2, peak: 0.3, d: 2.4 });           // gong resonance
-  // shimmering choir swell
-  const bank = vNode(v, v.ctx.createGain());
-  for (const [f, q, gn] of [[650, 6, 1], [1080, 7, 0.6], [2650, 9, 0.3]]) {
+  RES(v, { freqs: [110, 173, 262, 390], q: 30, k: 'pink', a: 0.005, peak: 1.2, d: 2.0 });   // resonant body
+  const bank = vNode(v, v.ctx.createGain());                                                 // choir swell
+  for (const [f, q, gn] of [[650, 6, 1], [1080, 7, 0.55], [2650, 9, 0.25]]) {
     const bp = vNode(v, v.ctx.createBiquadFilter());
     bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
     const g = vNode(v, v.ctx.createGain()); g.gain.value = gn;
     bank.connect(bp); bp.connect(g); g.connect(v.out);
   }
   for (const [f, d] of [[164.8, -7], [196, 6], [246.9, -4], [329.6, 8]]) {
-    T(v, { t: 0.1, type: 'sawtooth', f, det: d, a: 1.1, peak: 0.3, hold: 0.4, d: 1.4, to: bank });
+    T(v, { t: 0.1, type: 'sawtooth', f, det: d, a: 1.1, peak: 0.28, hold: 0.4, d: 1.4, to: bank });
   }
-  RES(v, { t: 0.3, freqs: [2637, 3951, 5274], q: 40, k: 'crackle', rate: 0.5, a: 0.8, peak: 3, d: 1.5 });
+  RES(v, { t: 0.3, freqs: [2637, 3951], q: 40, k: 'crackle', rate: 0.5, a: 0.8, peak: 1.5, d: 1.5, lp: 6000 });
 });
 
-sfx('bossDeath', { g: 0.738, verb: 0.55, max: 1, prio: 4, duck: true, len: 4.5 }, (v) => {
+sfx('bossDeath', { g: 0.275, verb: 0.52, max: 1, prio: 4, duck: true, len: 4.5 }, (v) => {
   explosion(v, 0, 0.7, 0.55);
   glassBreak(v, 0.02, 1.2, 0.6, 0.6);
   explosion(v, 0.55, 0.85, 0.7);
   explosion(v, 1.05, 0.9, 0.8);
-  // final colossal blast
-  explosion(v, 1.6, 1.5, 1);
+  explosion(v, 1.6, 1.5, 1);                                                                  // final blast
   glassBreak(v, 1.62, 1.6, 1, 1.5);
-  T(v, { t: 1.6, f: 60, f1: 20, st: 1.5, peak: 0.9, d: 2.2 });
-  N(v, { t: 1.6, k: 'brown', lp: 180, a: 0.05, peak: 0.8, d: 2.5 });
-  // dying choir, descending
-  for (const f of [220, 261.6, 329.6]) {
-    T(v, { t: 0.2, type: 'sawtooth', f, f1: f * 0.5, st: 2.5, bp: 900, q: 3, a: 0.4, peak: 0.12, hold: 0.8, d: 1.8 });
+  T(v, { t: 1.6, f: 55, f1: 20, st: 1.5, peak: 0.9, d: 2.2 });
+  for (const f of [220, 261.6, 329.6]) {                                                      // dying choir
+    T(v, { t: 0.2, type: 'sawtooth', f, f1: f * 0.5, st: 2.5, bp: 800, q: 3, a: 0.4, peak: 0.1, hold: 0.8, d: 1.8 });
   }
 });
 
 /* -------------------------------- World / UI ------------------------------- */
 
-sfx('waveStart', { g: 0.347, verb: 0.4, max: 1, prio: 2, len: 2.4 }, (v) => {
-  N(v, { bp: 300, bp1: 4000, fT: 0.95, q: 1.1, rise: 0.95, peak: 0.4, cut: 0.04 });     // tension riser
-  T(v, { type: 'sawtooth', f: 110, f1: 440, st: 0.95, lp: 2000, rise: 0.95, peak: 0.12, cut: 0.04 });
-  T(v, { t: 1.0, f: 100, f1: 35, st: 0.5, peak: 0.95, d: 0.6 });                        // hit
-  N(v, { t: 1.0, k: 'wide', lp: 5000, lp1: 300, fT: 0.4, peak: 0.6, d: 0.45 });
-  for (const [f, d] of [[146.8, -6], [174.6, 6], [220, -3]]) {
-    T(v, { t: 1.0, type: 'sawtooth', f, det: d, lp: 2200, lp1: 500, fT: 0.8, peak: 0.12, d: 0.9 });
-  }
+sfx('waveStart', { g: 0.309, verb: 0.38, max: 1, prio: 2, len: 2.4 }, (v) => {
+  N(v, { k: 'pink', bp: 300, bp1: 2500, fT: 0.95, q: 1.1, rise: 0.95, peak: 0.4, cut: 0.04 }); // riser
+  N(v, { k: 'brown', lp: 200, lp1: 500, fT: 0.95, rise: 0.95, peak: 0.4, cut: 0.05 });
+  T(v, { t: 1.0, f: 80, f1: 34, st: 0.5, a: 0.002, peak: 0.95, d: 0.7 });                   // hit
+  N(v, { t: 1.0, k: 'wide', lp: 4500, lp1: 300, fT: 0.4, peak: 0.55, d: 0.45 });
+  brass(v, 1.0, [73.4, 110, 146.8], 0.1, 0.03, 0.2, 0.8, 800, false);                          // low brass stab
 });
 
-sfx('sectorClear', { g: 0.5, verb: 0.45, max: 1, prio: 2, len: 2.6 }, (v) => {
-  const notes = [293.7, 370, 440, 587.3];                                                 // D major arpeggio
-  notes.forEach((f, i) => {
-    T(v, { t: i * 0.09, type: 'sawtooth', f, lp: 3000, lp1: 900, fT: 0.3, peak: 0.12, d: 0.35 });
-    bell(v, i * 0.09, f * 2, 0.08, 0.5, 2, 1);
-  });
-  for (const f of [146.8, 220, 293.7, 370, 440]) {
-    T(v, { t: 0.36, type: 'sawtooth', f, det: rand(-9, 9), lp: 2400, lp1: 1200, fT: 1.2, a: 0.08, peak: 0.08, hold: 0.4, d: 1.4 });
-  }
-  T(v, { t: 0.36, f: 73.4, a: 0.02, peak: 0.4, d: 1.2 });
+sfx('sectorClear', { g: 0.596, verb: 0.42, max: 1, prio: 2, len: 2.8 }, (v) => {
+  brass(v, 0, [65.4, 130.8, 196, 261.6, 329.6], 0.05, 0.25, 0.1, 0.4, 1200, false);          // bVII
+  brass(v, 0.5, [73.4, 146.8, 220, 293.7, 370], 0.06, 0.3, 0.6, 1.3, 1600, false);           // I (major)
+  thump(v, 0.5, 0.4, 70, 36, 0.8, 220);
 });
 
-sfx('uiHover', { g: 0.72, verb: 0.02, max: 2, ui: true, prio: 0, gap: 0.03, len: 0.2 }, (v) => {
-  T(v, { f: 3200, peak: 0.25, d: 0.018 });
+sfx('uiHover', { g: 2.35, verb: 0.01, max: 2, ui: true, prio: 0, gap: 0.03, len: 0.15 }, (v) => {
+  N(v, { off: 0.31, k: 'pink', bp: 2800, q: 2, lp: 6000, a: 0.0006, peak: 0.3, d: 0.01 });
 });
 
-sfx('uiClick', { g: 0.879, verb: 0.03, max: 3, ui: true, gap: 0.03, len: 0.2 }, (v) => {
-  N(v, { hp: 3000, peak: 0.16, d: 0.008 });
-  T(v, { f: 1800, peak: 0.34, d: 0.035 });
+sfx('uiClick', { g: 1.62, verb: 0.02, max: 3, ui: true, gap: 0.03, len: 0.2 }, (v) => {
+  N(v, { off: 0.73, k: 'pink', bp: 2200, q: 1.5, lp: 6000, a: 0.0006, peak: 0.45, d: 0.012 });
+  T(v, { f: 700, a: 0.001, peak: 0.08, d: 0.02 });
 });
 
-sfx('uiConfirm', { g: 0.441, verb: 0.08, max: 2, ui: true, len: 0.6 }, (v) => {
-  T(v, { type: 'triangle', f: 660, peak: 0.25, d: 0.15 });
-  T(v, { f: 990, peak: 0.18, d: 0.15 });
-  T(v, { t: 0.06, type: 'triangle', f: 1320, peak: 0.22, d: 0.22 });
+sfx('uiConfirm', { g: 0.569, verb: 0.06, max: 2, ui: true, len: 0.5 }, (v) => {
+  N(v, { off: 1.11, k: 'pink', bp: 2200, q: 1.5, lp: 6000, a: 0.0006, peak: 0.4, d: 0.012 });
+  T(v, { t: 0.01, type: 'triangle', f: 523, lp: 1800, a: 0.004, peak: 0.12, d: 0.14 });
+  T(v, { t: 0.05, type: 'triangle', f: 784, lp: 1800, a: 0.004, peak: 0.1, d: 0.18 });
 });
 
-sfx('uiBack', { g: 0.624, verb: 0.05, max: 2, ui: true, len: 0.4 }, (v) => {
-  T(v, { f: 700, f1: 450, st: 0.1, peak: 0.3, d: 0.12 });
-  T(v, { type: 'triangle', f: 350, f1: 225, st: 0.1, peak: 0.12, d: 0.1 });
+sfx('uiBack', { g: 0.933, verb: 0.04, max: 2, ui: true, len: 0.3 }, (v) => {
+  N(v, { off: 0.52, k: 'pink', bp: 1600, q: 1.5, lp: 5000, a: 0.0006, peak: 0.4, d: 0.015 });
+  T(v, { f: 500, f1: 380, st: 0.08, a: 0.002, peak: 0.08, d: 0.08 });
 });
 
-sfx('augmentPick', { g: 0.45, verb: 0.4, max: 1, len: 1.6 }, (v) => {
-  [880, 1108.7, 1318.5, 1760, 2217.5].forEach((f, i) => bell(v, i * 0.055, f, 0.16, 0.5, 3.5, 1.4));
-  N(v, { hp: 5000, rise: 0.3, peak: 0.15, cut: 0.25 });
-  T(v, { type: 'sawtooth', f: 220, f1: 880, st: 0.3, lp: 2500, a: 0.2, peak: 0.1, d: 0.5 });
+sfx('augmentPick', { g: 0.639, verb: 0.38, max: 1, len: 1.4 }, (v) => {
+  N(v, { bp: 3800, bp1: 5500, fT: 0.3, q: 3, lp: 7000, rise: 0.3, peak: 0.25, cut: 0.25 }); // shimmer
+  T(v, { f: 300, f1: 600, st: 0.3, a: 0.25, peak: 0.1, d: 0.45 });
+  N(v, { k: 'brown', lp: 300, rise: 0.3, peak: 0.3, cut: 0.3 });
+  RES(v, { t: 0.3, freqs: [2600, 3900], q: 30, k: 'white', a: 0.002, peak: 0.6, d: 0.5 });  // glint
 });
 
-sfx('countdown', { g: 0.373, verb: 0.1, max: 2, len: 0.4 }, (v) => {
-  T(v, { type: 'square', f: 880, lp: 3000, peak: 0.2, hold: 0.07, d: 0.08 });
-  T(v, { f: 1760, peak: 0.08, hold: 0.07, d: 0.08 });
+sfx('countdown', { g: 0.299, verb: 0.08, max: 2, len: 0.3 }, (v) => {
+  T(v, { type: 'triangle', f: 660, lp: 1500, a: 0.004, peak: 0.25, hold: 0.06, d: 0.1 });
+  N(v, { k: 'pink', bp: 2000, q: 1.5, peak: 0.2, d: 0.01 });
 });
 
-sfx('teleport', { g: 0.347, verb: 0.4, max: 1, len: 2.0 }, (v) => {
-  T(v, { type: 'sawtooth', f: 100, f1: 1600, st: 1.1, lp: 600, lp1: 5000, fT: 1.1, a: 0.3, peak: 0.2, hold: 0.6, d: 0.25 });
-  N(v, { bp: 200, bp1: 5000, fT: 1.1, q: 1, rise: 1.1, peak: 0.45, cut: 0.1 });
-  FM(v, { f: 400, f1: 3200, st: 1.1, ratio: 1.5, idx: 2, a: 0.8, peak: 0.1, d: 0.3 });
-  N(v, { t: 1.1, k: 'wide', hp: 2500, peak: 0.6, d: 0.1 });                               // arrival zap
-  T(v, { t: 1.1, f: 180, f1: 50, st: 0.2, peak: 0.6, d: 0.25 });
+sfx('teleport', { g: 0.463, verb: 0.38, max: 1, len: 2.0 }, (v) => {
+  N(v, { k: 'pink', bp: 200, bp1: 3000, fT: 1.1, q: 1.2, rise: 1.1, peak: 0.5, cut: 0.06 }); // warp rise
+  N(v, { k: 'brown', lp: 200, lp1: 600, fT: 1.1, rise: 1.1, peak: 0.4, cut: 0.08 });
+  T(v, { f: 80, f1: 320, st: 1.1, rise: 1.1, peak: 0.12, cut: 0.06 });
+  thump(v, 1.1, 0.6, 120, 45, 0.25, 400);                                                     // arrival
+  N(v, { t: 1.1, k: 'wide', lp: 5000, lp1: 500, fT: 0.3, peak: 0.4, d: 0.35 });
 });
 
-sfx('victory', { g: 0.451, verb: 0.5, max: 1, len: 3.5 }, (v) => {
-  const seq = [[0, 523.3], [0.12, 659.3], [0.24, 784], [0.36, 1046.5]];                   // C major fanfare
-  for (const [t, f] of seq) {
-    T(v, { t, type: 'sawtooth', f, det: -6, lp: 3200, peak: 0.12, d: 0.4 });
-    T(v, { t, type: 'sawtooth', f, det: 6, lp: 3200, peak: 0.12, d: 0.4 });
-  }
-  for (const f of [130.8, 196, 261.6, 329.6, 392]) {
-    T(v, { t: 0.48, type: 'sawtooth', f, det: rand(-10, 10), lp: 2500, lp1: 800, fT: 2, a: 0.05, peak: 0.08, hold: 0.8, d: 1.8 });
-  }
-  T(v, { t: 0.48, f: 65.4, peak: 0.5, d: 1.5 });
-  bell(v, 0.48, 2093, 0.1, 1.2, 2, 1);
+sfx('victory', { g: 0.543, verb: 0.48, max: 1, len: 3.5 }, (v) => {
+  brass(v, 0, [87.3, 174.6, 261.6, 349.2], 0.05, 0.2, 0.2, 0.5, 1100, false);                // IV
+  brass(v, 0.55, [98, 196, 293.7, 392], 0.05, 0.2, 0.2, 0.5, 1300, false);                   // V
+  brass(v, 1.1, [65.4, 130.8, 196, 261.6, 329.6], 0.055, 0.3, 0.8, 1.6, 1700, false);        // I
+  thump(v, 1.1, 0.45, 70, 34, 1.0, 220);
 });
 
-sfx('death', { g: 0.301, verb: 0.45, max: 1, prio: 3, len: 3.2 }, (v) => {
-  T(v, { type: 'sawtooth', f: 110, f1: 55, st: 1.6, lp: 700, lp1: 200, fT: 1.8, det: -8, a: 0.03, peak: 0.3, hold: 0.3, d: 1.8 });
-  T(v, { type: 'sawtooth', f: 110, f1: 55, st: 1.6, lp: 700, lp1: 200, fT: 1.8, det: 8, a: 0.03, peak: 0.3, hold: 0.3, d: 1.8 });
-  T(v, { f: 55, f1: 27, st: 1.8, peak: 0.8, hold: 0.3, d: 1.9 });
+sfx('death', { g: 0.27, verb: 0.42, max: 1, prio: 3, len: 3.2 }, (v) => {
+  brass(v, 0, [55, 82.4, 110], 0.1, 0.05, 0.3, 1.8, 600, false);
+  T(v, { f: 55, f1: 27, st: 1.8, a: 0.003, peak: 0.8, hold: 0.3, d: 1.9 });
   N(v, { k: 'brown', lp: 300, a: 0.4, peak: 0.5, d: 1.5 });
-  T(v, { f: 90, f1: 35, st: 0.3, peak: 0.7, d: 0.4 });
+  thump(v, 0, 0.6, 90, 35, 0.4, 300);
 });
 
 /* -------------------------------------------------------------------------- */
 /* Loops                                                                        */
 /* -------------------------------------------------------------------------- */
-// build(L) creates persistent nodes feeding L.in and returns the list of
-// detune params (in cents) that setPitch() drives.
+// build(L) creates persistent nodes feeding L.in and returns the detune params
+// (cents) that setPitch() drives. meta.persistent loops are exempt from the
+// inactivity watchdog; max = concurrent instances per name.
 
 const LOOPS = Object.create(null);
 function loopDef(name, meta, build) {
-  LOOPS[name] = Object.assign({ g: 0.5, verb: 0.15, max: 4 }, meta, { build });
+  LOOPS[name] = Object.assign({ g: 0.5, verb: 0.15, max: 1, persistent: false }, meta, { build });
 }
 
 function lOsc(L, type, f, to, det = 0) {
@@ -1112,26 +1154,27 @@ function lLfo(L, rate, depth, param, type = 'sine') {
   return g;
 }
 
-loopDef('overdriveHum', { g: 0.123, verb: 0.2, max: 1 }, (L) => {
+loopDef('overdriveHum', { g: 0.0858, verb: 0.2, persistent: true }, (L) => {
   const trem = lGain(L, 0.6, L.in);
-  lLfo(L, 2.1, 0.38, trem.gain);
-  const lp = lFilt(L, 'lowpass', 320, 2, trem);
-  const a = lOsc(L, 'sawtooth', 55, lp, -9), b = lOsc(L, 'sawtooth', 55, lp, 9);
-  const sub = lOsc(L, 'sine', 27.5, trem);
+  lLfo(L, 1.8, 0.3, trem.gain);
+  const lp = lFilt(L, 'lowpass', 200, 1.2, trem);
+  const a = lOsc(L, 'sawtooth', 55, lp, -7), b = lOsc(L, 'sawtooth', 55, lp, 7);
+  const sub = lOsc(L, 'sine', 55, lGain(L, 0.8, trem));
+  lNoise(L, 'brown', lFilt(L, 'lowpass', 150, 0.7, lGain(L, 0.6, trem)));
   return [a.detune, b.detune, sub.detune, lp.detune];
 });
 
-loopDef('lanceIdle', { g: 0.0231, verb: 0.05, max: 2 }, (L) => {
-  const bp = lFilt(L, 'bandpass', 1100, 3, L.in);
-  lLfo(L, 0.7, 220, bp.detune);
-  const a = lOsc(L, 'sine', 120, L.in);
-  const b = lOsc(L, 'sawtooth', 240, bp);
-  const hp = lFilt(L, 'highpass', 3000, 0.7, lGain(L, 0.08, L.in));
+loopDef('lanceIdle', { g: 0.0327, verb: 0.05 }, (L) => {
+  const a = lOsc(L, 'sine', 120, lGain(L, 0.6, L.in));
+  const hp = lFilt(L, 'bandpass', 3500, 1.2, lGain(L, 0.25, L.in));
   lNoise(L, 'crackle', hp);
-  return [a.detune, b.detune, bp.detune];
+  const bp = lFilt(L, 'bandpass', 900, 4, lGain(L, 0.3, L.in));
+  lLfo(L, 0.6, 200, bp.detune);
+  lNoise(L, 'pink', bp);
+  return [a.detune, bp.detune];
 });
 
-loopDef('bossHum', { g: 0.0752, verb: 0.35, max: 1 }, (L) => {
+loopDef('bossHum', { g: 0.0714, verb: 0.35, persistent: true }, (L) => {
   const amp = lGain(L, 0.8, L.in);
   lLfo(L, 0.3, 0.2, amp.gain);
   const sum = lGain(L, 1, null);
@@ -1149,17 +1192,20 @@ loopDef('bossHum', { g: 0.0752, verb: 0.35, max: 1 }, (L) => {
   return params;
 });
 
-loopDef('lancerBeam', { g: 0.177, verb: 0.2, max: 4 }, (L) => {
-  const bp = lFilt(L, 'bandpass', 1400, 2, L.in);
-  const a = lOsc(L, 'square', 440, bp, -5), b = lOsc(L, 'sawtooth', 443, bp, 5);
-  const hi = lOsc(L, 'sine', 1760, lGain(L, 0.12, L.in));
-  const vib = lGain(L, 15, null);
-  lOsc(L, 'sine', 9, vib);
-  vib.connect(a.detune); vib.connect(b.detune);
-  return [a.detune, b.detune, hi.detune, bp.detune];
+loopDef('lancerBeam', { g: 0.0871, verb: 0.18, max: 2 }, (L) => {
+  // Targeting hum: soft tonal core + servo-noise texture; everything tracks setPitch.
+  const lp = lFilt(L, 'lowpass', 1100, 0.9, L.in);
+  const a = lOsc(L, 'triangle', 220, lp);
+  const b = lOsc(L, 'sine', 110, lGain(L, 0.7, L.in));
+  const vib = lGain(L, 6, null);
+  lOsc(L, 'sine', 5, vib);
+  vib.connect(a.detune);
+  const bp = lFilt(L, 'bandpass', 1500, 6, lGain(L, 0.9, L.in));
+  lNoise(L, 'pink', bp);
+  return [a.detune, b.detune, bp.detune, lp.detune];
 });
 
-loopDef('wind', { g: 0.0676, verb: 0.1, max: 1 }, (L) => {
+loopDef('wind', { g: 0.0589, verb: 0.1, persistent: true }, (L) => {
   const gust = lGain(L, 0.7, L.in);
   lLfo(L, 0.05, 0.3, gust.gain);
   const params = [];
@@ -1180,12 +1226,16 @@ loopDef('wind', { g: 0.0676, verb: 0.1, max: 1 }, (L) => {
 /* -------------------------------------------------------------------------- */
 /* Music: theory helpers & track styles                                        */
 /* -------------------------------------------------------------------------- */
+// Restrained, cinematic score: evolving pads and drones, deep sub pulses, a
+// muted bass ostinato, sparse processed percussion and low brass swells.
+// Driving drums only appear near full intensity; melodic content is sparse.
 
 const CHORD_Q = {
   m: [0, 3, 7], M: [0, 4, 7], m7: [0, 3, 7, 10], M7: [0, 4, 7, 11], m9: [0, 3, 7, 14],
   add9: [0, 4, 7, 14], s4: [0, 5, 7], s2: [0, 2, 7], d: [0, 3, 6],
 };
 const chordEq = (a, b) => a && b && a[0] === b[0] && a[1] === b[1];
+const isMinor = (q) => q === 'm' || q === 'm7' || q === 'm9' || q === 'd';
 
 /** Voice a chord near `lo` with n notes, choosing the inversion closest to prev. */
 function voicing(key, ch, prev, lo, n) {
@@ -1209,88 +1259,86 @@ function voicing(key, ch, prev, lo, n) {
   return best;
 }
 
-const BASS_SEMI = { x: 0, o: 12, 5: 7, 7: 10 };
-
-const ARP_PATS = [
-  [0, 1, 2, 3, 4, 3, 2, 1, 0, 1, 2, 3, 4, 3, 2, 1],
-  [0, 2, 1, 3, 2, 4, 3, 1, 0, 2, 1, 3, 2, 4, 3, 4],
-  [0, 0, 3, 0, 2, 0, 4, 0, 1, 0, 3, 0, 2, 0, 4, 3],
-  [4, 3, 2, 0, 4, 3, 1, 0, 4, 2, 3, 0, 4, 3, 2, 1],
-  [0, 1, 2, 4, 1, 2, 4, 3, 0, 1, 2, 4, 1, 2, 4, 3],
+// Accents for the bass ostinato (8ths / 16ths in a 3-3-2 grouping).
+const PULSE_8 = [1, 0, 0.6, 0, 0.85, 0, 0.6, 0, 1, 0, 0.6, 0, 0.85, 0, 0.6, 0];
+const PULSE_16 = [1, 0.45, 0.45, 0.85, 0.45, 0.45, 0.85, 0.45, 1, 0.45, 0.45, 0.85, 0.45, 0.45, 0.85, 0.45];
+const PULSE_TAILS = [[0, 0, 0, 0], [0, 0, 12, 0], [0, 7, 0, 12], [12, 0, 10, 7]];
+// Sparse processed ticks: per-step probability at full density.
+const TICK_P = [0, 0, 0.25, 0, 0.6, 0, 0.3, 0.15, 0, 0.25, 0.7, 0, 0.35, 0, 0.5, 0.3];
+// Taiko-like ensembles (boss / final): level per step.
+const TAIKO = [
+  [1, 0, 0, 0, 0, 0, 0.7, 0, 1, 0, 0, 0, 0.6, 0, 0.8, 0],
+  [1, 0, 0, 0.6, 0, 0, 0.8, 0, 1, 0, 0.5, 0, 0.7, 0.5, 0.9, 0],
 ];
-
-// Heroic lead for 'final' (over Cm Ab Eb Bb): per bar [step, midi, lengthInSteps].
+// Slow motifs: [bar within 4, step, tone index].
+const MOTIFS = [
+  [[0, 0, 2], [0, 8, 1], [1, 0, 0]],
+  [[0, 0, 0], [0, 6, 1], [0, 12, 2], [2, 0, 1]],
+  [[0, 4, 3], [1, 0, 2], [2, 8, 1]],
+];
+// Slow heroic lead for 'final' over Cm | Ab | Eb | Bb (2 bars each): [step, midi, steps].
 const MEL_FINAL = [
-  [[[0, 67, 6], [6, 72, 2], [8, 74, 4], [12, 75, 4]], [[0, 72, 8], [8, 68, 4], [12, 70, 4]],
-   [[0, 70, 6], [6, 75, 2], [8, 74, 4], [12, 70, 4]], [[0, 74, 12], [12, 72, 2], [14, 70, 2]],
-   [[0, 67, 4], [4, 72, 4], [8, 75, 4], [12, 79, 4]], [[0, 80, 8], [8, 79, 4], [12, 77, 4]],
-   [[0, 75, 6], [6, 74, 2], [8, 75, 4], [12, 79, 4]], [[0, 77, 4], [4, 74, 4], [8, 70, 8]]],
-  [[[0, 72, 3], [3, 75, 3], [6, 79, 2], [8, 77, 4], [12, 75, 4]], [[0, 72, 6], [6, 75, 2], [8, 80, 6], [14, 79, 2]],
-   [[0, 79, 8], [8, 75, 4], [12, 82, 4]], [[0, 82, 6], [6, 80, 2], [8, 77, 4], [12, 74, 4]],
-   [[0, 75, 4], [4, 79, 4], [8, 84, 8]], [[0, 84, 4], [4, 82, 4], [8, 80, 4], [12, 79, 4]],
-   [[0, 82, 6], [6, 79, 2], [8, 75, 4], [12, 74, 4]], [[0, 74, 8], [8, 77, 4], [12, 79, 4]]],
+  [[[0, 67, 16]], [[0, 70, 8], [8, 72, 8]], [[0, 72, 16]], [[0, 75, 12], [12, 72, 4]],
+   [[0, 70, 16]], [[0, 67, 8], [8, 70, 8]], [[0, 74, 16]], [[0, 72, 8], [8, 70, 8]]],
+  [[[0, 75, 16]], [[0, 74, 8], [8, 72, 8]], [[0, 72, 12], [12, 75, 4]], [[0, 80, 16]],
+   [[0, 79, 16]], [[0, 77, 8], [8, 75, 8]], [[0, 77, 16]], [[0, 74, 8], [8, 70, 8]]],
 ];
 
+const ss = smooth;
 const STYLES = {
   menu: {
-    bpm: 84, key: 57, kind: 'ambient', level: 2.2, bassLo: 33, padLo: 52, padN: 4, padA: 1.6, padRel: 2.4, padCut: 1900,
+    bpm: 72, key: 57, kind: 'ambient', level: 1.75, bassLo: 33, padLo: 50, padN: 4, padA: 2.6, padRel: 3.5, padCut: 1500,
     progs: [
-      [[0, 'm9'], [8, 'M7'], [3, 'add9'], [10, 'M']],
-      [[0, 'm9'], [8, 'M7'], [10, 'M'], [7, 'm7']],
-      [[8, 'M7'], [10, 'M'], [0, 'm9'], [0, 'm7']],
+      [[0, 'm9'], [8, 'M7'], [3, 'add9'], [10, 's2']],
+      [[0, 'm9'], [5, 'm7'], [8, 'M7'], [7, 's4']],
+      [[8, 'M7'], [10, 'add9'], [0, 'm9'], [0, 'm9']],
     ],
-    mix: { pad: 0.34, sub: 0.18, arp: 0.23, choir: 0.4, bell: 0.12 },
+    mix: { pad: 0.3, sub: 0.2, atmos: 0.45, motif: 0.16, choir: 0.35, bell: 0.07 },
   },
   combat: {
-    bpm: 124, key: 50, kind: 'drive', bassLo: 36, padLo: 50, padN: 4, padA: 0.25, padRel: 0.9,
+    bpm: 124, key: 50, kind: 'drive', bassLo: 36, padLo: 48, padN: 4, padA: 1.2, padRel: 2.0, padCut: 900,
     progs: [
-      [[0, 'm'], [8, 'M'], [3, 'M'], [10, 'M'], [0, 'm'], [8, 'M'], [5, 'm'], [7, 'M']],
-      [[0, 'm'], [5, 'm'], [8, 'M'], [7, 'M'], [0, 'm'], [5, 'm'], [10, 'M'], [7, 'M']],
-      [[8, 'M'], [10, 'M'], [0, 'm'], [0, 'm'], [8, 'M'], [10, 'M'], [3, 'M'], [7, 's4']],
-      [[0, 'm9'], [0, 'm9'], [8, 'M7'], [8, 'M7'], [3, 'M'], [3, 'M'], [10, 'M'], [7, 'M']],
+      [[0, 'm9'], [0, 'm9'], [8, 'M7'], [8, 'M7'], [5, 'm'], [5, 'm'], [7, 's4'], [7, 'M']],
+      [[0, 'm'], [0, 'm'], [10, 'M'], [10, 'M'], [8, 'M'], [8, 'M'], [7, 's4'], [7, 's4']],
+      [[0, 'm9'], [0, 'm9'], [3, 'M'], [3, 'M'], [5, 'm'], [5, 'm'], [8, 'M'], [7, 'M']],
+      [[8, 'M7'], [8, 'M7'], [5, 'm'], [5, 'm'], [0, 'm9'], [0, 'm9'], [7, 's4'], [7, 'M']],
     ],
-    bass: [
-      { a: '-xxx-xxx-xxx-xxo', b: '-xxx-xxx-xxo-x5o', f: '-xxo-xox-o5o7o5o' },
-      { a: 'x-xox-xox-xox-xo', b: 'x-xox-xox-xo5-o7', f: 'xxoxxoxxo5o7o5ox' },
-      { a: 'xxxxxxxxxxxxxxxx', b: 'xxxxxxxxxxxxxxox', f: 'xxxxxxxxo5o7o5o5' },
-    ],
-    mix: { pad: 0.28, sub: 0.17, drums: 0.8, bass: 0.28, arp: 0.4, choir: 0.84, perc: 1.55, lead: 0 },
+    lv: (x) => ({ pulse: ss(0.22, 0.38, x), perc: ss(0.3, 0.5, x), motif: ss(0.45, 0.6, x), brass: ss(0.55, 0.75, x),
+      choir: ss(0.6, 0.8, x), drums: ss(0.82, 0.95, x) }),
+    mix: { pad: 0.3, sub: 0.3, atmos: 0.45, pulse: 0.3, perc: 0.8, motif: 0.15, brass: 0.5, choir: 0.7, drums: 0.7 },
   },
   boss: {
-    bpm: 140, key: 52, kind: 'drive', heavy: true, bassLo: 40, padLo: 52, padN: 4, padA: 0.2, padRel: 0.8,
+    bpm: 136, key: 52, kind: 'drive', heavy: true, bassLo: 40, padLo: 50, padN: 4, padA: 0.9, padRel: 1.6, padCut: 900,
     progs: [
-      [[0, 'm'], [1, 'M'], [0, 'm'], [8, 'M'], [5, 'm'], [1, 'M'], [10, 'M'], [7, 'M']],
-      [[0, 'm'], [0, 'm'], [1, 'M'], [1, 'M'], [8, 'M'], [10, 'M'], [1, 'M'], [7, 'M']],
-      [[0, 'm'], [3, 'M'], [1, 'M'], [0, 'm'], [8, 'M'], [5, 'm'], [1, 'M'], [7, 's4']],
+      [[0, 'm'], [0, 'm'], [1, 'M'], [1, 'M'], [0, 'm'], [0, 'm'], [8, 'M'], [7, 'M']],
+      [[0, 'm'], [0, 'm'], [8, 'M'], [8, 'M'], [5, 'm'], [5, 'm'], [1, 'M'], [7, 'M']],
+      [[0, 'm'], [1, 'M'], [0, 'm'], [1, 'M'], [8, 'M'], [8, 'M'], [7, 's4'], [7, 'M']],
     ],
-    bass: [
-      { a: 'x--x--x-x--x-o-x', b: 'x--x--x-x-xx-o7o', f: 'xxxxxxxxoooo7755' },
-      { a: 'xx-xx-xx-xx-x-o-', b: 'xx-xx-xx-x-xo7o5', f: 'xxxxxxxx7777oooo' },
-    ],
-    mix: { pad: 0.22, sub: 0.18, drums: 0.85, bass: 0.26, arp: 0.28, choir: 0.78, perc: 1.2, lead: 0 },
+    lv: (x) => ({ pulse: ss(0.2, 0.35, x), perc: ss(0.25, 0.45, x), brass: ss(0.45, 0.65, x),
+      choir: ss(0.35, 0.55, x), drums: ss(0.82, 0.95, x) }),
+    mix: { pad: 0.28, sub: 0.32, atmos: 0.45, pulse: 0.3, perc: 0.55, brass: 0.5, choir: 0.7, drums: 0.55 },
   },
   final: {
-    bpm: 132, key: 48, kind: 'drive', epic: true, bassLo: 36, padLo: 48, padN: 5, padA: 0.35, padRel: 1.2,
+    bpm: 128, key: 48, kind: 'drive', epic: true, bassLo: 36, padLo: 48, padN: 5, padA: 1.0, padRel: 2.0, padCut: 1000,
     progs: [
-      [[0, 'm'], [8, 'M'], [3, 'M'], [10, 'M'], [0, 'm'], [8, 'M'], [3, 'M'], [10, 'M']],
-      [[8, 'M'], [10, 'M'], [0, 'm'], [0, 'm'], [8, 'M'], [10, 'M'], [7, 'M'], [7, 'M']],
+      [[0, 'm'], [0, 'm'], [8, 'M'], [8, 'M'], [3, 'M'], [3, 'M'], [10, 'M'], [10, 'M']],
+      [[8, 'M'], [8, 'M'], [10, 'M'], [10, 'M'], [0, 'm'], [0, 'm'], [7, 'M'], [7, 'M']],
     ],
     order: [[0, 0], [0, 1], [1, -1]],       // [progression, melody] per 8-bar cycle
-    bass: [
-      { a: 'x-xxx-xxx-xxx-xo', b: 'x-xxx-xxx-xo5-o7', f: 'xxoxxoxxo5o7o5ox' },
-      { a: '-xxx-xxx-xxx-xxo', b: '-xxx-xxx-xxo-x5o', f: 'xxxxxxxxo5o7o5o5' },
-    ],
-    mix: { pad: 0.36, sub: 0.17, drums: 0.8, bass: 0.27, arp: 0.36, choir: 0.9, perc: 1.3, lead: 0.22 },
+    lv: (x) => ({ pulse: ss(0.25, 0.4, x), perc: ss(0.3, 0.5, x), brass: ss(0.4, 0.6, x),
+      choir: ss(0.45, 0.65, x), lead: ss(0.5, 0.7, x), drums: ss(0.82, 0.95, x) }),
+    mix: { pad: 0.32, sub: 0.3, atmos: 0.45, pulse: 0.28, perc: 0.45, brass: 0.5, choir: 0.75, lead: 0.22, drums: 0.6 },
   },
   victory: {
-    bpm: 72, key: 48, kind: 'ambient', major: true, level: 2.2, bassLo: 36, padLo: 52, padN: 5, padA: 1.2, padRel: 3,
-    padCut: 2400,
+    bpm: 72, key: 48, kind: 'ambient', major: true, level: 1.4, bassLo: 36, padLo: 52, padN: 5, padA: 1.4, padRel: 3.5,
+    padCut: 1900,
     progs: [[[5, 'M7'], [7, 'M'], [9, 'm7'], [5, 'add9'], [7, 's4'], [0, 'add9']]],
-    mix: { pad: 0.3, sub: 0.16, arp: 0.12, choir: 0.45, bell: 0.12 },
+    mix: { pad: 0.3, sub: 0.2, atmos: 0.4, motif: 0.12, choir: 0.4, bell: 0.08, brass: 0.4 },
   },
 };
 
 const OD_DETUNE = -70;   // cents: overdrive "tape slow" feel on music oscillators
+const LAYERS = ['pad', 'sub', 'atmos', 'pulse', 'perc', 'motif', 'brass', 'choir', 'drums', 'lead', 'bell'];
 
 /* -------------------------------------------------------------------------- */
 /* Music state + heartbeat                                                     */
@@ -1301,7 +1349,7 @@ const M = {
   intensity: 0, ix: 0, lastTick: 0,
   overdrive: false, lowHealth: false,
   heartNext: 0, lastGameHeart: -99,
-  timer: null,
+  timer: null, mixOverride: null,
 };
 
 function wantHeart(now) {
@@ -1329,8 +1377,8 @@ class Track {
     this.nodes = []; this.srcs = [];
     this.prevV = null; this.notes = null; this.tones = null; this.root = cfg.bassLo;
     this.chordQ = 'm'; this.cycle = -1; this.progIdx = 0; this.prog = cfg.progs[0];
-    this.bassPat = null; this.bassSet = cfg.bass ? cfg.bass[0] : null; this.arpPat = ARP_PATS[0];
-    this.melody = null; this.leadOn = false;
+    this.melody = null; this.leadOn = false; this.motif = MOTIFS[0]; this.brassDue = 0;
+    this.tail = PULSE_TAILS[0]; this.taiko = TAIKO[0]; this.rnd = new Float32Array(16);
     this.lv = {}; this.lvSet = {};
     this.solo = M.mixOverride || null;    // offline layer-balance renders only
 
@@ -1350,24 +1398,25 @@ class Track {
     // Layers: [name, through sidechain pump, reverb send]
     this.L = {};
     for (const [k, pumped, send] of [
-      ['pad', 1, 0.5], ['sub', 1, 0], ['bass', 1, 0.04], ['choir', 1, 0.7], ['arp', 0, 0.3],
-      ['lead', 0, 0.35], ['drums', 0, 0.07], ['perc', 0, 0.14], ['bell', 0, 0.8],
+      ['pad', 1, 0.55], ['sub', 1, 0], ['atmos', 0, 0.5], ['pulse', 1, 0.08], ['perc', 0, 0.45],
+      ['motif', 0, 0.5], ['brass', 1, 0.4], ['choir', 1, 0.7], ['drums', 0, 0.12], ['lead', 0, 0.4], ['bell', 0, 0.8],
     ]) {
       const lg = this.gn(0, pumped ? this.pump : this.bus);
       if (send) lg.connect(this.gn(send, this.send));
       this.L[k] = lg;
     }
-    // Dotted-8th feedback delay for arp / lead / bells.
+    // Dotted-8th feedback delay for motif / lead / bells / ticks.
     const dly = ctx.createDelay(1.5);
     dly.delayTime.value = this.sd * 3;
-    const dlp = this.filt('lowpass', 2600, 0.7, null);
-    const fb = this.gn(cfg.kind === 'ambient' ? 0.45 : 0.32, dly);
+    const dlp = this.filt('lowpass', 2200, 0.7, null);
+    const fb = this.gn(0.4, dly);
     dly.connect(dlp); dlp.connect(fb);
     dlp.connect(this.gn(0.5, [this.bus, this.send]));
     this.nodes.push(dly);
-    this.L.arp.connect(this.gn(cfg.kind === 'ambient' ? 0.5 : 0.3, dly));
-    this.L.lead.connect(this.gn(0.22, dly));
+    this.L.motif.connect(this.gn(0.45, dly));
+    this.L.lead.connect(this.gn(0.2, dly));
     this.L.bell.connect(this.gn(0.35, dly));
+    this.L.perc.connect(this.gn(0.18, dly));
     this.build();
     this.updateLayers(ctx.currentTime, true);
   }
@@ -1394,73 +1443,88 @@ class Track {
     this.nodes.push(o); this.srcs.push(o);
     return o;
   }
+  lfo(rate, depth, param) {
+    const g = this.gn(depth, null);
+    g.connect(param);
+    this.osc('sine', rate, g, 0, false);
+  }
 
-  /** Persistent mono instruments driven by automation (no per-note nodes). */
+  /** Persistent instruments driven by automation (no per-note nodes). */
   build() {
     const { cfg, L } = this;
-    // Sub bass
+    // Sub: a low drone that swells on pulses.
     this.subVCA = this.gn(0, L.sub);
     this.subO = this.osc('sine', mtof(cfg.bassLo - 12), this.subVCA);
-    // Pads: per-chord oscillators feed two panned sides → one lowpass.
-    this.padLP = this.filt('lowpass', cfg.padCut || 1200, 0.6, L.pad);
+    // Pads: per-chord oscillators feed two panned sides → one slowly moving lowpass.
+    this.padLP = this.filt('lowpass', cfg.padCut || 1000, 0.7, L.pad);
+    this.lfo(0.045, 450, this.padLP.detune);
     if (this.G.hasPan) {
-      this.panL = this.ctx.createStereoPanner(); this.panL.pan.value = -0.55;
-      this.panR = this.ctx.createStereoPanner(); this.panR.pan.value = 0.55;
+      this.panL = this.ctx.createStereoPanner(); this.panL.pan.value = -0.6;
+      this.panR = this.ctx.createStereoPanner(); this.panR.pan.value = 0.6;
       this.panL.connect(this.padLP); this.panR.connect(this.padLP);
       this.nodes.push(this.panL, this.panR);
     } else {
       this.panL = this.panR = this.padLP;
     }
+    // Atmosphere: two drifting bands of noise.
+    const ns = this.ctx.createBufferSource();
+    ns.buffer = this.G.buf.pink; ns.loop = true; ns.start(0, Math.random());
+    this.nodes.push(ns); this.srcs.push(ns);
+    for (const [f, q, g, rate, depth] of [[320, 0.8, 1, 0.037, 900], [1300, 1.3, 0.3, 0.061, 700]]) {
+      const bp = this.filt('bandpass', f, q, this.gn(g, L.atmos));
+      this.lfo(rate, depth, bp.detune);
+      ns.connect(bp);
+    }
     // Choir: formant bank ('ah') with shared vibrato.
     this.choirIn = this.gn(1, null);
-    for (const [f, q, g] of [[680, 5, 1], [1120, 7, 0.55], [2650, 9, 0.28]]) {
+    for (const [f, q, g] of [[680, 5, 1], [1120, 7, 0.5], [2650, 9, 0.2]]) {
       const bp = this.filt('bandpass', f, q, this.gn(g, L.choir));
       this.choirIn.connect(bp);
     }
-    this.vib = this.gn(9, null);
-    this.osc('sine', 5.2, this.vib, 0, false);
-    // Arp / pluck
-    const ambient = cfg.kind === 'ambient';
-    this.aVCA = this.gn(0, L.arp);
-    this.aLP = this.filt('lowpass', 1200, ambient ? 1 : 3, this.aVCA);
-    this.aA = this.osc(ambient ? 'triangle' : 'sawtooth', 440, this.aLP);
-    this.aB = this.osc(ambient ? 'sine' : 'square', 880, this.gn(ambient ? 0.5 : 0.3, this.aLP));
-    if (ambient) return;
-    // Rolling bass
-    this.bVCA = this.gn(0, L.bass);
+    this.vib = this.gn(7, null);
+    this.osc('sine', 4.8, this.vib, 0, false);
+    // Motif pluck (soft, muted, through the delay).
+    this.aVCA = this.gn(0, L.motif);
+    this.aLP = this.filt('lowpass', 1200, 0.8, this.aVCA);
+    this.aA = this.osc('triangle', 440, this.aLP);
+    this.aB = this.osc('sine', 880, this.gn(0.4, this.aLP));
+    if (cfg.kind === 'ambient') return;
+    // Muted bass ostinato.
+    this.bVCA = this.gn(0, L.pulse);
     let bIn = this.bVCA;
     if (cfg.heavy) {
-      const post = this.filt('lowpass', 1900, 0.8, this.bVCA);
+      const post = this.filt('lowpass', 1400, 0.7, this.bVCA);
       const ws = this.ctx.createWaveShaper();
-      ws.curve = driveCurve(this.G, 3.5);
+      ws.curve = driveCurve(this.G, 2.5);
       ws.connect(post); this.nodes.push(ws);
       bIn = ws;
     }
-    this.bLP = this.filt('lowpass', 200, cfg.heavy ? 3 : 6, bIn);
-    this.bA = this.osc('sawtooth', 55, this.bLP, -9);
-    this.bB = this.osc('sawtooth', 55, this.bLP, 9);
-    this.bS = this.osc('square', 27.5, this.gn(0.4, this.bLP));
-    // Lead (final)
+    this.bLP = this.filt('lowpass', 200, 2.5, bIn);
+    this.bA = this.osc('sawtooth', 55, this.bLP, -8);
+    this.bB = this.osc('sawtooth', 55, this.bLP, 8);
+    this.bS = this.osc('sine', 27.5, this.gn(0.6, this.bLP));
+    // Slow lead (final)
     if (cfg.epic) {
       this.lVCA = this.gn(0, L.lead);
-      this.lLP = this.filt('lowpass', 2600, 1, this.lVCA);
-      this.lA = this.osc('sawtooth', 440, this.lLP, -8);
-      this.lB = this.osc('sawtooth', 440, this.lLP, 8);
-      this.lC = this.osc('square', 220, this.gn(0.3, this.lLP));
-      const lv = this.gn(11, null);
-      this.osc('sine', 5.5, lv, 0, false);
+      this.lLP = this.filt('lowpass', 1500, 0.7, this.lVCA);
+      this.lA = this.osc('sawtooth', 440, this.lLP, -7);
+      this.lB = this.osc('sawtooth', 440, this.lLP, 7);
+      this.lC = this.osc('triangle', 220, this.gn(0.5, this.lLP));
+      const lv = this.gn(10, null);
+      this.osc('sine', 5, lv, 0, false);
       lv.connect(this.lA.detune); lv.connect(this.lB.detune);
     }
-    // Drums: one looping noise source → gated bands (hats, snare, clap, crash, ride).
-    const ns = this.ctx.createBufferSource();
-    ns.buffer = this.G.buf.white; ns.loop = true; ns.start();
-    this.nodes.push(ns); this.srcs.push(ns);
-    const band = (type, f, q, to) => { const g = this.gn(0, to); const fl = this.filt(type, f, q, g); ns.connect(fl); return g; };
-    this.hatG = band('highpass', 7200, 0.7, L.drums);
-    this.snG = band('bandpass', 1900, 0.7, L.drums);
-    this.clapG = band('bandpass', 1150, 1.3, L.drums);
-    this.crashG = band('highpass', 4200, 0.5, L.drums);
-    this.rideG = band('bandpass', 5600, 1.4, L.perc);
+    // Percussion bands from one looping noise source (gated by automation).
+    const wn = this.ctx.createBufferSource();
+    wn.buffer = this.G.buf.white; wn.loop = true; wn.start();
+    this.nodes.push(wn); this.srcs.push(wn);
+    const band = (type, f, q, to) => { const g = this.gn(0, to); const fl = this.filt(type, f, q, g); wn.connect(fl); return g; };
+    this.tickG = band('bandpass', 2600, 2.5, L.perc);
+    this.shakG = band('bandpass', 6000, 0.9, L.perc);
+    this.hatG = band('bandpass', 7500, 0.8, L.drums);
+    this.snG = band('bandpass', 1800, 0.7, L.drums);
+    this.clapG = band('bandpass', 1100, 1.3, L.drums);
+    this.crashG = band('highpass', 4000, 0.5, L.drums);
   }
 
   /* --------------------------- instrument hits ---------------------------- */
@@ -1469,7 +1533,7 @@ class Track {
     const cfg = this.cfg, ctx = this.ctx;
     const v = voice(this.G, t, 1, null);
     v.hooks = [];
-    const a = Math.min(cfg.padA, dur * 0.7), rel = cfg.padRel, peak = 1.6 / notes.length;
+    const a = Math.min(cfg.padA, dur * 0.6), rel = cfg.padRel, peak = 1.6 / notes.length;
     const envL = vNode(v, ctx.createGain()), envR = vNode(v, ctx.createGain());
     envL.connect(this.panL); envR.connect(this.panR);
     for (const env of [envL, envR]) {
@@ -1479,7 +1543,7 @@ class Track {
       env.gain.exponentialRampToValueAtTime(peak * 0.001, t + dur + rel);
     }
     for (const m of notes) {
-      for (const [env, det] of [[envL, -12], [envR, 12]]) {
+      for (const [env, det] of [[envL, -10], [envR, 10]]) {
         const o = vNode(v, ctx.createOscillator());
         o.type = 'sawtooth';
         o.frequency.value = mtof(m);
@@ -1496,14 +1560,14 @@ class Track {
     const v = voice(this.G, t, 1, this.choirIn);
     v.hooks = [];
     const env = v.out, peak = 0.9 / notes.length;
-    if (stab) adsr(env.gain, t, 0.02, peak * 1.3, 0.05, 0.35);
+    if (stab) adsr(env.gain, t, 0.03, peak * 1.2, 0.05, 0.4);
     else {
       env.gain.setValueAtTime(0, t);
-      env.gain.linearRampToValueAtTime(peak, t + Math.min(0.7, dur * 0.5));
+      env.gain.linearRampToValueAtTime(peak, t + Math.min(1.2, dur * 0.5));
       env.gain.setValueAtTime(peak, t + dur);
-      env.gain.exponentialRampToValueAtTime(peak * 0.001, t + dur + 1.1);
+      env.gain.exponentialRampToValueAtTime(peak * 0.001, t + dur + 1.4);
     }
-    const end = stab ? t + 0.45 : t + dur + 1.15;
+    const end = stab ? t + 0.5 : t + dur + 1.45;
     for (const m of notes) {
       const o = vNode(v, ctx.createOscillator());
       o.type = 'sawtooth';
@@ -1516,110 +1580,137 @@ class Track {
     }
   }
 
+  /** Low brass-like swell on the chord root / fifth / octave (+ third when epic). */
+  brassSwell(t, dur) {
+    const v = voice(this.G, t, 1, this.L.brass);
+    const r = this.root;
+    const notes = [r, r + 7, r + 12];
+    if (this.cfg.epic || this.cfg.major) notes.push(r + 12 + (isMinor(this.chordQ) ? 3 : 4));
+    const a = Math.min(1.8, dur * 0.45), hold = dur * 0.25, d = 1.6, cut = this.cfg.epic ? 1100 : 850;
+    const lp = vNode(v, this.ctx.createBiquadFilter());
+    lp.type = 'lowpass'; lp.Q.value = 0.8;
+    lp.frequency.setValueAtTime(220, t);
+    lp.frequency.exponentialRampToValueAtTime(cut, t + a);
+    lp.frequency.exponentialRampToValueAtTime(260, t + a + hold + d);
+    const env = vNode(v, this.ctx.createGain());
+    lp.connect(env); env.connect(v.out);
+    adsr(env.gain, t, a, 0.66 / notes.length, hold, d);
+    v.hooks = [];
+    for (const m of notes) {
+      for (const det of [-9, 8]) {
+        const o = vNode(v, this.ctx.createOscillator());
+        o.type = 'sawtooth'; o.frequency.value = mtof(m); o.detune.value = det;
+        if (this.dsrc) { this.dsrc.connect(o.detune); v.hooks.push([this.dsrc, o.detune]); }
+        o.connect(lp);
+        vSrc(v, o, t, t + a + hold + d + 0.05);
+      }
+    }
+  }
+
   kick(t, peak) {
     const v = voice(this.G, t, 1, this.L.drums);
-    T(v, { f: 380, path: [[0.012, 140], [0.11, 46], [0.4, 40]], a: 0.001, peak, hold: 0.02, d: this.cfg.heavy ? 0.45 : 0.36, fixed: true });
-    if (this.cfg.heavy) T(v, { type: 'triangle', f: 120, f1: 50, st: 0.08, sh: 3, peak: peak * 0.25, d: 0.12, fixed: true });
-    // Sidechain pump on pads / bass / sub / choir.
-    const depth = 0.5 * (this.lv.drums || 0);
+    T(v, { f: 300, path: [[0.012, 120], [0.1, 44], [0.4, 38]], a: 0.001, peak, hold: 0.02, d: this.cfg.heavy ? 0.5 : 0.4, fixed: true });
+    const depth = 0.32 * (this.lv.drums || 0);   // gentle sidechain on pads / pulse / sub
     const g = this.pump.gain;
     g.setValueAtTime(1, t);
-    g.linearRampToValueAtTime(1 - depth, t + 0.012);
-    g.setTargetAtTime(1, t + 0.014, 0.075);
+    g.linearRampToValueAtTime(1 - depth, t + 0.015);
+    g.setTargetAtTime(1, t + 0.017, 0.09);
   }
 
   snare(t, lvl, clap = true) {
     const v = voice(this.G, t, 1, this.L.drums);
-    T(v, { type: 'triangle', f: 210, f1: 150, st: 0.06, a: 0.001, peak: 0.55 * lvl, d: 0.12, fixed: true });
+    T(v, { type: 'triangle', f: 190, f1: 140, st: 0.06, a: 0.001, peak: 0.45 * lvl, d: 0.14, fixed: true });
     const g = this.snG.gain;
-    g.setValueAtTime(0.7 * lvl, t);
-    g.setTargetAtTime(0, t + 0.003, 0.055);
+    g.setValueAtTime(0.6 * lvl, t);
+    g.setTargetAtTime(0, t + 0.003, 0.07);
     if (clap) {
       const c = this.clapG.gain;
       for (let i = 0; i < 3; i++) {
-        c.setValueAtTime(lvl * (1 - i * 0.12), t + i * 0.011);
+        c.setValueAtTime(lvl * 0.8 * (1 - i * 0.12), t + i * 0.011);
         c.setTargetAtTime(0.02, t + i * 0.011 + 0.001, 0.003);
       }
-      c.setValueAtTime(lvl * 0.75, t + 0.033);
-      c.setTargetAtTime(0, t + 0.034, 0.07);
+      c.setValueAtTime(lvl * 0.6, t + 0.033);
+      c.setTargetAtTime(0, t + 0.034, 0.09);
     }
   }
 
-  hat(t, lvl, open) {
-    const g = this.hatG.gain;
-    g.setValueAtTime(lvl, t);
-    g.setTargetAtTime(0, t + 0.001, open ? 0.09 : 0.014);
+  gate(g, t, lvl, tau) {
+    g.gain.setValueAtTime(lvl, t);
+    g.gain.setTargetAtTime(0, t + 0.001, tau);
   }
 
-  crash(t, lvl) {
-    const g = this.crashG.gain;
-    g.setValueAtTime(lvl, t);
-    g.setTargetAtTime(0, t + 0.004, 0.55);
-  }
-
-  ride(t, lvl) {
-    const g = this.rideG.gain;
-    g.setValueAtTime(lvl, t);
-    g.setTargetAtTime(0, t + 0.002, 0.16);
-  }
-
-  tom(t, f, lvl) {
+  /** Deep cinematic boom (downbeats). */
+  boom(t, lvl) {
     const v = voice(this.G, t, 1, this.L.perc);
-    T(v, { f, f1: f * 0.62, st: 0.2, a: 0.001, peak: lvl, d: 0.28, fixed: true });
+    T(v, { f: 62, f1: 38, st: 0.3, a: 0.003, peak: lvl, d: 0.9, fixed: true });
+    N(v, { k: 'brown', lp: 220, a: 0.004, peak: lvl * 0.6, d: 0.6, fixed: true });
   }
 
-  subNote(t, m) {
-    this.subO.frequency.setTargetAtTime(mtof(m), t, 0.03);
-    this.subVCA.gain.setTargetAtTime(1, t, 0.08);
+  /** Low tom / taiko 'don': pitched body + skin slap + noise body. */
+  drum(t, f, lvl, d = 0.5) {
+    const v = voice(this.G, t, 1, this.L.perc);
+    T(v, { f, f1: f * 0.6, st: 0.07, a: 0.001, peak: lvl, d, fixed: true });
+    N(v, { k: 'brown', lp: 700, a: 0.001, peak: lvl * 0.5, d: d * 0.5, fixed: true });
+    N(v, { k: 'pink', bp: 240, q: 1, a: 0.0008, peak: lvl * 0.4, d: 0.05, fixed: true });
   }
 
-  bassNote(t, m, acc, x, od) {
+  subTo(t, m) {
+    this.subO.frequency.setTargetAtTime(mtof(m), t, 0.05);
+  }
+
+  subPulse(t, lvl) {
+    const g = this.subVCA.gain, base = 0.35;
+    g.setTargetAtTime(base + (1 - base) * lvl, t, 0.015);
+    g.setTargetAtTime(base, t + 0.07, 0.28);
+  }
+
+  pulseNote(t, m, acc, x, od) {
     const f = mtof(m), heavy = this.cfg.heavy;
     this.bA.frequency.setValueAtTime(f, t);
     this.bB.frequency.setValueAtTime(f, t);
     this.bS.frequency.setValueAtTime(f / 2, t);
-    const base = heavy ? 240 : 160;
-    const peak = base + (450 + 1100 * x) * (acc ? 1.5 : 1) * (od ? 0.55 : 1);
+    const base = heavy ? 150 : 110;
+    const peak = base + (180 + 520 * x) * acc * (od ? 0.6 : 1);
     const lp = this.bLP.frequency;
     lp.setTargetAtTime(peak, t, 0.004);
-    lp.setTargetAtTime(base, t + 0.012, heavy ? 0.09 : 0.06);
-    const gate = this.sd * (heavy ? 0.85 : 0.7);
+    lp.setTargetAtTime(base, t + 0.012, 0.07);
+    const gate = this.sd * 0.8;
     const g = this.bVCA.gain;
-    g.setTargetAtTime(1, t, 0.002);
-    g.setTargetAtTime(0.75, t + 0.015, 0.05);
-    g.setTargetAtTime(0, t + gate, 0.012);
+    g.setTargetAtTime(0.4 + 0.6 * acc, t, 0.003);
+    g.setTargetAtTime(0.3 * acc, t + 0.02, 0.06);
+    g.setTargetAtTime(0, t + gate, 0.015);
   }
 
-  arpNote(t, m, vel, decay, cut) {
+  motifNote(t, m, vel, decay, cut = 1300) {
     this.aA.frequency.setValueAtTime(mtof(m), t);
     this.aB.frequency.setValueAtTime(mtof(m + 12), t);
     const g = this.aVCA.gain;
-    g.setTargetAtTime(vel, t, 0.002);
-    g.setTargetAtTime(0, t + 0.01, decay);
+    g.setTargetAtTime(vel, t, 0.004);
+    g.setTargetAtTime(0, t + 0.02, decay);
     const f = this.aLP.frequency;
-    f.setTargetAtTime(cut, t, 0.002);
-    f.setTargetAtTime(Math.max(500, cut * 0.25), t + 0.008, decay * 1.2);
+    f.setTargetAtTime(cut, t, 0.003);
+    f.setTargetAtTime(Math.max(400, cut * 0.35), t + 0.01, decay * 1.2);
   }
 
   leadNote(t, m, dur) {
     const f = mtof(m);
     for (const [o, k] of [[this.lA, 1], [this.lB, 1], [this.lC, 0.5]]) {
-      if (this.leadOn) o.frequency.setTargetAtTime(f * k, t, 0.02);
+      if (this.leadOn) o.frequency.setTargetAtTime(f * k, t, 0.04);
       else o.frequency.setValueAtTime(f * k, t);
     }
     this.leadOn = true;
     const g = this.lVCA.gain;
-    g.setTargetAtTime(1, t, 0.012);
-    g.setTargetAtTime(0.7, t + 0.08, 0.25);
-    g.setTargetAtTime(0, t + dur - 0.03, 0.04);
+    g.setTargetAtTime(1, t, 0.06);
+    g.setTargetAtTime(0.75, t + 0.3, 0.5);
+    g.setTargetAtTime(0, t + dur - 0.05, 0.12);
     const lp = this.lLP.frequency;
-    lp.setTargetAtTime(3600, t, 0.01);
-    lp.setTargetAtTime(2100, t + 0.05, 0.3);
+    lp.setTargetAtTime(1900, t, 0.08);
+    lp.setTargetAtTime(1300, t + 0.3, 0.6);
   }
 
   bellNote(t, m, peak, d = 1.4) {
     const v = voice(this.G, t, 1, this.L.bell);
-    bell(v, 0, mtof(m), peak, d, 3.5, 1.1);
+    bell(v, 0, mtof(m), peak, d, 3.5, 0.9);
   }
 
   /* ------------------------------ harmony ---------------------------------- */
@@ -1637,8 +1728,10 @@ class Track {
       this.progIdx = i;
     }
     this.prog = cfg.progs[this.progIdx];
-    if (cfg.bass) this.bassSet = this.cycle === 0 ? cfg.bass[0] : pick(cfg.bass);
-    this.arpPat = this.cycle === 0 ? ARP_PATS[0] : pick(ARP_PATS);
+    this.motif = this.cycle === 0 ? MOTIFS[0] : pick(MOTIFS);
+    this.tail = this.cycle === 0 ? PULSE_TAILS[0] : pick(PULSE_TAILS);
+    this.taiko = pick(TAIKO);
+    for (let i = 0; i < 16; i++) this.rnd[i] = Math.random();   // this cycle's tick groove
   }
 
   setChord(ch) {
@@ -1652,7 +1745,7 @@ class Track {
     this.chordQ = ch[1];
   }
 
-  /** Lengths (in bars) of the chord starting at bar index cb of the progression. */
+  /** Length (in bars) of the chord starting at bar index cb of the progression. */
   chordLen(cb) {
     let len = 1;
     while (cb + len < this.prog.length && chordEq(this.prog[cb + len], this.prog[cb])) len++;
@@ -1664,75 +1757,80 @@ class Track {
   schedule(s, t) {
     if (this.cfg.kind === 'drive') this.stepDrive(s, t);
     else this.stepAmbient(s, t);
-    if ((s & (this.cfg.kind === 'ambient' ? 3 : 7)) === 0 && wantHeart(t)) heartAt(this.G, t);
+    if ((s & (this.cfg.kind === 'ambient' ? 3 : 7)) === 1 && wantHeart(t)) heartAt(this.G, t);   // off the downbeat step: spreads node creation
   }
 
   stepDrive(s, t) {
     const cfg = this.cfg, lv = this.lv, x = M.ix, od = M.overdrive;
-    const st = s & 15, bar = s >> 4, cb = bar % 8, heavy = cfg.heavy;
+    const st = s & 15, bar = s >> 4, cb = bar % 8, heavy = !!cfg.heavy, epic = !!cfg.epic;
     if (st === 0) {
       if (cb === 0) this.newCycle();
       const ch = this.prog[cb];
       if (cb === 0 || !chordEq(this.prog[cb - 1], ch)) {
         this.setChord(ch);
         const dur = this.chordLen(cb) * 16 * this.sd;
-        this.padChord(t, dur, cfg.epic ? [this.notes[0] - 12, ...this.notes] : this.notes);
-        if (lv.choir > 0.01) this.choirChord(t, dur, this.notes.slice(0, 3).map((n) => n + (heavy ? 0 : 12)));
-        this.subNote(t, this.root - 12);
+        this.padChord(t, dur, this.notes);
+        if (lv.choir > 0.01) this.choirChord(t, dur, this.notes.slice(0, 3).map((n) => n + 12));
+        this.subTo(t, this.root - 12);
+        this.brassDue = lv.brass > 0.01 && (cb % 4 === 0 || heavy || epic) ? dur : 0;
       }
-      if (cb === 0 && bar > 0 && lv.drums > 0.3) this.crash(t, 0.4);
-      const set = this.bassSet;
-      this.bassPat = cb === 7 ? set.f : cb % 4 === 3 ? set.b : set.a;
+      if (cb === 0 && bar > 0 && lv.drums > 0.3) this.gate(this.crashG, t, 0.22, 0.6);
     }
 
-    // Drums
-    if (lv.drums > 0.01) {
-      const half = heavy && ((bar >> 2) & 1) === 0;       // boss: half-time ↔ double-time
-      let k = 0;
-      if (half) k = st === 0 ? 1 : st === 10 ? 0.85 : st === 7 && x > 0.6 ? 0.6 : 0;
-      else k = (st & 3) === 0 ? 1 : st === 14 && x > 0.9 && (cb & 1) ? 0.7 : 0;
-      if (k) this.kick(t, k);
-      const sn = half ? st === 8 : st === 4 || st === 12;
-      if (sn) this.snare(t, 1);
-      else if (heavy && !half && x > 0.5 && (st === 7 || (cb % 4 === 3 && st >= 13))) this.snare(t, 0.45, false);
-      else if (cb === 7 && st >= 12 && lv.perc < 0.5 && x > 0.45) this.snare(t, 0.3 + (st - 12) * 0.15, false);
-      // Hats: 16ths when intense, 8ths otherwise, sparse offbeats in overdrive.
-      const openBeat = (st & 3) === 2;
-      if (od) { if (openBeat) this.hat(t, 0.22, false); }
-      else if (openBeat && x > 0.45 && !half) this.hat(t, 0.24, true);
-      else if (x > 0.55 && !half) this.hat(t, (st & 1) ? 0.1 : 0.17, false);
-      else if (!(st & 1)) this.hat(t, 0.15, false);
+    if (st === 2 && this.brassDue) { this.brassSwell(t, this.brassDue - 2 * this.sd); this.brassDue = 0; }
+
+    // Deep sub pulse: once a bar when calm, every half-bar, then every beat.
+    const subEvery = x < 0.3 ? 16 : x < 0.7 ? 8 : 4;
+    if (st % subEvery === 0) this.subPulse(t, st === 0 ? 1 : 0.7);
+
+    // Muted bass ostinato: 8ths, 16ths (3-3-2 accents) near full intensity.
+    if (lv.pulse > 0.01) {
+      const acc = x > 0.8 && !od ? PULSE_16[st] : PULSE_8[st];
+      if (acc) {
+        const tail = (cb & 1) && st >= 12 ? this.tail[st - 12] : 0;
+        this.pulseNote(t, this.root + tail, acc, x, od);
+      }
     }
-    // Extra percussion: ride + tom fills every 8 bars.
+
+    // Sparse processed percussion.
     if (lv.perc > 0.01) {
-      if (!(st & 1) && !od) this.ride(t, (st & 3) === 2 ? 0.2 : 0.12);
-      if (cb === 7 && st >= 8) {
-        const tf = [200, 0, 170, 150, 130, 115, 100, 88][st - 8];
-        if (tf) this.tom(t, tf * (heavy ? 0.85 : 1), 0.8);
+      const dens = smooth(0.3, 1, x);
+      if (heavy || epic) {
+        // Taiko-like ensemble: only the big hits when calm, the full pattern when intense.
+        const lvl = this.taiko[st];
+        if (lvl && (lvl >= 0.9 || dens > 0.35 + (1 - lvl) * 0.5)) this.drum(t, heavy ? 72 : 80, lvl, 0.55);
+        if (cb === 7 && st >= 12 && x > 0.7) this.drum(t, 95 - (st - 12) * 6, 0.5 + (st - 12) * 0.12, 0.35);
+        if ((st & 3) === 2 && dens > 0.45) this.gate(this.tickG, t, 0.25, 0.012);           // 'ka' rim
+      } else {
+        if (this.rnd[st] < TICK_P[st] * (0.3 + dens)) this.gate(this.tickG, t, (st & 3) === 2 ? 0.35 : 0.22, 0.01);
+        if (x > 0.65 && !od) this.gate(this.shakG, t, (st & 1) ? 0.05 : 0.08, 0.02);
+        if (st === 0 && !(cb & 1) && x > 0.4) this.boom(t, 0.8);
+        if (cb === 7 && x > 0.6 && (st === 8 || st === 11 || st === 14)) this.drum(t, 110 - (st - 8) * 6, 0.6, 0.4);
       }
     }
-    // Bass
-    if (lv.bass > 0.01 && this.bassPat) {
-      let c = this.bassPat[st];
-      if (c === '7' && this.chordQ !== 'm' && this.chordQ !== 'm9') c = '5';
-      if (c !== '-') this.bassNote(t, this.root + BASS_SEMI[c], c !== 'x', x, od);
+
+    // Driving kit — only near full intensity.
+    if (lv.drums > 0.01) {
+      const k = (st & 3) === 0 ? 1 : heavy && st === 14 ? 0.6 : 0;
+      if (k) this.kick(t, k);
+      if (heavy ? st === 8 : st === 4 || st === 12) this.snare(t, 1);
+      if (od) { if ((st & 7) === 4) this.gate(this.hatG, t, 0.12, 0.02); }
+      else if ((st & 1) === 0) this.gate(this.hatG, t, (st & 3) === 2 ? 0.14 : 0.08, (st & 3) === 2 ? 0.05 : 0.015);
     }
-    // Arp / pluck
-    if (lv.arp > 0.01 && this.tones) {
-      const every = od || heavy ? 2 : 1;
-      if (st % every === 0) {
-        const idx = this.arpPat[(st / every + (heavy ? bar * 8 : 0)) & 15];
-        const m = this.tones[idx % this.tones.length] + (heavy ? 12 : 0);
-        this.arpNote(t, m, (st & 3) === 0 ? 1 : 0.7, heavy ? 0.09 : 0.06, od ? 1400 : 2600 + 2400 * x);
+
+    // Slow motif (combat): a few soft notes every 4 bars.
+    if (lv.motif > 0.01 && this.motif && this.tones) {
+      for (const [b, ns, ti] of this.motif) {
+        if ((cb & 3) === b && ns === st) this.motifNote(t, this.tones[ti % this.tones.length], 0.9, 0.9);
       }
     }
-    // Boss choir stabs
-    if (heavy && lv.choir > 0.01 && (bar & 1) && (st === 0 || st === 3 || st === 6) && this.notes) {
-      this.choirChord(t, 0.3, this.notes.slice(0, 3).map((n) => n + 12), true);
-    }
-    // Heroic lead
-    if (cfg.epic && lv.lead > 0.01 && this.melody) {
+    // Slow heroic lead (final)
+    if (epic && lv.lead > 0.01 && this.melody) {
       for (const [ns, m, len] of this.melody[cb]) if (ns === st) this.leadNote(t, m, len * this.sd);
+    }
+    // Boss: choir stabs at the top end
+    if (heavy && x > 0.85 && lv.choir > 0.01 && (bar & 1) && (st === 0 || st === 3 || st === 6) && this.notes) {
+      this.choirChord(t, 0.3, this.notes.slice(0, 3).map((n) => n + 12), true);
     }
   }
 
@@ -1747,7 +1845,7 @@ class Track {
           this.setChord(this.prog[this.prog.length - 1]);
           this.padChord(t, 4 * 16 * this.sd, this.notes);
           this.choirChord(t, 4 * 16 * this.sd, this.notes.slice(0, 3).map((n) => n + 12));
-          this.subNote(t, this.root - 12);
+          this.subTo(t, this.root - 12);
         }
       } else if (bar % chordBars === 0) {
         const pos = victory ? bar : (bar >> 1) % this.prog.length;
@@ -1756,51 +1854,45 @@ class Track {
         const dur = chordBars * 16 * this.sd;
         this.padChord(t, dur, this.notes);
         if (victory ? bar >= 2 : this.cycle % 2 === 1) this.choirChord(t, dur, this.notes.slice(0, 3).map((n) => n + 12));
-        this.subNote(t, this.root - 12);
+        if (victory && (bar === 0 || bar === this.prog.length - 1)) this.brassDue = dur * 1.5;
+        this.subTo(t, this.root - 12);
       }
+      this.subPulse(t, 0.6);
     }
+    if (st === 2 && this.brassDue) { this.brassSwell(t, this.brassDue); this.brassDue = 0; }
     if (!this.tones) return;
     if (victory) {
-      if (!sustain && (st & 3) === 0) this.bellNote(t, this.tones[(st >> 2) % this.tones.length] + 12, 0.7, 1.6);
-      else if (sustain && st === 0 && (bar & 1) && Math.random() < 0.6) this.bellNote(t, pick(this.tones) + 12, 0.5, 2.2);
-      if (!sustain && (st & 1) === 0 && bar >= 1) this.arpNote(t, this.tones[this.arpPat[st >> 1]], 0.5, 0.25, 1800);
+      if (!sustain && (st & 7) === 0) this.bellNote(t, this.tones[(st >> 3) + (bar & 1) * 2] + 12, 0.6, 2.2);
+      else if (sustain && st === 0 && (bar & 1) && Math.random() < 0.5) this.bellNote(t, pick(this.tones) + 12, 0.45, 2.6);
       return;
     }
-    // Menu: slow plucked arpeggio with delay; occasional high bell.
-    if ((st & 1) === 0 && Math.random() > 0.15) {
-      const idx = this.arpPat[(st >> 1) + ((bar & 1) << 3)];
-      this.arpNote(t, this.tones[idx % this.tones.length], 0.8, 0.28, 1700);
-    }
-    if (st === 8 && bar % 4 === 1) this.bellNote(t, pick(this.tones) + 12, 0.8, 2.4);
+    // Menu: sparse soft plucks drifting through the delay; an occasional high bell.
+    if ((st & 3) === 0 && Math.random() < 0.3) this.motifNote(t, pick(this.tones), 0.7, 1.1, 1500);
+    if (st === 8 && bar % 4 === 1) this.bellNote(t, pick(this.tones) + 12, 0.7, 2.6);
   }
 
   /** Layer levels from the (smoothed) intensity; ramps only when they change. */
   updateLayers(now, force) {
     const cfg = this.cfg, x = M.ix;
     const t = cfg.kind === 'ambient'
-      ? { pad: 1, sub: 1, arp: 1, bell: 1, choir: 1, drums: 0, bass: 0, lead: 0, perc: 0 }
-      : {
-        pad: 1, sub: 1, bell: 0,
-        drums: smooth(0.28, 0.42, x), bass: smooth(0.3, 0.45, x),
-        arp: smooth(0.62, 0.78, x), choir: smooth(0.66, 0.84, x),
-        lead: cfg.epic ? smooth(0.55, 0.75, x) : 0, perc: smooth(0.86, 0.98, x),
-      };
-    for (const k in this.L) {
+      ? { pad: 1, sub: 1, atmos: 1, motif: 1, bell: 1, choir: 1, brass: 1 }
+      : Object.assign({ pad: 1, sub: 1, atmos: 1 }, cfg.lv(x));
+    const solo = this.solo;
+    for (const k of LAYERS) {
       this.lv[k] = t[k] || 0;
-      const solo = this.solo;
       const target = (solo && solo.indexOf(k) < 0 ? 0 : cfg.mix[k] || 0) * this.lv[k];
       if (force || Math.abs(target - (this.lvSet[k] !== undefined ? this.lvSet[k] : -1)) > 0.004) {
         const p = this.L[k].gain;
         p.cancelScheduledValues(now);
-        p.setTargetAtTime(target, now, force ? 0.03 : 0.3);
+        p.setTargetAtTime(target, now, force ? 0.03 : 0.4);
         this.lvSet[k] = target;
       }
     }
     if (cfg.kind === 'drive') {
-      const cut = (M.overdrive ? 700 : 900) + 2600 * x;
+      const cut = (cfg.padCut || 900) * (M.overdrive ? 0.7 : 1) * (1 + 1.2 * x);
       if (force || Math.abs(cut - (this.cutSet || 0)) > 40) {
         this.padLP.frequency.cancelScheduledValues(now);
-        this.padLP.frequency.setTargetAtTime(cut, now, force ? 0.03 : 0.4);
+        this.padLP.frequency.setTargetAtTime(cut, now, force ? 0.03 : 0.6);
         this.cutSet = cut;
       }
     }
@@ -1867,52 +1959,40 @@ class Track {
 /* Stingers: short phrases in the current key                                  */
 /* -------------------------------------------------------------------------- */
 
-function stab(v, t, notes, peak, d, lp = 3000, lp1 = 600) {
-  for (const m of notes) {
-    T(v, { t, type: 'sawtooth', f: mtof(m), det: -7, lp, lp1, fT: d * 0.8, a: 0.008, peak, d, fixed: true });
-    T(v, { t, type: 'sawtooth', f: mtof(m), det: 7, lp, lp1, fT: d * 0.8, a: 0.008, peak, d, fixed: true });
-  }
-}
 const triad = (r, q) => q === 'M' ? [r, r + 4, r + 7] : [r, r + 3, r + 7];
+const hz = (arr) => arr.map(mtof);
 
 const STINGERS = {
   waveStart(v, k) {
-    stab(v, 0, [k - 12, k - 5, k, k + 3, k + 7], 0.05, 0.9);
-    T(v, { f: 72, f1: 34, st: 0.4, peak: 0.7, d: 0.6, fixed: true });
-    N(v, { k: 'wide', lp: 4000, lp1: 300, fT: 0.3, peak: 0.35, d: 0.4, fixed: true });
-    bell(v, 0, mtof(k + 24), 0.06, 0.8, 2, 1.2);
+    brass(v, 0, hz([k - 24, k - 17, k - 12, k - 9]), 0.07, 0.04, 0.3, 1.2, 900);          // low brass hit
+    T(v, { f: 70, f1: 34, st: 0.4, a: 0.002, peak: 0.7, d: 0.8, fixed: true });
+    N(v, { k: 'brown', lp: 300, peak: 0.5, d: 0.6, fixed: true });
+    N(v, { k: 'wide', lp: 3500, lp1: 300, fT: 0.3, peak: 0.25, d: 0.35, fixed: true });
   },
   sectorClear(v, k) {
-    const seq = [[0, k + 8], [0.3, k + 10], [0.6, k]];
-    seq.forEach(([t, r], i) => {
-      const q = 'M';
-      stab(v, t, triad(r, q), i === 2 ? 0.035 : 0.03, i === 2 ? 1.8 : 0.35, 2600, 900);
-      triad(r + 12, q).forEach((m, j) => bell(v, t + j * 0.05, mtof(m + 12), 0.05, 0.6, 2, 1));
-    });
-    T(v, { t: 0.6, f: mtof(k - 24), a: 0.02, peak: 0.45, d: 1.4, fixed: true });
+    brass(v, 0, hz([k - 16, ...triad(k - 4, 'M')]), 0.05, 0.3, 0.1, 0.5, 1000);           // bVI
+    brass(v, 0.45, hz([k - 14, ...triad(k - 2, 'M')]), 0.05, 0.3, 0.1, 0.5, 1100);        // bVII
+    brass(v, 0.9, hz([k - 24, k - 12, ...triad(k, 'M')]), 0.055, 0.35, 0.8, 1.6, 1400);   // I (major)
+    T(v, { t: 0.9, f: mtof(k - 24), a: 0.05, peak: 0.35, d: 1.6, fixed: true });
   },
   death(v, k) {
-    [k + 7, k + 5, k + 3, k + 2, k].forEach((m, i) => {
-      T(v, { t: i * 0.38, type: 'sawtooth', f: mtof(m), lp: 1100, a: 0.03, peak: 0.1, hold: 0.2, d: 0.6, fixed: true });
+    [k - 5, k - 7, k - 9, k - 10, k - 12].forEach((m, i) => {
+      T(v, { t: i * 0.42, type: 'sawtooth', f: mtof(m), lp: 700, a: 0.08, peak: 0.08, hold: 0.25, d: 0.7, fixed: true });
     });
-    for (const m of [k - 24, k - 12, k - 5]) {
-      T(v, { type: 'sawtooth', f: mtof(m), det: rand(-8, 8), lp: 500, a: 0.4, peak: 0.09, hold: 1.2, d: 1.6, fixed: true });
-    }
-    T(v, { f: 60, f1: 30, st: 0.8, peak: 0.6, d: 1.2, fixed: true });
+    brass(v, 0, hz([k - 36, k - 24, k - 17]), 0.08, 0.5, 1.2, 1.8, 500);
+    T(v, { f: 55, f1: 30, st: 0.8, a: 0.003, peak: 0.5, d: 1.2, fixed: true });
   },
   bossDefeated(v, k) {
-    const seq = [[0, k + 8, 0.55], [0.6, k + 10, 0.55], [1.2, k, 2.6]];
-    for (const [t, r, d] of seq) {
-      stab(v, t, [r - 12, ...triad(r, 'M'), r + 12], 0.03, d, 3200, 1000);
-    }
-    T(v, { t: 1.2, f: 80, f1: 32, st: 0.8, peak: 0.8, d: 1.2, fixed: true });
-    N(v, { t: 1.2, hp: 4000, peak: 0.2, d: 1.5, fixed: true });
-    [0, 4, 7, 12, 16, 19, 24].forEach((iv, i) => bell(v, 1.2 + i * 0.07, mtof(k + 12 + iv), 0.05, 1.2, 2, 1));
+    brass(v, 0, hz([k - 16, k - 4, k, k + 3]), 0.045, 0.25, 0.2, 0.5, 1100);             // bVI
+    brass(v, 0.6, hz([k - 14, k - 2, k + 2, k + 5]), 0.045, 0.25, 0.2, 0.5, 1200);       // bVII
+    brass(v, 1.2, hz([k - 24, k - 12, k - 5, k, k + 4]), 0.05, 0.3, 1.2, 2.0, 1600);    // I major
+    T(v, { t: 1.2, f: 70, f1: 32, st: 0.8, a: 0.003, peak: 0.8, d: 1.4, fixed: true });
+    N(v, { t: 1.2, k: 'brown', lp: 300, peak: 0.5, d: 1.0, fixed: true });
   },
   augment(v, k) {
-    [12, 15, 19, 24, 27, 31].forEach((iv, i) => bell(v, i * 0.05, mtof(k + 12 + iv), 0.08, 0.7, 3.5, 1.3));
-    N(v, { hp: 5000, rise: 0.25, peak: 0.08, cut: 0.3, fixed: true });
-    stab(v, 0.05, [k, k + 7, k + 12], 0.03, 0.9, 2400, 800);
+    N(v, { bp: 3500, bp1: 5500, fT: 0.35, q: 3, lp: 7000, rise: 0.35, peak: 0.12, cut: 0.4, fixed: true });
+    brass(v, 0.05, hz([k - 12, k - 5, k, k + 7]), 0.035, 0.35, 0.2, 0.9, 1400);
+    RES(v, { t: 0.35, freqs: [mtof(k + 24), mtof(k + 31)], q: 40, k: 'white', a: 0.003, peak: 0.4, d: 0.8, fixed: true });
   },
 };
 
@@ -1927,7 +2007,7 @@ const S = {
   voices: [], byName: new Map(), lastStart: new Map(), lastSweep: 0,
   loops: [], lastLoopUpdate: 0,
   warned: new Set(),
-  userPaused: false, hiddenSuspended: false, visHooked: false,
+  userPaused: false, hiddenSuspended: false, visHooked: false, watchTimer: null,
 };
 
 const DUMMY_LOOP = Object.freeze({ setVolume() {}, setPitch() {}, setPos() {}, stop() {} });
@@ -2171,21 +2251,31 @@ function play(name, opts) {
     }
     S.lastStart.set(name, now);
     if (def.duck) duckMusic(now);
+    // handle so a caller can cut a long one-shot short (e.g. a charge-up whose owner died)
+    return { stop() { if (!v.done && !v.stolen) steal(v); } };
   } catch (e) {
     /* never throw into game code */
   }
+  return NO_VOICE;
 }
+const NO_VOICE = { stop() {} };
 
 /* -------------------------------- loops ------------------------------------ */
+// Loops can never get stuck: a non-persistent loop that receives no
+// setPos / setPitch / setVolume for WATCHDOG_S seconds fades out by itself.
+
+const WATCHDOG_S = 2.5;
 
 /** Build a loop into graph G. Returns the loop record (with .handle). */
 function makeLoop(G, name, def, opts, t) {
   const ctx = G.ctx;
   const L = {
     G, ctx, name, def, nodes: [], srcs: [], stopped: false,
-    vol: clamp(finite(opts.volume, 1), 0, 4), pos: opts.pos || null,
-    pan: clamp(finite(opts.pan, 0), -1, 1), last: null, t0: t,
+    vol: clamp(finite(opts.volume, 1), 0, 4), pos: opts.pos ? { x: opts.pos.x, y: opts.pos.y, z: opts.pos.z } : null,
+    pan: clamp(finite(opts.pan, 0), -1, 1), last: null, t0: t, touched: t, cents: 0,
+    persistent: opts.persistent !== undefined ? !!opts.persistent : !!def.persistent,
   };
+  const now = () => Math.max(ctx.currentTime, L.t0);
   L.out = G.gain(0, null); L.nodes.push(L.out);
   L.in = L.out;
   L.lp = ctx.createBiquadFilter(); L.lp.type = 'lowpass';
@@ -2199,46 +2289,76 @@ function makeLoop(G, name, def, opts, t) {
   L.params = def.build(L).map((p) => [p, p.value]);
   for (const s of L.srcs) { if (s.offset0 !== undefined) s.start(t, s.offset0); else s.start(t); }
   L.apply = (tau) => {
-    const now = Math.max(ctx.currentTime, L.t0);
     let gain = def.g * L.vol, pan = L.pan, cutoff = 20000, wet = 1;
     if (L.pos) { const sp = spatial(L.pos); gain *= sp.gain; pan = sp.pan; cutoff = sp.cutoff; wet = sp.wet; }
     const k = [gain, pan, cutoff, wet];
     if (L.last && Math.abs(k[0] - L.last[0]) < 0.002 && Math.abs(k[1] - L.last[1]) < 0.01 && Math.abs(k[2] - L.last[2]) < 50) return;
     L.last = k;
-    L.out.gain.setTargetAtTime(gain, now, tau);
-    L.lp.frequency.setTargetAtTime(Math.min(cutoff, G.nyq), now, tau);
-    if (L.sp) L.sp.pan.setTargetAtTime(pan, now, tau);
-    L.send.gain.setTargetAtTime(def.verb * wet, now, tau);
+    const n = now();
+    for (const [p, v] of [[L.out.gain, gain], [L.lp.frequency, Math.min(cutoff, G.nyq)], [L.send.gain, def.verb * wet]]) {
+      p.cancelScheduledValues(n); p.setTargetAtTime(v, n, tau);
+    }
+    if (L.sp) { L.sp.pan.cancelScheduledValues(n); L.sp.pan.setTargetAtTime(pan, n, tau); }
   };
+  const free = () => { for (const nd of L.nodes) { try { nd.disconnect(); } catch (e) { /* ignore */ } } L.nodes.length = 0; };
   L.stop = (fade) => {
-    if (L.stopped) return;
+    if (L.stopped) return;                       // idempotent
     L.stopped = true;
     const i = S.loops.indexOf(L);
     if (i >= 0) S.loops.splice(i, 1);
-    const now = ctx.currentTime, f = Math.max(0.01, finite(fade, 0.1));
-    L.out.gain.cancelScheduledValues(now);
-    L.out.gain.setTargetAtTime(0, now, f / 4);
-    for (const s of L.srcs) { try { s.stop(now + f + 0.05); } catch (e) { /* ignore */ } }
-    if (L.srcs[0]) {
-      L.srcs[0].onended = () => { for (const n of L.nodes) { try { n.disconnect(); } catch (e) { /* ignore */ } } };
-    }
+    const n = now(), f = Math.max(0.01, finite(fade, 0.1));
+    L.out.gain.cancelScheduledValues(n);
+    L.out.gain.setValueAtTime(L.out.gain.value, n);
+    L.out.gain.linearRampToValueAtTime(0, n + f);
+    for (const s of L.srcs) { try { s.stop(n + f + 0.03); } catch (e) { /* ignore */ } }
+    if (L.srcs[0]) L.srcs[0].onended = free;
+    setTimeout(free, (f + 0.5) * 1000 + (n - ctx.currentTime) * 1000);   // fallback
   };
+  const touch = () => { L.touched = ctx.currentTime; };
   L.handle = {
-    setVolume(v) { try { if (L.stopped) return; L.vol = clamp(finite(v, L.vol), 0, 4); L.apply(0.05); } catch (e) { /* ignore */ } },
+    setVolume(v) { try { if (L.stopped) return; touch(); L.vol = clamp(finite(v, L.vol), 0, 4); L.apply(0.05); } catch (e) { /* ignore */ } },
     setPitch(p) {
       try {
         if (L.stopped) return;
+        touch();
         const cents = 1200 * Math.log2(clamp(finite(p, 1), 0.1, 8));
-        const now = ctx.currentTime;
-        for (const [param, base] of L.params) param.setTargetAtTime(base + cents, now, 0.04);
+        if (Math.abs(cents - L.cents) < 0.5) return;
+        L.cents = cents;
+        const n = now();
+        for (const [param, base] of L.params) {       // smooth glide: no zipper noise
+          param.cancelScheduledValues(n);
+          param.setTargetAtTime(base + cents, n, 0.05);
+        }
       } catch (e) { /* ignore */ }
     },
-    setPos(pos) { try { if (L.stopped || !pos) return; L.pos = { x: pos.x, y: pos.y, z: pos.z }; L.apply(0.04); } catch (e) { /* ignore */ } },
+    setPos(pos) {
+      try {
+        if (L.stopped || !pos) return;
+        touch();
+        L.pos = { x: pos.x, y: pos.y, z: pos.z };
+        L.apply(0.04);
+      } catch (e) { /* ignore */ }
+    },
     stop(fade = 0.1) { try { L.stop(fade); } catch (e) { /* ignore */ } },
   };
   L.out.gain.setValueAtTime(0, t);
   L.apply(0.06);
   return L;
+}
+
+function loopWatch() {
+  S.watchTimer = null;
+  if (!S.ready) return;
+  try {
+    const now = S.ctx.currentTime;
+    const frozen = S.userPaused || S.ctx.state !== 'running';
+    for (const L of S.loops.slice()) {
+      if (L.persistent) continue;
+      if (frozen) L.touched = now;               // the game is paused: don't time out
+      else if (now - L.touched > WATCHDOG_S) L.stop(0.4);
+    }
+  } catch (e) { /* ignore */ }
+  if (S.loops.some((l) => !l.persistent)) S.watchTimer = setTimeout(loopWatch, 250);
 }
 
 function loop(name, opts) {
@@ -2247,11 +2367,14 @@ function loop(name, opts) {
     const def = LOOPS[name];
     if (!def) { warnOnce(String(name)); return DUMMY_LOOP; }
     opts = opts || {};
+    const persistent = opts.persistent !== undefined ? !!opts.persistent : !!def.persistent;
+    const max = persistent ? Math.max(def.max, 3) : def.max;
     const same = S.loops.filter((l) => l.name === name);
-    if (same.length >= def.max) same[0].stop(0.05);
-    if (S.loops.length >= MAX_LOOPS) S.loops[0].stop(0.05);
+    for (let i = 0; i <= same.length - max; i++) same[i].stop(0.08);     // steal the oldest
+    if (S.loops.length >= MAX_LOOPS) S.loops[0].stop(0.08);
     const L = makeLoop(S.G, name, def, opts, S.ctx.currentTime);
     S.loops.push(L);
+    if (!L.persistent && !S.watchTimer) S.watchTimer = setTimeout(loopWatch, 250);
     return L.handle;
   } catch (e) {
     return DUMMY_LOOP;
@@ -2369,7 +2492,7 @@ function stinger(name) {
   } catch (e) { /* ignore */ }
 }
 
-const STING_GAIN = { waveStart: 1, sectorClear: 0.9, death: 0.64, bossDefeated: 0.37, augment: 0.8 };
+const STING_GAIN = { waveStart: 0.42, sectorClear: 0.74, death: 0.58, bossDefeated: 0.34, augment: 1.18 };
 
 function spawnStinger(G, fn, t, key) {
   const v = voice(G, t, 1, G.musicVol);
@@ -2464,6 +2587,8 @@ function levelStats(buf) {
   };
 }
 
+const WARM = 0.6;
+
 function offlineCtx(seconds) {
   const OAC = typeof window !== 'undefined' && (window.OfflineAudioContext || window.webkitOfflineAudioContext);
   if (!OAC) return null;
@@ -2478,11 +2603,13 @@ async function renderOffline(name, seconds, opts = {}) {
   const isSting = typeof name === 'string' && name.startsWith('stinger:');
   const def = SFX[name], ldef = LOOPS[name], sfn = isSting ? STINGERS[name.slice(8)] : null;
   if (!def && !ldef && !sfn) return null;
-  const secs = seconds || (def ? def.len : 3);
+  // The limiter needs a moment to settle after the graph is built, so sounds
+  // start at WARM seconds (live contexts are always warmed up).
+  const secs = (seconds || (def ? def.len : 3)) + WARM;
   const octx = offlineCtx(secs);
   if (!octx) return null;
   const G = buildGraph(octx);
-  const t = 0.02;
+  const t = WARM + finite(opts.delay, 0);
   if (def) {
     let gain = def.g * finite(opts.volume, 1), pan = 0, cutoff = 0, wet = 1;
     if (opts.pos) {
@@ -2493,7 +2620,15 @@ async function renderOffline(name, seconds, opts = {}) {
     const reps = Math.max(1, opts.repeat | 0), dt = finite(opts.interval, 0.1);
     for (let i = 0; i < reps; i++) spawn(G, name, def, t + i * dt, finite(opts.pitch, 1) * (1 + (i % 3 - 1) * 0.02), gain, pan, cutoff, wet);
   } else if (ldef) {
-    makeLoop(G, name, ldef, opts, t);
+    const L = makeLoop(G, name, ldef, opts, t);
+    if (opts.pitchRamp) {                         // e.g. lancerBeam 0.8 → 1.6 like the game does
+      const [p0, p1, dur] = opts.pitchRamp;
+      for (const [param, base] of L.params) {
+        param.setValueAtTime(base + 1200 * Math.log2(p0), t);
+        param.linearRampToValueAtTime(base + 1200 * Math.log2(p1), t + dur);
+      }
+    }
+    if (opts.stopNow) L.stop(0.05);
   } else {
     spawnStinger(G, sfn, t, opts.key || 50);
   }
@@ -2506,7 +2641,7 @@ async function renderOffline(name, seconds, opts = {}) {
 /** Render `seconds` of a music track at a fixed intensity (all steps pre-scheduled). */
 async function renderMusicOffline(track, intensity = 1, seconds = 20, opts = {}) {
   if (!STYLES[track]) return null;
-  const octx = offlineCtx(seconds);
+  const octx = offlineCtx(seconds + WARM);
   if (!octx) return null;
   const G = buildGraph(octx);
   const saved = { ix: M.ix, intensity: M.intensity, od: M.overdrive, lh: M.lowHealth, gh: M.lastGameHeart };
@@ -2526,9 +2661,9 @@ async function renderMusicOffline(track, intensity = 1, seconds = 20, opts = {})
       G.fx.detune.value = 1200 * Math.log2(700 / G.fx.frequency.value);
       G.fx.Q.value = 1.8;
     }
-    const tr = new Track(G, track, 0.05, 0, 0.2);
+    const tr = new Track(G, track, WARM, WARM, 0.2);
     persistent = created;
-    while (tr.next < seconds - 0.05) {
+    while (tr.next < seconds + WARM - 0.05) {
       const c0 = created;
       tr.run(0, tr.next + tr.sd * 0.5);
       maxStep = Math.max(maxStep, created - c0);
@@ -2587,7 +2722,7 @@ export const audio = {
     } catch (e) { /* ignore */ }
   },
 
-  play(name, opts) { play(name, opts); },
+  play(name, opts) { return play(name, opts); },
 
   loop(name, opts) { return loop(name, opts); },
 

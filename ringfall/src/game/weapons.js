@@ -360,8 +360,13 @@ export function createWeapons() {
       const tp = e.aimPoint;
       const dx = tp.x - player.pos.x, dz = tp.z - player.pos.z;
       const dist = Math.hypot(dx, dz);
-      if (!e.alive || W.lungeT <= 0) { W.lungeTarget = null; }
-      else if (dist < 1.8 + e.radius) {
+      if (!e.alive || W.lungeT <= 0) {
+        // aborted (target died to something else / timed out): don't keep flying at lunge speed
+        W.lungeTarget = null;
+        const hs = Math.hypot(player.vel.x, player.vel.z), cap = 10;
+        if (hs > cap) { player.vel.x *= cap / hs; player.vel.z *= cap / hs; }
+        player.vel.y = Math.min(player.vel.y, 2);
+      } else if (dist < 1.8 + e.radius) {
         W.lungeTarget = null;
         W.meleeT = 0; W.meleeHitDone = true;
         player.vel.x *= 0.2; player.vel.z *= 0.2;

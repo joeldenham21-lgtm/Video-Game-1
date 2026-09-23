@@ -54,7 +54,15 @@ export function createPlayer() {
       p.airJumps = p.maxAirJumps;
       p.trauma = 0; p.recoil = 0; p.landDip = 0;
     },
+    endOverdrive() {
+      const was = p.odActive > 0;
+      p.odActive = 0; p.od = 0;
+      G.audio?.music.setOverdrive(false);
+      if (was) G.events.emit('overdrive', false);
+    },
     fullReset() {
+      p.endOverdrive();
+      if (p._low) { p._low = false; G.audio?.music.setLowHealth(false); }
       p.maxHp = 100; p.hp = 100; p.maxShield = 50; p.shield = 50; p.od = 0; p.odActive = 0;
       p.maxDash = 2; p.dashCharges = 2; p.maxAirJumps = 1; p.alive = true; p.kills = 0; p.damageDealt = 0;
       p.shieldRegenRate = 26; p.odDuration = 7; p.odReadyAnnounced = false;

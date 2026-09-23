@@ -7,16 +7,18 @@ let MATS = null;
 export function vmMaterials() {
   if (MATS) return MATS;
   MATS = {
-    metal: new THREE.MeshStandardMaterial({ color: 0x30343c, metalness: 0.85, roughness: 0.3, envMapIntensity: 1.2 }),
-    panel: new THREE.MeshStandardMaterial({ color: 0x9aa2ae, metalness: 0.45, roughness: 0.38, envMapIntensity: 0.9 }),
-    rubber: new THREE.MeshStandardMaterial({ color: 0x17191e, metalness: 0.05, roughness: 0.85 }),
-    glove: new THREE.MeshStandardMaterial({ color: 0x23262d, metalness: 0.3, roughness: 0.65, envMapIntensity: 0.7 }),
-    armor: new THREE.MeshStandardMaterial({ color: 0x8d949f, metalness: 0.6, roughness: 0.38, envMapIntensity: 1.0 }),
+    // gunmetal, painted polymer and cloth: kept dark so the bright planet in the
+    // environment map reads as a sheen, not a wash
+    metal: new THREE.MeshStandardMaterial({ color: 0x2a2d33, metalness: 0.9, roughness: 0.32, envMapIntensity: 0.75 }),
+    panel: new THREE.MeshStandardMaterial({ color: 0x5c626c, metalness: 0.35, roughness: 0.46, envMapIntensity: 0.45 }),
+    rubber: new THREE.MeshStandardMaterial({ color: 0x141619, metalness: 0.0, roughness: 0.9, envMapIntensity: 0.3 }),
+    glove: new THREE.MeshStandardMaterial({ color: 0x24272c, metalness: 0.05, roughness: 0.8, envMapIntensity: 0.3 }),
+    armor: new THREE.MeshStandardMaterial({ color: 0x5d636d, metalness: 0.55, roughness: 0.4, envMapIntensity: 0.5 }),
   };
   return MATS;
 }
 
-function accentMat(color, intensity = 3) {
+function accentMat(color, intensity = 1.8) {
   return new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), toneMapped: false });
 }
 
@@ -85,7 +87,7 @@ function glove(kit, M, side = 1) {
 
 export function buildCarbine() {
   const M = vmMaterials();
-  const acc = accentMat(0x7fe6ff, 3.4);
+  const acc = accentMat(0x7fe6ff, 2.1);
   const k = new Kit();
   k.box(0.085, 0.1, 0.34, M.metal, 0, 0, 0);
   k.box(0.09, 0.05, 0.3, M.panel, 0, 0.045, -0.02);
@@ -93,8 +95,9 @@ export function buildCarbine() {
   k.box(0.05, 0.05, 0.22, M.metal, 0, -0.03, -0.31);
   k.cyl(0.018, 0.018, 0.16, M.metal, 0, 0.015, -0.5);
   k.cyl(0.026, 0.026, 0.05, M.metal, 0, 0.015, -0.585);
-  for (let i = 0; i < 3; i++) k.torus(0.046, 0.007, acc, 0, 0.005, -0.23 - i * 0.055);
-  k.box(0.092, 0.012, 0.2, acc, 0, 0.072, -0.03, 0, 0, 0, 0.003);
+  for (let i = 0; i < 3; i++) k.torus(0.046, 0.0045, i === 1 ? acc : M.metal, 0, 0.005, -0.23 - i * 0.055);
+  // thin light-pipes down both flanks (a full-width top slab read as a glowing brick in first person)
+  for (const sx of [-1, 1]) k.box(0.004, 0.008, 0.2, acc, sx * 0.045, 0.06, -0.03, 0, 0, 0, 0.002);
   // sight
   k.box(0.05, 0.045, 0.06, M.metal, 0, 0.1, 0.02);
   k.box(0.006, 0.03, 0.006, acc, 0, 0.128, -0.005);
@@ -127,7 +130,7 @@ export function buildCarbine() {
 
 export function buildScatter() {
   const M = vmMaterials();
-  const acc = accentMat(0xffa24a, 3.4);
+  const acc = accentMat(0xffa24a, 2.1);
   const k = new Kit();
   k.box(0.11, 0.12, 0.3, M.metal, 0, 0, 0, 0, 0, 0, 0.015);
   k.box(0.115, 0.05, 0.24, M.panel, 0, 0.06, 0.0, 0, 0, 0, 0.012);
@@ -144,7 +147,7 @@ export function buildScatter() {
   const group = k.build();
   const pk = new Kit();
   pk.box(0.1, 0.065, 0.16, M.rubber, 0, 0, 0, 0, 0, 0, 0.015);
-  pk.box(0.102, 0.012, 0.12, acc, 0, 0.034, 0, 0, 0, 0, 0.004);
+  for (const sx of [-1, 1]) pk.box(0.004, 0.009, 0.12, acc, sx * 0.05, 0.03, 0, 0, 0, 0, 0.002);
   const lk = new Kit();
   lk.box(0.08, 0.075, 0.11, M.glove, 0, -0.06, 0, 0, 0, 0, 0.02);
   lk.cyl(0.04, 0.05, 0.4, M.glove, -0.1, -0.11, 0.14, Math.PI / 2 - 0.35, 0.5, 0);
@@ -164,7 +167,7 @@ export function buildScatter() {
 
 export function buildLance() {
   const M = vmMaterials();
-  const acc = accentMat(0xc6a0ff, 3.6);
+  const acc = accentMat(0xc6a0ff, 2.3);
   const k = new Kit();
   k.box(0.08, 0.1, 0.38, M.metal, 0, 0, 0.02, 0, 0, 0, 0.012);
   k.box(0.085, 0.045, 0.3, M.panel, 0, 0.05, 0.04, 0, 0, 0, 0.01);
@@ -185,7 +188,7 @@ export function buildLance() {
   k.box(0.055, 0.08, 0.22, M.metal, 0, -0.01, 0.3, 0, 0, 0, 0.012);
   const group = k.build();
   // charge core between rails (scaled by charge)
-  const core = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.01, 0.5), accentMat(0xe8d8ff, 5));
+  const core = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.01, 0.5), accentMat(0xe8d8ff, 3.2));
   core.position.set(0, 0.01, -0.42); group.add(core);
   const hands = new Kit();
   glove(hands, M, 1);
@@ -202,7 +205,7 @@ export function buildLance() {
 
 export function buildNova() {
   const M = vmMaterials();
-  const acc = accentMat(0x6dff9a, 3.2);
+  const acc = accentMat(0x6dff9a, 2);
   const k = new Kit();
   k.box(0.1, 0.11, 0.3, M.metal, 0, 0, 0.05, 0, 0, 0, 0.015);
   k.cyl(0.05, 0.055, 0.3, M.panel, 0, 0.015, -0.28);
@@ -221,7 +224,7 @@ export function buildNova() {
   const drum = dk.build();
   drum.position.set(0, -0.02, -0.08);
   group.add(drum);
-  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), accentMat(0x9dffbe, 5));
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), accentMat(0x9dffbe, 3.2));
   orb.position.set(0, 0.015, -0.42); group.add(orb);
   const hands = new Kit();
   glove(hands, M, 1);
@@ -245,8 +248,8 @@ export function buildFist() {
   k.box(0.1, 0.03, 0.03, M.armor, 0, 0.0, -0.06, 0, 0, 0, 0.01);
   k.cyl(0.05, 0.058, 0.42, M.glove, 0, -0.01, 0.25, Math.PI / 2, 0, 0);
   k.box(0.11, 0.06, 0.26, M.armor, 0, 0.03, 0.22, 0, 0, 0, 0.015);
-  const acc = accentMat(0x7fe6ff, 4);
-  k.box(0.112, 0.012, 0.2, acc, 0, 0.061, 0.22, 0, 0, 0, 0.004);
+  const acc = accentMat(0x7fe6ff, 2.5);
+  for (const sx of [-1, 1]) k.box(0.004, 0.009, 0.2, acc, sx * 0.055, 0.055, 0.22, 0, 0, 0, 0.002);
   k.torus(0.06, 0.008, acc, 0, -0.005, 0.07);
   const group = k.build();
   const glow = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7fe6ff).multiplyScalar(2), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));

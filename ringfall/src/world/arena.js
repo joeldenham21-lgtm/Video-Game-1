@@ -1,7 +1,7 @@
 // Builds an arena from a layout: merged static meshes per material, emissive trims, colliders,
 // jump pads, and the distant megastructure backdrop.
 import * as THREE from 'three';
-import { G } from '../state.js';
+import { G, fxLayer } from '../state.js';
 import { CollisionWorld } from './collision.js';
 import { LAYOUTS } from './layouts.js';
 import { makePlating } from './textures.js';
@@ -115,18 +115,25 @@ let SHARED = null;
 function sharedMaterials() {
   if (SHARED) return SHARED;
   const aniso = G.renderer ? G.renderer.gl.capabilities.getMaxAnisotropy() : 4;
-  const floorT = makePlating('floor', { anisotropy: aniso });
-  const wallT = makePlating('wall', { anisotropy: aniso });
-  const darkT = makePlating('dark', { anisotropy: aniso, accent: '#d89a3a' });
-  const std = (t, color, envI) => new THREE.MeshStandardMaterial({
-    map: t.map, normalMap: t.normalMap, roughnessMap: t.ormMap, metalnessMap: t.ormMap,
-    roughness: 1, metalness: 1, color, envMapIntensity: envI, normalScale: new THREE.Vector2(1, 1),
-  });
+  const q = G.renderer?.q || {};
+  const size = q.tex || 512;
+  const floorT = makePlating('floor', { anisotropy: aniso, size });
+  const wallT = makePlating('wall', { anisotropy: aniso, size });
+  const darkT = makePlating('dark', { anisotropy: aniso, accent: '#c8923a', size });
+  // high-end GPUs get physically based clear-coated decks (polished, lacquered metal)
+  const std = (t, color, envI, coat = 0) => {
+    const o = {
+      map: t.map, normalMap: t.normalMap, roughnessMap: t.ormMap, metalnessMap: t.ormMap,
+      roughness: 1, metalness: 1, color, envMapIntensity: envI, normalScale: new THREE.Vector2(1.1, 1.1),
+    };
+    if (q.physical && coat > 0) return new THREE.MeshPhysicalMaterial({ ...o, clearcoat: coat, clearcoatRoughness: 0.22 });
+    return new THREE.MeshStandardMaterial(o);
+  };
   SHARED = {
-    floor: std(floorT, 0xb8bcc6, 0.9),
-    wall: std(wallT, 0xc2c6ce, 0.8),
-    dark: std(darkT, 0xaeb2b8, 0.7),
-    underside: new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 0.55, metalness: 0.8, envMapIntensity: 0.6 }),
+    floor: std(floorT, 0xc4c8d0, 1.0, 0.55),
+    wall: std(wallT, 0xc8ccd2, 0.95, 0.25),
+    dark: std(darkT, 0xb4b8be, 0.85, 0.35),
+    underside: new THREE.MeshStandardMaterial({ color: 0x1a1d24, roughness: 0.5, metalness: 0.85, envMapIntensity: 0.8 }),
     trim: new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }),
     trimDim: new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
     lamp: new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }),
@@ -138,9 +145,10 @@ function sharedMaterials() {
 }
 
 export const ARENA_TRIM = {
-  docks: { trim: 0xffa640, trimI: 3.2, lamp: 0xfff0d8, lampI: 4, dim: 0xff9a30, dimI: 0.9 },
-  garden: { trim: 0xff3a5c, trimI: 3.4, lamp: 0xffd8c8, lampI: 4, dim: 0xff2850, dimI: 0.9 },
-  heart: { trim: 0x7fe0ff, trimI: 3.4, lamp: 0xe8f6ff, lampI: 4, dim: 0x60c8ff, dimI: 0.9 },
+  // emissive strengths are HDR; kept modest so the lighting, not the trim, carries the scene
+  docks: { trim: 0xf0a060, trimI: 1.0, lamp: 0xfff0d8, lampI: 2.4, dim: 0xff9a30, dimI: 0.28 },
+  garden: { trim: 0xe8766a, trimI: 0.95, lamp: 0xffd8c8, lampI: 2.4, dim: 0xff3050, dimI: 0.26 },
+  heart: { trim: 0xa0d8ee, trimI: 1.0, lamp: 0xe8f6ff, lampI: 2.4, dim: 0x60c8ff, dimI: 0.28 },
 };
 
 export function buildArena(layoutName) {
@@ -150,8 +158,8 @@ export function buildArena(layoutName) {
   M.trim.color.set(theme.trim).multiplyScalar(theme.trimI);
   M.trimDim.color.set(theme.dim).multiplyScalar(theme.dimI);
   M.lamp.color.set(theme.lamp).multiplyScalar(theme.lampI);
-  M.padGlow.color.set(0x60e8ff).multiplyScalar(2.5);
-  M.windows.color.set(theme.lamp).multiplyScalar(2.2);
+  M.padGlow.color.set(0x60e8ff).multiplyScalar(1.7);
+  M.windows.color.set(theme.lamp).multiplyScalar(1.1);
 
   const world = new CollisionWorld();
   const group = new THREE.Group();
@@ -300,7 +308,7 @@ export function buildArena(layoutName) {
   const padGeo = new THREE.CylinderGeometry(0.95, 1.05, 3.2, 24, 1, true);
   padGeo.translate(0, 1.6, 0);
   const padMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0x58e0ff).multiplyScalar(2.2) }, uBoost: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0x58e0ff).multiplyScalar(1.1) }, uBoost: { value: 0 } },
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
     fragmentShader: `uniform float uTime; uniform vec3 uColor; uniform float uBoost; varying vec2 vUv;
       void main(){
@@ -314,7 +322,7 @@ export function buildArena(layoutName) {
   for (const pad of pads) {
     const m = new THREE.Mesh(padGeo, padMat.clone());
     m.position.set(pad.x, pad.y, pad.z);
-    group.add(m);
+    group.add(fxLayer(m));
     padMeshes.push(m);
     pad.mesh = m;
   }
