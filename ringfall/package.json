@@ -1,0 +1,16 @@
+{
+  "name": "ringfall",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "RINGFALL — a first-person roguelite arena shooter for phone and laptop browsers",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --dev --serve",
+    "test": "node test/playtest.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.0",
+    "three": "0.160.0"
+  }
+}
