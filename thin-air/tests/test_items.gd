@@ -59,7 +59,7 @@ func _connect_events() -> void:
 	for sig in ["item_picked_up", "item_crafted", "blueprint_unlocked", "ui_screen_opened", "ui_screen_closed",
 			"notification", "item_consumed", "equipment_changed"]:
 		_events[sig] = 0
-		var s := sig
+		var s: String = sig
 		Events.connect(sig, func(_a: Variant = null, _b: Variant = null) -> void: _events[s] = int(_events[s]) + 1)
 
 
@@ -379,7 +379,7 @@ func _test_pickups() -> void:
 	again.persist_id = "test_loot_flare"
 	add_child(again)
 	await get_tree().process_frame
-	check(again.is_queued_for_deletion(), "collected loot doesn't respawn after load")
+	check(not is_instance_valid(again) or again.is_queued_for_deletion(), "collected loot doesn't respawn after load")
 	# every item can be a pickup
 	var fails := []
 	for id in ItemDB.all_items():
@@ -516,6 +516,9 @@ func _test_screen() -> void:
 	var prev_state := Game.state
 	Game.player = p
 	Game.state = Game.State.PLAYING
+	var stale := InventoryScreen.get_instance()
+	if stale:
+		stale.free()
 	var screen := (load("res://scenes/ui/inventory_screen.tscn") as PackedScene).instantiate() as InventoryScreen
 	add_child(screen)
 	await get_tree().process_frame
