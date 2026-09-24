@@ -128,14 +128,15 @@ func _target_intensity() -> float:
 	return 0.0
 
 
-func _set_state(s: FireState) -> void:
+## `quiet`: restoring a save — no ignition sound.
+func _set_state(s: FireState, quiet := false) -> void:
 	if state == s:
 		return
 	var prev := state
 	state = s
 	fire_state_changed.emit(s)
 	if s == FireState.BURNING:
-		if prev != FireState.EMBERS:
+		if prev != FireState.EMBERS and not quiet:
 			Audio.play_sfx(&"fire_ignite", global_position)
 		_start_loop()
 	elif s == FireState.OUT or s == FireState.UNLIT:
@@ -332,7 +333,7 @@ func load_state(d: Dictionary) -> void:
 	fuel_minutes = float(d.get("fuel", 0.0))
 	ember_minutes = float(d.get("ember", 0.0))
 	has_kindling = bool(d.get("kindling", fuel_minutes > 0.0))
-	_set_state(int(d.get("state", 0)) as FireState)
+	_set_state(clampi(int(d.get("state", 0)), 0, FireState.OUT) as FireState, true)
 	intensity = _target_intensity()
 
 
@@ -354,7 +355,7 @@ func _build_fx() -> void:
 	var amt := 1.0 if q >= 2 else (0.7 if q == 1 else 0.5)
 	# Flames: a few large flipbook sprites (each frame is a whole cluster of tongues) + a hot bed at the base.
 	_flames = _particles("Flames", int(10 * amt), 0.95, _flame_draw(Vector2(0.66, 0.84), 0.37, 2.4), _flame_process(false))
-	_core = _particles("Core", int(6 * amt), 0.7, _flame_draw(Vector2(0.46, 0.4), 0.17, 3.0), _flame_process(true))
+	_core = _particles("Core", int(6 * amt), 0.7, _flame_draw(Vector2(0.46, 0.4), 0.17, 1.7), _flame_process(true))
 	_smoke = _particles("Smoke", int(26 * amt), 6.5, _smoke_draw(), _smoke_process())
 	_embers = _particles("Embers", int(20 * amt), 2.4, _ember_draw(), _ember_process())
 	_smoke.position.y = 0.45
@@ -488,7 +489,7 @@ func _flame_process(core: bool) -> ParticleProcessMaterial:
 	pm.anim_offset_min = 0.0
 	pm.anim_offset_max = 1.0
 	if core:
-		pm.color_ramp = _gradient([[0.0, Color(1, 1, 1, 0)], [0.2, Color(1.0, 0.95, 0.85, 0.85)], [0.75, Color(1.0, 0.85, 0.7, 0.75)], [1.0, Color(1.0, 0.6, 0.4, 0)]])
+		pm.color_ramp = _gradient([[0.0, Color(1, 1, 1, 0)], [0.2, Color(1.0, 0.86, 0.6, 0.7)], [0.75, Color(1.0, 0.72, 0.45, 0.6)], [1.0, Color(1.0, 0.5, 0.3, 0)]])
 	else:
 		pm.color_ramp = _gradient([[0.0, Color(1, 1, 1, 0)], [0.15, Color(1.0, 0.93, 0.85, 0.85)], [0.7, Color(1.0, 0.82, 0.66, 0.7)], [1.0, Color(0.9, 0.5, 0.3, 0)]])
 	return pm

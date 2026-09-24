@@ -975,7 +975,9 @@ func _layout() -> void:
 	_header.custom_minimum_size.y = 50 if _compact else 58
 	_brand.visible = _root.size.x > 1560.0
 	_detail_panel.custom_minimum_size.x = clampf(_root.size.x * 0.25, 350.0, 470.0)
-	(_detail["stage"] as Control).custom_minimum_size.y = clampf(_root.size.y * 0.18, 104.0, 196.0)
+	(_detail["stage"] as Control).custom_minimum_size.y = clampf(_root.size.y * 0.18, 104.0, 196.0) if not _compact else 90.0
+	for b in (_detail["hb"] as Control).get_children():
+		(b as Control).custom_minimum_size.y = 40.0 if _compact else 44.0
 	(_rd["icon"] as Control).custom_minimum_size = Vector2.ONE * (112.0 if _compact else 150.0)
 	(_rd["panel"] as Control).custom_minimum_size.x = 440.0 if _compact else 520.0
 	_craft_left.custom_minimum_size.x = 520.0 if _compact else 600.0
@@ -1369,7 +1371,7 @@ func _refresh_detail() -> void:
 		_stat_row(stats, "Condition", "%d%%" % roundi(dur * 100.0), dur, InvStyle.durability_color(dur))
 	var holdable := ItemInfo.is_holdable(id) or ItemInfo.is_consumable(id)
 	var own := sel_slot.kind == ItemSlot.Kind.INV and sel_slot.inventory == inv
-	(_detail["hb_label"] as Control).visible = holdable and own
+	(_detail["hb_label"] as Control).visible = holdable and own and not _compact
 	(_detail["hb"] as Control).visible = holdable and own
 	_build_actions(actions, id, n)
 
