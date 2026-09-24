@@ -20,6 +20,7 @@ SR = 48000
 PRE = 2.0            # seconds of pre-roll at the start of every rendered timeline
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE = os.path.join(HERE, "_cache")
+ONESHOT_LEAD = 0.04  # seconds of audio kept before beat 1 in one-shot files
 KEYBOARD = {"piano", "mellow_piano", "ep", "ep_detuned", "harp", "celesta", "vibes", "glock"}
 DYN_EXTRA = 0.7      # exponent of the CC11 curve that rides along with CC2
 
@@ -214,9 +215,15 @@ def render_cue(cue: Cue, out_ogg: str, log=print) -> dict:
         mix = dsp.fold_loop(mix, pre_n, loop_len)
         stem_views = {k: dsp.fold_loop(v, pre_n, loop_len) for k, v in stem_levels.items()}
     else:
+        # one-shots start 40 ms before beat 1 so humanised / attack-compensated onsets that land
+        # just ahead of the downbeat are kept, then a 5 ms raised-cosine fade-in: the first sample
+        # is exactly 0 (no click when the player starts a stinger out of silence)
+        start = max(0, pre_n - int(ONESHOT_LEAD * SR))
         stop = min(len(mix), pre_n + int((body_s + cue.tail_s) * SR))
-        mix = mix[pre_n:stop]
-        stem_views = {k: v[pre_n:stop] for k, v in stem_levels.items()}
+        mix = mix[start:stop]
+        fi = int(0.005 * SR)
+        mix[:fi] *= (0.5 - 0.5 * np.cos(np.linspace(0, np.pi, fi)))[:, None]
+        stem_views = {k: v[start:stop] for k, v in stem_levels.items()}
 
     # 2) master: bus compression -> loudness -> true-peak limiting
     c = cue.comp

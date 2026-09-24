@@ -105,7 +105,8 @@ def entry(cue, fname: str, stats: dict) -> dict:
         "fade_out_s": 0.0 if cue.kind == "stinger" else (2.5 if cue.intensity >= 0.8 else 5.0),
         # musical boundaries (seconds) so a director can switch / cross-fade on phrase starts
         "bar_s": round(cue.sec(cue.meter) - cue.sec(0), 4),
-        "phrase_starts_s": [round(cue.sec(b * cue.meter), 3) for b in range(0, cue.bars, 4)],
+        "phrase_starts_s": [round(cue.sec(b * cue.meter) + (0.0 if cue.loop else render.ONESHOT_LEAD), 3)
+                            for b in range(0, cue.bars, 4)],
     }
 
 
