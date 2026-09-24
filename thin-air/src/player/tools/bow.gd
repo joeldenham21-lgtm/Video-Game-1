@@ -5,7 +5,11 @@ extends HeldItem
 
 const DRAW_TIME := 0.9
 const HOLD_STAMINA := 3.0
-const DRAW_LENGTH := 0.26          # visual string pull in model space
+## Full-draw anchor (corner of the mouth, just below and right of the eye) and drawing elbow, camera space.
+## The string hand ends up at the face — below the view — like a real anchor, not floating in front of it.
+const ANCHOR_CAM := Vector3(0.035, -0.1, -0.07)
+const DRAW_ELBOW_CAM := Vector3(0.36, -0.1, 0.22)
+const REST_ELBOW := Vector3(0.5, -0.2, 0.84)
 
 var draw := 0.0
 var drawing := false
@@ -115,7 +119,7 @@ func item_process(delta: float, can_act: bool) -> void:
 	var t := Time.get_ticks_msec() * 0.001
 	var shake := Vector3(sin(t * 17.0), sin(t * 13.0 + 1.0), 0.0) * tremor * 0.9
 	_loose_kick = move_toward(_loose_kick, 0.0, delta * 5.0)
-	anim_pos = Vector3(0.1, 0.1, 0.02) * d + Vector3(0.0, 0.0, 0.03) * _loose_kick
+	anim_pos = Vector3(0.07, 0.065, -0.04) * d + Vector3(0.0, 0.0, 0.03) * _loose_kick
 	anim_rot = Vector3(3.0, 6.0, -8.0) * d + shake + Vector3(-6.0, 0.0, 0.0) * _loose_kick
 	_bow_mat.set_shader_parameter(&"bend", 0.22 * d)
 	_arrow_mi.visible = has_arrow and (drawing or draw > 0.01 or _loose_kick <= 0.0)
@@ -129,16 +133,20 @@ func _update_string() -> void:
 	var tip_z := FPModels.bow_limb_z(tip_y) + bend * pow(tip_y - 0.08, 2.0) + 0.004
 	var top := Vector3(0.0, tip_y - bend * pow(tip_y - 0.08, 3.0) * 0.8, tip_z)
 	var bot := Vector3(0.0, -top.y, tip_z)
-	var nock := Vector3(0.0, 0.01, lerpf(tip_z + 0.005, tip_z + DRAW_LENGTH, d))
+	var nock := Vector3(0.0, 0.01, tip_z + 0.005)
+	var elbow := REST_ELBOW
+	if d > 0.0 and is_inside_tree() and player and player.camera:
+		# Pull the nock toward the anchor on the face (bow space ← camera space).
+		var cam_to_bow := _bow_root.global_transform.affine_inverse() * player.camera.global_transform
+		nock = nock.lerp(cam_to_bow * ANCHOR_CAM, d)
+		elbow = REST_ELBOW.lerp((cam_to_bow.basis * (DRAW_ELBOW_CAM - ANCHOR_CAM)).normalized(), d).normalized()
 	_place_segment(_string_top, top, nock)
 	_place_segment(_string_bot, bot, nock)
 	# Arrow rests on the riser and its nock sits on the string.
 	var rest := Vector3(-0.012, 0.02, -0.02)
 	var dir := (rest - nock).normalized()
 	_arrow_mi.transform = Transform3D(Basis.looking_at(dir, Vector3.UP), nock + dir * 0.36)
-	# Right hand hooks the string at the nock, forearm back toward the camera.
-	# Drawing elbow sits high and back (anchor at the cheek).
-	var elbow := Vector3(0.5, -0.2, 0.84)
+	# Right hand hooks the string at the nock; the drawing elbow sits high and back.
 	var hb := FPHands.grip_basis(Vector3(0.0, -1.0, 0.0), elbow, false)
 	_hand_r.transform = Transform3D(hb, nock - hb * FPHands.grip_point(&"hook", false))
 	FPHands.aim_forearm(_hand_r, elbow)

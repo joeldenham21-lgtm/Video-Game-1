@@ -87,14 +87,15 @@ func _particles(kind: StringName, amount: int, life: float, s_min: float, s_max:
 	match kind:
 		&"smoke":
 			g.offsets = PackedFloat32Array([0.0, 0.15, 1.0])
-			g.colors = PackedColorArray([Color(0.9, 0.5, 0.5, 0.0), Color(0.85, 0.55, 0.55, 0.5), Color(0.6, 0.55, 0.55, 0.0)])
+			g.colors = PackedColorArray([Color(0.85, 0.62, 0.6, 0.0), Color(0.8, 0.64, 0.62, 0.3), Color(0.62, 0.58, 0.58, 0.0)])
 			var c := Curve.new()
 			c.add_point(Vector2(0.0, 0.3))
 			c.add_point(Vector2(1.0, 1.0))
 			p.scale_amount_curve = c
 		&"flame":
-			g.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
-			g.colors = PackedColorArray([Color(1.0, 0.8, 0.8, 1.0), Color(1.0, 0.2, 0.1, 0.8), Color(0.6, 0.0, 0.0, 0.0)])
+			# Strontium red: a hot pink-white core fading through deep red.
+			g.offsets = PackedFloat32Array([0.0, 0.2, 0.55, 1.0])
+			g.colors = PackedColorArray([Color(1.0, 0.62, 0.72, 1.0), Color(1.0, 0.24, 0.3, 0.9), Color(0.9, 0.06, 0.08, 0.6), Color(0.5, 0.0, 0.02, 0.0)])
 		_:
 			g.offsets = PackedFloat32Array([0.0, 1.0])
 			g.colors = PackedColorArray([Color(1.0, 0.75, 0.6, 1.0), Color(1.0, 0.2, 0.05, 0.0)])

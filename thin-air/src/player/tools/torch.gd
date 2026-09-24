@@ -72,7 +72,7 @@ func build_visual() -> void:
 		_globe_mat = FPMaterials.vm_emissive(&"glass_dark", Color(1.0, 0.64, 0.32), 0.0)
 		mi.set_surface_override_material(1, _globe_mat)
 		_head = Vector3(0.0, 0.1, 0.0)
-		var elbow := basis.inverse() * Vector3(0.12, -0.32, 1.0).normalized()
+		var elbow := basis.inverse() * Vector3(0.42, -0.3, 0.86).normalized()
 		var arm := FPHands.make_arm(&"grip", false, Vector3(0.0, 0.25, 0.0), Vector3(-1, 0, 0), elbow)
 		_holder.add_child(arm)
 		_register(arm)

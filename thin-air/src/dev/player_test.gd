@@ -1124,7 +1124,7 @@ func _setup_shot(item: StringName) -> void:
 		print("SHOT %s frames %d-%d" % [id, i * per, i * per + per - 1])
 		var hold := String(args.get("hold", ""))
 		if hold != "":
-			for f in 8:
+			for f in int(args.get("hold_after", "16")):
 				await get_tree().process_frame
 			Input.action_press(StringName(hold))
 		for f in per:
