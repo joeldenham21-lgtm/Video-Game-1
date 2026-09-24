@@ -31,6 +31,32 @@ sox/ffmpeg, piper TTS). Nothing is sampled from outside sources. Rebuild: see `t
   ambience to the station interior (hum if `Game.flags.station_power` or `generator_loop` is playing, silent and
   creaking otherwise). `set_muffled(0..1)` sweeps the Master low-pass 20.5 kHz → 320 Hz.
 - **Flags read:** `station_power` (bool), `wolves_silent` (bool, suppresses distant phantom howls).
+- **More hooks:** `Events.radio_message(id)` plays that voice line (a direct `play_voice` of the same line in the
+  same moment does not restart it); `sleep_started`/`sleep_ended` muffle the mix and pause the score; death muffles
+  until `player_respawned`. `Audio.stop_all()` silences everything at once (world teardown).
+- **Mobile** (`Settings.is_mobile()`): 16 instead of 24 pooled 3D voices, at most 6 ambience beds decoding at once
+  (the weakest are dropped), otherwise identical behaviour.
+
+## Voice line index (data/voice.json — for Story)
+
+Every line has `segments` (per-sentence subtitles with exact times) and `kind` (cockpit / radio_tx / radio /
+radio_weak / awos / dictaphone / in_person / scene). Radio lines already contain squelch and PTT; play them 2D
+(handheld) or with `play_voice_3d` on the wreck's radio.
+
+| When | Line ids |
+|---|---|
+| Prologue (black screen) | `prologue` — the whole 232 s scene (the individual `pro_01`…`pro_22` exist too, dry of engine) |
+| Act 1, wreck radio | `beacon_awos` (automated weather loop, Mara's message is not in it), `beacon_mara` (her recorded plea, weak), `beacon_live` (once: she hears the crash, names the cabin and channel 6) |
+| Act 2, ranger cabin radio | `mara_contact_1` (first contact, yes/no clicks), `mara_contact_2` (what happened), `mara_contact_3` (the plan: Ashford Mine) |
+| Guidance | `mara_night`, `mara_first_night_end`, `mara_mine_arrive`, `mara_mine_inside`, `mara_owen_found`, `mara_bear_warning`, `mara_depot_found`, `mara_treeline`, `mara_glacier`, `mara_icefall`, `mara_ice_cave`, `mara_altitude`, `mara_station_approach` |
+| Contextual hints | `hint_fire`, `hint_cold`, `hint_water`, `hint_food`, `hint_shelter`, `hint_wolves`, `hint_scanner`, `hint_oxygen`, `hint_storm` |
+| Act 5, station (in person) | `mara_station_meet`, `mara_generator`, `mara_generator_on`, `mara_relay_explain`, `mara_about_elias`, `mara_summit_depart` |
+| Act 6, summit and ending | `mara_summit_storm`, `mara_hale_found`, `mara_relay_guide`, `mara_relay_online`, `final_call`, `mara_come_home`, `mara_last_night` (in person), `rescue_dawn`, `mara_ending` (in person) |
+| Crew logs (dictaphone) | `log_burke_01/02`, `log_hale_01/02/03`, `log_reyes_01/02`, `log_park_01/02/03`, `log_voss_01/02/03/04` — referenced by `data/logs.json` (`voice`), which also holds 11 written documents (Dale's pilot log, ranger logbook + note, 3 miner's diary pages, Burke's note, whiteboard, fuel log, relay diagnostic, Hale's notebook) with `location_hint`s |
+
+Story timeline and every date/number in the script are kept consistent (see the header of
+`tools/audio/voice/script.py`): relay lost Oct 9 04:12, Mara's fall Oct 10, Burke killed Oct 12, Hale Oct 14,
+Tomas Oct 19 (June went east), generator dry Oct 22, crash Oct 28.
 
 ## Engine (src/autoload/audio.gd, src/audio/*)
 
@@ -113,6 +139,11 @@ auditioned by spectrogram and noise floor (`voice/audition.py`); voices with hum
 | Terrace Rescue / Rescue One-Six | 750 / 20 | calm professional males |
 | Kestrel automated weather | 500 | flat-prosody male, rendered monotone + 8-bit µ-law |
 
+The script (79 lines, ≈27 minutes of speech plus the prologue) was written against DESIGN.md §2: understated,
+concrete (Otter C-FKTL, R-1340 carb/induction icing, AWOS format, channel 6, Kubota 6 kW on gelling summer diesel,
+mass balance −1.4 m w.e., icefall velocities, a water-split transceiver), with radio procedure (callsigns, "say souls
+on board and fuel", mayday format) and no melodrama.
+
 Delivery: per-speaker `length_scale`/`noise_scale`/`noise_w`, slower pacing on the heaviest lines; every sentence
 is rendered separately and re-timed with punctuation-dependent pauses, soft synthesized inhales, and exact
 per-sentence subtitle timing. Processing: **radio** = 280–3,500 Hz, small-speaker EQ, fast AGC, soft clipping,
@@ -120,7 +151,8 @@ FM capture-effect noise floor, squelch-open burst and "kssh" tail per transmissi
 split around Sam's mic clicks. **Weak signal** (beacon, broken replies) ≈ 12 dB SNR with multipath flutter,
 picket-fencing micro-dropouts and scripted dropouts. **Dictaphone** = small room / ice-cave reverb or summit wind
 on the mic, 180–6,500 Hz, AGC, wow (0.62 Hz) & flutter (7.3 Hz), tape hiss, capstan whine, record/stop key
-clunks. **Cockpit** = boom-mic intercom band + the R-1340 under it; **in person** = station module room.
+clunks; the ice-cave logs use a short bright ice-cave room (Sabine RT ≈ 1.2 s with a snow floor) and meltwater drips,
+Hale's summit log has wind buffeting the recorder mic. **Cockpit** = boom-mic intercom band + the R-1340 under it; **in person** = station module room.
 
 ## QA
 
@@ -129,6 +161,10 @@ loop seams (decoded end→start discontinuity and level step). During developmen
 log-frequency spectrograms + waveform (`build_sfx.py --preview`, `contact_sheet.py`); issues found and fixed that
 way included over-bright snow grains, wind beds collapsing to silence between gusts, truncated resonance tails,
 modal onset clicks, ice-crack dispersion 3× too slow, and unintelligible weak-radio SNR.
+
+QA status (last run): 482 files, all ≤ −1.0 dBTP after encoding (the writers decode and re-check every OGG),
+all loops continuous at the seam (end→start jump ≤ 1.2× a typical 90th-percentile sample step, i.e. inaudible), mono/stereo layout as specified. Wind beds were retuned
+so strong/gale winds swell by 10–14 dB (p10–p90) without ever dropping to a calm-day hush between gusts.
 
 ## Known gaps
 

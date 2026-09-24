@@ -74,7 +74,7 @@ LINES = [
 		"Nineteen days nobody's heard a word from that station. Five people."]},
 	{"id": "pro_10", "speaker": "dale", "kind": "cockpit", "parts": [
 		"Hear that? She's running a little rough.", ("pause", 0.6),
-		"Carb heat's coming on. Wet snow like this, the intake packs up."]},
+		"Carb ice, maybe. Carb heat's coming on. Wet snow like this, the intake packs up."]},
 	{"id": "pro_11", "speaker": "dale", "kind": "cockpit", "parts": ["Come on, girl."]},
 	{"id": "pro_12", "speaker": "dale", "kind": "radio_tx", "parts": [
 		"Dispatch, Kilo Tango Lima. I've got some roughness. Carb heat's on, manifold pressure's still dropping.",

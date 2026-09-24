@@ -2404,10 +2404,10 @@
   "file": "res://assets/audio/voice/pro_10.ogg",
   "speaker": "Dale Morrow",
   "speaker_id": "dale",
-  "text": "Hear that? She's running a little rough. Carb heat's coming on. Wet snow like this, the intake packs up.",
+  "text": "Hear that? She's running a little rough. Carb ice, maybe. Carb heat's coming on. Wet snow like this, the intake packs up.",
   "radio": false,
   "kind": "cockpit",
-  "duration_s": 8.23,
+  "duration_s": 9.86,
   "segments": [
    {
     "t": 0.35,
@@ -2417,8 +2417,8 @@
    },
    {
     "t": 3.654,
-    "d": 4.52,
-    "text": "Carb heat's coming on. Wet snow like this, the intake packs up.",
+    "d": 6.16,
+    "text": "Carb ice, maybe. Carb heat's coming on. Wet snow like this, the intake packs up.",
     "speaker": "Dale Morrow"
    }
   ]
@@ -2697,10 +2697,10 @@
   "file": "res://assets/audio/voice/prologue.ogg",
   "speaker": "Dale Morrow",
   "speaker_id": "dale",
-  "text": "Dale Morrow: Sam, you still with me back there? That's the Aldous coming up on the right. Dale Morrow: Forty minutes to the glacier, if this holds. Dale Morrow: Terrace Dispatch, Otter Kilo Tango Lima, position report. Terrace Dispatch: Kilo Tango Lima, Terrace Dispatch. Go ahead, Dale. Dale Morrow: Over the Nass headwaters at six thousand five hundred, estimating the Corrigan névé at seventeen-oh-five. Dale Morrow: Ceilings are coming down faster than the forecast said. Light snow. Terrace Dispatch: Copy that. Kestrel's weather station has the col at minus fourteen, wind two-seven-zero at thirty-five, gusting fifty. Terrace Dispatch: That was twenty minutes ago. Dale Morrow: So their weather station's still transmitting. They've got power, anyway. Terrace Dispatch: Still nothing from the crew. Northern Heli turned back twice last week. Terrace Dispatch: The RCMP want somebody to lay eyes on it. Your call, Dale. Nobody's going to blame you for turning around. Dale Morrow: I'll have a look at the icefall. If the col's socked in, I'll put down at Loon Lake and wait it out. Dale Morrow: Kilo Tango Lima. Dale Morrow: Your relay's up on that summit, if we could see it. Dale Morrow: Nineteen days nobody's heard a word from that station. Five people. Dale Morrow: Hear that? She's running a little rough. Dale Morrow: Carb heat's coming on. Wet snow like this, the intake packs up. Dale Morrow: Come on, girl. Dale Morrow: Dispatch, Kilo Tango Lima. I've got some roughness. Carb heat's on, manifold pressure's still dropping. Dale Morrow: Turning back for the lake. Terrace Dispatch: Kilo Tango Lima, copy rough running, turning for Loon Lake. Say souls on board and fuel. Dale Morrow: Two souls. Three hours of fuel. Dale Morrow: Sam. Tighten your belt. All the way. Put that case under the seat. Dale Morrow: Mixture, rich. Dale Morrow: Fuel selector, front tank. Dale Morrow: Primer. Dale Morrow: Mags, both. Dale Morrow: Not catching. Dale Morrow: She's not catching. Dale Morrow: Mayday, mayday, mayday. Terrace Dispatch, Otter Kilo Tango Lima. Dale Morrow: Engine failure. Forced landing, Aldous valley, one mile west of Loon Lake. Two souls on board. Dale Morrow: ELT is armed. Terrace Dispatch: Kilo Tango Lima, Terrace. Terrace Dispatch: copy your mayday. Terrace Dispatch: one mile west of Loon. Terrace Dispatch: soon as the weather Dale Morrow: There's a meadow past the river. Trees at the far end. Dale Morrow: I'll hold her off as long as I can. Dale Morrow: Sam. When I say, head down, arms over your head. It's going to be loud. Dale Morrow: Brace. Brace. Brace.",
+  "text": "Dale Morrow: Sam, you still with me back there? That's the Aldous coming up on the right. Dale Morrow: Forty minutes to the glacier, if this holds. Dale Morrow: Terrace Dispatch, Otter Kilo Tango Lima, position report. Terrace Dispatch: Kilo Tango Lima, Terrace Dispatch. Go ahead, Dale. Dale Morrow: Over the Nass headwaters at six thousand five hundred, estimating the Corrigan névé at seventeen-oh-five. Dale Morrow: Ceilings are coming down faster than the forecast said. Light snow. Terrace Dispatch: Copy that. Kestrel's weather station has the col at minus fourteen, wind two-seven-zero at thirty-five, gusting fifty. Terrace Dispatch: That was twenty minutes ago. Dale Morrow: So their weather station's still transmitting. They've got power, anyway. Terrace Dispatch: Still nothing from the crew. Northern Heli turned back twice last week. Terrace Dispatch: The RCMP want somebody to lay eyes on it. Your call, Dale. Nobody's going to blame you for turning around. Dale Morrow: I'll have a look at the icefall. If the col's socked in, I'll put down at Loon Lake and wait it out. Dale Morrow: Kilo Tango Lima. Dale Morrow: Your relay's up on that summit, if we could see it. Dale Morrow: Nineteen days nobody's heard a word from that station. Five people. Dale Morrow: Hear that? She's running a little rough. Dale Morrow: Carb ice, maybe. Carb heat's coming on. Wet snow like this, the intake packs up. Dale Morrow: Come on, girl. Dale Morrow: Dispatch, Kilo Tango Lima. I've got some roughness. Carb heat's on, manifold pressure's still dropping. Dale Morrow: Turning back for the lake. Terrace Dispatch: Kilo Tango Lima, copy rough running, turning for Loon Lake. Say souls on board and fuel. Dale Morrow: Two souls. Three hours of fuel. Dale Morrow: Sam. Tighten your belt. All the way. Put that case under the seat. Dale Morrow: Mixture, rich. Dale Morrow: Fuel selector, front tank. Dale Morrow: Primer. Dale Morrow: Mags, both. Dale Morrow: Not catching. Dale Morrow: She's not catching. Dale Morrow: Mayday, mayday, mayday. Terrace Dispatch, Otter Kilo Tango Lima. Dale Morrow: Engine failure. Forced landing, Aldous valley, one mile west of Loon Lake. Two souls on board. Dale Morrow: ELT is armed. Terrace Dispatch: Kilo Tango Lima, Terrace. Terrace Dispatch: copy your mayday. Terrace Dispatch: one mile west of Loon. Terrace Dispatch: soon as the weather Dale Morrow: There's a meadow past the river. Trees at the far end. Dale Morrow: I'll hold her off as long as I can. Dale Morrow: Sam. When I say, head down, arms over your head. It's going to be loud. Dale Morrow: Brace. Brace. Brace.",
   "radio": true,
   "kind": "scene",
-  "duration_s": 230.01,
+  "duration_s": 231.65,
   "segments": [
    {
     "t": 3.55,
@@ -2800,144 +2800,144 @@
    },
    {
     "t": 106.535,
-    "d": 4.88,
-    "text": "Carb heat's coming on. Wet snow like this, the intake packs up.",
+    "d": 6.51,
+    "text": "Carb ice, maybe. Carb heat's coming on. Wet snow like this, the intake packs up.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 114.812,
+    "t": 116.448,
     "d": 1.56,
     "text": "Come on, girl.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 119.173,
+    "t": 120.809,
     "d": 7.5,
     "text": "Dispatch, Kilo Tango Lima. I've got some roughness. Carb heat's on, manifold pressure's still dropping.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 126.724,
+    "t": 128.36,
     "d": 1.93,
     "text": "Turning back for the lake.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 130.249,
+    "t": 131.885,
     "d": 5.74,
     "text": "Kilo Tango Lima, copy rough running, turning for Loon Lake. Say souls on board and fuel.",
     "speaker": "Terrace Dispatch"
    },
    {
-    "t": 137.887,
+    "t": 139.523,
     "d": 3.32,
     "text": "Two souls. Three hours of fuel.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 145.81,
+    "t": 147.446,
     "d": 5.54,
     "text": "Sam. Tighten your belt. All the way. Put that case under the seat.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 155.147,
+    "t": 156.783,
     "d": 1.37,
     "text": "Mixture, rich.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 156.57,
+    "t": 158.206,
     "d": 2.28,
     "text": "Fuel selector, front tank.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 158.903,
+    "t": 160.539,
     "d": 1.17,
     "text": "Primer.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 160.118,
+    "t": 161.754,
     "d": 1.62,
     "text": "Mags, both.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 163.733,
+    "t": 165.369,
     "d": 1.56,
     "text": "Not catching.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 165.618,
+    "t": 167.254,
     "d": 1.72,
     "text": "She's not catching.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 169.538,
+    "t": 171.174,
     "d": 5.23,
     "text": "Mayday, mayday, mayday. Terrace Dispatch, Otter Kilo Tango Lima.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 174.822,
+    "t": 176.458,
     "d": 7.03,
     "text": "Engine failure. Forced landing, Aldous valley, one mile west of Loon Lake. Two souls on board.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 181.901,
+    "t": 183.537,
     "d": 1.99,
     "text": "ELT is armed.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 185.495,
+    "t": 187.131,
     "d": 2.63,
     "text": "Kilo Tango Lima, Terrace.",
     "speaker": "Terrace Dispatch"
    },
    {
-    "t": 188.179,
+    "t": 189.815,
     "d": 1.53,
     "text": "copy your mayday.",
     "speaker": "Terrace Dispatch"
    },
    {
-    "t": 189.929,
+    "t": 191.565,
     "d": 2.01,
     "text": "one mile west of Loon.",
     "speaker": "Terrace Dispatch"
    },
    {
-    "t": 192.455,
+    "t": 194.091,
     "d": 1.59,
     "text": "soon as the weather",
     "speaker": "Terrace Dispatch"
    },
    {
-    "t": 198.544,
+    "t": 200.18,
     "d": 3.77,
     "text": "There's a meadow past the river. Trees at the far end.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 202.365,
+    "t": 204.001,
     "d": 2.5,
     "text": "I'll hold her off as long as I can.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 208.469,
+    "t": 210.105,
     "d": 5.79,
     "text": "Sam. When I say, head down, arms over your head. It's going to be loud.",
     "speaker": "Dale Morrow"
    },
    {
-    "t": 219.062,
+    "t": 220.698,
     "d": 3.45,
     "text": "Brace. Brace. Brace.",
     "speaker": "Dale Morrow"
@@ -2945,9 +2945,9 @@
   ],
   "events": {
    "engine_rough": 99.23,
-   "engine_quit": 152.75,
-   "brace": 218.71,
-   "impact": 221.01
+   "engine_quit": 154.38,
+   "brace": 220.35,
+   "impact": 222.65
   }
  },
  "rescue_dawn": {

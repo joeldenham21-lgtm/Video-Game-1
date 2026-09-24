@@ -153,8 +153,8 @@ func _process(delta: float) -> void:
 				var base: float = audio.catalog.entries[b].volume_db if audio.catalog.entries.has(b) else 0.0
 				p.volume_db = base + linear_to_db(cur)
 				if not p.playing:
-					var len := p.stream.get_length() if p.stream else 0.0
-					p.play(randf() * len * 0.9 if len > 1.0 else 0.0)
+					var length := p.stream.get_length() if p.stream else 0.0
+					p.play(randf() * length * 0.9 if length > 1.0 else 0.0)
 		elif p and p.playing and tgt <= 0.0:
 			p.stop()
 	if events_enabled and has_listener and Game.world != null:

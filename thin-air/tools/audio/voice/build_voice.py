@@ -4,7 +4,7 @@
 -18 LUFS, and write assets/audio/voice/*.ogg + data/voice.json + data/logs.json. Also builds the complete
 prologue scene (voice/prologue.py).
 
-  python3.12 thin-air/tools/audio/voice/build_voice.py [--only id1,id2] [--preview DIR] [--no-prologue]
+  python3.12 thin-air/tools/audio/voice/build_voice.py [--only id1,id2 [--with-prologue]] [--preview DIR] [--no-prologue]
 
 TTS renders are cached in tools/audio/_cache/tts (keyed by speaker, settings and text).
 """
@@ -331,6 +331,7 @@ def main():
 	ap.add_argument("--only", default="")
 	ap.add_argument("--preview", default="")
 	ap.add_argument("--no-prologue", action="store_true")
+	ap.add_argument("--with-prologue", action="store_true", help="also rebuild the prologue scene with --only")
 	ap.add_argument("--jobs", type=int, default=4)
 	a = ap.parse_args()
 	lines = S.LINES
@@ -353,7 +354,7 @@ def main():
 		res.pop("tp")
 		rid = res.pop("id")
 		data[rid] = res
-	if not a.no_prologue and not a.only:
+	if (not a.no_prologue and not a.only) or a.with_prologue:
 		from voice import prologue
 		data["prologue"] = prologue.build(a.preview)
 		print("prologue", data["prologue"]["duration_s"], "s")
