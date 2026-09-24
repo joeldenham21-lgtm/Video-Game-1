@@ -81,7 +81,7 @@ def render_one(args):
 	ceiling = -2.5 if (spec.loop or spec.stereo) else -1.0
 	y = loud.normalize_loudness(x, target, mode, ceiling, 6.0 if spec.loop else 3.0)
 	out = abs_path(res_path(spec, i))
-	aio.write_ogg(out, y, spec.quality)
+	y = y * aio.write_ogg_checked(out, y, spec.quality, -1.0)
 	stats = {
 		"id": sid, "i": i, "file": res_path(spec, i), "dur": round(dur, 3),
 		"lufs_i": round(loud.integrated_lufs(y), 1), "lufs_m": round(loud.momentary_max_lufs(y), 1),

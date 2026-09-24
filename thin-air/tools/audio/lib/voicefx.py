@@ -156,8 +156,10 @@ def dictaphone(x: np.ndarray, r, room: str = "station", wind: float = 0.0, cave:
 	place(v, x, lead)
 	# acoustic space
 	if cave > 0:
-		ir = dsp.make_ir(2.2, r, 0.012, 6000, 1500, early=[(0.006, 0.5), (0.013, 0.4), (0.021, 0.3)], hp_hz=150)
-		v = dsp.reverb(v, ir, 0.28 * cave)[:n]
+		# small ice cave: hard, bright ice walls but a snow floor that soaks up the highs (Sabine RT ~1.2 s);
+		# dense early reflections, no long low-end build-up that would smear the words
+		ir = dsp.make_ir(1.2, r, 0.01, 6500, 1800, early=[(0.006, 0.5), (0.013, 0.4), (0.021, 0.3)], hp_hz=220)
+		v = dsp.reverb(v, ir, 0.17 * cave)[:n]
 		for tt in dsp.poisson_times(n / SR, 0.6, r):
 			place(v, dsp.reverb(M.drop_plink(r, 1.2), ir, 0.4)[:ns(1.5)] * 0.02, float(tt))
 	elif wind > 0:

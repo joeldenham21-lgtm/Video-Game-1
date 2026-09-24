@@ -323,6 +323,7 @@ func stop_all() -> void:
 		pu.stop()
 	stop_voice()
 	music.set_state(&"silence")
+	music.stop_now()
 	if ambience and ambience.has_method("stop_all"):
 		ambience.stop_all()
 

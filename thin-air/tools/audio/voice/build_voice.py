@@ -306,7 +306,7 @@ def build_one(args):
 	x, items, kind = process_line(line, r)
 	y = loud.normalize_loudness(x, TARGET[kind], "integrated", -1.0, 2.0)
 	path = os.path.join(OUT_DIR, f"{line['id']}.ogg")
-	aio.write_ogg(path, y, QUALITY)
+	y = y * aio.write_ogg_checked(path, y, QUALITY, -1.0)
 	dur = len(y) / SR
 	segs = segments_for(items, line, dur)
 	if preview:

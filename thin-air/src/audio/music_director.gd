@@ -205,6 +205,16 @@ func play_stinger(id: StringName) -> bool:
 	return true
 
 
+## Cuts all music at once (no fade) — world teardown, tests.
+func stop_now() -> void:
+	for i in 2:
+		_players[i].stop()
+		_gain[i] = 0.0
+		_target[i] = 0.0
+		_players[i].volume_db = -80.0
+	_stinger.stop()
+
+
 func current_cue() -> StringName:
 	return _cue_of[_active] if _players[_active].playing else &""
 

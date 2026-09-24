@@ -123,15 +123,17 @@ def amb_wind_breeze(r, i):
 @sfx("amb_wind_strong", n=1, cat="bed", loop=True, stereo=True, folder="ambience", target=-22.0, quality=3.0)
 def amb_wind_strong(r, i):
 	L = ns(45.0)
-	return _stereo_wind(r, L, 0.16, 0.7, 700, 1.0, 2.6, buffet=0.5, air=0.15,
-		whistles=((520, 25, 0.05, 1.3),))
+	# sustained wind: swells of ~10-14 dB (p10..p90), never dropping to a calm-day hush between gusts
+	return _stereo_wind(r, L, 0.16, 0.6, 700, 1.0, 2.3, buffet=0.5, air=0.15,
+		whistles=((520, 25, 0.05, 1.25),))
 
 
 @sfx("amb_wind_gale", n=1, cat="bed", loop=True, stereo=True, folder="ambience", target=-18.0, quality=3.0)
 def amb_wind_gale(r, i):
 	L = ns(45.0)
-	return _stereo_wind(r, L, 0.22, 0.8, 1000, 1.0, 2.8, buffet=1.0, air=0.2,
-		whistles=((480, 30, 0.08, 1.1), (760, 40, 0.05, 1.3), (1150, 50, 0.03, 1.5)))
+	# a gale is a continuous roar with violent swells on top (turbulence intensity ~0.2)
+	return _stereo_wind(r, L, 0.22, 0.6, 1000, 1.0, 2.2, buffet=1.0, air=0.2,
+		whistles=((480, 30, 0.08, 1.05), (760, 40, 0.05, 1.2), (1150, 50, 0.03, 1.35)))
 
 
 @sfx("amb_wind_alpine", n=1, cat="bed", loop=True, stereo=True, folder="ambience", target=-23.0, quality=3.0)

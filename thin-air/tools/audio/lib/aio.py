@@ -65,6 +65,21 @@ def write_ogg(path: str, x: np.ndarray, quality: float = 4.0, sr: int = SR) -> N
 		os.unlink(tmp)
 
 
+def write_ogg_checked(path: str, x: np.ndarray, quality: float = 4.0, ceiling_db: float = -1.0, sr: int = SR) -> float:
+	"""write_ogg, then decode and re-measure the true peak: lossy coding can overshoot the pre-encode ceiling
+	by 0.5-1 dB on dense material. If it does, trim the gain and re-encode. Returns the gain applied."""
+	from .loud import true_peak_db
+	g = 1.0
+	ch = 1 if x.ndim == 1 else x.shape[1]
+	for _ in range(4):
+		write_ogg(path, x * g, quality, sr)
+		tp = true_peak_db(read_any(path, sr, ch))
+		if tp <= ceiling_db:
+			break
+		g *= 10.0 ** ((ceiling_db - 0.15 - tp) / 20.0)
+	return g
+
+
 def spectrogram_png(wav_or_ogg: str, png: str, title: str = "", width: int = 900, height: int = 300,
 		zmax_db: int = 100) -> None:
 	os.makedirs(os.path.dirname(png) or ".", exist_ok=True)

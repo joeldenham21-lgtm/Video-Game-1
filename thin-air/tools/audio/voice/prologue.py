@@ -165,7 +165,7 @@ def build(preview: str = "") -> dict:
 	mix[-k:] *= np.linspace(1, 0, k)[:, None] ** 2
 	y = loud.normalize_loudness(mix, -18.0, "integrated", -1.0, 4.0)
 	path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "assets", "audio", "voice", "prologue.ogg")
-	aio.write_ogg(os.path.abspath(path), y, 3.5)
+	y = y * aio.write_ogg_checked(os.path.abspath(path), y, 3.5, -1.0)
 	for k2, s in enumerate(segs):
 		nxt = segs[k2 + 1]["t"] if k2 + 1 < len(segs) else n / SR
 		s["d"] = round(max(0.8, min(s["d"], nxt - s["t"] - 0.05)), 2)
