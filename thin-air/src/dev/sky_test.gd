@@ -6,6 +6,10 @@ extends Node
 ##     --quit-after 40 --resolution 1280x720 res://scenes/dev/sky_test.tscn -- --hours=16.75 --weather=clear \
 ##     --look=240,4 [--pos=x,g,z] [--moon=0.5] [--aurora=0.8] [--snow=0.4] [--day=3] [--preset=high] [--perf]
 ##     [--fov=70] [--no_backdrop] [--timelapse=HOURS_PER_SECOND]
+## Debug: [--taa=0|1] override TAA, [--probe_mats] emissive/unshaded/lit reference cubes (exposure checks),
+##   [--pdebug=N] snow particle debug (1 plain billboards [--psize=m], 2 ParticleProcessMaterial, 3+ flake
+##   shader debug_mode N-2 (N >= 10: N-10), 9 dense box [--pbox=x,y,z --poff=x,y,z]), [--pamount=N], [--debug],
+##   [--sky=procedural] stock ProceduralSkyMaterial as a GPU-cost baseline.
 ## yaw: 0 = north (−Z), 90 = west, 180 = south, 270 = east (Godot Y rotation).
 
 const TERRAIN_SIZE := 18000.0
@@ -78,6 +82,10 @@ func _ready() -> void:
 		call_deferred("_particle_debug", int(args["pdebug"]))
 	if args.has("probe_mats"):
 		_probe_materials(pos, cam.global_basis)
+	if args.get("sky", "") == "procedural" and sky:
+		# Perf baseline: Godot's stock procedural sky in place of ours (same radiance settings).
+		(sky.get("sky") as Sky).sky_material = ProceduralSkyMaterial.new()
+		sky.set_process(false)
 
 
 ## Dev: emissive / unshaded / lit reference cubes in front of the camera (exposure pipeline checks).

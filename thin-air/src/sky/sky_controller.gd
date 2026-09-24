@@ -665,11 +665,25 @@ func _moon_frame(md: Vector3) -> Array[Vector3]:
 
 
 func _pixel_angle(cam: Camera3D) -> float:
-	var vp := get_viewport()
+	return pixel_angle_of(get_viewport(), cam)
+
+
+## Radians per rendered 3D pixel (vertical). Uses the real render height (window/sub-viewport pixels ×
+## 3D scaling), not the stretched canvas size.
+static func pixel_angle_of(vp: Viewport, cam: Camera3D) -> float:
 	if cam == null or vp == null:
 		return 0.0012
-	var h := vp.get_visible_rect().size.y * vp.scaling_3d_scale
-	return deg_to_rad(cam.fov) / maxf(h, 1.0)
+	var h := vp.get_visible_rect().size.y
+	if vp is Window:
+		h = float((vp as Window).size.y)
+	elif vp is SubViewport:
+		h = float((vp as SubViewport).size.y)
+	h *= vp.scaling_3d_scale
+	var fov := cam.fov
+	if cam.keep_aspect == Camera3D.KEEP_WIDTH and h > 0.0:
+		var w := float((vp as Window).size.x) if vp is Window else vp.get_visible_rect().size.x
+		fov = rad_to_deg(2.0 * atan(tan(deg_to_rad(cam.fov) * 0.5) * h / maxf(w * vp.scaling_3d_scale, 1.0)))
+	return deg_to_rad(fov) / maxf(h, 1.0)
 
 
 static func _lum(c: Color) -> float:

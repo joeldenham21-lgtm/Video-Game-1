@@ -313,7 +313,8 @@ vec3 aurora(vec3 dir, int quality_steps) {
 		vec2 nrm = normalize(vec2(-slope, 1.0));
 		float cos_inc = abs(dot(vec2(de, dn), nrm)) * cos_el;
 		float path = 8.0 / max(cos_inc, 0.12);
-		float strength = 1.0 / (1.0 + fk * 1.2);
+		// Curtains fade out toward east/west instead of ending at the edge of the modelled sheet.
+		float strength = 1.0 / (1.0 + fk * 1.2) * smoothstep(0.03, 0.3, dn) * (1.0 - smoothstep(1100.0, 2400.0, s));
 		acc += e * patchy * path * strength;
 	}
 	float airmass = 1.0 / max(dir.y + 0.05, 0.05);

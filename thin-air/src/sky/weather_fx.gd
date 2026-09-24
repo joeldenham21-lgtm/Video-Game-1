@@ -208,10 +208,8 @@ func _process(delta: float) -> void:
 		return
 	var cp := cam.global_position
 	global_position = cp
-	var vh := vp.get_visible_rect().size.y * vp.scaling_3d_scale
-	_pixel_angle = deg_to_rad(cam.fov) / maxf(vh, 1.0)
+	_pixel_angle = SkyController.pixel_angle_of(vp, cam)
 	_min_pixels = 5.5 if vp.use_taa else 3.0
-	var p: Dictionary = Climate.params
 	var precip := Climate.precipitation
 	var wind: Vector3 = Climate.get_wind_at(cp)
 	var wind_speed := wind.length()
