@@ -133,8 +133,9 @@ func apply() -> void:
 	var vp := get_tree().root
 	var scale := clampf(_dyn_scale, 0.35, 1.0)
 	var up: StringName = values.get(&"upscaler", &"bilinear")
-	if up == &"fsr2" and not is_forward_plus():
-		up = &"fsr"
+	if not is_forward_plus():
+		# FSR1/FSR2 are Forward+-only in Godot 4.7; the Mobile renderer upscales bilinearly (MSAA keeps edges clean).
+		up = &"bilinear"
 	match up:
 		&"fsr": vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
 		&"fsr2": vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR2
