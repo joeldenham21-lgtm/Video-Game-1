@@ -63,6 +63,17 @@ func _ready() -> void:
 		_t[b] = 0.0
 
 
+func _exit_tree() -> void:
+	for id in _players:
+		var p: AudioStreamPlayer = _players[id]
+		p.stop()
+		p.stream = null
+	for key in _emitters:
+		var e: AudioStreamPlayer3D = _emitters[key]
+		e.stop()
+		e.stream = null
+
+
 func _bed_player(id: StringName) -> AudioStreamPlayer:
 	if _players.has(id):
 		return _players[id]
@@ -162,7 +173,7 @@ func _compute_targets() -> void:
 		_t[b] = 0.0
 	# ---- menu / no world
 	if Game.world == null or not has_listener:
-		if menu_ambience and Game.world == null:
+		if menu_ambience and Game.world == null and Game.state == Game.State.MENU:
 			_t[&"amb_wind_breeze"] = 0.35
 			_t[&"amb_wind_calm"] = 0.4
 		ctx = {"menu": true}

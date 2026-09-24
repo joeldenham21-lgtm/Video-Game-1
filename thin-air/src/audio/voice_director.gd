@@ -33,6 +33,14 @@ func _ready() -> void:
 	load_lines()
 
 
+func _exit_tree() -> void:
+	player.stop()
+	player.stream = null
+	if player3d and is_instance_valid(player3d):
+		player3d.stop()
+		player3d.stream = null
+
+
 func load_lines(path: String = PATH) -> void:
 	lines.clear()
 	if not FileAccess.file_exists(path):
@@ -152,7 +160,7 @@ func _emit_due() -> void:
 		var s: Dictionary = _segments[_seg]
 		if float(s.get("t", 0.0)) > pos + 0.02:
 			break
-		Events.subtitle.emit(_speaker, String(s.get("text", "")), float(s.get("d", 3.0)))
+		Events.subtitle.emit(String(s.get("speaker", _speaker)), String(s.get("text", "")), float(s.get("d", 3.0)))
 		_seg += 1
 
 

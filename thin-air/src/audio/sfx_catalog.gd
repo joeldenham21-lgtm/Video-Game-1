@@ -61,6 +61,14 @@ func load_catalog(path: String = PATH) -> bool:
 	return true
 
 
+func release() -> void:
+	for id in entries:
+		var e: Entry = entries[id]
+		e.streams.clear()
+	entries.clear()
+	_pending.clear()
+
+
 func has(id: StringName) -> bool:
 	return entries.has(id)
 
@@ -73,16 +81,25 @@ func get_entry(id: StringName) -> Entry:
 	return e
 
 
-## Start background loads for small, frequently used categories.
+## Queue small, frequently used streams for warm-up; warm_step() loads a few per frame so the first
+## footstep/UI click never hitches and boot is not blocked.
 func warm_up() -> void:
+	_pending.clear()
 	for id in entries:
 		var e: Entry = entries[id]
-		if not PRELOAD_CATEGORIES.has(e.category):
-			continue
-		for f in e.files:
-			if ResourceLoader.exists(f):
-				if ResourceLoader.load_threaded_request(f, "AudioStream") == OK:
-					_pending.append(f)
+		if PRELOAD_CATEGORIES.has(e.category):
+			_pending.append(String(id))
+
+
+func warm_step(count: int) -> void:
+	while count > 0 and not _pending.is_empty():
+		var id := StringName(_pending[_pending.size() - 1])
+		_pending.remove_at(_pending.size() - 1)
+		var e: Entry = entries.get(id)
+		if e:
+			for i in e.files.size():
+				stream_at(e, i)
+		count -= 1
 
 
 ## Returns a stream for the entry (random variation, never the same file twice in a row).
@@ -117,12 +134,7 @@ func stream_at(e: Entry, idx: int) -> AudioStream:
 
 func _load(path: String, loop: bool) -> AudioStream:
 	var s: AudioStream = null
-	if _pending.has(path):
-		var st := ResourceLoader.load_threaded_get_status(path)
-		if st == ResourceLoader.THREAD_LOAD_LOADED or st == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
-			s = ResourceLoader.load_threaded_get(path) as AudioStream
-		_pending.remove_at(_pending.find(path))
-	if s == null and ResourceLoader.exists(path):
+	if ResourceLoader.exists(path):
 		s = load(path) as AudioStream
 	if s == null:
 		if not _warned.has(path):

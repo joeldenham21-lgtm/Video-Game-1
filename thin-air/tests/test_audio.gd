@@ -177,10 +177,9 @@ func _test_api() -> void:
 	# reverb + muffle
 	Audio.set_environment_reverb(&"cave")
 	Audio.set_muffled(1.0)
-	for k in 90:
-		await get_tree().process_frame
+	await get_tree().create_timer(3.0).timeout
 	check(Audio.env_kind == &"cave", "reverb environment set")
-	check(Audio._reverb_fx != null and Audio._reverb_fx.wet > 0.25 and Audio._reverb_fx.dry == 1.0, "cave reverb applied to Reverb bus (%s)" % (Audio._reverb_fx.wet if Audio._reverb_fx else -1))
+	check(Audio._reverb_fx != null and Audio._reverb_fx.wet > 0.3 and Audio._reverb_fx.dry == 1.0, "cave reverb applied to Reverb bus (%s)" % (Audio._reverb_fx.wet if Audio._reverb_fx else -1))
 	check(Audio._lpf != null and Audio._lpf.cutoff_hz < 2000.0, "set_muffled drives Master low-pass (%s)" % (Audio._lpf.cutoff_hz if Audio._lpf else -1))
 	check(AudioServer.get_bus_send(AudioServer.get_bus_index(&"SFX")) == &"Reverb", "SFX routed through Reverb")
 	Audio.set_environment_reverb(&"outdoor")
@@ -238,7 +237,7 @@ func _test_voice_api() -> void:
 		check(false, "voice lines available")
 	else:
 		var d := Audio.play_voice(ids[0])
-		await get_tree().process_frame
+		await get_tree().create_timer(1.2).timeout
 		check(d > 0.0, "play_voice returns duration (%.2f)" % d)
 		check(not got.is_empty() and String(got[0][1]) != "", "subtitle emitted")
 		check(Audio.voice.is_playing(), "voice playing")

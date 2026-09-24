@@ -77,7 +77,9 @@ def render_one(args):
 		mode = "short"
 	if mode == "integrated" and dur < 1.0:
 		mode = "momentary"
-	y = loud.normalize_loudness(x, target, mode, -1.0, 6.0 if spec.loop else 3.0)
+	# Vorbis overshoots noise-like material by ~1.5 dB: keep more headroom on loops/beds
+	ceiling = -2.5 if (spec.loop or spec.stereo) else -1.0
+	y = loud.normalize_loudness(x, target, mode, ceiling, 6.0 if spec.loop else 3.0)
 	out = abs_path(res_path(spec, i))
 	aio.write_ogg(out, y, spec.quality)
 	stats = {

@@ -74,6 +74,14 @@ func _ready() -> void:
 	load_catalog()
 
 
+func _exit_tree() -> void:
+	for p in _players:
+		p.stop()
+		p.stream = null
+	_stinger.stop()
+	_stinger.stream = null
+
+
 # ------------------------------------------------------------------------------------------------ catalog
 
 func load_catalog(path: String = PATH) -> void:

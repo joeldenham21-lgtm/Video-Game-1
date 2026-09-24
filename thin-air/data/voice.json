@@ -1,0 +1,433 @@
+{
+ "beacon_awos": {
+  "file": "res://assets/audio/voice/beacon_awos.ogg",
+  "speaker": "Kestrel Weather",
+  "speaker_id": "awos",
+  "text": "Kestrel Station automated weather. Time, zero zero one zero zulu. Wind, two six zero at four two, gusting five five. Visibility, one half. Snow. Blowing snow. Temperature, minus one six. Altimeter, two niner four one. Kestrel Station automated weather.",
+  "radio": true,
+  "kind": "awos",
+  "duration_s": 20.43,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.49,
+    "text": "Kestrel Station automated weather.",
+    "speaker": "Kestrel Weather"
+   },
+   {
+    "t": 2.887,
+    "d": 2.8,
+    "text": "Time, zero zero one zero zulu.",
+    "speaker": "Kestrel Weather"
+   },
+   {
+    "t": 5.739,
+    "d": 3.83,
+    "text": "Wind, two six zero at four two, gusting five five.",
+    "speaker": "Kestrel Weather"
+   },
+   {
+    "t": 9.622,
+    "d": 3.85,
+    "text": "Visibility, one half. Snow. Blowing snow.",
+    "speaker": "Kestrel Weather"
+   },
+   {
+    "t": 13.521,
+    "d": 2.07,
+    "text": "Temperature, minus one six.",
+    "speaker": "Kestrel Weather"
+   },
+   {
+    "t": 15.64,
+    "d": 2.23,
+    "text": "Altimeter, two niner four one.",
+    "speaker": "Kestrel Weather"
+   },
+   {
+    "t": 17.919,
+    "d": 2.46,
+    "text": "Kestrel Station automated weather.",
+    "speaker": "Kestrel Weather"
+   }
+  ]
+ },
+ "beacon_live": {
+  "file": "res://assets/audio/voice/beacon_live.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Anyone on this frequency. I heard an engine. In the valley. It stopped. If you can hear me. the ranger cabin on Loon Lake. There's a radio in the cabin. Channel six. Please.",
+  "radio": true,
+  "kind": "radio_weak",
+  "duration_s": 18.33,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.25,
+    "text": "Anyone on this frequency.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 2.916,
+    "d": 2.86,
+    "text": "I heard an engine. In the valley.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.83,
+    "d": 1.45,
+    "text": "It stopped.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 7.898,
+    "d": 1.62,
+    "text": "If you can hear me.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 9.64,
+    "d": 2.5,
+    "text": "the ranger cabin on Loon Lake.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 12.561,
+    "d": 2.06,
+    "text": "There's a radio in the cabin.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 14.675,
+    "d": 1.61,
+    "text": "Channel six.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 17.001,
+    "d": 1.28,
+    "text": "Please.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "final_call": {
+  "file": "res://assets/audio/voice/final_call.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Terrace Rescue, Terrace Rescue, this is Kestrel Station, Kestrel Station. Do you read? Terrace Rescue: Kestrel Station, Terrace Rescue. We read you, weak but readable. Go ahead. Terrace Rescue, Kestrel. We have two survivors. One with a fractured leg, stable. The Otter out of Terrace went down in the Aldous valley on the twenty-eighth. The pilot is deceased. Four of the station crew are missing or deceased. We need evacuation from the Kestrel helipad. Terrace Rescue: Copy, Kestrel. Two survivors, one fractured leg. We've got a storm sitting on the range until morning. Terrace Rescue: Rescue One-Six will launch at first light, weather permitting. Can you hold the night? We can hold the night. Kestrel standing by.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 52.19,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 6.61,
+    "text": "Terrace Rescue, Terrace Rescue, this is Kestrel Station, Kestrel Station. Do you read?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 8.481,
+    "d": 6.04,
+    "text": "Kestrel Station, Terrace Rescue. We read you, weak but readable. Go ahead.",
+    "speaker": "Terrace Rescue"
+   },
+   {
+    "t": 14.842,
+    "d": 6.73,
+    "text": "Terrace Rescue, Kestrel. We have two survivors. One with a fractured leg, stable.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 21.627,
+    "d": 6.98,
+    "text": "The Otter out of Terrace went down in the Aldous valley on the twenty-eighth. The pilot is deceased.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 28.66,
+    "d": 6.46,
+    "text": "Four of the station crew are missing or deceased. We need evacuation from the Kestrel helipad.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 35.835,
+    "d": 6.43,
+    "text": "Copy, Kestrel. Two survivors, one fractured leg. We've got a storm sitting on the range until morning.",
+    "speaker": "Terrace Rescue"
+   },
+   {
+    "t": 42.317,
+    "d": 5.26,
+    "text": "Rescue One-Six will launch at first light, weather permitting. Can you hold the night?",
+    "speaker": "Terrace Rescue"
+   },
+   {
+    "t": 48.097,
+    "d": 1.74,
+    "text": "We can hold the night.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 49.956,
+    "d": 2.19,
+    "text": "Kestrel standing by.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "log_hale_03": {
+  "file": "res://assets/audio/voice/log_hale_03.ogg",
+  "speaker": "Elias Hale",
+  "speaker_id": "hale",
+  "text": "Elias Hale. The fourteenth, I think. Early. I'm in the lee of the relay hut. The weather came back an hour after I got here, and I've been sheltering since. It isn't the antenna. Water got into the transceiver housing, probably in the September rain, and froze, and split the board. The spare module is in stores. Bin C-four. And the battery pack up here is finished. Take the lithium pack from the charging rack. The old ones won't hold a charge in this cold. I've written it all down in the book as well. My hands aren't. I'm not doing very well, Mara. I'm very cold, and I'm very tired, and I know what that means. Don't let anyone come up here in weather. Tell my sister I was working. And that it was beautiful, before the cloud came in. It was. You could see all the way to the sea.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 60.48,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 4.8,
+    "text": "Elias Hale. The fourteenth, I think. Early.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 5.647,
+    "d": 6.62,
+    "text": "I'm in the lee of the relay hut. The weather came back an hour after I got here, and I've been sheltering since.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 12.321,
+    "d": 8.88,
+    "text": "It isn't the antenna. Water got into the transceiver housing, probably in the September rain, and froze, and split the board.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 21.247,
+    "d": 4.09,
+    "text": "The spare module is in stores. Bin C-four.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 25.386,
+    "d": 8.29,
+    "text": "And the battery pack up here is finished. Take the lithium pack from the charging rack. The old ones won't hold a charge in this cold.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 33.723,
+    "d": 3.02,
+    "text": "I've written it all down in the book as well.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 37.468,
+    "d": 1.82,
+    "text": "My hands aren't.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 39.608,
+    "d": 2.33,
+    "text": "I'm not doing very well, Mara.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 41.989,
+    "d": 4.02,
+    "text": "I'm very cold, and I'm very tired, and I know what that means.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 46.06,
+    "d": 2.66,
+    "text": "Don't let anyone come up here in weather.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 49.236,
+    "d": 5.76,
+    "text": "Tell my sister I was working. And that it was beautiful, before the cloud came in.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 55.319,
+    "d": 3.76,
+    "text": "It was. You could see all the way to the sea.",
+    "speaker": "Elias Hale"
+   }
+  ]
+ },
+ "mara_contact_1": {
+  "file": "res://assets/audio/voice/mara_contact_1.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Kestrel Station to anyone on channel six. Kestrel to anyone. [keys the radio] Someone's there. I heard you key up. If you can hear me, key twice. [keys the radio twice] Okay. Okay. Hi. My name's Mara Voss. I'm at Kestrel Station, on the col under Corrigan. You were on the plane. I heard it go over, and then I heard it stop. We'll do this the easy way. Key once for yes, twice for no. Is the pilot with you? [keys the radio twice] I'm sorry. Are you hurt? [keys the radio twice] Good. That's good.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 45.79,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.54,
+    "text": "Kestrel Station to anyone on channel six. Kestrel to anyone.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 4.94,
+    "d": 1.52,
+    "speaker": "Sam",
+    "text": "[keys the radio]"
+   },
+   {
+    "t": 6.51,
+    "d": 2.74,
+    "text": "Someone's there. I heard you key up.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 9.298,
+    "d": 2.46,
+    "text": "If you can hear me, key twice.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 11.803,
+    "d": 1.6,
+    "speaker": "Sam",
+    "text": "[keys the radio twice]"
+   },
+   {
+    "t": 13.973,
+    "d": 1.49,
+    "text": "Okay.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 15.582,
+    "d": 2.15,
+    "text": "Okay. Hi.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 17.89,
+    "d": 5.6,
+    "text": "My name's Mara Voss. I'm at Kestrel Station, on the col under Corrigan.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 23.536,
+    "d": 4.82,
+    "text": "You were on the plane. I heard it go over, and then I heard it stop.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 28.875,
+    "d": 4.11,
+    "text": "We'll do this the easy way. Key once for yes, twice for no.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 33.032,
+    "d": 2.01,
+    "text": "Is the pilot with you?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 35.095,
+    "d": 1.6,
+    "speaker": "Sam",
+    "text": "[keys the radio twice]"
+   },
+   {
+    "t": 38.065,
+    "d": 1.63,
+    "text": "I'm sorry.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 40.416,
+    "d": 1.41,
+    "text": "Are you hurt?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 41.88,
+    "d": 1.52,
+    "speaker": "Sam",
+    "text": "[keys the radio twice]"
+   },
+   {
+    "t": 43.45,
+    "d": 2.29,
+    "text": "Good. That's good.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_station_meet": {
+  "file": "res://assets/audio/voice/mara_station_meet.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Hi. Sorry. You're real. I've been talking to a radio for nine days. Come in, shut the door. The heat's the only thing I've got left.",
+  "radio": false,
+  "kind": "in_person",
+  "duration_s": 12.79,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 1.05,
+    "text": "Hi.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 1.925,
+    "d": 4.98,
+    "text": "Sorry. You're real. I've been talking to a radio for nine days.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 6.95,
+    "d": 4.42,
+    "text": "Come in, shut the door. The heat's the only thing I've got left.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "pro_19": {
+  "file": "res://assets/audio/voice/pro_19.ogg",
+  "speaker": "Terrace Dispatch",
+  "speaker_id": "dispatch",
+  "text": "Kilo Tango Lima, Terrace. copy your mayday. one mile west of Loon. soon as the weather",
+  "radio": true,
+  "kind": "radio_weak",
+  "duration_s": 9.66,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.64,
+    "text": "Kilo Tango Lima, Terrace.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 3.035,
+    "d": 1.53,
+    "text": "copy your mayday.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 4.784,
+    "d": 2.01,
+    "text": "one mile west of Loon.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 7.311,
+    "d": 1.59,
+    "text": "soon as the weather",
+    "speaker": "Terrace Dispatch"
+   }
+  ]
+ }
+}

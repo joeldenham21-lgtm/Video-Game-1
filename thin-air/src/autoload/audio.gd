@@ -119,6 +119,21 @@ func _ready() -> void:
 	_connect_events()
 
 
+func _exit_tree() -> void:
+	# release cached streams/entries before engine shutdown (avoids leak reports at exit)
+	for p in _pool:
+		p.stop()
+		p.stream = null
+	for p2 in _pool2d:
+		p2.stop()
+		p2.stream = null
+	for pu in _ui:
+		pu.stop()
+		pu.stream = null
+	if catalog:
+		catalog.release()
+
+
 # ================================================================================================ contract API
 
 func play_sfx(id: StringName, position: Variant = null, volume_db := 0.0, pitch := 1.0) -> void:
@@ -357,6 +372,7 @@ func _auto_env() -> StringName:
 
 
 func _process(delta: float) -> void:
+	catalog.warm_step(3)
 	_env_timer -= delta
 	if _env_timer <= 0.0:
 		_env_timer = 0.5
@@ -417,6 +433,11 @@ func _configure3d(p: AudioStreamPlayer3D, e: SfxCatalog.Entry, volume_db: float)
 	p.attenuation_filter_db = -18.0 if e.max_distance > 500.0 else -24.0
 	p.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP if e.doppler else AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED
 	p.panning_strength = 1.0
+	if e.doppler:
+		# Doppler needs the listening camera to track velocity as well
+		var cam := get_viewport().get_camera_3d() if get_viewport() else null
+		if cam and cam.doppler_tracking == Camera3D.DOPPLER_TRACKING_DISABLED:
+			cam.doppler_tracking = Camera3D.DOPPLER_TRACKING_PHYSICS_STEP
 
 
 func _play_entry(e: SfxCatalog.Entry, position: Variant, volume_db: float, pitch: float, low_priority: bool, ignore_cooldown: bool) -> Node:
@@ -440,15 +461,20 @@ func _play_entry(e: SfxCatalog.Entry, position: Variant, volume_db: float, pitch
 		p.stream = s
 		p.pitch_scale = _pitch(e, pitch)
 		p.global_position = position
-		if e.doppler:
-			var cam := get_viewport().get_camera_3d() if get_viewport() else null
-			if cam:
-				cam.doppler_tracking = Camera3D.DOPPLER_TRACKING_PHYSICS_STEP
 		p.play()
 		_pool_id[i] = e.id
 		_pool_t[i] = _now()
 		_pool_low[i] = low_priority
 		return p
+	if e.bus == &"UI":
+		# interface sounds must work while the tree is paused
+		var pu: AudioStreamPlayer = _ui[_ui_next]
+		_ui_next = (_ui_next + 1) % _ui.size()
+		pu.stream = s
+		pu.volume_db = e.volume_db + volume_db
+		pu.pitch_scale = _pitch(e, pitch)
+		pu.play()
+		return pu
 	var j := _acquire2d(e.id, e.max_voices)
 	var p2 := _pool2d[j]
 	p2.stop()
@@ -522,7 +548,7 @@ func _connect_events() -> void:
 		"scan_completed": _on_scan, "ui_screen_opened": _on_screen_opened, "ui_screen_closed": _on_screen_closed,
 		"objective_added": _on_objective_added, "objective_completed": _on_objective_done,
 		"poi_discovered": _on_poi, "log_found": _on_log, "game_started": _on_game_started,
-		"equipment_changed": _on_equip,
+		"equipment_changed": _on_equip, "player_respawned": _on_respawned,
 	}
 	for sig in hooks:
 		if Events.has_signal(sig) and not Events.is_connected(sig, hooks[sig]):
@@ -646,6 +672,11 @@ func _on_log(_id: StringName) -> void:
 func _on_equip(_slot: StringName, id: StringName) -> void:
 	if id != &"":
 		play_sfx(&"equip")
+
+
+func _on_respawned() -> void:
+	set_muffled(0.0)
+	music.set_state(&"explore")
 
 
 func _on_game_started(_is_new: bool) -> void:

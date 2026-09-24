@@ -1,0 +1,227 @@
+{
+ "log_burke_01": {
+  "title": "Depot at Ashford",
+  "author": "Owen Burke",
+  "date": "Sep 28",
+  "voice": "log_burke_01",
+  "location_hint": "ashford_mine: depot crosscut, on the orange-painted timbers",
+  "text": "Burke. Twenty-eighth of September. Depot's in at the Ashford adit. First crosscut on the left, orange paint on the timbers. Four twenty-litre cans of diesel, winter blend, the good stuff. Two ice axes, two pairs of crampons, sixty metres of rope. Stove, fuel, food for four for three days. If the helicopter can't get in and we have to walk out, that's the route. Down the icefall, east to the mine, then the old road to Loon Lake. Grey's been around the mine all month. Big old boar, scar on his shoulder. He's put on a lot of weight. Leave him alone and he'll leave you alone. Burke out.",
+  "kind": "recording"
+ },
+ "log_hale_01": {
+  "title": "End of Season Notes",
+  "author": "Dr. Elias Hale",
+  "date": "Oct 5",
+  "voice": "log_hale_01",
+  "location_hint": "kestrel_station: lab module desk",
+  "text": "October fifth. End of season notes, Corrigan mass balance project, Kestrel Station. Final stake readings are in. Net balance at the station stakes is minus one point four metres water equivalent. That makes it the fourth worst year in the record. Three of the other four are in the last decade. June has reset the time-lapse cameras on the icefall for the winter. Tomas is nursing the generator. Pickup is on the twentieth, weather permitting, which up here means nothing at all. There's a system coming in on the eighth. A big one. We'll batten down and wait it out, as usual. Note for next season: the guy wires on the summit relay need replacing. They sang all through September. End of notes.",
+  "kind": "recording"
+ },
+ "log_reyes_01": {
+  "title": "Generator Log",
+  "author": "Tomas Reyes",
+  "date": "Oct 8",
+  "voice": "log_reyes_01",
+  "location_hint": "kestrel_station: generator shed workbench",
+  "text": "Tomas. Eighth of October. Generator log, because June says if I don't record it, I didn't do it. Day tank's at sixty percent. We're down to the last four drums in the shed, and they're summer diesel, which at minus twenty turns into lard. I've got the block heater on and heat tape on the fuel line and I'm praying to the patron saint of Kubota. Wind's picking up from the west. There's rime on the anemometer already. You can hear the mast humming. If the power goes tonight, Owen, the headlamps are in the red bin by the door. Not the blue one. The blue one is Christmas lights. Don't ask.",
+  "kind": "recording"
+ },
+ "log_park_01": {
+  "title": "Relay Down",
+  "author": "June Park",
+  "date": "Oct 9",
+  "voice": "log_park_01",
+  "location_hint": "kestrel_station: comms rack",
+  "text": "June Park. October ninth, oh six hundred. We lost the relay at oh four twelve. Not a fade. A hard drop. The carrier was gone in one scan. I've power cycled the base unit twice. The station side is fine. The fault is up at the summit. Elias thinks the antenna iced up. I don't think it's the antenna. Icing would degrade the signal first. We'd have seen it coming. We had eighteen dB of margin at four o'clock. This looks like the transceiver died. Which means somebody has to go up there. Not today. Gusts are over a hundred and ten at the col. For the record, the Iridium is on charge, and it works. So we're not cut off.\n\nWe're just quieter.",
+  "kind": "recording"
+ },
+ "log_voss_01": {
+  "title": "The Stairs",
+  "author": "Dr. Mara Voss",
+  "date": "Oct 10",
+  "voice": "log_voss_01",
+  "location_hint": "kestrel_station: bunk room",
+  "text": "Mara Voss. October tenth. I'm recording this because I can't write. My hands won't stop shaking. I went out at dawn to clear the rime off the pad lights and I missed the second step. Verglas. I heard it go. Owen says it's the fibula, maybe the ankle as well. He set it, and I'm told I said some things. It's splinted. I'm on the good painkillers, which is why this sounds so calm. So I'm not going anywhere.\n\nElias looked at me like I'd done it on purpose. Which is fair. I'm the one who always tells everyone to be careful on those stairs.",
+  "kind": "recording"
+ },
+ "log_burke_02": {
+  "title": "Going Down",
+  "author": "Owen Burke",
+  "date": "Oct 11",
+  "voice": "log_burke_02",
+  "location_hint": "owens_bivouac: in the bivvy bag",
+  "text": "Eleventh. Weather's giving us a gap, maybe two days. I'm going down to the depot for the winter diesel, then on to the ranger cabin to call Terrace on the park radio. The Iridium's been dropping every call since the storm, and I want a real voice at the other end. Tomas, don't touch my rope. Mara, keep the leg up. Back Tuesday. If I'm not, it's because I'm sitting in the ranger cabin eating the ranger's chocolate. Burke out.",
+  "kind": "recording"
+ },
+ "log_hale_02": {
+  "title": "Arithmetic",
+  "author": "Dr. Elias Hale",
+  "date": "Oct 13",
+  "voice": "log_hale_02",
+  "location_hint": "kestrel_station: boot room by the door",
+  "text": "Thirteenth. Owen hasn't called in, and the Iridium has given up entirely. June thinks the antenna cable cracked in the cold. The forecast gives us eight hours of calm from mid-morning. I'm going up to the relay. I know that route better than anyone left standing. Tomas is needed here. June is needed here. And Mara has told me several times that I'm a stubborn old fool. She's right. I'm going anyway. Spare antenna, tools, the small battery. Back before dark. If I'm not back before dark, nobody comes after me.\n\nThat isn't bravery. It's arithmetic.",
+  "kind": "recording"
+ },
+ "log_hale_03": {
+  "title": "Relay Hut",
+  "author": "Dr. Elias Hale",
+  "date": "Oct 14",
+  "voice": "log_hale_03",
+  "location_hint": "summit: with Hale, in the lee of the relay hut",
+  "text": "Elias Hale. The fourteenth, I think. Early. I'm in the lee of the relay hut. The weather came back an hour after I got here, and I've been sheltering since. It isn't the antenna. Water got into the transceiver housing, probably in the September rain, and froze, and split the board. The spare module is in stores. Bin C-four. And the battery pack up here is finished. Take the lithium pack from the charging rack. The old ones won't hold a charge in this cold. I've written it all down in the book as well.\n\nMy hands aren't.\n\nI'm not doing very well, Mara. I'm very cold, and I'm very tired, and I know what that means. Don't let anyone come up here in weather.\n\nTell my sister I was working. And that it was beautiful, before the cloud came in.\n\nIt was. You could see all the way to the sea.",
+  "kind": "recording"
+ },
+ "log_voss_02": {
+  "title": "The Line Through the Icefall",
+  "author": "Dr. Mara Voss",
+  "date": "Oct 15",
+  "voice": "log_voss_02",
+  "location_hint": "kestrel_station: map table",
+  "text": "Fifteenth. Elias didn't come back. The cloud came down on the summit at noon yesterday and it hasn't lifted. Owen is two days overdue. Tomas and June want to go down the icefall and walk out to the ranger cabin radio. I'd have said no. I can't say no. I can't even stand up. They'll take the Iridium and try it again from lower down. I've shown June my velocity maps. The safe line through the icefall has moved forty metres east since August. I drew it on her map.\n\nI drew it twice.",
+  "kind": "recording"
+ },
+ "log_reyes_02": {
+  "title": "Last Generator Note",
+  "author": "Tomas Reyes",
+  "date": "Oct 16",
+  "voice": "log_reyes_02",
+  "location_hint": "kestrel_station: generator shed door",
+  "text": "Sixteenth, oh five thirty. Last generator note before we go. Day tank's at twenty percent. I've left it on low with the lab heaters off. Mara, you've got maybe six days if you keep the thermostat at twelve. Don't argue with me. I did the maths twice. The propane heater's by your bunk with three bottles. We're taking the Iridium, the good rope, and June's snacks, which is the real reason she's coming. We'll call from the cabin. Probably tomorrow night. Keep your handheld on channel six.",
+  "kind": "recording"
+ },
+ "log_park_02": {
+  "title": "Ice Cave",
+  "author": "June Park",
+  "date": "Oct 17",
+  "voice": "log_park_02",
+  "location_hint": "ice_cave: by the sleeping mat",
+  "text": "October seventeenth. We're in an ice cave off the east side of the icefall, about halfway down. Tomas went into a crevasse this afternoon. The bridge just went. I held him. The rope held. It took me two hours to get him out, and his left leg is broken below the knee. Badly. I've splinted it with an ice axe and a foam pad. The Iridium was in his chest pocket. It's at the bottom of that crevasse now. He keeps apologising for that. I keep telling him it doesn't matter.\n\nIt's very blue in here. Mara would love it.",
+  "kind": "recording"
+ },
+ "log_park_03": {
+  "title": "East",
+  "author": "June Park",
+  "date": "Oct 19",
+  "voice": "log_park_03",
+  "location_hint": "ice_cave: at the entrance, weighted with a stone",
+  "text": "Nineteenth.\n\nTomas died last night. I think it was bleeding. Inside, where I couldn't.\n\nI don't know. He was telling me about his daughter's football team, and then he just wasn't. I've covered him with the tarp. I'm going to try the east moraine at first light. It's longer, but there's no ice on it. If someone finds this before they find me, I went east.\n\nTell Mara the line she drew was right. It was the bridge. Nobody could have seen that bridge.",
+  "kind": "recording"
+ },
+ "log_voss_03": {
+  "title": "Every Ten Minutes",
+  "author": "Dr. Mara Voss",
+  "date": "Oct 22",
+  "voice": "log_voss_03",
+  "location_hint": "kestrel_station: east module (Mara gives it to you)",
+  "text": "Twenty-second. The generator ran dry at four this morning. I heard it stop. I've moved everything into the east module. Sleeping bag, food, the propane heater, the radio. I've recorded a message into the weather broadcast. June showed me how in August, as a joke. It goes out every ten minutes on the aviation frequency. Nobody flies over in October. I know that. I keep the handheld on channel six anyway, in case Tomas and June made the cabin. It's been six days.\n\nThe cabin's six hours.",
+  "kind": "recording"
+ },
+ "log_voss_04": {
+  "title": "When the Wind Stops",
+  "author": "Dr. Mara Voss",
+  "date": "Oct 27",
+  "voice": "log_voss_04",
+  "location_hint": "kestrel_station: east module (Mara gives it to you)",
+  "text": "Twenty-seventh. The storm broke this afternoon, the first time in a week. I sat at the window and watched the icefall for two hours, which is what I'm paid to do. So. Not a wasted day. I'm on the last propane bottle. I've been talking to the radio at night like it's a person. I think I'll keep doing that. If a plane comes, I'll hear it. You can hear everything up here, when the wind stops.",
+  "kind": "recording"
+ },
+ "dale_logbook": {
+  "title": "Pilot's Log",
+  "author": "Dale Morrow",
+  "date": "Oct 27–28",
+  "voice": null,
+  "location_hint": "crash_site: cockpit, in the door pocket",
+  "text": "PILOT'S LOG — D. MORROW — DHC-3 OTTER C-FKTL\n\n27 OCT — Terrace to Aldous: no go. Freezing level 1100 m, snow, ceilings 800 ft. Stood down. Called Kestrel's company contact again — still nothing from the station since the 9th.\n\n28 OCT — Window forecast 1400–1800. Plan: dep. Terrace 1540, direct Aldous via the Nass headwaters, ski landing on the Corrigan névé (last spring's strip) ~1705. If the col is not visible: Loon Lake, or the meadow W of the lake (good for skis, checked it in March).\nLoad: 1 pax — S. Calder, relay technician. Freight 64 kg: relay test gear, survey scanner, tools, food box for Kestrel. Fuel 3 hrs.\nCarb heat EARLY. Intake packed with wet snow last January, same aircraft, same valley.\n\nAnnie's birthday Saturday. Cake from Gemma's, pick up Friday. Candles this time.",
+  "kind": "document"
+ },
+ "ranger_logbook": {
+  "title": "Loon Lake Ranger Station Log",
+  "author": "Ellen Tsang, Park Ranger",
+  "date": "Sep 2–30",
+  "voice": null,
+  "location_hint": "ranger_cabin: on the desk by the radio",
+  "text": "LOON LAKE RANGER STATION — DAILY LOG\n\nSep 2 — Clear, 11°C. Wolf pack (4 adults, 1 pup) crossed the outlet at dusk heading W. Pup limping, keeping up.\n\nSep 9 — Owen Burke and Tomas Reyes down from Kestrel for a swim (their word) and a radio check. Ch. 6 good to the col. They left with two dozen of my eggs. Owed: 2 doz. eggs.\n\nSep 16 — Grizzly on the Ashford road, 2 km E. The big boar the station people call Old Grey — scar on the left shoulder. Feeding on a goat carcass. Posted the road closed.\n\nSep 22 — Grey again at the mine. Very heavy, feeding hard. Told Kestrel on ch. 6. Owen says he's stocking a depot in the adit anyway. Told him that bear's been in the adit. He said so has he.\n\nSep 30 — Closing the cabin for the season. Handheld on the charger, solar controller OK. Bow and arrows in the locker, key on the nail. Firewood stacked. Note on the table for the Kestrel crew. See you in May.",
+  "kind": "document"
+ },
+ "ranger_note": {
+  "title": "Note on the Table",
+  "author": "Ellen Tsang",
+  "date": "Sep 30",
+  "voice": null,
+  "location_hint": "ranger_cabin: table",
+  "text": "Kestrel folks —\nCabin's yours if you need it. Radio's on the charger, channel 6. Bow's in the locker, key on the nail. Don't feed the jays, they'll never leave.\nStill owed: 2 doz. eggs, Owen.\n— Ellen",
+  "kind": "document"
+ },
+ "miner_diary_1": {
+  "title": "Caretaker's Diary, Autumn 1934",
+  "author": "William Harker",
+  "date": "Oct–Nov 1934",
+  "voice": null,
+  "location_hint": "ashford_mine: collapsed bunkhouse, under the bunk",
+  "text": "ASHFORD GOLD MINES LTD. — WINTER CARETAKER'S DIARY — W. HARKER\n\nOct. 21st 1934. Last of the crew went down with the pack train today. Mr. Ashford's orders: keep the adit timbered and the pumps greased till spring. Myself and Nils Ostby to winter. Flour, beans, 40 lb. bacon, coal oil, 2 cases of powder in the powder house.\n\nOct. 30th. First real snow. Three feet at the portal. Nils shot a goat on the bluffs. We are eating well.\n\nNov. 12th. Clear and very cold. The glacier cracks in the night like rifle shots. Nils says it is the mountain turning over in its sleep.",
+  "kind": "document"
+ },
+ "miner_diary_2": {
+  "title": "Caretaker's Diary, December",
+  "author": "William Harker",
+  "date": "Dec 1934",
+  "voice": null,
+  "location_hint": "ashford_mine: adit, powder house door",
+  "text": "Dec. 3rd 1934. A grizzly came into the bacon cache last night through the back wall of the cookhouse. A big silvertip. Nils fired at it twice in the dark and missed or did not miss, we cannot tell. Tracks go up the creek. We keep the rifle by the door now.\n\nDec. 19th. The bear has been back. It does not sleep. Nils says a bear that is awake in December is a hungry bear, and a hungry bear is a bad neighbour. We have moved what food is left into the adit behind the powder house door.\n\nDec. 25th. Christmas. Beans. Nils sang in Norwegian. The wind took the stovepipe off the bunkhouse at supper.",
+  "kind": "document"
+ },
+ "miner_diary_3": {
+  "title": "Caretaker's Diary, Last Entries",
+  "author": "William Harker",
+  "date": "Feb–Mar 1935",
+  "voice": null,
+  "location_hint": "ashford_mine: No. 2 drift, at the collapse",
+  "text": "Feb. 8th 1935. Timbers groaning in the No. 2 drift all week. The frost is in the rock.\n\nFeb. 11th. No. 2 came down in the night. Nobody in it, thank God. The pumps are buried.\n\nMar. 2nd. Nils went down the creek to meet the pack train and has not come back. Four days. Snowing hard.\n\nMar. 9th. I found his snowshoe at the forks. Bear tracks. I will not write any more about it.\n\nMar. 20th. The pack train came in today. Ashford Gold is finished, they say — the vein pinched out at 300 feet and what is left is not worth the freight. I am to close the portal and come down. I am glad. This mountain does not want us here, and it has made itself plain.",
+  "kind": "document"
+ },
+ "burke_note": {
+  "title": "Note in the Adit",
+  "author": "Owen Burke",
+  "date": "Oct 12",
+  "voice": null,
+  "location_hint": "ashford_mine: adit, near Owen",
+  "text": "12 Oct, 1640.\nGrey's been in the adit. Depot torn apart, food gone, one can punctured. He's still in here somewhere, I can smell him. Can't get back to the portal without passing the crosscut. Sitting tight. Bear spray's empty.\nIf anyone reads this: three cans of diesel are still good. The ice gear's still here. Tell Mara the route's open.\n— O.B.",
+  "kind": "document"
+ },
+ "station_whiteboard": {
+  "title": "Station Whiteboard",
+  "author": "Kestrel crew",
+  "date": "Week of Oct 5",
+  "voice": null,
+  "location_hint": "kestrel_station: main module wall",
+  "text": "KESTREL STATION — WEEK OF OCT 5\nPICKUP: OCT 20 — Northern Heli, AS350, 2 lifts — BAGS AT THE PAD BY 0900!!\nKitchen: June / Mara. Generator: Tomas. Radio sked 0800 / 2000: June.\nStakes K1–K14 — DONE. Icefall cameras reset — DONE. GPR data backed up ×2 — Elias\nRelay mast guy wires — next season (Owen)\nNOBODY WALKS THE ICEFALL ALONE. NOBODY. — O.\n(in different pen) Who ate the last of the good coffee. — T.",
+  "kind": "document"
+ },
+ "station_fuel_log": {
+  "title": "Generator Fuel Log",
+  "author": "Tomas Reyes",
+  "date": "Oct 6–22",
+  "voice": null,
+  "location_hint": "kestrel_station: generator shed, clipboard",
+  "text": "GENERATOR FUEL LOG — KUBOTA 6 kW\nOct 06 — 4 drums left (summer blend). Day tank 85%. — TR\nOct 08 — Gelling at the filter. Heat tape on the line. 60%. — TR\nOct 11 — Owen fetching winter diesel from the Ashford depot (4 cans). 45%. — TR\nOct 14 — 30%. Lab heaters off. — TR\nOct 16 — 20%. Thermostat 12°C. Mara: 6 days. — TR\nOct 22 — (different handwriting) Empty. 04:10. — M.V.",
+  "kind": "document"
+ },
+ "relay_diagnostics": {
+  "title": "Relay Link Diagnostic",
+  "author": "June Park",
+  "date": "Oct 9",
+  "voice": null,
+  "location_hint": "kestrel_station: comms rack printer",
+  "text": "KESTREL RELAY — LINK DIAGNOSTIC — 09 OCT 04:31\nLINK STATUS ........... DOWN\nLAST CARRIER .......... 04:12:07\nBASE UNIT ............. OK (self-test pass)\nUHF PATH .............. NO RESPONSE FROM REMOTE\nREMOTE BATTERY ........ NO TELEMETRY\n\n(handwritten) Not icing. Icing = gradual SNR loss and we had 18 dB margin at 04:00. This is a hard failure at the summit — transceiver or power. Spare module: stores, bin C-4. — J.P.",
+  "kind": "document"
+ },
+ "hale_notebook": {
+  "title": "Field Notebook, Last Page",
+  "author": "Dr. Elias Hale",
+  "date": "Oct 14",
+  "voice": null,
+  "location_hint": "summit: Hale's chest pocket",
+  "text": "14 Oct — Relay hut, Corrigan summit.\nTransceiver housing split — ice inside. Board cracked across the RF section. Not repairable.\nBattery pack 3.1 V/cell at −24 °C. Finished.\nNeeded: transceiver module (stores C-4), lithium pack (charging rack, lab). Two thumbscrews + ribbon. Latch.\nCloud down 11:40. Sheltering in the lee of the hut.\nToo tired to try the ridge in this.\n\nM — don't let anyone come up in weather.\nE.",
+  "kind": "document"
+ }
+}
