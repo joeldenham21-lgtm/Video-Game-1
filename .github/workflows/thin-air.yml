@@ -1,0 +1,154 @@
+name: THIN AIR builds
+
+# Exports the Godot game in thin-air/ for Windows, Android (arm64 APK) and Linux, runs the headless
+# tests, and publishes the builds as a GitHub pre-release you can download on the phone / laptop.
+
+on:
+  push:
+    branches: [main, claude/aaa-3d-mountain-game-fmzpq7]
+    paths: ['thin-air/**', '.github/workflows/thin-air.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: thin-air-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: '4.7.2'
+  GODOT_RELEASE: stable
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache Godot editor + export templates
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-${{ env.GODOT_RELEASE }}-v1
+
+      - name: Download Godot + export templates
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_RELEASE}"
+          mkdir -p ~/godot ~/.local/share/godot/export_templates
+          cd ~/godot
+          curl -fsSL --retry 4 -o editor.zip "$base/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64.zip"
+          unzip -q editor.zip && rm editor.zip
+          curl -fsSL --retry 4 -o templates.tpz "$base/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_export_templates.tpz"
+          unzip -q templates.tpz && rm templates.tpz
+          dest=~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}
+          rm -rf "$dest" && mv templates "$dest"
+          rm -f "$dest"/ios.zip "$dest"/macos.zip "$dest"/web*.zip
+
+      - name: Configure Godot (Android SDK, keystores)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_USER: ${{ secrets.ANDROID_KEYSTORE_USER }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          sudo ln -sf ~/godot/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64 /usr/local/bin/godot
+          godot --version
+          mkdir -p ~/.config/godot ~/.keystores
+          keytool -genkeypair -keystore ~/.keystores/debug.keystore -storepass android -alias androiddebugkey \
+            -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          if [ -n "${KEYSTORE_B64:-}" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > ~/.keystores/release.keystore
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=$KEYSTORE_USER" >> "$GITHUB_ENV"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=$KEYSTORE_PASS" >> "$GITHUB_ENV"
+          else
+            # No signing secret configured: sign with a throwaway key (uninstall the old APK before updating).
+            keytool -genkeypair -keystore ~/.keystores/release.keystore -storepass thinair-sideload -alias thinair \
+              -keypass thinair-sideload -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=THIN AIR,O=Thin Air,C=CA"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=thinair" >> "$GITHUB_ENV"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=thinair-sideload" >> "$GITHUB_ENV"
+          fi
+          echo "GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$HOME/.keystores/release.keystore" >> "$GITHUB_ENV"
+          cat > ~/.config/godot/editor_settings-${GODOT_VERSION%.*}.tres <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/debug_keystore = "$HOME/.keystores/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+          sed -i 's/^          //' ~/.config/godot/editor_settings-${GODOT_VERSION%.*}.tres
+
+      - name: Import project
+        run: |
+          timeout 2400 godot --headless --path thin-air --import > import.log 2>&1 || true
+          timeout 1200 godot --headless --path thin-air --import > import2.log 2>&1 || true
+          grep -E "SCRIPT ERROR|Parse Error" import2.log || echo "no script errors"
+
+      - name: Headless tests
+        id: tests
+        continue-on-error: true
+        run: |
+          fail=0
+          for t in thin-air/tests/test_*.gd; do
+            name=$(basename "$t")
+            if timeout 600 godot --headless --path thin-air res://tests/test_runner.tscn -- --test=res://tests/$name > "t_$name.log" 2>&1; then
+              echo "PASS $name"
+            else
+              echo "FAIL $name"; grep -E "FAIL|ERROR" "t_$name.log" | head -20; fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Export Windows / Android / Linux
+        run: |
+          set -euo pipefail
+          cd thin-air
+          mkdir -p build/windows build/android build/linux
+          timeout 2400 godot --headless --export-release "Windows Desktop" build/windows/ThinAir.exe 2>&1 | tail -5
+          timeout 2400 godot --headless --export-release "Android" build/android/ThinAir.apk 2>&1 | tail -5
+          timeout 2400 godot --headless --export-release "Linux" build/linux/ThinAir.x86_64 2>&1 | tail -5
+          test -s build/windows/ThinAir.exe && test -s build/windows/ThinAir.pck
+          test -s build/android/ThinAir.apk
+          test -s build/linux/ThinAir.x86_64 && test -s build/linux/ThinAir.pck
+          mkdir -p ../dist
+          (cd build/windows && zip -q -r ../../../dist/ThinAir-Windows-x64.zip .)
+          cp build/android/ThinAir.apk ../dist/ThinAir-Android-arm64.apk
+          tar czf ../dist/ThinAir-Linux-x64.tar.gz -C build/linux .
+          ls -la ../dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thin-air-builds
+          path: dist/*
+          retention-days: 14
+
+      - name: Publish pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF_NAME" = "main" ]; then tag=thin-air-latest; else tag=thin-air-preview; fi
+          short=${GITHUB_SHA::7}
+          notes="Automated build of THIN AIR from \`$GITHUB_REF_NAME\` @ $short (tests: $TESTS_OUTCOME).
+
+          - **Android (Galaxy S25 Ultra):** download \`ThinAir-Android-arm64.apk\` on the phone, allow installs from your browser, install. If an older build is installed and the update is refused, uninstall it first.
+          - **Windows (MSI Cyborg):** download \`ThinAir-Windows-x64.zip\`, extract, run \`ThinAir.exe\` (keep the .pck next to it). SmartScreen: More info → Run anyway.
+          - **Linux:** extract and run \`ThinAir.x86_64\`."
+          gh release delete "$tag" -y --cleanup-tag || true
+          gh release create "$tag" dist/* --prerelease --target "$GITHUB_SHA" \
+            --title "THIN AIR preview ($short)" --notes "$notes"
