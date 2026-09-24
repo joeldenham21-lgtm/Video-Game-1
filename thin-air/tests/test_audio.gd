@@ -260,6 +260,20 @@ func _test_voice_api() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 		check(not Audio.voice.is_playing(), "voice finishes when its 3D node is freed")
+	# Events.radio_message plays the line; a direct play_voice of the same line right after does not restart it
+	if not ids.is_empty():
+		var starts := [0]
+		var on_start := func(_id: StringName) -> void: starts[0] += 1
+		Audio.voice.line_started.connect(on_start)
+		Events.radio_message.emit(StringName(ids[0]))
+		Audio.play_voice(ids[0])
+		check(Audio.voice.is_playing() and starts[0] == 1, "radio_message + play_voice plays once (%d)" % starts[0])
+		Audio.voice.line_started.disconnect(on_start)
+		Audio.stop_voice()
+	Events.sleep_started.emit(8.0)
+	check(Audio._muffle_target > 0.5, "sleep muffles the mix")
+	Events.sleep_ended.emit()
+	check(Audio._muffle_target == 0.0, "waking unmuffles")
 	# the prologue scene and every log recording referenced by logs.json can be played
 	for key in [&"prologue", &"beacon_mara", &"mara_contact_1", &"final_call"]:
 		check(Audio.voice_line_exists(key), "voice line %s exists" % key)
@@ -299,6 +313,14 @@ func _test_ambience() -> void:
 	Audio.env_kind = &"cave"
 	amb._compute_targets()
 	check(float(amb._t[&"amb_cave"]) > 0.9 and float(amb._t[&"amb_wind_calm"]) < 0.2, "cave bed replaces open wind")
+	amb.max_beds = 1
+	amb._compute_targets()
+	var n_active := 0
+	for b in amb.BEDS:
+		if float(amb._t[b]) > 0.02:
+			n_active += 1
+	check(n_active <= 1 and float(amb._t[&"amb_cave"]) > 0.9, "mobile bed cap keeps the strongest beds (%d)" % n_active)
+	amb.max_beds = 17
 	Audio.set_environment_reverb(&"outdoor")
 	Audio.env_kind = &"outdoor"
 	Game.world = old_world

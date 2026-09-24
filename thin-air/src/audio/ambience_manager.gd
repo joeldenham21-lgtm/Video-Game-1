@@ -54,6 +54,8 @@ var _water := {"creek": INF, "river": INF, "lake": INF, "fall": INF, "creek_p": 
 	"river_p": Vector3.ZERO, "lake_p": Vector3.ZERO, "fall_p": Vector3.ZERO}
 var _emitters: Dictionary = {}         # "creek"/"river"/"lake"/"fall" -> AudioStreamPlayer3D
 var _speed := 1.0
+## Mobile: only the strongest beds actually play (each stereo Vorbis bed costs a decoder).
+var max_beds := 17
 
 
 func _ready() -> void:
@@ -61,6 +63,8 @@ func _ready() -> void:
 	for b in BEDS:
 		_w[b] = 0.0
 		_t[b] = 0.0
+	if Settings.has_method("is_mobile") and bool(Settings.is_mobile()):
+		max_beds = 6
 
 
 func _exit_tree() -> void:
@@ -260,9 +264,25 @@ func _compute_targets() -> void:
 			_t[&"amb_station_dead"] = 1.0
 	if indoor > 0.3 and env != &"cave":
 		_t[&"amb_interior_wind"] = indoor * _smooth(2.0, 12.0, wind * _exposure) * (0.5 if env == &"station" else 1.0)
+	if max_beds < BEDS.size():
+		_limit_beds()
 	ctx = {"wind": wind, "eff": eff, "forest": forest, "day": day, "alt": alt, "indoor": indoor, "storm": storm,
 		"exposure": _exposure, "env": env, "biome": _biome(p), "creek": _water["creek"], "river": _water["river"],
 		"lake": _water["lake"], "fall": _water["fall"], "menu": false}
+
+
+func _limit_beds() -> void:
+	var active := 0
+	for b in BEDS:
+		if _t[b] > 0.02:
+			active += 1
+	while active > max_beds:
+		var weakest: StringName = &""
+		for b in BEDS:
+			if _t[b] > 0.02 and (weakest == &"" or _t[b] < _t[weakest]):
+				weakest = b
+		_t[weakest] = 0.0
+		active -= 1
 
 
 func _is_station_powered() -> bool:

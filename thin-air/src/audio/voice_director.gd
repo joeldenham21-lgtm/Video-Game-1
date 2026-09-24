@@ -69,6 +69,9 @@ func play(id: StringName, node: Node3D = null) -> float:
 	if e.is_empty():
 		push_warning("Audio: unknown voice line '%s'" % id)
 		return 0.0
+	# the same line requested twice at once (Events.radio_message + a direct play_voice) plays once
+	if id == current and _clock < 0.75:
+		return _duration
 	stop(false)
 	var path := String(e.get("file", ""))
 	var stream: AudioStream = null

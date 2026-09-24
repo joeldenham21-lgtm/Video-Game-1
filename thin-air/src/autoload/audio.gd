@@ -22,6 +22,7 @@ const AmbienceManager := preload("res://src/audio/ambience_manager.gd")
 const VoiceDirector := preload("res://src/audio/voice_director.gd")
 
 const POOL_3D := 24
+const POOL_3D_MOBILE := 16
 const POOL_2D := 8
 const POOL_UI := 4
 
@@ -74,7 +75,8 @@ func _ready() -> void:
 	_root3d.top_level = true
 	_root3d.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(_root3d)
-	for i in POOL_3D:
+	var mobile := Settings.has_method("is_mobile") and bool(Settings.is_mobile())
+	for i in (POOL_3D_MOBILE if mobile else POOL_3D):
 		var p := AudioStreamPlayer3D.new()
 		p.name = "P3D_%d" % i
 		p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
@@ -579,7 +581,8 @@ func _connect_events() -> void:
 		"scan_completed": _on_scan, "ui_screen_opened": _on_screen_opened, "ui_screen_closed": _on_screen_closed,
 		"objective_added": _on_objective_added, "objective_completed": _on_objective_done,
 		"poi_discovered": _on_poi, "log_found": _on_log, "game_started": _on_game_started,
-		"equipment_changed": _on_equip, "player_respawned": _on_respawned,
+		"equipment_changed": _on_equip, "player_respawned": _on_respawned, "radio_message": _on_radio_message,
+		"sleep_started": _on_sleep_started, "sleep_ended": _on_sleep_ended,
 	}
 	for sig in hooks:
 		if Events.has_signal(sig) and not Events.is_connected(sig, hooks[sig]):
@@ -635,6 +638,23 @@ func _on_died(_cause: StringName) -> void:
 	music.play_stinger(&"death")
 	music.set_state(&"silence")
 	stop_voice()
+	set_muffled(0.55)
+
+
+## Story may either emit Events.radio_message or call play_voice itself: both paths play the line once.
+func _on_radio_message(message_id: StringName) -> void:
+	if voice.has_line(message_id):
+		play_voice(message_id)
+
+
+func _on_sleep_started(_hours: float) -> void:
+	set_muffled(0.7)
+	music.set_state(&"silence")
+
+
+func _on_sleep_ended() -> void:
+	set_muffled(0.0)
+	music.set_state(&"explore")
 
 
 func _on_picked(_id: StringName, _count: int) -> void:
