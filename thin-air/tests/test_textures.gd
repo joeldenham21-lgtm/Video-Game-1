@@ -136,6 +136,13 @@ func _test_material_library() -> void:
 			set_name + " uses anisotropic filtering")
 		if mat is ORMMaterial3D:
 			check((mat as ORMMaterial3D).orm_texture != null, set_name + " has ORM texture")
+			# ORMMaterial3D ignores the occlusion (R) channel unless ao_enabled is set
+			check(bm.ao_enabled, set_name + " applies ORM occlusion (ao_enabled)")
+		check(not bm.subsurf_scatter_enabled, set_name + " avoids SSS (unsupported on the Mobile renderer)")
+		var uv_expect: Array = info.get("uv1_scale", [])
+		if uv_expect.size() == 2:
+			check(is_equal_approx(snappedf(bm.uv1_scale.x, 0.0001), snappedf(float(uv_expect[0]), 0.0001)),
+				"%s uv1_scale matches its real-world tile size (%.4f)" % [set_name, bm.uv1_scale.x])
 		if bool(info.get("triplanar", false)):
 			check(bm.uv1_triplanar and bm.uv1_world_triplanar, set_name + " is world triplanar")
 		if bool(info.get("tiling", true)):

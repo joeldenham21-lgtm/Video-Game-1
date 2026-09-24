@@ -10,7 +10,8 @@ extends Node3D
 ##   --mode=sets --sets=a,b,c          close-up row of the named material sets (sphere + patch + cylinder)
 ##   --mode=terrain --layer=snow       one terrain layer on a 400 m plane at its real tiling, eye height 1.7 m
 ##   --mode=strips --layers=a,b,c      side-by-side terrain strips from eye height (compare / repetition)
-## Common options: --sun=elev,azimuth (deg; azimuth 0 = light from +Z/behind the camera, 90 = from +X/right,
+## Common options: --macro=1 (reference anti-tiling: macro noise tint + distance-blended second fetch),
+##   --sun=elev,azimuth (deg; azimuth 0 = light from +Z/behind the camera, 90 = from +X/right,
 ##   180 = against the camera)
 ##   --cam=x,y,z --look=yaw,pitch --fov=deg --exposure=f --time=hours (sets a sun elevation preset)
 
@@ -23,10 +24,15 @@ shader_type spatial;
 render_mode cull_back, depth_draw_opaque;
 uniform sampler2DArray albedo_height : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2DArray normal_rough : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D macro_noise : filter_linear_mipmap, repeat_enable;
 uniform float layer = 0.0;
 uniform float tiling_m = 4.0;
 uniform float normal_depth = 1.0;
 uniform bool vertical = false;   // map world Y to V (cliff faces)
+// Reference anti-tiling (what the game's terrain shader is expected to do, see tools/README.md):
+//  * macro: albedo brightness/tint from terrain_macro_noise.png tiled every 256 m (R 256 m, G 85 m, B 28 m)
+//  * far: a second fetch of the same layer at 1/3.7 scale, rotated, blended in with distance
+uniform bool macro = false;
 varying vec3 wpos;
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -35,6 +41,17 @@ void vertex() {
 void fragment() {
 	vec4 ah = texture(albedo_height, vec3(UV, layer));
 	vec4 nr = texture(normal_rough, vec3(UV, layer));
+	if (macro) {
+		float dist = length(wpos - CAMERA_POSITION_WORLD);
+		float far_w = smoothstep(8.0, 48.0, dist) * 0.6;
+		vec2 uv2 = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8)) * UV / 3.7 + vec2(0.37, 0.71);
+		ah = mix(ah, texture(albedo_height, vec3(uv2, layer)), far_w);
+		nr.a = mix(nr.a, texture(normal_rough, vec3(uv2, layer)).a, far_w);
+		vec3 m = texture(macro_noise, wpos.xz / 256.0).rgb;
+		float v = dot(m - 0.5, vec3(0.5, 0.3, 0.2)) * 2.0;     // about -0.35 .. 0.35
+		ah.rgb *= 1.0 + v * 0.55;
+		ah.rgb *= mix(vec3(1.0), vec3(1.03, 1.0, 0.96), clamp(m.g * 2.0 - 1.0, -1.0, 1.0) * 0.5 + 0.5);
+	}
 	ALBEDO = ah.rgb;
 	NORMAL_MAP = nr.rgb;
 	NORMAL_MAP_DEPTH = normal_depth;
@@ -50,6 +67,7 @@ var cam: Camera3D
 var sun: DirectionalLight3D
 var env: Environment
 var terrain_shader: Shader
+var macro_tex: Texture2D
 var frame := 0
 
 
@@ -64,6 +82,7 @@ func _ready() -> void:
 	terrain_shader.code = TERRAIN_SHADER
 	var ah: Resource = load(TERRAIN_DIR + "terrain_albedo_height.png")
 	var nr: Resource = load(TERRAIN_DIR + "terrain_normal_rough.png")
+	macro_tex = load(TERRAIN_DIR + "terrain_macro_noise.png")
 	cam = Camera3D.new()
 	cam.fov = float(args.get("fov", "60"))
 	cam.near = 0.05
@@ -158,6 +177,8 @@ func _terrain_material(layer_name: String, ah: Resource, nr: Resource, vertical 
 		tiling = float(layer_info[idx].get("tiling_m", 4.0))
 	m.set_shader_parameter("tiling_m", tiling)
 	m.set_shader_parameter("vertical", vertical)
+	m.set_shader_parameter("macro", args.get("macro", "0") == "1")
+	m.set_shader_parameter("macro_noise", macro_tex)
 	return m
 
 
@@ -237,13 +258,13 @@ func _build_grid(ah: Resource, nr: Resource) -> void:
 		_add_mesh(patch, _material(n, Vector2(2.0, 2.0)), Vector3(x, 0.001, z))
 		_label(n, Vector3(x, 1.15, z), 0.2)
 	var tp := PlaneMesh.new()
-	tp.size = Vector2(2.4, 2.4)
+	tp.size = Vector2(2.1, 2.1)
 	for i in LAYERS.size():
-		var x := (i - 4) * 2.5
+		var x := (i - 4) * 2.3
 		_add_mesh(tp, _terrain_material(LAYERS[i], ah, nr), Vector3(x, 0.002, 0.0))
-		_label(LAYERS[i], Vector3(x, 0.35, 1.1), 0.2)
-	cam.position = Vector3(0, 9.0, 4.5)
-	cam.rotation_degrees = Vector3(-52, 0, 0)
+		_label(LAYERS[i], Vector3(x, 0.35, 1.0), 0.2)
+	cam.position = Vector3(0, 10.5, 3.4)
+	cam.rotation_degrees = Vector3(-60, 0, 0)
 
 
 ## A row of named sets, each as sphere + ground patch + upright cylinder (bark/logs read correctly on it).
@@ -312,18 +333,19 @@ func _build_wall(layer_name: String, ground_name: String, ah: Resource, nr: Reso
 	cam.rotation_degrees = Vector3(8, -32, 0)
 
 
-## Side-by-side strips (6 m wide, 300 m long) of several layers, from eye height.
+## Side-by-side strips (4 m wide, 300 m long) of several layers, seen from a low hillside (5 m up).
 func _build_strips(layers: PackedStringArray, ah: Resource, nr: Resource) -> void:
-	var w := 6.0
+	var w := 4.0
+	_neutral_ground(800.0)
 	for i in layers.size():
 		var pm := PlaneMesh.new()
 		pm.size = Vector2(w, 300)
 		pm.subdivide_depth = 32
 		var x := (i - (layers.size() - 1) * 0.5) * w
-		_add_mesh(pm, _terrain_material(String(layers[i]), ah, nr), Vector3(x, 0, -148))
-		_label(String(layers[i]), Vector3(x, 0.4, -3.0), 0.25)
-	cam.position = Vector3(0, 1.7, 1.0)
-	cam.rotation_degrees = Vector3(-20, 0, 0)
+		_add_mesh(pm, _terrain_material(String(layers[i]), ah, nr), Vector3(x, 0, -146))
+		_label(String(layers[i]), Vector3(x, 0.5, -4.0), 0.3)
+	cam.position = Vector3(0, 5.0, 8.0)
+	cam.rotation_degrees = Vector3(-17, 0, 0)
 
 
 func _process(_d: float) -> void:

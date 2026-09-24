@@ -247,7 +247,8 @@ def hide(t: tl.Tex) -> dict:
 	fat = tl.patches(S, r, 3, 24, 0.2, 0.6)
 	col = tl.mix3(col, tl.rgb(200, 176, 110), fat * 0.3)
 	rough = 0.66 - 0.28 * membrane - 0.1 * fat + 0.05 * wrink
-	return dict(albedo=col, height=height, rough=rough, ao_radius=0.004, ao_bake=0.2, subsurf=0.2)
+	# no subsurface scattering: the Mobile renderer does not support it (warns) and at 0.2 it is barely visible
+	return dict(albedo=col, height=height, rough=rough, ao_radius=0.004, ao_bake=0.2)
 
 
 # =============================================================================================

@@ -12,7 +12,5 @@ ao_enabled = true
 normal_enabled = true
 normal_scale = 1.000
 normal_texture = ExtResource("3_normal")
-subsurf_scatter_enabled = true
-subsurf_scatter_strength = 0.200
 uv1_scale = Vector3(1.66667, 1.66667, 1)
 texture_filter = 5
