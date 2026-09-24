@@ -10,6 +10,7 @@ Everything under `tools/` is ignored by Godot (`.gdignore`). Every generator is 
 | Texture seam QA | `python3 thin-air/tools/textures/check_seams.py [set ...]` | prints wrap-around continuity per map (same statistic as `tests/test_textures.gd`) |
 | Texture contact sheet | `python3 thin-air/tools/textures/contact_sheet.py out.jpg mat_rope terrain_rock ...` | tiles the CPU previews written by `--preview` (in `tools/textures/_cache/preview/`, git-ignored) |
 | Material preview stage | `DISPLAY=:99 godot --path thin-air --write-movie /tmp/m.png --fixed-fps 30 --quit-after 10 res://scenes/dev/material_preview.tscn -- --mode=grid` | lit renders: `--mode=grid`, `--mode=sets --sets=a,b`, `--mode=terrain --layer=rock`, `--mode=strips --layers=a,b`, `--mode=wall --layer=cliff --ground=scree`; `--macro=1`, `--sun=elev,az`, `--perf` |
+| Viewmodel textures (player) | `python3 thin-air/tools/player/gen_fp_textures.py` → import → `python3 thin-air/tools/player/gen_fp_textures.py --fix-imports` → import | `scenes/player/textures/*` (512² seamless PBR sets: wood ash/dark/raw, steel, stone, leather, fabric, knit, rubber, aluminium, plastic, canvas; topo map; flame/smoke/spark sprites). Needs numpy + PIL (`python3.12` in this container). |
 
 Workstreams append their generators to this table.
 

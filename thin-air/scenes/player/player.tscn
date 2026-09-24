@@ -1,0 +1,165 @@
+[gd_scene load_steps=19 format=3]
+
+[ext_resource type="Script" path="res://src/player/player.gd" id="1_player"]
+[ext_resource type="Script" path="res://src/player/player_camera.gd" id="2_cam"]
+[ext_resource type="Script" path="res://src/player/interactor.gd" id="3_inter"]
+[ext_resource type="Script" path="res://src/player/viewmodel.gd" id="4_vm"]
+[ext_resource type="Script" path="res://src/survival/vitals.gd" id="5_vitals"]
+[ext_resource type="Script" path="res://src/player/player_sounds.gd" id="6_sounds"]
+[ext_resource type="Texture2D" path="res://scenes/player/textures/smoke.png" id="7_smoke"]
+
+[sub_resource type="CapsuleShape3D" id="Capsule"]
+radius = 0.3
+height = 1.8
+
+[sub_resource type="CapsuleShape3D" id="SensorCapsule"]
+radius = 0.45
+height = 1.95
+
+[sub_resource type="SphereShape3D" id="CeilSphere"]
+radius = 0.27
+
+[sub_resource type="SphereShape3D" id="MeleeSphere"]
+radius = 0.16
+
+[sub_resource type="Gradient" id="VaporGradient"]
+offsets = PackedFloat32Array(0, 0.18, 0.55, 1)
+colors = PackedColorArray(0.82, 0.8, 0.78, 0, 0.82, 0.8, 0.78, 0.13, 0.8, 0.79, 0.77, 0.06, 0.8, 0.79, 0.77, 0)
+
+[sub_resource type="Curve" id="VaporScale"]
+_data = [Vector2(0, 0.35), 0.0, 1.6, 0, 0, Vector2(1, 1), 0.4, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="StandardMaterial3D" id="VaporMat"]
+transparency = 1
+cull_mode = 2
+shading_mode = 2
+vertex_color_use_as_albedo = true
+albedo_color = Color(1, 1, 1, 1)
+albedo_texture = ExtResource("7_smoke")
+roughness = 1.0
+billboard_mode = 3
+billboard_keep_scale = true
+particles_anim_h_frames = 1
+particles_anim_v_frames = 1
+proximity_fade_enabled = true
+proximity_fade_distance = 0.15
+
+[sub_resource type="QuadMesh" id="VaporQuad"]
+material = SubResource("VaporMat")
+size = Vector2(0.14, 0.14)
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 589
+floor_constant_speed = true
+floor_max_angle = 0.890118
+floor_snap_length = 0.45
+script = ExtResource("1_player")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("Capsule")
+
+[node name="Head" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.62, 0)
+script = ExtResource("2_cam")
+
+[node name="Shake" type="Node3D" parent="Head"]
+
+[node name="Camera3D" type="Camera3D" parent="Head/Shake"]
+current = true
+fov = 75.0
+near = 0.05
+far = 4000.0
+
+[node name="Viewmodel" type="Node3D" parent="Head/Shake/Camera3D"]
+script = ExtResource("4_vm")
+
+[node name="BreathVapor" type="CPUParticles3D" parent="Head/Shake"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.09, -0.2)
+emitting = false
+amount = 9
+lifetime = 1.7
+one_shot = true
+explosiveness = 0.55
+randomness = 0.4
+local_coords = false
+mesh = SubResource("VaporQuad")
+emission_shape = 1
+emission_sphere_radius = 0.02
+direction = Vector3(0, -0.15, -1)
+spread = 22.0
+gravity = Vector3(0, 0.07, 0)
+initial_velocity_min = 0.35
+initial_velocity_max = 0.6
+damping_min = 0.35
+damping_max = 0.6
+angle_min = -180.0
+angle_max = 180.0
+scale_amount_min = 0.55
+scale_amount_max = 1.0
+scale_amount_curve = SubResource("VaporScale")
+color_ramp = SubResource("VaporGradient")
+
+[node name="InteractRay" type="RayCast3D" parent="Head"]
+target_position = Vector3(0, 0, -2.6)
+collision_mask = 601
+collide_with_areas = true
+script = ExtResource("3_inter")
+
+[node name="MeleeCast" type="ShapeCast3D" parent="Head"]
+enabled = false
+shape = SubResource("MeleeSphere")
+target_position = Vector3(0, 0, -1.6)
+max_results = 8
+collision_mask = 605
+collide_with_areas = true
+
+[node name="Probes" type="Node3D" parent="."]
+
+[node name="ClimbRay" type="RayCast3D" parent="Probes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+enabled = false
+target_position = Vector3(0, 0, -0.95)
+collision_mask = 577
+
+[node name="ClimbRayHigh" type="RayCast3D" parent="Probes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.75, 0)
+enabled = false
+target_position = Vector3(0, 0, -0.95)
+collision_mask = 577
+
+[node name="MantleRay" type="RayCast3D" parent="Probes"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.15, -0.72)
+enabled = false
+target_position = Vector3(0, -1.45, 0)
+collision_mask = 577
+
+[node name="FootRay" type="RayCast3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+enabled = false
+target_position = Vector3(0, -0.85, 0)
+collision_mask = 585
+
+[node name="CeilingCast" type="ShapeCast3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+enabled = false
+shape = SubResource("CeilSphere")
+target_position = Vector3(0, 0.95, 0)
+collision_mask = 577
+
+[node name="Sensor" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 184
+monitorable = false
+
+[node name="Shape" type="CollisionShape3D" parent="Sensor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.97, 0)
+shape = SubResource("SensorCapsule")
+
+[node name="Vitals" type="Node" parent="."]
+script = ExtResource("5_vitals")
+
+[node name="Sounds" type="Node" parent="."]
+script = ExtResource("6_sounds")
