@@ -145,6 +145,10 @@ func _finish() -> void:
 		depleted.emit()
 
 
+func suppress_interaction() -> bool:
+	return act != Act.NONE
+
+
 func get_speed_cap() -> float:
 	return PlayerMotion.WALK_SPEED * 1.3 if act != Act.NONE else INF
 

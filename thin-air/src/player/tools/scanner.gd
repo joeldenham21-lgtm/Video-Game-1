@@ -126,6 +126,10 @@ func item_process(delta: float, can_act: bool) -> void:
 	anim_rot = Vector3(sin(t2 * 31.0), sin(t2 * 27.0), 0.0) * (0.25 if _scanning else 0.0)
 
 
+func suppress_interaction() -> bool:
+	return _scanning
+
+
 func get_speed_cap() -> float:
 	return PlayerMotion.WALK_SPEED if _scanning else INF
 

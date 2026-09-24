@@ -196,6 +196,7 @@ func _process(delta: float) -> void:
 		player.speed_cap = current.get_speed_cap()
 		player.look_scale = current.get_look_scale()
 		player.head.fov_override = current.get_fov()
+		player.interactor.suppressed = current.suppress_interaction()
 	_update_motion(delta)
 	_update_wetness(delta)
 

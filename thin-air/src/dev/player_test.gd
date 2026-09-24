@@ -1129,10 +1129,12 @@ func _setup_shot(item: StringName) -> void:
 			Input.action_press(StringName(hold))
 		for f in per:
 			await get_tree().process_frame
+		print("PERF %s draw_calls=%d primitives=%d player_physics_avg=%.3fms" % [id,
+			int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+			int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)),
+			player.perf_physics_us / 1000.0])
 		if hold != "":
 			Input.action_release(StringName(hold))
-	if args.has("tap_at"):
-		pass
 
 
 func _make_night() -> void:

@@ -73,6 +73,10 @@ func _api(course: PlayerTestCourse) -> void:
 	check(p.equip(&"crampons") and p.has_gear(&"crampons") and p.has_crampons(), "crampons → has_gear(crampons)")
 	check(p.equipment[&"feet_addon"] == &"crampons", "crampons go on as a boot add-on")
 	check(not p.has_gear(&"o2_mask"), "no O2 mask yet")
+	p.inventory.add(&"o2_mask", 1)
+	check(p.equip(&"o2_mask") and p.has_gear(&"o2_mask") and p.find_equipped(&"o2_mask") == &"mask", "O2 mask worn (mask slot)")
+	p.unequip(&"face")
+	check(not p.has_gear(&"o2_mask") and p.inventory.has(&"o2_mask"), "unequip(face) takes the O2 mask off")
 	p.unequip(&"head")
 	check(p.inventory.has(&"wool_hat") and is_equal_approx(p.get_insulation(), 12.0), "unequip returns the item")
 	# Hotbar & active item.

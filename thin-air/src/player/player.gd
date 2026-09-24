@@ -10,6 +10,7 @@ enum Move { GROUND, SWIM, CLIMB, LADDER, MANTLE }
 
 const EQUIP_SLOTS: Array[StringName] = [&"head", &"face", &"body", &"legs", &"hands", &"feet", &"back",
 	&"feet_addon", &"mask"]
+const SLOT_ALIASES := {&"face": &"mask", &"feet": &"feet_addon"}
 const HOTBAR_SIZE := 6
 const BASE_SLOTS := 24
 const BASE_WEIGHT := 30.0
@@ -317,6 +318,10 @@ func equip(id: StringName) -> bool:
 
 func unequip(slot: StringName) -> void:
 	var id: StringName = equipment.get(slot, &"")
+	# UI written against the data's equip_slot ("face" O2 mask, "feet" crampons) reaches the add-on slots.
+	if id == &"" and SLOT_ALIASES.has(slot):
+		slot = SLOT_ALIASES[slot]
+		id = equipment.get(slot, &"")
 	if id == &"":
 		if slot == &"hand":
 			select_hotbar(-1)
@@ -447,6 +452,20 @@ func set_hotbar_slot(index: int, id: StringName) -> void:
 		Events.active_item_changed.emit(get_active_item())
 		if viewmodel and viewmodel.has_method(&"set_item"):
 			viewmodel.call(&"set_item", get_active_item())
+
+
+## Equipment slot an item would go into (&"hand" for tools). Besides the CONTRACT slots, crampons strap
+## over boots into &"feet_addon" and an O2 mask goes into &"mask" so it can be worn with goggles.
+func get_equip_slot(id: StringName) -> StringName:
+	return _equip_slot_for(ItemDB.get_item(id))
+
+
+## Slot currently holding `id`, or &"" if it isn't worn.
+func find_equipped(id: StringName) -> StringName:
+	for s in EQUIP_SLOTS:
+		if equipment.get(s, &"") == id:
+			return s
+	return &""
 
 
 ## Inventory slot index of the active item (for durability), -1 if none.

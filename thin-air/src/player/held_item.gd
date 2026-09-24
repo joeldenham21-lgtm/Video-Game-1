@@ -85,6 +85,12 @@ func climb_swing() -> void:
 	pass
 
 
+## True while this item's own action must not compete with world interaction (scanning uses the same
+## progress events; a drawn bow or a raised canteen occupies the hands).
+func suppress_interaction() -> bool:
+	return false
+
+
 # ---- Helpers --------------------------------------------------------------------------------------
 
 func tool_value(key: String, default: float) -> float:

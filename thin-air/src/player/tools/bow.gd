@@ -195,6 +195,10 @@ func get_fov() -> float:
 	return 0.0
 
 
+func suppress_interaction() -> bool:
+	return draw > 0.3
+
+
 func get_speed_cap() -> float:
 	return PlayerMotion.WALK_SPEED if draw > 0.2 else INF
 
