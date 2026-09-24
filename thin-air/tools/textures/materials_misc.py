@@ -304,7 +304,8 @@ def rock_boulder(t: tl.Tex) -> dict:
 	height -= pit * 0.002
 	gcol, gmicro, mineral = cm.granite_grain(t, grain_m=0.005, weather=0.45)
 	height += gmicro * 0.0004
-	col = gcol * np.exp(0.06 * tl.spectral(S, r, 1, 10, 1.3))[..., None]
+	# same weathered granite as the terrain 'rock' layer (linear albedo ~0.29) so boulders sit on outcrops
+	col = gcol * 0.88 * np.exp(0.06 * tl.spectral(S, r, 1, 10, 1.3))[..., None]
 	col = tl.mix3(col, gcol * 1.12, np.clip(scar + scar2, 0, 1) * 0.6)
 	col = tl.mix3(col, tl.rgb(150, 132, 108), tl.smoothstep(0.5, 1.8, tl.spectral(S, r, 2, 16, 1.2)) * 0.22)
 	mott = tl.smoothstep(0.2, 1.2, tl.warp(tl.spectral(S, r, 3, 40, 1.1), *(tl.spectral(S, r, 6, 60, 1.0) * 6 for _ in range(2))))

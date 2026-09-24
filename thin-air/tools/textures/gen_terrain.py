@@ -72,15 +72,16 @@ def layer_snow(t: tl.Tex) -> dict:
 	col = tl.mix3(col, tl.rgb(218, 224, 233), crust * 0.5)
 	hollow = tl.smoothstep(0.0, 0.004, tl.cavity(height, t.px(0.10)))
 	col = tl.mix3(col, tl.rgb(208, 219, 236), hollow * 0.35)
-	grit = (r.random(S) < 0.00025) * (0.3 + 0.7 * r.random(S))
+	grit = (r.random(S) < 0.00011) * (0.3 + 0.7 * r.random(S))       # sparse wind-blown grit, ~3 per m²
 	grit = tl.gauss(grit.astype(float), 0.6) * 4.0
 	col = tl.mix3(col, tl.rgb(100, 95, 88), np.clip(grit, 0, 0.6))
 	# roughness: powder 0.74, polished crust ~0.6; sparkle = sparse near-mirror crystal facets
 	rough = 0.74 - 0.13 * crust + 0.03 * tl.spectral(S, r, 20, 200, 0.5)
-	sparkle = r.random(S) < 0.02
+	# (few facets, small tilts: large tilts also darken the diffuse term and read as pepper at low sun)
+	sparkle = r.random(S) < 0.012
 	rough = np.where(sparkle, 0.08 + 0.10 * r.random(S), rough)
-	tx = np.where(sparkle, (r.random(S) - 0.5) * 1.0, 0.0)
-	ty = np.where(sparkle, (r.random(S) - 0.5) * 1.0, 0.0)
+	tx = np.where(sparkle, (r.random(S) - 0.5) * 0.5, 0.0)
+	ty = np.where(sparkle, (r.random(S) - 0.5) * 0.5, 0.0)
 	return dict(albedo=col, height=height, rough=rough, tilt=(tx, ty), ao_bake=0.2, ao_radius=0.3,
 	            albedo_target=0.80)
 

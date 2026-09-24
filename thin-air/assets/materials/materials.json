@@ -450,9 +450,9 @@
   "transparent": false,
   "desc": "lichen-spotted granite for rock meshes (triplanar)",
   "avg_albedo_linear": [
-   0.342,
-   0.333,
-   0.2966
+   0.3127,
+   0.3047,
+   0.2704
   ],
   "roughness_avg": 0.779,
   "metal_avg": 0.0,

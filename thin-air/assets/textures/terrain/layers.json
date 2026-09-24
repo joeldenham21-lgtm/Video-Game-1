@@ -4,11 +4,11 @@
   "name": "snow",
   "tiling_m": 6.0,
   "avg_albedo_linear": [
-   0.7567,
-   0.7942,
-   0.8533
+   0.7569,
+   0.7943,
+   0.8535
   ],
-  "roughness_avg": 0.7134,
+  "roughness_avg": 0.7182,
   "height_range_m": 0.1254,
   "surface": "snow"
  },
