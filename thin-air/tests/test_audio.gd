@@ -344,6 +344,19 @@ func _test_ambience() -> void:
 	amb.max_beds = 17
 	Audio.set_environment_reverb(&"outdoor")
 	Audio.env_kind = &"outdoor"
+	# script cost: the whole audio frame (Audio + ambience + music), worst case with every timer due
+	var t0 := Time.get_ticks_usec()
+	for k in 200:
+		amb._timer = 0.0
+		amb._slow_timer = 0.0
+		amb._event_timer = 0.0
+		Audio._env_timer = 0.0
+		Audio._process(0.016)
+		amb._process(0.016)
+		Audio.music._process(0.016)
+	var per_frame_ms := float(Time.get_ticks_usec() - t0) / 200.0 / 1000.0
+	check(per_frame_ms < 1.0, "audio script cost per frame, worst case %.3f ms" % per_frame_ms)
+	print("PERF audio worst-case frame %.3f ms" % per_frame_ms)
 	Audio.play_voice(Audio.voice.lines.keys()[0])
 	await get_tree().process_frame
 	Game.world = old_world

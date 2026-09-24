@@ -168,6 +168,10 @@ QA status (last run): 482 files, all ≤ −1.0 dBTP after encoding (the writers
 all loops continuous at the seam (end→start jump ≤ 1.2× a typical 90th-percentile sample step, i.e. inaudible), mono/stereo layout as specified. Wind beds were retuned
 so strong/gale winds swell by 10–14 dB (p10–p90) without ever dropping to a calm-day hush between gusts.
 
+Script cost (tests/test_audio.gd, headless, contended 4-core container): the whole audio frame — Audio, ambience
+blend + context + water search + event scheduler, music director — costs ≈ 0.33 ms in the worst case where every
+timer fires in the same frame; a typical frame is a fraction of that.
+
 ## Known gaps
 
 - Music is composed by the music stream; until `data/music.json` exists the director is silent (by design).
