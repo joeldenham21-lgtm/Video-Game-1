@@ -80,15 +80,23 @@ var _station_icon: TextureRect
 var _station_name: Label
 var _station_status: Label
 var _station_bar: ProgressBar
-var _station_actions: HFlowContainer
-var _chip_row: HFlowContainer
+var _station_actions: HBoxContainer
+var _chip_row: HBoxContainer
 var _recipe_list: VBoxContainer
 var _recipe_scroll: ScrollContainer
 var _recipe_rows: Array[Button] = []
 var _rd: Dictionary = {}
 var _dirty := true
 var _slot_px := 96.0
+var _cont_px := 96.0
+var _compact := false
+var _margin: MarginContainer
+var _header: HBoxContainer
+var _brand: Label
+var _body: HBoxContainer
+var _craft_left: VBoxContainer
 var _device := "mouse"
+var _wear_hint: Label
 var _prev_mouse_mode: Input.MouseMode = Input.MOUSE_MODE_VISIBLE
 var _tween: Tween
 var _silhouette: ShaderMaterial
@@ -122,6 +130,7 @@ func _exit_tree() -> void:
 func _ready() -> void:
 	if is_queued_for_deletion():
 		return
+	_device = "touch" if Settings.is_mobile() else "mouse"
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 40
 	_silhouette = ShaderMaterial.new()
@@ -379,12 +388,14 @@ func _build() -> void:
 	margin.add_theme_constant_override("margin_bottom", 22)
 	_root.add_child(margin)
 	_frame = margin
+	_margin = margin
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 14)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(col)
 	col.add_child(_build_header())
 	var body := HBoxContainer.new()
+	_body = body
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 14)
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -404,10 +415,12 @@ func _build() -> void:
 
 func _build_header() -> Control:
 	var h := HBoxContainer.new()
+	_header = h
 	h.custom_minimum_size = Vector2(0, 58)
 	h.add_theme_constant_override("separation", 6)
 	var brand := InvStyle.caps("Field kit", 14, InvStyle.TEXT_FAINT, 3)
 	brand.custom_minimum_size = Vector2(120, 0)
+	_brand = brand
 	brand.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	h.add_child(brand)
 	var tab_wrap := Control.new()
@@ -582,9 +595,10 @@ func _build_inventory_page() -> Control:
 	v.add_child(_pack_scroll)
 	_pack_grid = GridContainer.new()
 	_pack_grid.columns = 6
+	_pack_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_pack_grid.add_theme_constant_override("h_separation", 8)
 	_pack_grid.add_theme_constant_override("v_separation", 8)
-	_pack_scroll.add_child(_pack_grid)
+	_pack_scroll.add_child(_centered(_pack_grid))
 	v.add_child(InvStyle.hline())
 	v.add_child(InvStyle.caps("Hotbar", 14, InvStyle.TEXT_FAINT))
 	v.add_child(_make_hotbar_row())
@@ -606,15 +620,35 @@ func _build_inventory_page() -> Control:
 	cv.add_child(cs)
 	_cont_grid = GridContainer.new()
 	_cont_grid.columns = 4
+	_cont_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_cont_grid.add_theme_constant_override("h_separation", 8)
 	_cont_grid.add_theme_constant_override("v_separation", 8)
-	cs.add_child(_cont_grid)
+	cs.add_child(_centered(_cont_grid))
 	page.add_child(_cont_panel)
 	return page
 
 
+## A single-line strip that scrolls sideways (drag / wheel) when it doesn't fit — chips and fuel buttons on phones.
+static func _hscroll(row: Control) -> ScrollContainer:
+	var sc := ScrollContainer.new()
+	sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	sc.add_child(row)
+	return sc
+
+
+## Wraps a grid so it sits centred at the top of a ScrollContainer (which never centres its child itself).
+static func _centered(c: Control) -> CenterContainer:
+	var cc := CenterContainer.new()
+	cc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cc.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	cc.add_child(c)
+	return cc
+
+
 func _make_hotbar_row() -> HBoxContainer:
 	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 8)
 	for i in ItemActions.HOTBAR_SIZE:
 		var s := _make_slot(ItemSlot.Kind.HOTBAR)
@@ -664,12 +698,13 @@ func _build_equipment_page() -> Control:
 	_wear_grid.columns = 5
 	_wear_grid.add_theme_constant_override("h_separation", 8)
 	_wear_grid.add_theme_constant_override("v_separation", 8)
-	ws.add_child(_wear_grid)
+	ws.add_child(_centered(_wear_grid))
 	rv.add_child(InvStyle.hline())
 	rv.add_child(InvStyle.caps("Protection", 14, InvStyle.TEXT_FAINT))
 	rv.add_child(_stats_box)
 	rv.add_child(InvStyle.hline())
-	rv.add_child(InvStyle.caps("Hotbar  ·  select an item, press 1–6", 14, InvStyle.TEXT_FAINT))
+	_wear_hint = InvStyle.caps("Hotbar  ·  select an item, press 1–6", 14, InvStyle.TEXT_FAINT)
+	rv.add_child(_wear_hint)
 	rv.add_child(_make_hotbar_row())
 	page.add_child(right)
 	return page
@@ -682,6 +717,7 @@ func _build_crafting_page() -> Control:
 	page.add_theme_constant_override("separation", 14)
 	page.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var left := VBoxContainer.new()
+	_craft_left = left
 	left.add_theme_constant_override("separation", 14)
 	left.custom_minimum_size = Vector2(600, 0)
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -710,15 +746,13 @@ func _build_crafting_page() -> Control:
 	sinfo.add_child(_station_status)
 	_station_bar = _bar(InvStyle.ACCENT, 6)
 	sinfo.add_child(_station_bar)
-	_station_actions = HFlowContainer.new()
-	_station_actions.add_theme_constant_override("h_separation", 8)
-	_station_actions.add_theme_constant_override("v_separation", 8)
-	sv.add_child(_station_actions)
+	_station_actions = HBoxContainer.new()
+	_station_actions.add_theme_constant_override("separation", 8)
+	sv.add_child(_hscroll(_station_actions))
 	left.add_child(_station_card)
 	# category chips
-	_chip_row = HFlowContainer.new()
-	_chip_row.add_theme_constant_override("h_separation", 6)
-	_chip_row.add_theme_constant_override("v_separation", 6)
+	_chip_row = HBoxContainer.new()
+	_chip_row.add_theme_constant_override("separation", 6)
 	for cat in CATEGORIES:
 		var b := Button.new()
 		b.text = cat[1]
@@ -734,7 +768,7 @@ func _build_crafting_page() -> Control:
 			_refresh_crafting())
 		b.set_meta("key", key)
 		_chip_row.add_child(b)
-	left.add_child(_chip_row)
+	left.add_child(_hscroll(_chip_row))
 	var lc := _card()
 	var list_panel: PanelContainer = lc[0]
 	list_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -768,23 +802,38 @@ func _build_crafting_page() -> Control:
 	top.add_child(tv)
 	var rname := InvStyle.label("", 30, InvStyle.TEXT, "SemiBold")
 	rname.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rname.custom_minimum_size.x = 200
 	tv.add_child(rname)
 	var rmeta := InvStyle.label("", 17, InvStyle.TEXT_DIM)
 	tv.add_child(rmeta)
+	var rscroll := ScrollContainer.new()
+	rscroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	rscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	dv.add_child(rscroll)
+	var rin := VBoxContainer.new()
+	rin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rin.add_theme_constant_override("separation", 12)
+	rscroll.add_child(rin)
 	var rdesc := InvStyle.label("", 19, Color(0.78, 0.81, 0.83))
 	rdesc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	dv.add_child(rdesc)
+	rdesc.custom_minimum_size.x = 240
+	rin.add_child(rdesc)
 	var rnote := InvStyle.label("", 17, InvStyle.TEXT_DIM, "Italic")
 	rnote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	dv.add_child(rnote)
-	dv.add_child(InvStyle.hline())
-	dv.add_child(InvStyle.caps("Requires", 14, InvStyle.TEXT_FAINT))
+	rnote.custom_minimum_size.x = 240
+	rin.add_child(rnote)
+	rin.add_child(InvStyle.hline())
+	rin.add_child(InvStyle.caps("Requires", 14, InvStyle.TEXT_FAINT))
 	var ings := VBoxContainer.new()
 	ings.add_theme_constant_override("separation", 6)
-	dv.add_child(ings)
-	var sp := Control.new()
-	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	dv.add_child(sp)
+	rin.add_child(ings)
+	var rstats_label := InvStyle.caps("Result", 14, InvStyle.TEXT_FAINT)
+	rin.add_child(rstats_label)
+	var rstats := VBoxContainer.new()
+	rstats.add_theme_constant_override("separation", 7)
+	rin.add_child(rstats)
+	rin.move_child(rstats_label, 2)     # description · result stats · requirements
+	rin.move_child(rstats, 3)
 	var reason := InvStyle.label("", 17, InvStyle.BAD, "Medium")
 	dv.add_child(reason)
 	var craft_row := HBoxContainer.new()
@@ -812,7 +861,7 @@ func _build_crafting_page() -> Control:
 	craft_row.add_child(cancel_b)
 	page.add_child(dpanel)
 	_rd = {"panel": dpanel, "icon": icon_bg, "name": rname, "meta": rmeta, "desc": rdesc, "note": rnote,
-		"ings": ings, "reason": reason, "craft": craft_b, "progress": prog, "cancel": cancel_b}
+		"ings": ings, "stats": rstats, "stats_label": rstats_label, "reason": reason, "craft": craft_b, "progress": prog, "cancel": cancel_b}
 	return page
 
 
@@ -829,18 +878,26 @@ func _build_detail_panel() -> PanelContainer:
 	v.add_child(stage)
 	var name_l := InvStyle.label("", 30, InvStyle.TEXT, "SemiBold")
 	name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_l.custom_minimum_size.x = 200
 	v.add_child(name_l)
 	var meta := InvStyle.label("", 17, InvStyle.TEXT_DIM)
+	meta.clip_text = true
 	v.add_child(meta)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(scroll)
+	var inner := VBoxContainer.new()
+	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inner.add_theme_constant_override("separation", 10)
+	scroll.add_child(inner)
 	var desc := InvStyle.label("", 19, Color(0.78, 0.81, 0.83))
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(desc)
+	desc.custom_minimum_size.x = 240
+	inner.add_child(desc)
 	var stats := VBoxContainer.new()
 	stats.add_theme_constant_override("separation", 7)
-	v.add_child(stats)
-	var sp := Control.new()
-	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(sp)
+	inner.add_child(stats)
 	var hb_label := InvStyle.caps("Assign to hotbar", 13, InvStyle.TEXT_FAINT)
 	v.add_child(hb_label)
 	var hb := HBoxContainer.new()
@@ -862,9 +919,10 @@ func _build_detail_panel() -> PanelContainer:
 	var empty := InvStyle.label("Select an item to inspect it.", 19, InvStyle.TEXT_FAINT)
 	empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(empty)
+	empty.custom_minimum_size.x = 240
+	inner.add_child(empty)
 	_detail = {"stage": stage, "name": name_l, "meta": meta, "desc": desc, "stats": stats, "hb_label": hb_label,
-		"hb": hb, "actions": actions, "empty": empty}
+		"hb": hb, "actions": actions, "empty": empty, "scroll": scroll}
 	return p
 
 
@@ -876,21 +934,110 @@ func _layout() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	var s := float(Settings.get_value(&"touch_ui_scale", 1.0))
 	if Settings.is_mobile():
-		s *= 1.18
-	s = clampf(s, 0.6, 1.8)
-	# never let the logical canvas get smaller than the layout needs
-	s = minf(s, minf(vp.x / 1500.0, vp.y / 820.0))
+		s *= 1.6          # a 6.8" phone at arm's length: body text ≈ 12 sp
+	s = clampf(s, 0.6, 2.4)
+	# never let the logical canvas get smaller than the compact layout needs
+	s = minf(s, minf(vp.x / 1300.0, vp.y / 620.0))
 	_root.scale = Vector2(s, s)
 	_root.position = Vector2.ZERO
 	_root.size = vp / s
-	var avail_h := _root.size.y - 30 - 22 - 58 - 14 - 30 - 14
-	_slot_px = clampf(floorf((avail_h - 36 - 26 - 30 - 118 - 8 * 5) / 5.0), 70.0, 104.0)
-	var pack_w := _slot_px * 6 + 8 * 5 + 36 + 14
-	_pack_panel.custom_minimum_size.x = pack_w
-	for s2 in _pack_slots + _hotbar_slots + _cont_slots + _wear_slots:
-		s2.custom_minimum_size = Vector2(_slot_px, _slot_px)
-	_detail_panel.custom_minimum_size.x = clampf(_root.size.x * 0.24, 380.0, 470.0)
+	_compact = _root.size.y < 900.0
+	var mh := 24 if _compact else 44
+	_margin.add_theme_constant_override("margin_left", mh)
+	_margin.add_theme_constant_override("margin_right", mh)
+	_margin.add_theme_constant_override("margin_top", 12 if _compact else 30)
+	_margin.add_theme_constant_override("margin_bottom", 8 if _compact else 22)
+	_header.custom_minimum_size.y = 50 if _compact else 58
+	_brand.visible = _root.size.x > 1560.0
+	_detail_panel.custom_minimum_size.x = clampf(_root.size.x * 0.25, 350.0, 470.0)
+	(_detail["stage"] as Control).custom_minimum_size.y = clampf(_root.size.y * 0.18, 104.0, 196.0)
+	(_rd["icon"] as Control).custom_minimum_size = Vector2.ONE * (112.0 if _compact else 150.0)
+	(_rd["panel"] as Control).custom_minimum_size.x = 440.0 if _compact else 520.0
+	_craft_left.custom_minimum_size.x = 520.0 if _compact else 600.0
+	for row in _recipe_rows:
+		row.custom_minimum_size.y = _recipe_row_h()
+	_frame.set_offsets_preset(Control.PRESET_FULL_RECT)
+	_fit_doll()
+	_fit_grids()
 	_mark_dirty()
+
+
+func _recipe_row_h() -> float:
+	return 64.0 if _compact else 76.0
+
+
+## Height available to the pages (root minus margins, header, footer and gaps).
+func _body_height() -> float:
+	var m := 20.0 if _compact else 52.0
+	return _root.size.y - m - _header.custom_minimum_size.y - 30.0 - 28.0
+
+
+## Chooses pack/container grid columns and slot sizes so the stacks (plus the hotbar row) fill their panels.
+func _fit_grids() -> void:
+	if _root == null:
+		return
+	var mh := 48.0 if _compact else 88.0
+	var bh := _body_height()
+	var total_w := _root.size.x - mh - _detail_panel.custom_minimum_size.x - 14.0
+	var n := inv.size() if inv != null else ItemActions.BASE_SLOTS
+	const PAD := 36.0 + 16.0            # card padding + scrollbar room
+	var fixed_h := 36.0 + 24.0 + 12.0 * 4.0 + 1.0 + 18.0
+	if container_inv != null:
+		var wp := floorf((total_w - 14.0) * 0.56)
+		_slot_px = _grid_fit(_pack_grid, n, wp - PAD, bh - fixed_h, true)
+		_cont_px = _grid_fit(_cont_grid, container_inv.size(), total_w - 14.0 - wp - PAD, bh - 36.0 - 24.0 - 12.0, false)
+		_pack_panel.custom_minimum_size.x = wp
+	else:
+		_slot_px = _grid_fit(_pack_grid, n, total_w - PAD, bh - fixed_h, true)
+		_pack_panel.custom_minimum_size.x = 0.0
+	for s2 in _pack_slots + _hotbar_slots + _wear_slots:
+		s2.custom_minimum_size = Vector2(_slot_px, _slot_px)
+	for s2 in _cont_slots:
+		s2.custom_minimum_size = Vector2(_cont_px, _cont_px)
+
+
+## Best (largest) slot size for `n` slots in w × h, trying 4–12 columns; sets the grid's columns.
+static func _grid_fit(grid: GridContainer, n: int, w: float, h: float, hotbar_row: bool) -> float:
+	const GAP := 8.0
+	var best := 0.0
+	var best_cols := 6
+	var best_waste := 1 << 20
+	for cols in range(4, 13):
+		var rows := ceili(float(maxi(n, 1)) / cols)
+		var zw := (w - (cols - 1) * GAP) / cols
+		var zh := (h - (rows - 1) * GAP - (GAP if hotbar_row else 0.0)) / (rows + (1 if hotbar_row else 0))
+		if hotbar_row:
+			zw = minf(zw, (w - 5.0 * GAP) / 6.0)
+		var z := minf(minf(zw, zh), 112.0)
+		var waste := rows * cols - n
+		if z > best + 2.0 or (absf(z - best) <= 2.0 and waste < best_waste):
+			best = maxf(z, best)
+			best_cols = cols
+			best_waste = waste
+	grid.columns = best_cols
+	return floorf(clampf(best, 60.0, 112.0))
+
+
+## Columns for the "wearable gear" grid: the equipment page's middle card width over the slot pitch.
+func _wear_columns() -> int:
+	var mh := 48.0 if _compact else 88.0
+	var w := _root.size.x - mh - _detail_panel.custom_minimum_size.x - (_doll as Control).custom_minimum_size.x - 36.0 * 2.0 - 14.0 * 2.0 - 16.0
+	return clampi(int((w + 8.0) / (_slot_px + 8.0)), 3, 10)
+
+
+## Scales the paper doll to the page height (phones).
+func _fit_doll() -> void:
+	var doll := _doll as DollFigure
+	if doll == null:
+		return
+	var k := clampf((_body_height() - 36.0 - 30.0) / 590.0, 0.6, 1.0)
+	doll.k = k
+	doll.custom_minimum_size = Vector2(460.0, 590.0) * k
+	for e in EQUIP_LAYOUT:
+		var sl: ItemSlot = _equip_slots[e[0]]
+		sl.position = (e[2] as Vector2) * k
+		sl.size = Vector2(88.0, 88.0) * k
+	doll.queue_redraw()
 
 
 # =============================================================================================== refresh
@@ -924,6 +1071,9 @@ func _process(delta: float) -> void:
 		station_node = null
 		_dirty = true
 	_update_header_info()
+	# An anchored container that once grew to a (transient) large minimum size keeps its offsets: snap it back.
+	if _frame.size.y > _root.size.y + 0.5 and (_tween == null or not _tween.is_running()):
+		_frame.set_offsets_preset(Control.PRESET_FULL_RECT)
 	if _dirty:
 		_dirty = false
 		_refresh_all()
@@ -941,6 +1091,7 @@ func _too_far(n: Node, dist: float) -> bool:
 func _refresh_all() -> void:
 	if inv == null:
 		return
+	_fit_grids()
 	_refresh_pack()
 	_refresh_container()
 	_refresh_hotbars()
@@ -1009,7 +1160,7 @@ func _sync_slots(grid: GridContainer, list: Array[ItemSlot], inventory: Inventor
 	var n := inventory.size() if inventory else 0
 	while list.size() < n:
 		var s := _make_slot(ItemSlot.Kind.INV)
-		s.custom_minimum_size = Vector2(_slot_px, _slot_px)
+		s.custom_minimum_size = Vector2.ONE * (_cont_px if list == _cont_slots else _slot_px)
 		grid.add_child(s)
 		list.append(s)
 	while list.size() > n:
@@ -1037,7 +1188,6 @@ func _refresh_container() -> void:
 	if container_inv == null:
 		_sync_slots(_cont_grid, _cont_slots, null)
 		return
-	_cont_grid.columns = 4 if _root.size.x < 1800 else 5
 	_cont_title.text = "%s   %.1f kg" % [container_title.to_upper(), container_inv.total_weight()]
 	_sync_slots(_cont_grid, _cont_slots, container_inv)
 
@@ -1070,13 +1220,17 @@ func _refresh_equipment() -> void:
 		var st := inv.get_slot(i)
 		if not st.is_empty() and ItemInfo.is_wearable(st["id"]):
 			idxs.append(i)
-	while _wear_slots.size() < maxi(idxs.size(), 10):
+	var cols := _wear_columns()
+	_wear_grid.columns = cols
+	var shown := maxi(ceili(float(maxi(idxs.size(), 1)) / cols), 2) * cols
+	while _wear_slots.size() < shown:
 		var s := _make_slot(ItemSlot.Kind.INV)
 		s.custom_minimum_size = Vector2(_slot_px, _slot_px)
 		_wear_grid.add_child(s)
 		_wear_slots.append(s)
 	for k in _wear_slots.size():
 		var s := _wear_slots[k]
+		s.visible = k < shown
 		if k < idxs.size():
 			s.inventory = inv
 			s.index = idxs[k]
@@ -1086,7 +1240,6 @@ func _refresh_equipment() -> void:
 			s.index = -1
 			s.set_stack({})
 		s.set_selected(s == sel_slot)
-	_wear_grid.columns = maxi(3, int((_wear_grid.get_parent_control().size.x + 8) / (_slot_px + 8)))
 	# protection summary
 	for c in _stats_box.get_children():
 		c.queue_free()
@@ -1184,8 +1337,9 @@ func _refresh_detail() -> void:
 	if ItemSlot._has_durability(id) and sel_slot.kind != ItemSlot.Kind.HOTBAR:
 		_stat_row(stats, "Condition", "%d%%" % roundi(dur * 100.0), dur, InvStyle.durability_color(dur))
 	var holdable := ItemInfo.is_holdable(id) or ItemInfo.is_consumable(id)
-	(_detail["hb_label"] as Control).visible = holdable and sel_slot.kind == ItemSlot.Kind.INV
-	(_detail["hb"] as Control).visible = holdable and sel_slot.kind == ItemSlot.Kind.INV
+	var own := sel_slot.kind == ItemSlot.Kind.INV and sel_slot.inventory == inv
+	(_detail["hb_label"] as Control).visible = holdable and own
+	(_detail["hb"] as Control).visible = holdable and own
 	_build_actions(actions, id, n)
 
 
@@ -1470,6 +1624,7 @@ func _refresh_crafting() -> void:
 	while _recipe_rows.size() < entries.size():
 		var row := RecipeRow.new()
 		row.screen = self
+		row.custom_minimum_size.y = _recipe_row_h()
 		_recipe_list.add_child(row)
 		_recipe_rows.append(row)
 	for i in _recipe_rows.size():
@@ -1535,6 +1690,13 @@ func _refresh_recipe_detail() -> void:
 	if st != &"hand":
 		var ok_st := bool(chk["station_ok"])
 		ings.add_child(_tool_row(st, ok_st, locked, true))
+	var rstats: VBoxContainer = _rd["stats"]
+	for c in rstats.get_children():
+		c.queue_free()
+	var rows := [] if locked else ItemInfo.stat_rows(result)
+	(_rd["stats_label"] as Control).visible = not rows.is_empty()
+	for row in rows:
+		_stat_row(rstats, row["label"], row["value"], float(row["bar"]), InvStyle.ACCENT, InvStyle.TEXT if bool(row["good"]) else InvStyle.BAD)
 	var crafting_this := craft_job != null and craft_job.is_running() and craft_recipe_id == rid
 	var busy := craft_job != null and craft_job.is_running()
 	var cb: Button = _rd["craft"]
@@ -1755,6 +1917,8 @@ func _station_actions_signature(fire: Campfire) -> String:
 func _update_footer() -> void:
 	if _footer_hint == null:
 		return
+	if _wear_hint:
+		_wear_hint.text = ("Hotbar  ·  drag gear onto a slot" if _device == "touch" else "Hotbar  ·  select an item, press 1–6").to_upper()
 	match _device:
 		"pad":
 			_footer_hint.text = "Ⓐ Actions   Ⓑ Back   Ⓨ Close   LB / RB Tabs"
@@ -1810,6 +1974,11 @@ class IconStage extends Control:
 			var f := 1.0 - i / 12.0
 			draw_circle(c, r * (0.35 + 0.65 * f), Color(1, 1, 1, 0.012))
 		draw_arc(c, r * 0.98, 0.0, TAU, 64, Color(1, 1, 1, 0.05), 1.0, true)
+
+
+## "Stick ×4", or just "Stone" for one.
+static func _qty_name(id: StringName, n: int) -> String:
+	return ItemInfo.name_of(id) if n == 1 else "%s ×%d" % [ItemInfo.name_of(id), n]
 
 
 ## A row in the recipe list.
@@ -1894,11 +2063,11 @@ class RecipeRow extends Button:
 			var ing: Dictionary = recipe.get("ingredients", {})
 			var miss: Dictionary = check.get("missing", {})
 			for k in ing:
-				parts.append("%d %s" % [int(ing[k]), ItemInfo.name_of(StringName(k))])
+				parts.append(InventoryScreen._qty_name(StringName(k), int(ing[k])))
 			sub = "  ·  ".join(parts)
 			if not miss.is_empty():
 				sub = "Missing: " + ", ".join(PackedStringArray(miss.keys().map(func(k: Variant) -> String:
-					return "%d %s" % [int(miss[k]), ItemInfo.name_of(StringName(k))])))
+					return InventoryScreen._qty_name(StringName(k), int(miss[k])))))
 			elif not (check.get("missing_tools", []) as Array).is_empty():
 				sub = "Needs %s" % Crafting.tool_name(StringName((check["missing_tools"] as Array)[0])).to_lower()
 			elif not bool(check.get("station_ok", true)):
@@ -1922,8 +2091,10 @@ class RecipeRow extends Button:
 ## Stylised figure for the equipment page, with leader lines to the worn-item slots.
 class DollFigure extends Control:
 	var anchors: Array = []   # [[slot: Control, anchor: Vector2], ...]
+	var k := 1.0              # drawn at 460×590 design units, scaled by k
 
 	func _draw() -> void:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(k, k))
 		var fill := Color(1, 1, 1, 0.045)
 		var edge := Color(1, 1, 1, 0.12)
 		var cx := 230.0
@@ -1943,8 +2114,8 @@ class DollFigure extends Control:
 		for a in anchors:
 			var slot: Control = a[0]
 			var p: Vector2 = a[1]
-			var sc := slot.position + slot.size * 0.5
-			var start := sc + (p - sc).normalized() * slot.size.x * 0.52
+			var sc := (slot.position + slot.size * 0.5) / k
+			var start := sc + (p - sc).normalized() * slot.size.x / k * 0.52
 			var sel := slot is ItemSlot and ((slot as ItemSlot).is_selected or not (slot as ItemSlot).stack.is_empty())
 			var col := Color(InvStyle.ACCENT.r, InvStyle.ACCENT.g, InvStyle.ACCENT.b, 0.55) if sel else Color(1, 1, 1, 0.1)
 			draw_line(start, p, col, 1.0, true)
