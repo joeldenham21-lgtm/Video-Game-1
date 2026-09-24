@@ -7,7 +7,9 @@ extends Node3D
 ##  * Blizzard streaks: fast, fine, long-exposure snow when strong wind meets heavy snowfall.
 ##  * Spindrift: wisps of blowing snow skimming the ground in strong wind wherever there is snow cover.
 ##  * Diamond dust: sparse glinting ice crystals on clear, calm, very cold days (and sunlit light snow sparkles).
-##  * Valley fog bank: a FogVolume with a soft top and noise banks (Forward+ with volumetric fog).
+##  * Valley fog sea: seen from above, a depth-aware fog-top plane (all renderers, one draw call) whose opacity
+##    is the fog actually crossed down to the terrain; near/inside it, a FogVolume (Forward+ volumetric fog)
+##    and the environment fog carry the murk.
 ## Budgets (Settings.particles 0/1/2): 3,000 particles on mobile (all layers), ≈12k medium, ≈25k desktop high.
 ## Flakes live in a small wrap-around box (≤ 10 m radius): that is where individual flakes are resolvable;
 ## beyond it the snowfall is carried by the sky's precipitation veil and the fog.
@@ -16,6 +18,10 @@ extends Node3D
 const PROCESS_SHADER := "res://assets/shaders/weather_particles.gdshader"
 const DRAW_SHADER := "res://assets/shaders/weather_flake.gdshader"
 const FLAKES := "res://assets/textures/sky/flakes.png"
+const FOG_SEA_SHADER := "res://assets/shaders/weather_valley_fog.gdshader"
+const CLOUD_NOISE := "res://assets/textures/sky/cloud_noise.png"
+## Visibility inside the valley fog bank (m) → extinction of the fog sea.
+const VALLEY_FOG_VISIBILITY := 120.0
 
 ## Particle counts per Settings.particles level (0 = mobile).
 const AMOUNTS := {
@@ -35,6 +41,9 @@ var _layers := {}
 var _level := -1
 var _time := 0.0
 var _fog_volume: FogVolume
+var _fog_sea: MeshInstance3D
+var _fog_sea_mat: ShaderMaterial
+var _fog_drift := Vector2.ZERO
 var _fog_material: FogMaterial
 var _sky: Node
 var _shelter := 0.0
@@ -70,6 +79,8 @@ func _rebuild() -> void:
 		_layers.clear()
 		for k in [&"snow", &"streaks", &"drift", &"dust"]:
 			_layers[k] = _make_layer(k, level)
+	if _fog_sea == null:
+		_make_fog_sea()
 	var want_fog := Settings.is_forward_plus() and bool(Settings.get_value(&"volumetric_fog", false))
 	if want_fog and _fog_volume == null:
 		_make_fog_volume()
@@ -140,6 +151,24 @@ func _make_layer(kind: StringName, level: int) -> Dictionary:
 	add_child(p)
 	p.emitting = true
 	return {&"node": p, &"proc": proc, &"draw": draw, &"kind": kind}
+
+
+func _make_fog_sea() -> void:
+	_fog_sea = MeshInstance3D.new()
+	_fog_sea.name = "ValleyFogSea"
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(30000.0, 30000.0)
+	_fog_sea.mesh = pm
+	_fog_sea_mat = ShaderMaterial.new()
+	_fog_sea_mat.shader = load(FOG_SEA_SHADER)
+	_fog_sea_mat.set_shader_parameter(&"cloud_noise", load(CLOUD_NOISE))
+	_fog_sea_mat.set_shader_parameter(&"extinction", 3.912 / VALLEY_FOG_VISIBILITY)
+	_fog_sea.material_override = _fog_sea_mat
+	_fog_sea.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_fog_sea.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+	_fog_sea.visible = false
+	add_child(_fog_sea)
+	_fog_sea.top_level = true
 
 
 func _make_fog_volume() -> void:
@@ -298,6 +327,22 @@ func _process(delta: float) -> void:
 		draw4.set_shader_parameter(&"opacity", 0.25)
 		_set_light(draw4, amb_v, sun_v, sun_dir)
 		(du[&"node"] as GPUParticles3D).visible = d4 > 0.001
+
+	# ------------------------------------------------------------------ valley fog sea (seen from above)
+	if _fog_sea:
+		var vf_s := Climate.valley_fog
+		var top_s := Climate.valley_fog_top
+		var fog_on := vf_s > 0.01 and cp.y > top_s + 1.5
+		_fog_sea.visible = fog_on
+		if fog_on:
+			_fog_drift += Vector2(wind.x, wind.z) * delta * 0.6
+			_fog_drift = Vector2(fposmod(_fog_drift.x, 100000.0), fposmod(_fog_drift.y, 100000.0))
+			_fog_sea.global_position = Vector3(roundf(cp.x / 64.0) * 64.0, top_s, roundf(cp.z / 64.0) * 64.0)
+			_fog_sea_mat.set_shader_parameter(&"intensity", vf_s)
+			_fog_sea_mat.set_shader_parameter(&"drift", -_fog_drift)
+			_fog_sea_mat.set_shader_parameter(&"light_ambient", amb_v)
+			_fog_sea_mat.set_shader_parameter(&"light_sun", sun_v)
+			_fog_sea_mat.set_shader_parameter(&"sun_dir", sun_dir)
 
 	# ------------------------------------------------------------------ valley fog bank (volumetric)
 	if _fog_volume and _fog_material:
