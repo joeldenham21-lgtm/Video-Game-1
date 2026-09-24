@@ -63,6 +63,7 @@ var _ui: Array[AudioStreamPlayer] = []
 var _ui_next := 0
 var _last: Dictionary = {}           # group -> [time_s, position|null]
 var _loops: Array = []               # [WeakRef(player), id]
+var _had_world := false
 
 
 func _ready() -> void:
@@ -407,6 +408,10 @@ func _auto_env() -> StringName:
 
 func _process(delta: float) -> void:
 	catalog.warm_step(3)
+	var has_world := Game.world != null and is_instance_valid(Game.world)
+	if _had_world and not has_world:
+		_on_world_unloaded()
+	_had_world = has_world
 	_env_timer -= delta
 	if _env_timer <= 0.0:
 		_env_timer = 0.5
@@ -614,7 +619,7 @@ func _on_footstep(surface: StringName, position: Vector3, intensity: float) -> v
 	if played != null and crampons:
 		var c: SfxCatalog.Entry = catalog.get_entry(&"crampon_step")
 		if c:
-			_play_entry(c, position, lerpf(-8.0, 1.0, it), 1.0, false, true)
+			_play_entry(c, position, lerpf(-8.0, 1.0, it), 1.0, false, false)
 
 
 func _on_landed(fall_speed: float, surface: StringName) -> void:
@@ -626,7 +631,8 @@ func _on_landed(fall_speed: float, surface: StringName) -> void:
 	var step := StringName("step_" + String(surface))
 	var e: SfxCatalog.Entry = catalog.get_entry(step) if catalog.has(step) else null
 	if e and pos != null:
-		_play_entry(e, pos, 3.0 if hard else 0.0, 0.92, false, true)
+		# normal de-dup: a player script that also plays the landing step itself must not double it
+		_play_entry(e, pos, 3.0 if hard else 0.0, 0.92, false, false)
 
 
 func _on_damaged(amount: float, type: StringName, _source: Node) -> void:
@@ -728,6 +734,19 @@ func _on_equip(_slot: StringName, id: StringName) -> void:
 
 func _on_respawned() -> void:
 	set_muffled(0.0)
+	music.set_state(&"explore")
+
+
+## Quit to menu / reload: nothing from the old world may keep talking or ringing over the menu.
+func _on_world_unloaded() -> void:
+	for p in _pool:
+		p.stop()
+	for p2 in _pool2d:
+		p2.stop()
+	stop_voice()
+	set_muffled(0.0)
+	_env_explicit = &""
+	music.requested_state = &"explore"      # resolves to the menu cue from context
 	music.set_state(&"explore")
 
 

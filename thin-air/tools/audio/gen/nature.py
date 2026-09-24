@@ -83,8 +83,9 @@ def fire_ignite(r, i):
 		n = ns(0.12)
 		strike = M.scrape(r, 0.12, 900, 8000, 2500) * dsp.env_points(n, [(0, 0), (0.02, 1), (0.12, 0.3)]) * 0.6
 		place(out, strike, 0.0)
-		m = ns(0.5)
-		flare = dsp.bp(dsp.pink(m, r), 500, 6000) * dsp.env_points(m, [(0, 0), (0.03, 1), (0.5, 0.15)]) * 0.5
+		# match-head flare: a fierce 0.3 s sulphur burst that settles into the small flame (no hard stop)
+		m = ns(0.95)
+		flare = dsp.bp(dsp.pink(m, r), 500, 6000) * dsp.env_points(m, [(0, 0), (0.03, 1), (0.3, 0.35), (0.6, 0.12), (0.95, 0)]) * 0.5
 		place(out, flare, 0.09)
 	elif i == 1:
 		n = ns(0.06)
@@ -98,7 +99,8 @@ def fire_ignite(r, i):
 	m = ns(1.8)
 	t = tvec(m)
 	grow = np.clip(t / 0.9, 0, 1) ** 1.5
-	catch = _fire(r, 1.8, 14, 0.8, 0.8, 0.5) * grow
+	# the caller hands over to fire_loop: tail off so the one-shot crossfades instead of stopping dead
+	catch = dsp.fade(_fire(r, 1.8, 14, 0.8, 0.8, 0.5) * grow, 0.0, 0.7)
 	place(out, catch * 0.9, 0.4 if i < 2 else 0.0)
 	if i == 2:
 		w = dsp.lp(dsp.brown(ns(0.6), r), 300) * dsp.env_points(ns(0.6), [(0, 0), (0.15, 1), (0.6, 0)])

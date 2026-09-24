@@ -56,7 +56,9 @@ func load_catalog(path: String = PATH) -> bool:
 		e.max_voices = int(d.get("max_voices", 4))
 		e.category = String(d.get("category", ""))
 		e.doppler = bool(d.get("doppler", false))
-		e.group = StringName(d.get("group", "footstep" if String(k).begins_with("step_") or String(k) == "crampon_step" else k))
+		# all surfaces share one footstep group (Events.footstep + a direct play_sfx of the same step = one sound);
+		# crampons are their own group so a system playing step + crampon_step back to back gets both
+		e.group = StringName(d.get("group", "footstep" if String(k).begins_with("step_") else k))
 		entries[e.id] = e
 	return true
 

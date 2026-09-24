@@ -162,6 +162,15 @@ func _test_api() -> void:
 	Events.footstep.emit(&"gravel", Vector3(5, 1450, 5), 0.8)
 	await get_tree().process_frame
 	check(_playing_ids().has(&"step_gravel"), "Events.footstep sonified")
+	# a player script that emits Events.footstep AND plays the step itself produces one footstep
+	Audio._last.erase(&"footstep")
+	Events.footstep.emit(&"rock", Vector3(20, 1450, 5), 0.6)
+	Audio.play_sfx(&"step_rock", Vector3(20, 1450, 5))
+	Audio.play_sfx(&"crampon_step", Vector3(20, 1450, 5))
+	Audio.play_sfx(&"crampon_step", Vector3(20, 1450, 5))
+	await get_tree().process_frame
+	check(_playing_ids().count(&"step_rock") == 1, "event + direct footstep de-duplicated (%d)" % _playing_ids().count(&"step_rock"))
+	check(_playing_ids().count(&"crampon_step") == 1, "crampons layer on a step exactly once (%d)" % _playing_ids().count(&"crampon_step"))
 	Events.footstep.emit(&"lava", Vector3(9, 1450, 9), 0.5)
 	await get_tree().process_frame
 	check(true, "unknown surface falls back safely")
@@ -323,9 +332,13 @@ func _test_ambience() -> void:
 	amb.max_beds = 17
 	Audio.set_environment_reverb(&"outdoor")
 	Audio.env_kind = &"outdoor"
+	Audio.play_voice(Audio.voice.lines.keys()[0])
+	await get_tree().process_frame
 	Game.world = old_world
 	w.queue_free()
 	await get_tree().process_frame
+	await get_tree().process_frame
+	check(not Audio.voice.is_playing(), "unloading the world stops voice lines")
 	amb._update_listener()
 	amb._compute_targets()
 	check(bool(amb.ctx.get("menu", false)), "no world → menu ambience")
