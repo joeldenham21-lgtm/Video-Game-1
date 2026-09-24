@@ -15,19 +15,21 @@ from synth import Boom, Glass, Pluck
 
 def _stinger(name, bpm, bars, title, intensity, tail, **kw):
     return Cue(name, bpm=bpm, meter=4, key=kw.pop("key", "D"), loop=False, bars=bars, kind="stinger",
-               title=title, intensity=intensity, tail_s=tail, target_lufs=-16.0, fade_out_s=1.0, **kw)
+               title=title, intensity=intensity, tail_s=tail, target_lufs=-16.0, fade_out_s=1.0, max_s=10.0,
+               **kw)
 
 
 def discovery() -> Cue:
     c = _stinger("stinger_discovery", 72, 2, "Discovery", 0.3, 4.5, key="D Lydian", rt60=3.6, wet_db=-2.5,
                  predelay_ms=36, ir_seed=51)
-    harp = c.part("harp", "harp", gain_db=-1.0)
+    # the harp sweep leads in; the string/choir bloom must be felt under it, not buried
+    harp = c.part("harp", "harp", gain_db=-3.5)
     cel = c.part("celesta", "celesta", gain_db=-1.0, send=0.7, delay=(0.42, 0.35, 0.3))
-    v1 = c.part("vln1", "vln1", gain_db=-3.0, attack_ms=40)
-    v2 = c.part("vln2", "vln2", gain_db=-4.0, attack_ms=40)
-    vla = c.part("vla", "vla", gain_db=-5.0)
-    ch = c.part("choir", "choir_ooh", gain_db=-5.0)
-    cb = c.part("cb", "cb", gain_db=-6.0)
+    v1 = c.part("vln1", "vln1", gain_db=-0.5, attack_ms=40)
+    v2 = c.part("vln2", "vln2", gain_db=-1.5, attack_ms=40)
+    vla = c.part("vla", "vla", gain_db=-2.5)
+    ch = c.part("choir", "choir_ooh", gain_db=-2.5)
+    cb = c.part("cb", "cb", gain_db=-2.0)
     harp.phrase(0, "@58 D3:0.25 A3:0.25 D4:0.25 E4:0.25 G#4:0.25 A4:0.25 C#5:0.25 E5:0.25 "
                    "G#5:0.25 A5:0.25 C#6:0.25 E6:1.25 | r:4 |")
     cel.phrase(0, "@52 r:2 D6:1 A6:1 | E7:2@40 r:2 |")
@@ -82,7 +84,7 @@ def objective() -> Cue:
     vla = c.part("vla", "vla", gain_db=-5.0)
     vc = c.part("vc", "vc", gain_db=-4.0, doubles="cb")
     cb = c.part("cb", "cb", gain_db=-6.0)
-    harp = c.part("harp", "harp", gain_db=-3.0)
+    harp = c.part("harp", "harp", gain_db=-6.5)       # the horns carry the ascent; harp colours the arrival
     hn.phrase(0, "D4:1 A4:2 B4:0.5 C#5:0.5 | D5:4 |")
     hn.dyn((0, "mp"), (2.5, "mf"), (4.5, "mf"), (6.5, "p"), (8, "n"))
     v1.phrase(0, "F#5:4 | A5:4 |")
@@ -97,7 +99,8 @@ def objective() -> Cue:
 
 def death() -> Cue:
     c = _stinger("stinger_death", 56, 2, "Death", 0.6, 5.5, key="D Aeolian", rt60=4.4, wet_db=-3.0,
-                 predelay_ms=40, ir_seed=59, ir_brightness=0.25)
+                 predelay_ms=40, ir_seed=59, ir_brightness=0.25,
+                 master_eq=dict(hp=34))   # keep the thud's body, drop sub-30 Hz rumble that eats headroom
     pno = c.part("piano", "piano", gain_db=0.0, shelf=[("high", 3000, -6.0)], qa_voice=False)
     vc = c.part("vc", "vc_fast", gain_db=0.0)
     cb = c.part("cb", "cb", gain_db=-3.0)

@@ -22,7 +22,8 @@ EM, C, D, AM, GB, BM, F = "E2 B2", "C2 G2", "D2 A2", "A1 E2", "B1 G2", "B1 F#2",
 
 def build() -> Cue:
     c = Cue("forest", bpm=66, meter=3, key="E Dorian", loop=True, bars=66, title="Under the Canopy",
-            intensity=0.3, rt60=3.0, predelay_ms=26, wet_db=-4.5, tail_s=9.0, ir_brightness=0.35)
+            intensity=0.3, rt60=3.0, predelay_ms=26, wet_db=-4.5, tail_s=9.0, ir_brightness=0.35,
+            master_eq=dict(shelf=[("high", 4500, 3.0)], peaks=[(380, -1.5, 0.9)]))
     cbp = c.part("cb_pizz", "cb_pizz", gain_db=1.0, qa_voice=False)
     vcp = c.part("vc_pizz", "vc_pizz", gain_db=-8.0, qa_voice=False)
     vc = c.part("vc", "vc", gain_db=1.0)

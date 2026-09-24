@@ -234,6 +234,10 @@ def render_cue(cue: Cue, out_ogg: str, log=print) -> dict:
         last = int(np.nonzero(env > thr)[0][-1]) if np.any(env > thr) else len(mix) - 1
         mix = mix[: min(len(mix), last + int(0.3 * SR))]
         f = int(max(0.3, cue.fade_out_s) * SR)
+        if cue.max_s and len(mix) > int(cue.max_s * SR):
+            # stingers: the reverb tail is faded into the length cap instead of ringing on
+            mix = mix[: int(cue.max_s * SR)]
+            f = int(max(f / SR, 2.5) * SR)
         f = min(f, len(mix))
         mix[-f:] *= (0.5 + 0.5 * np.cos(np.linspace(0, np.pi, f)))[:, None]
     ceiling = -1.4

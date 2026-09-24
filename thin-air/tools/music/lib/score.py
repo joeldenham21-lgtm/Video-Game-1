@@ -339,6 +339,7 @@ class Cue:
     master_eq: dict = field(default_factory=dict)
     leveler: dict | None = None          # optional slow compressor for long one-shots (see render.py)
     fade_out_s: float = 0.0              # one-shots: fade at the very end of the tail
+    max_s: float = 0.0                   # one-shots: hard cap on the file length (tail faded into it)
     notes: str = ""                      # composer's notes (goes into QA report)
     qa_ok: list = field(default_factory=list)   # substrings of QA lines that are intentional
 

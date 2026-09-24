@@ -19,7 +19,8 @@ from common import bar_pedal
 def build() -> Cue:
     c = Cue("station", bpm=70, meter=4, key="F# minor", loop=True, bars=44, title="Kestrel Station",
             intensity=0.2, rt60=2.8, predelay_ms=24, wet_db=-5.0, tail_s=10.0, ir_brightness=0.45,
-            ir_seed=23)
+            ir_seed=23,
+            master_eq=dict(hp=30, shelf=[("low", 180, -5.0), ("high", 3200, 2.5)]))
     ep = c.part("ep", "ep", gain_db=5.0, shelf=[("high", 5000, -2.0)])
     epl = c.part("ep_lh", "ep", gain_db=1.0, pan=-0.1, shelf=[("high", 5000, -2.0)])
     vcs = c.part("vc_solo", "vc_solo", gain_db=1.0, lp=6500, shelf=[("high", 2800, -4.0)])

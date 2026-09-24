@@ -18,7 +18,9 @@ from synth import Glass, SawPad
 def build() -> Cue:
     c = Cue("night", bpm=56, meter=4, key="D Aeolian", loop=True, bars=42, title="Long Night",
             intensity=0.15, rt60=4.6, predelay_ms=45, wet_db=-2.5, tail_s=14.0, ir_brightness=0.3,
-            ir_seed=11)
+            ir_seed=11,
+            # the pad + basses sit on 50-250 Hz: lean the bass so the piano carries on small speakers
+            master_eq=dict(hp=32, shelf=[("low", 150, -5.0), ("high", 3000, 1.5)]))
     pno = c.part("pno", "mellow_piano", gain_db=9.0, dry_db=-6.0, send=0.75,
                  delay=(0.535, 0.38, 0.32), qa_voice=False)
     cel = c.part("celesta", "celesta", gain_db=1.0, dry_db=-6.0, send=0.8, delay=(0.402, 0.4, 0.35))
@@ -44,7 +46,7 @@ def build() -> Cue:
     c.add(SawPad("pad", notes=pad_notes, voices=5, detune_cents=11, attack=5.0, release=6.0,
                  cutoff=[(0, 380), (24, 720), (48, 420), (84, 640), (100, 900), (120, 520), (144, 760),
                          (168, 380)],
-                 resonance=0.8, sine_mix=0.5, gain_db=-4.0, send=0.55, hp=40, seed=21))
+                 resonance=0.8, sine_mix=0.5, gain_db=-4.0, send=0.55, hp=62, seed=21))
     c.add(Glass("stars", notes=[("A6", 34, 10, -6), ("E6", 38, 8, -9), ("D7", 102, 12, -8),
                                 ("A6", 108, 8, -10), ("E7", 146, 10, -11), ("A6", 150, 8, -8)],
                 attack=3.0, release=5.0, gain_db=-8.0, send=0.9, dry_db=-6.0, hp=900))

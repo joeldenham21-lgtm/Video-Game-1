@@ -333,19 +333,20 @@ class Cymbal(Layer):
         for (b0, b1, pk) in self.swells:
             t0, t1 = pre + cue.sec(b0), pre + cue.sec(b1)
             i0 = int(t0 * sr)
-            m = min(n - i0, int((t1 - t0 + self.decay * 1.5) * sr))
+            m = min(n - i0, int((t1 - t0 + self.decay * 2.5) * sr))
             y = self._metal(m, sr, rng)
             tt = np.arange(m) / sr
             L = t1 - t0
             env = np.where(tt < L, (np.clip(tt / L, 0, 1) ** 2.2), np.exp(-(tt - L) / (self.decay * 0.35)))
+            env *= _env(m, sr, 0.0, 0.08)
             y *= (env * (1 + 0.15 * np.sin(2 * np.pi * 7.3 * tt)))[:, None]
             out[i0:i0 + m] += y * 10 ** (pk / 20)
         for (b, lvl) in self.crashes:
             i0 = int((pre + cue.sec(b)) * sr)
-            m = min(n - i0, int(self.decay * 1.6 * sr))
+            m = min(n - i0, int(self.decay * 3.2 * sr))
             y = self._metal(m, sr, rng)
             tt = np.arange(m) / sr
-            env = np.exp(-tt / (self.decay * 0.45)) * np.clip(tt / 0.003, 0, 1)
+            env = np.exp(-tt / (self.decay * 0.45)) * np.clip(tt / 0.003, 0, 1) * _env(m, sr, 0.0, 0.08)
             out[i0:i0 + m] += y * env[:, None] * 10 ** (lvl / 20)
         return out
 
@@ -364,7 +365,7 @@ class Boom(Layer):
     def render(self, cue, sr, n, pre, loop_len):
         rng = np.random.default_rng(self.seed)
         out = np.zeros((n, 2))
-        m = int(sr * (self.decay * 2.5))
+        m = int(sr * (self.decay * 7.0))
         tt = np.arange(m) / sr
         f = self.f_end + (self.f_start - self.f_end) * np.exp(-tt / 0.18)
         ph = 2 * np.pi * np.cumsum(f) / sr
@@ -372,7 +373,7 @@ class Boom(Layer):
         nz = rng.standard_normal(m) * np.exp(-tt / 0.05)
         nz = signal.sosfilt(signal.butter(2, [60, 900], "bp", fs=sr, output="sos"), nz)
         y = body + nz * 10 ** (self.click_db / 20)
-        y = np.tanh(y * 1.4) / np.tanh(1.4)
+        y = np.tanh(y * 1.4) / np.tanh(1.4) * _env(m, sr, 0.0, 0.1)
         for (beat, lvl) in self.hits:
             i0 = int((pre + cue.sec(beat)) * sr)
             e = min(n, i0 + m)
