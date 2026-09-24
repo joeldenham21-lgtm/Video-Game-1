@@ -49,6 +49,8 @@ var _exposure := 1.0
 var _first := true
 var _sky_quality := 2
 var _mobile_shader := false
+var _pre_expose := false
+var _pre := 1.0
 var _update_interval := 0.0
 var _update_timer := 0.0
 var _cloud_offset := Vector2(0.37, 0.61)
@@ -180,6 +182,7 @@ func apply_settings() -> void:
 		return
 	var fp := Settings.is_forward_plus() if Settings.has_method("is_forward_plus") else true
 	var mobile := Settings.is_mobile() if Settings.has_method("is_mobile") else false
+	_pre_expose = RenderingServer.get_current_rendering_method() != "forward_plus"
 	environment.ssao_enabled = fp and bool(Settings.get_value(&"ssao", false))
 	environment.ssil_enabled = fp and bool(Settings.get_value(&"ssil", false))
 	environment.ssr_enabled = fp and bool(Settings.get_value(&"ssr", false))
@@ -248,6 +251,13 @@ func snap() -> void:
 
 func get_exposure() -> float:
 	return _exposure
+
+
+## Mobile renderer only: the part of the exposure applied before the (low-precision) colour buffer.
+## Unshaded / emissive materials that must match lit surfaces at night multiply their output by this
+## (1.0 on Forward+). See the note at the pre-exposure code in _update().
+func get_pre_exposure() -> float:
+	return _pre
 
 
 func get_fog_color() -> Color:
@@ -431,9 +441,24 @@ func _update(delta: float) -> void:
 	environment.fog_sun_scatter = (0.015 + 0.12 * haze + 0.12 * vf) * (1.0 - overcast)
 	if environment.volumetric_fog_enabled:
 		# Extinction per metre: clean air ≈ 1e-4 (60 km visibility); snow murk and whiteouts are far denser.
-		environment.volumetric_fog_density = 0.00012 * (1.0 + 6.0 * haze) + 0.006 * pow(precip, 1.5) + 0.05 * fog * fog + 0.004 * vf_inside
+		environment.volumetric_fog_density = 0.00012 * (1.0 + 6.0 * haze) + 0.0025 * pow(precip, 1.5) + 0.03 * fog * fog + 0.004 * vf_inside
 		environment.volumetric_fog_anisotropy = lerpf(0.6, 0.25, clampf(precip + overcast * 0.5, 0.0, 1.0))
-	environment.tonemap_exposure = _exposure
+	if _pre_expose:
+		# Mobile stores the scene in RGB10A2 (0..2): physical night radiance (~1e-4) would quantise into
+		# coloured rings. The camera exposure multiplier scales lights, sky and ambient before the buffer
+		# (and once more in the tonemapper), so pre-expose by p — as far as the brightest sky allows without
+		# clipping — and hand the rest of the exposure to the tonemapper: net = p·p·(E/p²) = E.
+		var peak := maxf(_lum(_row4(ROW_HOR_SUN, alt, el_s)) * sun_e * 3.0, _lum(hor) * 2.0)
+		peak = maxf(peak * (1.0 - 0.7 * overcast), _lum(zen))
+		_pre = clampf(1.6 / maxf(peak, 1e-6), 1.0, _exposure)
+		camera_attributes.exposure_multiplier = _pre
+		environment.tonemap_exposure = _exposure / (_pre * _pre)
+		# Fog, emission and unshaded materials are not pre-exposed by the engine: scale what the sky owns.
+		environment.fog_light_energy *= _pre
+	else:
+		_pre = 1.0
+		camera_attributes.exposure_multiplier = 1.0
+		environment.tonemap_exposure = _exposure
 	# Scotopic vision: colour drains from moonlit scenes.
 	var darkness := 1.0 - smoothstep(-10.0, -2.0, el_s)
 	environment.adjustment_saturation = lerpf(1.0, 0.78, darkness) * lerpf(1.0, 0.92, overcast)
@@ -449,8 +474,8 @@ func _update(delta: float) -> void:
 		e_down = lerpf(e_down, under, overcast)
 	var e_up := _lum(ground) * PI
 	var amb_tint := _norm(zen + hor).lerp(Color(1, 1, 1), 0.5 + 0.5 * overcast)
-	_particle_amb = _wb(_mulc(amb_tint, 0.9 * 0.5 * (e_down + e_up) / PI))
-	_particle_sun = _wb(_mulc(light_rgb, 0.9 * 0.5 / PI))
+	_particle_amb = _wb(_mulc(amb_tint, 0.9 * 0.5 * (e_down + e_up) / PI * _pre))
+	_particle_sun = _wb(_mulc(light_rgb, 0.9 * 0.5 / PI * _pre))
 	_particle_dir = light_dir
 
 	# ---------------------------------------------------------------- sky material (throttled on mobile)

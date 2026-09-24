@@ -76,6 +76,33 @@ func _ready() -> void:
 		sky.call_deferred("snap")
 	if args.has("pdebug"):
 		call_deferred("_particle_debug", int(args["pdebug"]))
+	if args.has("probe_mats"):
+		_probe_materials(pos, cam.global_basis)
+
+
+## Dev: emissive / unshaded / lit reference cubes in front of the camera (exposure pipeline checks).
+func _probe_materials(pos: Vector3, basis: Basis) -> void:
+	var kinds := ["emissive", "unshaded", "lit"]
+	for i in kinds.size():
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.6, 0.6, 0.6)
+		mi.mesh = bm
+		var m := StandardMaterial3D.new()
+		match kinds[i]:
+			"emissive":
+				m.albedo_color = Color(0, 0, 0)
+				m.emission_enabled = true
+				m.emission = Color(1.0, 0.5, 0.2)
+				m.emission_energy_multiplier = 0.05
+			"unshaded":
+				m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				m.albedo_color = Color(0.05, 0.05, 0.05)
+			"lit":
+				m.albedo_color = Color(0.8, 0.8, 0.8)
+		mi.material_override = m
+		add_child(mi)
+		mi.global_position = pos + basis * Vector3((float(i) - 1.0) * 1.0, -0.3, -3.0)
 
 
 func _particle_debug(mode: int) -> void:

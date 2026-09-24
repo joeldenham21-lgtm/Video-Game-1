@@ -603,8 +603,9 @@ func get_visibility_at(pos: Vector3) -> float:
 	var vis := 60000.0 / (1.0 + 4.0 * float(params.get(&"haze", 0.0)))
 	var p := precipitation
 	if p > 0.0:
-		# moderate snow (0.55) ≈ 1.2 km, blizzard (1.0) ≈ 60 m before whiteout
-		vis = minf(vis, lerpf(8000.0, 60.0, pow(p, 1.35)))
+		# Log-linear in snowfall rate: light snow (0.2) ≈ 4.5 km, moderate (0.55) ≈ 900 m,
+		# blizzard (1.0) ≈ 60 m before the whiteout factor.
+		vis = minf(vis, 8000.0 * pow(60.0 / 8000.0, pow(p, 1.35)))
 	vis = minf(vis, lerpf(vis, 25.0, pow(fog_density, 2.5)))
 	if valley_fog > 0.01 and pos.y < valley_fog_top:
 		var depth := clampf((valley_fog_top - pos.y) / 60.0, 0.0, 1.0)

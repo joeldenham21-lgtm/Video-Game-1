@@ -53,6 +53,7 @@ var _fog_density := 0.0
 ## TAA averages away moving specks narrower than ~4 px (no motion vectors for blended particles), so
 ## flakes get a larger minimum footprint when it is on.
 var _min_pixels := 3.0
+var _pre := 1.0
 
 
 func _ready() -> void:
@@ -231,6 +232,7 @@ func _process(delta: float) -> void:
 	var amb_v := Vector3(amb.r, amb.g, amb.b)
 	var sun_v := Vector3(sun_c.r, sun_c.g, sun_c.b)
 	var sunlit := clampf(sun_v.length() / maxf(amb_v.length() * 3.0, 1e-5), 0.0, 1.0)
+	_pre = float(_sky.get_pre_exposure()) if _sky and _sky.has_method("get_pre_exposure") else 1.0
 	var env: Environment = _sky.get(&"environment") if _sky else null
 	_fog_density = env.fog_density if env and env.fog_enabled else 0.0
 
@@ -361,6 +363,7 @@ func _set_light(m: ShaderMaterial, amb: Vector3, sun: Vector3, sd: Vector3) -> v
 	m.set_shader_parameter(&"pixel_angle", _pixel_angle)
 	m.set_shader_parameter(&"min_pixels", _min_pixels)
 	m.set_shader_parameter(&"fog_density", _fog_density)
+	m.set_shader_parameter(&"fog_scale", _pre)
 	m.set_shader_parameter(&"light_ambient", amb)
 	m.set_shader_parameter(&"light_sun", sun)
 	m.set_shader_parameter(&"sun_dir", sd)

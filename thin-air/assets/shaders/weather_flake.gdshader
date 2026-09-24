@@ -25,6 +25,7 @@ uniform float time_s = 0.0;
 uniform float pixel_angle = 0.0017;   // radians per rendered pixel (set by WeatherFX)
 uniform float fog_density = 0.0;      // environment extinction (1/m), applied at fog_strength
 uniform float fog_strength = 0.5;
+uniform float fog_scale = 1.0;        // mobile pre-exposure (Sky.get_pre_exposure())
 uniform float min_pixels = 3.0;       // smallest on-screen flake (render px; a display pixel spans ~6 arcmin, the eye resolves 1)
 uniform int debug_mode = 0;      // 1 = solid geometry, 2 = (fade, energy, coverage) as colour
 
@@ -81,7 +82,7 @@ void fragment() {
 	// Ice crystals scatter strongly forward and look brighter than a matte diffuser.
 	vec3 col = light_ambient * 1.6 + light_sun * (0.7 + 2.2 * v_fwd);
 	col += light_sun * v_glint * 14.0;
-	col = mix(col * tint, fog_color.rgb, clamp(v_fog, 0.0, 1.0));
+	col = mix(col * tint, fog_color.rgb * fog_scale, clamp(v_fog, 0.0, 1.0));
 	ALBEDO = col;
 	ALPHA = clamp(a * opacity * v_fade * v_energy + v_glint * a * 0.5, 0.0, 1.0);
 	if (debug_mode == 1) {
