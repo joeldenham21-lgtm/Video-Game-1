@@ -1,0 +1,7 @@
+.godot/
+build/
+android/
+*.tmp
+/tools/**/__pycache__/
+/tools/**/_cache/
+*.blend1
