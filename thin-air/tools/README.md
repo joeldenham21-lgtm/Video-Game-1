@@ -16,6 +16,10 @@ Everything under `tools/` is ignored by Godot (`.gdignore`). Every generator is 
 | Item icon renders | `blender -b -P thin-air/tools/icons/render_icons.py -- [--ids=a,b] [--samples=96]` | `tools/icons/_cache/raw/<id>.png` (Cycles studio rig, 512 px, materials rebuilt from `materials.json`) |
 | Item icon finish | `python3.12 thin-air/tools/icons/finish_icons.py [ids ...]` | `assets/icons/<id>.png` (256 px RGBA, cropped/centred/sharpened) + `assets/icons/_unknown.png` |
 | Items dev scene / shots | `DISPLAY=:99 godot --path thin-air --fixed-fps 30 --resolution 1280x720 res://scenes/dev/items_test.tscn -- --shot=<campfire_night\|ui_inventory\|ui_equipment\|ui_crafting\|ui_container\|pickups> --save=<abs.jpg>` | `docs/shots/items_*.jpg` (add `--preset=mobile_high --rendering-method mobile` for the phone layout) |
+| SFX + ambience synthesis (Audio) | `python3.12 thin-air/tools/audio/build_sfx.py [--only ids] [--preview DIR]` then `python3.12 thin-air/tools/audio/set_loop_flags.py` and `godot --headless --path thin-air --import` | `assets/audio/sfx/*.ogg`, `assets/audio/ambience/*.ogg`, `data/sfx.json` (≈2 min, 4 cores) |
+| Voice casting analysis (Audio) | `python3.12 thin-air/tools/audio/voice/cast_voices.py` · `python3.12 thin-air/tools/audio/voice/audition.py DIR` | `tools/audio/_cache/casting.json`, audition WAV/PNGs |
+| Voice lines, logs, prologue (Audio) | `python3.12 thin-air/tools/audio/voice/build_voice.py [--only ids] [--preview DIR]` (script: `tools/audio/voice/script.py`) | `assets/audio/voice/*.ogg`, `data/voice.json`, `data/logs.json` (≈10 min first run with parallel piper, ≈7 min re-process from the TTS cache; `--only ids --with-prologue` for quick edits) |
+| Audio QA (Audio) | `python3.12 thin-air/tools/audio/qa_audio.py [--out DIR]` | loudness/true-peak/channels/loop-seam report + sox spectrograms |
 
 Workstreams append their generators to this table.
 

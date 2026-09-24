@@ -1,0 +1,2982 @@
+{
+ "beacon_awos": {
+  "file": "res://assets/audio/voice/beacon_awos.ogg",
+  "speaker": "Kestrel Weather",
+  "speaker_id": "awos",
+  "text": "Kestrel Station automated weather. Time, zero zero one zero zulu. Wind, two six zero at four two, gusting five five. Visibility, one half. Snow. Blowing snow. Temperature, minus one six. Altimeter, two niner four one. Kestrel Station automated weather.",
+  "radio": true,
+  "kind": "awos",
+  "duration_s": 20.43,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.49,
+    "text": "Kestrel Station automated weather.",
+    "speaker": "Kestrel Weather"
+   },
+   {
+    "t": 2.887,
+    "d": 2.8,
+    "text": "Time, zero zero one zero zulu.",
+    "speaker": "Kestrel Weather"
+   },
+   {
+    "t": 5.739,
+    "d": 3.83,
+    "text": "Wind, two six zero at four two, gusting five five.",
+    "speaker": "Kestrel Weather"
+   },
+   {
+    "t": 9.622,
+    "d": 3.85,
+    "text": "Visibility, one half. Snow. Blowing snow.",
+    "speaker": "Kestrel Weather"
+   },
+   {
+    "t": 13.521,
+    "d": 2.07,
+    "text": "Temperature, minus one six.",
+    "speaker": "Kestrel Weather"
+   },
+   {
+    "t": 15.64,
+    "d": 2.23,
+    "text": "Altimeter, two niner four one.",
+    "speaker": "Kestrel Weather"
+   },
+   {
+    "t": 17.919,
+    "d": 2.46,
+    "text": "Kestrel Station automated weather.",
+    "speaker": "Kestrel Weather"
+   }
+  ]
+ },
+ "beacon_live": {
+  "file": "res://assets/audio/voice/beacon_live.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Anyone on this frequency. I heard an engine. In the valley. It stopped. If you can hear me. the ranger cabin on Loon Lake. There's a radio in the cabin. Channel six. Please.",
+  "radio": true,
+  "kind": "radio_weak",
+  "duration_s": 18.33,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.25,
+    "text": "Anyone on this frequency.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 2.916,
+    "d": 2.86,
+    "text": "I heard an engine. In the valley.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.83,
+    "d": 1.45,
+    "text": "It stopped.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 7.898,
+    "d": 1.62,
+    "text": "If you can hear me.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 9.64,
+    "d": 2.5,
+    "text": "the ranger cabin on Loon Lake.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 12.561,
+    "d": 2.06,
+    "text": "There's a radio in the cabin.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 14.675,
+    "d": 1.61,
+    "text": "Channel six.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 17.001,
+    "d": 1.28,
+    "text": "Please.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "beacon_mara": {
+  "file": "res://assets/audio/voice/beacon_mara.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "This is Kestrel Station, Aldous Range. This is Doctor Mara Voss. We have lost our satellite link. We have one injured, four missing. Anyone receiving this, please relay to RCMP Terrace. Kestrel Station, out.",
+  "radio": true,
+  "kind": "radio_weak",
+  "duration_s": 19.49,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.91,
+    "text": "This is Kestrel Station, Aldous Range.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.311,
+    "d": 2.2,
+    "text": "This is Doctor Mara Voss.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.561,
+    "d": 5.02,
+    "text": "We have lost our satellite link. We have one injured, four missing.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 10.7,
+    "d": 6.67,
+    "text": "Anyone receiving this, please relay to RCMP Terrace.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 17.416,
+    "d": 2.03,
+    "text": "Kestrel Station, out.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "final_call": {
+  "file": "res://assets/audio/voice/final_call.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Terrace Rescue, Terrace Rescue, this is Kestrel Station, Kestrel Station. Do you read? Terrace Rescue: Kestrel Station, Terrace Rescue. We read you, weak but readable. Go ahead. Terrace Rescue, Kestrel. We have two survivors. One with a fractured leg, stable. The Otter out of Terrace went down in the Aldous valley on the twenty-eighth. The pilot is deceased. Four of the station crew are missing or deceased. We need evacuation from the Kestrel helipad. Terrace Rescue: Copy, Kestrel. Two survivors, one fractured leg. We've got a storm sitting on the range until morning. Terrace Rescue: Rescue One-Six will launch at first light, weather permitting. Can you hold the night? We can hold the night. Kestrel standing by.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 52.19,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 6.61,
+    "text": "Terrace Rescue, Terrace Rescue, this is Kestrel Station, Kestrel Station. Do you read?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 8.481,
+    "d": 6.04,
+    "text": "Kestrel Station, Terrace Rescue. We read you, weak but readable. Go ahead.",
+    "speaker": "Terrace Rescue"
+   },
+   {
+    "t": 14.842,
+    "d": 6.73,
+    "text": "Terrace Rescue, Kestrel. We have two survivors. One with a fractured leg, stable.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 21.627,
+    "d": 6.98,
+    "text": "The Otter out of Terrace went down in the Aldous valley on the twenty-eighth. The pilot is deceased.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 28.66,
+    "d": 6.46,
+    "text": "Four of the station crew are missing or deceased. We need evacuation from the Kestrel helipad.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 35.835,
+    "d": 6.43,
+    "text": "Copy, Kestrel. Two survivors, one fractured leg. We've got a storm sitting on the range until morning.",
+    "speaker": "Terrace Rescue"
+   },
+   {
+    "t": 42.317,
+    "d": 5.26,
+    "text": "Rescue One-Six will launch at first light, weather permitting. Can you hold the night?",
+    "speaker": "Terrace Rescue"
+   },
+   {
+    "t": 48.097,
+    "d": 1.74,
+    "text": "We can hold the night.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 49.956,
+    "d": 2.19,
+    "text": "Kestrel standing by.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "hint_cold": {
+  "file": "res://assets/audio/voice/hint_cold.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "If you're shivering, you're already behind. Out of the wind, get a fire going, get dry. In that order.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 7.48,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 5.42,
+    "text": "If you're shivering, you're already behind. Out of the wind, get a fire going, get dry.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.823,
+    "d": 1.61,
+    "text": "In that order.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "hint_fire": {
+  "file": "res://assets/audio/voice/hint_fire.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Stones in a ring, tinder in the middle, small sticks over it. Birch bark if you can find it. It burns even wet.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 8.71,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.43,
+    "text": "Stones in a ring, tinder in the middle, small sticks over it.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 4.825,
+    "d": 3.84,
+    "text": "Birch bark if you can find it. It burns even wet.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "hint_food": {
+  "file": "res://assets/audio/voice/hint_food.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Owen used to say you can't climb on an empty stomach. There are hares in the willows along the creek. Berries on the south slopes, under the snow.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 9.87,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 3.19,
+    "text": "Owen used to say you can't climb on an empty stomach.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.587,
+    "d": 6.24,
+    "text": "There are hares in the willows along the creek. Berries on the south slopes, under the snow.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "hint_oxygen": {
+  "file": "res://assets/audio/voice/hint_oxygen.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Use the bottle. Two litres a minute while you climb, four if you're struggling. Slow breaths.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 7.16,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 6.76,
+    "text": "Use the bottle. Two litres a minute while you climb, four if you're struggling. Slow breaths.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "hint_scanner": {
+  "file": "res://assets/audio/voice/hint_scanner.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "That survey scanner you brought. Point it at things. It'll tell you what they're made of. Elias loved those stupid things.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 9.32,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 3.45,
+    "text": "That survey scanner you brought. Point it at things.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.848,
+    "d": 5.42,
+    "text": "It'll tell you what they're made of. Elias loved those stupid things.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "hint_shelter": {
+  "file": "res://assets/audio/voice/hint_shelter.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Get out of the wind and you've won half the battle. Even a lean-to against a rock face.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 6.04,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 5.64,
+    "text": "Get out of the wind and you've won half the battle. Even a lean-to against a rock face.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "hint_storm": {
+  "file": "res://assets/audio/voice/hint_storm.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "The barometer's falling. Whatever you're doing, find shelter before it hits. Nobody survives a night out in one of these above the trees.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 8.95,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.61,
+    "text": "The barometer's falling. Whatever you're doing, find shelter before it hits.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.013,
+    "d": 3.88,
+    "text": "Nobody survives a night out in one of these above the trees.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "hint_water": {
+  "file": "res://assets/audio/voice/hint_water.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Don't eat the snow. It costs you more heat than it gives you back. Melt it. Boil it.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 6.89,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.21,
+    "text": "Don't eat the snow. It costs you more heat than it gives you back.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 4.611,
+    "d": 2.23,
+    "text": "Melt it. Boil it.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "hint_wolves": {
+  "file": "res://assets/audio/voice/hint_wolves.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "They're testing you. Keep the fire high and your back to something solid. Wolves don't like a fight they can't win.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 7.69,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.37,
+    "text": "They're testing you. Keep the fire high and your back to something solid.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 4.773,
+    "d": 2.87,
+    "text": "Wolves don't like a fight they can't win.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "log_burke_01": {
+  "file": "res://assets/audio/voice/log_burke_01.ogg",
+  "speaker": "Owen Burke",
+  "speaker_id": "burke",
+  "text": "Burke. Twenty-eighth of September. Depot's in at the Ashford adit. First crosscut on the left, orange paint on the timbers. Four twenty-litre cans of diesel, winter blend, the good stuff. Two ice axes, two pairs of crampons, sixty metres of rope. Stove, fuel, food for four for three days. If the helicopter can't get in and we have to walk out, that's the route. Down the icefall, east to the mine, then the old road to Loon Lake. Grey's been around the mine all month. Big old boar, scar on his shoulder. He's put on a lot of weight. Leave him alone and he'll leave you alone. Burke out.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 38.2,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 2.52,
+    "text": "Burke. Twenty-eighth of September.",
+    "speaker": "Owen Burke"
+   },
+   {
+    "t": 3.367,
+    "d": 5.11,
+    "text": "Depot's in at the Ashford adit. First crosscut on the left, orange paint on the timbers.",
+    "speaker": "Owen Burke"
+   },
+   {
+    "t": 8.525,
+    "d": 11.37,
+    "text": "Four twenty-litre cans of diesel, winter blend, the good stuff. Two ice axes, two pairs of crampons, sixty metres of rope. Stove, fuel, food for four for three days.",
+    "speaker": "Owen Burke"
+   },
+   {
+    "t": 19.94,
+    "d": 7.39,
+    "text": "If the helicopter can't get in and we have to walk out, that's the route. Down the icefall, east to the mine, then the old road to Loon Lake.",
+    "speaker": "Owen Burke"
+   },
+   {
+    "t": 27.377,
+    "d": 5.74,
+    "text": "Grey's been around the mine all month. Big old boar, scar on his shoulder. He's put on a lot of weight.",
+    "speaker": "Owen Burke"
+   },
+   {
+    "t": 33.168,
+    "d": 2.26,
+    "text": "Leave him alone and he'll leave you alone.",
+    "speaker": "Owen Burke"
+   },
+   {
+    "t": 35.481,
+    "d": 1.32,
+    "text": "Burke out.",
+    "speaker": "Owen Burke"
+   }
+  ]
+ },
+ "log_burke_02": {
+  "file": "res://assets/audio/voice/log_burke_02.ogg",
+  "speaker": "Owen Burke",
+  "speaker_id": "burke",
+  "text": "Eleventh. Weather's giving us a gap, maybe two days. I'm going down to the depot for the winter diesel, then on to the ranger cabin to call Terrace on the park radio. The Iridium's been dropping every call since the storm, and I want a real voice at the other end. Tomas, don't touch my rope. Mara, keep the leg up. Back Tuesday. If I'm not, it's because I'm sitting in the ranger cabin eating the ranger's chocolate. Burke out.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 27.46,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 3.54,
+    "text": "Eleventh. Weather's giving us a gap, maybe two days.",
+    "speaker": "Owen Burke"
+   },
+   {
+    "t": 4.388,
+    "d": 5.95,
+    "text": "I'm going down to the depot for the winter diesel, then on to the ranger cabin to call Terrace on the park radio.",
+    "speaker": "Owen Burke"
+   },
+   {
+    "t": 10.385,
+    "d": 4.89,
+    "text": "The Iridium's been dropping every call since the storm, and I want a real voice at the other end.",
+    "speaker": "Owen Burke"
+   },
+   {
+    "t": 15.322,
+    "d": 3.61,
+    "text": "Tomas, don't touch my rope. Mara, keep the leg up.",
+    "speaker": "Owen Burke"
+   },
+   {
+    "t": 18.986,
+    "d": 5.7,
+    "text": "Back Tuesday. If I'm not, it's because I'm sitting in the ranger cabin eating the ranger's chocolate.",
+    "speaker": "Owen Burke"
+   },
+   {
+    "t": 24.739,
+    "d": 1.32,
+    "text": "Burke out.",
+    "speaker": "Owen Burke"
+   }
+  ]
+ },
+ "log_hale_01": {
+  "file": "res://assets/audio/voice/log_hale_01.ogg",
+  "speaker": "Elias Hale",
+  "speaker_id": "hale",
+  "text": "October fifth. End of season notes, Corrigan mass balance project, Kestrel Station. Final stake readings are in. Net balance at the station stakes is minus one point four metres water equivalent. That makes it the fourth worst year in the record. Three of the other four are in the last decade. June has reset the time-lapse cameras on the icefall for the winter. Tomas is nursing the generator. Pickup is on the twentieth, weather permitting, which up here means nothing at all. There's a system coming in on the eighth. A big one. We'll batten down and wait it out, as usual. Note for next season: the guy wires on the summit relay need replacing. They sang all through September. End of notes.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 47.93,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 6.21,
+    "text": "October fifth. End of season notes, Corrigan mass balance project, Kestrel Station.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 7.061,
+    "d": 6.44,
+    "text": "Final stake readings are in. Net balance at the station stakes is minus one point four metres water equivalent.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 13.556,
+    "d": 6.51,
+    "text": "That makes it the fourth worst year in the record. Three of the other four are in the last decade.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 20.115,
+    "d": 7.25,
+    "text": "June has reset the time-lapse cameras on the icefall for the winter. Tomas is nursing the generator.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 27.415,
+    "d": 4.49,
+    "text": "Pickup is on the twentieth, weather permitting, which up here means nothing at all.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 31.958,
+    "d": 5.94,
+    "text": "There's a system coming in on the eighth. A big one. We'll batten down and wait it out, as usual.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 37.945,
+    "d": 7.05,
+    "text": "Note for next season: the guy wires on the summit relay need replacing. They sang all through September.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 45.045,
+    "d": 1.48,
+    "text": "End of notes.",
+    "speaker": "Elias Hale"
+   }
+  ]
+ },
+ "log_hale_02": {
+  "file": "res://assets/audio/voice/log_hale_02.ogg",
+  "speaker": "Elias Hale",
+  "speaker_id": "hale",
+  "text": "Thirteenth. Owen hasn't called in, and the Iridium has given up entirely. June thinks the antenna cable cracked in the cold. The forecast gives us eight hours of calm from mid-morning. I'm going up to the relay. I know that route better than anyone left standing. Tomas is needed here. June is needed here. And Mara has told me several times that I'm a stubborn old fool. She's right. I'm going anyway. Spare antenna, tools, the small battery. Back before dark. If I'm not back before dark, nobody comes after me. That isn't bravery. It's arithmetic.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 41.8,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 8.52,
+    "text": "Thirteenth. Owen hasn't called in, and the Iridium has given up entirely. June thinks the antenna cable cracked in the cold.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 9.37,
+    "d": 6.15,
+    "text": "The forecast gives us eight hours of calm from mid-morning. I'm going up to the relay.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 15.57,
+    "d": 6.48,
+    "text": "I know that route better than anyone left standing. Tomas is needed here. June is needed here.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 22.099,
+    "d": 6.73,
+    "text": "And Mara has told me several times that I'm a stubborn old fool. She's right. I'm going anyway.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 28.877,
+    "d": 4.87,
+    "text": "Spare antenna, tools, the small battery. Back before dark.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 33.8,
+    "d": 3.56,
+    "text": "If I'm not back before dark, nobody comes after me.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 37.476,
+    "d": 2.93,
+    "text": "That isn't bravery. It's arithmetic.",
+    "speaker": "Elias Hale"
+   }
+  ]
+ },
+ "log_hale_03": {
+  "file": "res://assets/audio/voice/log_hale_03.ogg",
+  "speaker": "Elias Hale",
+  "speaker_id": "hale",
+  "text": "Elias Hale. The fourteenth, I think. Early. I'm in the lee of the relay hut. The weather came back an hour after I got here, and I've been sheltering since. It isn't the antenna. Water got into the transceiver housing, probably in the September rain, and froze, and split the board. The spare module is in stores. Bin C-4. And the battery pack up here is finished. Take the lithium pack from the charging rack. The old ones won't hold a charge in this cold. I've written it all down in the book as well. My hands aren't. I'm not doing very well, Mara. I'm very cold, and I'm very tired, and I know what that means. Don't let anyone come up here in weather. Tell my sister I was working. And that it was beautiful, before the cloud came in. It was. You could see all the way to the sea.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 60.48,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 4.8,
+    "text": "Elias Hale. The fourteenth, I think. Early.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 5.647,
+    "d": 6.62,
+    "text": "I'm in the lee of the relay hut. The weather came back an hour after I got here, and I've been sheltering since.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 12.321,
+    "d": 8.88,
+    "text": "It isn't the antenna. Water got into the transceiver housing, probably in the September rain, and froze, and split the board.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 21.247,
+    "d": 4.09,
+    "text": "The spare module is in stores. Bin C-4.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 25.386,
+    "d": 8.29,
+    "text": "And the battery pack up here is finished. Take the lithium pack from the charging rack. The old ones won't hold a charge in this cold.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 33.723,
+    "d": 3.02,
+    "text": "I've written it all down in the book as well.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 37.468,
+    "d": 1.82,
+    "text": "My hands aren't.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 39.608,
+    "d": 2.33,
+    "text": "I'm not doing very well, Mara.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 41.989,
+    "d": 4.02,
+    "text": "I'm very cold, and I'm very tired, and I know what that means.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 46.06,
+    "d": 2.66,
+    "text": "Don't let anyone come up here in weather.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 49.236,
+    "d": 5.76,
+    "text": "Tell my sister I was working. And that it was beautiful, before the cloud came in.",
+    "speaker": "Elias Hale"
+   },
+   {
+    "t": 55.319,
+    "d": 3.76,
+    "text": "It was. You could see all the way to the sea.",
+    "speaker": "Elias Hale"
+   }
+  ]
+ },
+ "log_park_01": {
+  "file": "res://assets/audio/voice/log_park_01.ogg",
+  "speaker": "June Park",
+  "speaker_id": "park",
+  "text": "June Park. October ninth, oh six hundred. We lost the relay at oh four twelve. Not a fade. A hard drop. The carrier was gone in one scan. I've power cycled the base unit twice. The station side is fine. The fault is up at the summit. Elias thinks the antenna iced up. I don't think it's the antenna. Icing would degrade the signal first. We'd have seen it coming. We had eighteen dB of margin at four o'clock. This looks like the transceiver died. Which means somebody has to go up there. Not today. Gusts are over a hundred and ten at the col. For the record, the Iridium is on charge, and it works. So we're not cut off. We're just quieter.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 43.16,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 3.47,
+    "text": "June Park. October ninth, oh six hundred.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 4.323,
+    "d": 6.55,
+    "text": "We lost the relay at oh four twelve. Not a fade. A hard drop. The carrier was gone in one scan.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 10.925,
+    "d": 5.85,
+    "text": "I've power cycled the base unit twice. The station side is fine. The fault is up at the summit.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 16.828,
+    "d": 9.73,
+    "text": "Elias thinks the antenna iced up. I don't think it's the antenna. Icing would degrade the signal first. We'd have seen it coming. We had eighteen dB of margin at four o'clock.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 26.609,
+    "d": 4.34,
+    "text": "This looks like the transceiver died. Which means somebody has to go up there.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 30.996,
+    "d": 3.54,
+    "text": "Not today. Gusts are over a hundred and ten at the col.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 34.586,
+    "d": 5.51,
+    "text": "For the record, the Iridium is on charge, and it works. So we're not cut off.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 40.211,
+    "d": 1.55,
+    "text": "We're just quieter.",
+    "speaker": "June Park"
+   }
+  ]
+ },
+ "log_park_02": {
+  "file": "res://assets/audio/voice/log_park_02.ogg",
+  "speaker": "June Park",
+  "speaker_id": "park",
+  "text": "October seventeenth. We're in an ice cave off the east side of the icefall, about halfway down. Tomas went into a crevasse this afternoon. The bridge just went. I held him. The rope held. It took me two hours to get him out, and his left leg is broken below the knee. Badly. I've splinted it with an ice axe and a foam pad. The Iridium was in his chest pocket. It's at the bottom of that crevasse now. He keeps apologising for that. I keep telling him it doesn't matter. It's very blue in here. Mara would love it.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 34.44,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 5.84,
+    "text": "October seventeenth. We're in an ice cave off the east side of the icefall, about halfway down.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 6.689,
+    "d": 3.77,
+    "text": "Tomas went into a crevasse this afternoon. The bridge just went.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 10.511,
+    "d": 7.38,
+    "text": "I held him. The rope held. It took me two hours to get him out, and his left leg is broken below the knee. Badly.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 17.942,
+    "d": 2.75,
+    "text": "I've splinted it with an ice axe and a foam pad.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 20.738,
+    "d": 4.2,
+    "text": "The Iridium was in his chest pocket. It's at the bottom of that crevasse now.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 24.992,
+    "d": 4.31,
+    "text": "He keeps apologising for that. I keep telling him it doesn't matter.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 29.819,
+    "d": 3.22,
+    "text": "It's very blue in here. Mara would love it.",
+    "speaker": "June Park"
+   }
+  ]
+ },
+ "log_park_03": {
+  "file": "res://assets/audio/voice/log_park_03.ogg",
+  "speaker": "June Park",
+  "speaker_id": "park",
+  "text": "Nineteenth. Tomas died last night. I think it was bleeding. Inside, where I couldn't. I don't know. He was telling me about his daughter's football team, and then he just wasn't. I've covered him with the tarp. I'm going to try the east moraine at first light. It's longer, but there's no ice on it. If someone finds this before they find me, I went east. Tell Mara the line she drew was right. It was the bridge. Nobody could have seen that bridge.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 31.68,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 1.41,
+    "text": "Nineteenth.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 2.734,
+    "d": 2.09,
+    "text": "Tomas died last night.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 4.878,
+    "d": 3.71,
+    "text": "I think it was bleeding. Inside, where I couldn't.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 8.912,
+    "d": 1.13,
+    "text": "I don't know.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 10.095,
+    "d": 3.79,
+    "text": "He was telling me about his daughter's football team, and then he just wasn't.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 13.939,
+    "d": 1.75,
+    "text": "I've covered him with the tarp.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 15.741,
+    "d": 4.93,
+    "text": "I'm going to try the east moraine at first light. It's longer, but there's no ice on it.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 20.719,
+    "d": 3.46,
+    "text": "If someone finds this before they find me, I went east.",
+    "speaker": "June Park"
+   },
+   {
+    "t": 24.498,
+    "d": 5.79,
+    "text": "Tell Mara the line she drew was right. It was the bridge. Nobody could have seen that bridge.",
+    "speaker": "June Park"
+   }
+  ]
+ },
+ "log_reyes_01": {
+  "file": "res://assets/audio/voice/log_reyes_01.ogg",
+  "speaker": "Tomas Reyes",
+  "speaker_id": "reyes",
+  "text": "Tomas. Eighth of October. Generator log, because June says if I don't record it, I didn't do it. Day tank's at sixty percent. We're down to the last four drums in the shed, and they're summer diesel, which at minus twenty turns into lard. I've got the block heater on and heat tape on the fuel line and I'm praying to the patron saint of Kubota. Wind's picking up from the west. There's rime on the anemometer already. You can hear the mast humming. If the power goes tonight, Owen, the headlamps are in the red bin by the door. Not the blue one. The blue one is Christmas lights. Don't ask.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 35.11,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 6.11,
+    "text": "Tomas. Eighth of October. Generator log, because June says if I don't record it, I didn't do it.",
+    "speaker": "Tomas Reyes"
+   },
+   {
+    "t": 6.959,
+    "d": 7.26,
+    "text": "Day tank's at sixty percent. We're down to the last four drums in the shed, and they're summer diesel, which at minus twenty turns into lard.",
+    "speaker": "Tomas Reyes"
+   },
+   {
+    "t": 14.268,
+    "d": 5.02,
+    "text": "I've got the block heater on and heat tape on the fuel line and I'm praying to the patron saint of Kubota.",
+    "speaker": "Tomas Reyes"
+   },
+   {
+    "t": 19.337,
+    "d": 5.7,
+    "text": "Wind's picking up from the west. There's rime on the anemometer already. You can hear the mast humming.",
+    "speaker": "Tomas Reyes"
+   },
+   {
+    "t": 25.083,
+    "d": 5.36,
+    "text": "If the power goes tonight, Owen, the headlamps are in the red bin by the door. Not the blue one.",
+    "speaker": "Tomas Reyes"
+   },
+   {
+    "t": 30.488,
+    "d": 3.23,
+    "text": "The blue one is Christmas lights. Don't ask.",
+    "speaker": "Tomas Reyes"
+   }
+  ]
+ },
+ "log_reyes_02": {
+  "file": "res://assets/audio/voice/log_reyes_02.ogg",
+  "speaker": "Tomas Reyes",
+  "speaker_id": "reyes",
+  "text": "Sixteenth, oh five thirty. Last generator note before we go. Day tank's at twenty percent. I've left it on low with the lab heaters off. Mara, you've got maybe six days if you keep the thermostat at twelve. Don't argue with me. I did the maths twice. The propane heater's by your bunk with three bottles. We're taking the Iridium, the good rope, and June's snacks, which is the real reason she's coming. We'll call from the cabin. Probably tomorrow night. Keep your handheld on channel six.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 32.05,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 4.51,
+    "text": "Sixteenth, oh five thirty. Last generator note before we go.",
+    "speaker": "Tomas Reyes"
+   },
+   {
+    "t": 5.357,
+    "d": 4.03,
+    "text": "Day tank's at twenty percent. I've left it on low with the lab heaters off.",
+    "speaker": "Tomas Reyes"
+   },
+   {
+    "t": 9.441,
+    "d": 7.51,
+    "text": "Mara, you've got maybe six days if you keep the thermostat at twelve. Don't argue with me. I did the maths twice.",
+    "speaker": "Tomas Reyes"
+   },
+   {
+    "t": 17.004,
+    "d": 2.83,
+    "text": "The propane heater's by your bunk with three bottles.",
+    "speaker": "Tomas Reyes"
+   },
+   {
+    "t": 19.883,
+    "d": 5.06,
+    "text": "We're taking the Iridium, the good rope, and June's snacks, which is the real reason she's coming.",
+    "speaker": "Tomas Reyes"
+   },
+   {
+    "t": 24.989,
+    "d": 5.66,
+    "text": "We'll call from the cabin. Probably tomorrow night. Keep your handheld on channel six.",
+    "speaker": "Tomas Reyes"
+   }
+  ]
+ },
+ "log_voss_01": {
+  "file": "res://assets/audio/voice/log_voss_01.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Mara Voss. October tenth. I'm recording this because I can't write. My hands won't stop shaking. I went out at dawn to clear the rime off the pad lights and I missed the second step. Verglas. I heard it go. Owen says it's the fibula, maybe the ankle as well. He set it, and I'm told I said some things. It's splinted. I'm on the good painkillers, which is why this sounds so calm. So I'm not going anywhere. Elias looked at me like I'd done it on purpose. Which is fair. I'm the one who always tells everyone to be careful on those stairs.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 41.06,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 2.93,
+    "text": "Mara Voss. October tenth.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.776,
+    "d": 4.83,
+    "text": "I'm recording this because I can't write. My hands won't stop shaking.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 8.652,
+    "d": 6.95,
+    "text": "I went out at dawn to clear the rime off the pad lights and I missed the second step. Verglas. I heard it go.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 15.65,
+    "d": 6.99,
+    "text": "Owen says it's the fibula, maybe the ankle as well. He set it, and I'm told I said some things.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 22.69,
+    "d": 5.12,
+    "text": "It's splinted. I'm on the good painkillers, which is why this sounds so calm.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 27.861,
+    "d": 2.34,
+    "text": "So I'm not going anywhere.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 30.321,
+    "d": 9.34,
+    "text": "Elias looked at me like I'd done it on purpose. Which is fair. I'm the one who always tells everyone to be careful on those stairs.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "log_voss_02": {
+  "file": "res://assets/audio/voice/log_voss_02.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Fifteenth. Elias didn't come back. The cloud came down on the summit at noon yesterday and it hasn't lifted. Owen is two days overdue. Tomas and June want to go down the icefall and walk out to the ranger cabin radio. I'd have said no. I can't say no. I can't even stand up. They'll take the Iridium and try it again from lower down. I've shown June my velocity maps. The safe line through the icefall has moved forty metres east since August. I drew it on her map. I drew it twice.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 37.12,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 3.03,
+    "text": "Fifteenth. Elias didn't come back.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.879,
+    "d": 6.37,
+    "text": "The cloud came down on the summit at noon yesterday and it hasn't lifted. Owen is two days overdue.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 10.303,
+    "d": 5.68,
+    "text": "Tomas and June want to go down the icefall and walk out to the ranger cabin radio.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 16.033,
+    "d": 4.46,
+    "text": "I'd have said no. I can't say no. I can't even stand up.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 20.543,
+    "d": 3.58,
+    "text": "They'll take the Iridium and try it again from lower down.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 24.169,
+    "d": 7.46,
+    "text": "I've shown June my velocity maps. The safe line through the icefall has moved forty metres east since August.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 31.681,
+    "d": 1.94,
+    "text": "I drew it on her map.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 33.94,
+    "d": 1.78,
+    "text": "I drew it twice.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "log_voss_03": {
+  "file": "res://assets/audio/voice/log_voss_03.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Twenty-second. The generator ran dry at four this morning. I heard it stop. I've moved everything into the east module. Sleeping bag, food, the propane heater, the radio. I've recorded a message into the weather broadcast. June showed me how in August, as a joke. It goes out every ten minutes on the aviation frequency. Nobody flies over in October. I know that. I keep the handheld on channel six anyway, in case Tomas and June made the cabin. It's been six days. The cabin's six hours.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 36.85,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 5.33,
+    "text": "Twenty-second. The generator ran dry at four this morning. I heard it stop.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 6.176,
+    "d": 6.34,
+    "text": "I've moved everything into the east module. Sleeping bag, food, the propane heater, the radio.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 12.569,
+    "d": 5.98,
+    "text": "I've recorded a message into the weather broadcast. June showed me how in August, as a joke.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 18.602,
+    "d": 6.98,
+    "text": "It goes out every ten minutes on the aviation frequency. Nobody flies over in October. I know that.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 25.634,
+    "d": 5.49,
+    "text": "I keep the handheld on channel six anyway, in case Tomas and June made the cabin.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 31.169,
+    "d": 1.79,
+    "text": "It's been six days.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 33.284,
+    "d": 2.17,
+    "text": "The cabin's six hours.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "log_voss_04": {
+  "file": "res://assets/audio/voice/log_voss_04.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Twenty-seventh. The storm broke this afternoon, the first time in a week. I sat at the window and watched the icefall for two hours, which is what I'm paid to do. So. Not a wasted day. I'm on the last propane bottle. I've been talking to the radio at night like it's a person. I think I'll keep doing that. If a plane comes, I'll hear it. You can hear everything up here, when the wind stops.",
+  "radio": false,
+  "kind": "dictaphone",
+  "duration_s": 31.91,
+  "segments": [
+   {
+    "t": 0.8,
+    "d": 5.32,
+    "text": "Twenty-seventh. The storm broke this afternoon, the first time in a week.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 6.174,
+    "d": 10.02,
+    "text": "I sat at the window and watched the icefall for two hours, which is what I'm paid to do. So. Not a wasted day.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 16.245,
+    "d": 2.6,
+    "text": "I'm on the last propane bottle.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 18.898,
+    "d": 5.28,
+    "text": "I've been talking to the radio at night like it's a person. I think I'll keep doing that.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 24.232,
+    "d": 6.27,
+    "text": "If a plane comes, I'll hear it. You can hear everything up here, when the wind stops.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_about_elias": {
+  "file": "res://assets/audio/voice/mara_about_elias.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Elias was my supervisor my first season here. Twenty-three summers on this glacier. He went up because he didn't want anyone else to. That's the kind of stupid I'd like to be, one day. Just not yet.",
+  "radio": false,
+  "kind": "in_person",
+  "duration_s": 16.37,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 5.88,
+    "text": "Elias was my supervisor my first season here. Twenty-three summers on this glacier.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 6.278,
+    "d": 3.01,
+    "text": "He went up because he didn't want anyone else to.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 9.807,
+    "d": 5.14,
+    "text": "That's the kind of stupid I'd like to be, one day. Just not yet.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_altitude": {
+  "file": "res://assets/audio/voice/mara_altitude.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "You're getting high now. Above twenty-eight hundred the air thins out fast. If you feel slow and stupid, that's not you, that's hypoxia. Rest, and breathe.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 11.57,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 5.17,
+    "text": "You're getting high now. Above twenty-eight hundred the air thins out fast.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.57,
+    "d": 5.95,
+    "text": "If you feel slow and stupid, that's not you, that's hypoxia. Rest, and breathe.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_bear_warning": {
+  "file": "res://assets/audio/voice/mara_bear_warning.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "If you see him, don't run. Make yourself big, talk to him, back away slowly. If he comes anyway, the flare gun. Right at his feet.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 9.26,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.94,
+    "text": "If you see him, don't run. Make yourself big, talk to him, back away slowly.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.338,
+    "d": 3.87,
+    "text": "If he comes anyway, the flare gun. Right at his feet.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_come_home": {
+  "file": "res://assets/audio/voice/mara_come_home.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Come down now. Come home. Carefully.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 4.4,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.72,
+    "text": "Come down now. Come home.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.191,
+    "d": 1.16,
+    "text": "Carefully.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_contact_1": {
+  "file": "res://assets/audio/voice/mara_contact_1.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Kestrel Station to anyone on channel six. Kestrel to anyone. [keys the radio] Someone's there. I heard you key up. If you can hear me, key twice. [keys the radio twice] Okay. Okay. Hi. My name's Mara Voss. I'm at Kestrel Station, on the col under Corrigan. You were on the plane. I heard it go over, and then I heard it stop. We'll do this the easy way. Key once for yes, twice for no. Is the pilot with you? [keys the radio twice] I'm sorry. Are you hurt? [keys the radio twice] Good. That's good.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 45.79,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.54,
+    "text": "Kestrel Station to anyone on channel six. Kestrel to anyone.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 4.94,
+    "d": 1.52,
+    "speaker": "Sam",
+    "text": "[keys the radio]"
+   },
+   {
+    "t": 6.51,
+    "d": 2.74,
+    "text": "Someone's there. I heard you key up.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 9.298,
+    "d": 2.46,
+    "text": "If you can hear me, key twice.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 11.803,
+    "d": 1.6,
+    "speaker": "Sam",
+    "text": "[keys the radio twice]"
+   },
+   {
+    "t": 13.973,
+    "d": 1.49,
+    "text": "Okay.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 15.582,
+    "d": 2.15,
+    "text": "Okay. Hi.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 17.89,
+    "d": 5.6,
+    "text": "My name's Mara Voss. I'm at Kestrel Station, on the col under Corrigan.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 23.536,
+    "d": 4.82,
+    "text": "You were on the plane. I heard it go over, and then I heard it stop.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 28.875,
+    "d": 4.11,
+    "text": "We'll do this the easy way. Key once for yes, twice for no.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 33.032,
+    "d": 2.01,
+    "text": "Is the pilot with you?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 35.095,
+    "d": 1.6,
+    "speaker": "Sam",
+    "text": "[keys the radio twice]"
+   },
+   {
+    "t": 38.065,
+    "d": 1.63,
+    "text": "I'm sorry.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 40.416,
+    "d": 1.41,
+    "text": "Are you hurt?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 41.88,
+    "d": 1.52,
+    "speaker": "Sam",
+    "text": "[keys the radio twice]"
+   },
+   {
+    "t": 43.45,
+    "d": 2.29,
+    "text": "Good. That's good.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_contact_2": {
+  "file": "res://assets/audio/voice/mara_contact_2.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Okay. Here's where we are. There were five of us up here. Elias, our team lead, went up to the summit relay fifteen days ago and didn't come back. Tomas and June tried to walk out through the icefall. They should have reached that cabin in a day. Owen went down for his fuel cache. I'm the only one left up here. I fell on the helipad stairs two days into the storm. My leg's broken. It's splinted, but I can't walk down. The generator ran dry six days ago. I've got a propane heater and one bottle left. So I'm not going anywhere, and nobody's flying in this.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 39.41,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.69,
+    "text": "Okay. Here's where we are.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.09,
+    "d": 1.93,
+    "text": "There were five of us up here.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.072,
+    "d": 5.74,
+    "text": "Elias, our team lead, went up to the summit relay fifteen days ago and didn't come back.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 10.863,
+    "d": 5.85,
+    "text": "Tomas and June tried to walk out through the icefall. They should have reached that cabin in a day.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 16.761,
+    "d": 2.73,
+    "text": "Owen went down for his fuel cache.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 19.816,
+    "d": 2.2,
+    "text": "I'm the only one left up here.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 22.192,
+    "d": 7.9,
+    "text": "I fell on the helipad stairs two days into the storm. My leg's broken. It's splinted, but I can't walk down.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 30.14,
+    "d": 5.64,
+    "text": "The generator ran dry six days ago. I've got a propane heater and one bottle left.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 35.829,
+    "d": 3.53,
+    "text": "So I'm not going anywhere, and nobody's flying in this.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_contact_3": {
+  "file": "res://assets/audio/voice/mara_contact_3.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Can I ask you something? They said on the last call they were sending a technician for the relay. Is that you? [keys the radio] Of course it is. Okay. That's actually— okay. The only way up here is over the Corrigan Icefall, and you can't climb that without crampons and an axe. Owen kept a depot at the old Ashford Mine, on the east flank. Ice axe, crampons, rope, and fuel for the generator. If you can get to the mine, you can get up here. Follow the lake shore east to the creek, then the old mine road up the north bank. You'll see the headframe. Take the bow from the cabin. There are bears on that side. Keep the radio on. I'll be listening.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 44.88,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 1.55,
+    "text": "Can I ask you something?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 1.954,
+    "d": 3.85,
+    "text": "They said on the last call they were sending a technician for the relay.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.855,
+    "d": 1.28,
+    "text": "Is that you?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 7.189,
+    "d": 1.6,
+    "speaker": "Sam",
+    "text": "[keys the radio]"
+   },
+   {
+    "t": 9.059,
+    "d": 1.7,
+    "text": "Of course it is.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 10.811,
+    "d": 3.18,
+    "text": "Okay. That's actually— okay.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 14.124,
+    "d": 6.68,
+    "text": "The only way up here is over the Corrigan Icefall, and you can't climb that without crampons and an axe.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 20.853,
+    "d": 7.73,
+    "text": "Owen kept a depot at the old Ashford Mine, on the east flank. Ice axe, crampons, rope, and fuel for the generator.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 28.634,
+    "d": 2.68,
+    "text": "If you can get to the mine, you can get up here.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 31.362,
+    "d": 6.55,
+    "text": "Follow the lake shore east to the creek, then the old mine road up the north bank. You'll see the headframe.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 37.957,
+    "d": 3.96,
+    "text": "Take the bow from the cabin. There are bears on that side.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 41.964,
+    "d": 2.87,
+    "text": "Keep the radio on. I'll be listening.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_depot_found": {
+  "file": "res://assets/audio/voice/mara_depot_found.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "You've got the gear? The crampons and the axe? [keys the radio] And the diesel. Owen, you beautiful man. Right. Treeline next. Dress for it before you get there, not after.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 14.76,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 3.57,
+    "text": "You've got the gear? The crampons and the axe?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.966,
+    "d": 1.42,
+    "speaker": "Sam",
+    "text": "[keys the radio]"
+   },
+   {
+    "t": 5.436,
+    "d": 3.58,
+    "text": "And the diesel. Owen, you beautiful man.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 9.341,
+    "d": 5.37,
+    "text": "Right. Treeline next. Dress for it before you get there, not after.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_ending": {
+  "file": "res://assets/audio/voice/mara_ending.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "You came up a mountain to fix a radio. Thank you, Sam.",
+  "radio": false,
+  "kind": "in_person",
+  "duration_s": 7.1,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.88,
+    "text": "You came up a mountain to fix a radio.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.947,
+    "d": 1.73,
+    "text": "Thank you, Sam.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_first_night_end": {
+  "file": "res://assets/audio/voice/mara_first_night_end.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Morning. You made it through the night. So did I. That's two of us.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 5.89,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.75,
+    "text": "Morning. You made it through the night.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.147,
+    "d": 2.7,
+    "text": "So did I. That's two of us.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_generator": {
+  "file": "res://assets/audio/voice/mara_generator.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "The generator shed's across the helipad. The diesel goes in the day tank. Then bleed the injector pump. The bleed screw's on top, you'll see it. Then the starter. It'll crank for a while. It's cold, and it's sulking.",
+  "radio": false,
+  "kind": "in_person",
+  "duration_s": 17.61,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 3.16,
+    "text": "The generator shed's across the helipad.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.558,
+    "d": 6.74,
+    "text": "The diesel goes in the day tank. Then bleed the injector pump. The bleed screw's on top, you'll see it.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 10.344,
+    "d": 5.84,
+    "text": "Then the starter. It'll crank for a while. It's cold, and it's sulking.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_generator_on": {
+  "file": "res://assets/audio/voice/mara_generator_on.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Oh. Listen to that. Lights. Heat. The oxygen concentrator's in the lab module. It'll fill the bottles. You'll need them on the summit.",
+  "radio": false,
+  "kind": "in_person",
+  "duration_s": 13.98,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 1.14,
+    "text": "Oh.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 1.814,
+    "d": 1.57,
+    "text": "Listen to that.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.902,
+    "d": 1.81,
+    "text": "Lights. Heat.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.759,
+    "d": 6.8,
+    "text": "The oxygen concentrator's in the lab module. It'll fill the bottles. You'll need them on the summit.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_glacier": {
+  "file": "res://assets/audio/voice/mara_glacier.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Stay on the moraine as long as you can. On the glacier, watch for sags in the snow. Those are bridges over crevasses, and they don't look like anything until they go.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 11.47,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.81,
+    "text": "Stay on the moraine as long as you can.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 3.207,
+    "d": 8.22,
+    "text": "On the glacier, watch for sags in the snow. Those are bridges over crevasses, and they don't look like anything until they go.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_hale_found": {
+  "file": "res://assets/audio/voice/mara_hale_found.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Is he there? [keys the radio] Okay. He always kept a notebook in his chest pocket. Would you bring it down? Thank you.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 15.85,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 1.75,
+    "text": "Is he there?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 2.153,
+    "d": 1.6,
+    "speaker": "Sam",
+    "text": "[keys the radio]"
+   },
+   {
+    "t": 6.323,
+    "d": 1.44,
+    "text": "Okay.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 8.78,
+    "d": 5.22,
+    "text": "He always kept a notebook in his chest pocket. Would you bring it down?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 14.523,
+    "d": 1.28,
+    "text": "Thank you.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_ice_cave": {
+  "file": "res://assets/audio/voice/mara_ice_cave.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "You're at the ice cave. That's where June and Tomas would have sheltered. Is anyone. Is anyone there? [keys the radio twice] Okay. If there are recordings, bring them. Their families should hear them.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 17.32,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.21,
+    "text": "You're at the ice cave. That's where June and Tomas would have sheltered.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 4.605,
+    "d": 1.39,
+    "text": "Is anyone.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 6.11,
+    "d": 1.56,
+    "text": "Is anyone there?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 7.72,
+    "d": 1.6,
+    "speaker": "Sam",
+    "text": "[keys the radio twice]"
+   },
+   {
+    "t": 11.19,
+    "d": 1.34,
+    "text": "Okay.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 13.049,
+    "d": 4.22,
+    "text": "If there are recordings, bring them. Their families should hear them.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_icefall": {
+  "file": "res://assets/audio/voice/mara_icefall.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "That's the icefall. It moves a metre and a half a day in summer. Less now, but it's still moving. Go early, go fast, and don't stop under the séracs. I've spent four summers measuring that ice. I never wanted anyone to have to climb it.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 17.68,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 1.63,
+    "text": "That's the icefall.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 2.031,
+    "d": 5.23,
+    "text": "It moves a metre and a half a day in summer. Less now, but it's still moving.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 7.308,
+    "d": 4.06,
+    "text": "Go early, go fast, and don't stop under the séracs.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 11.688,
+    "d": 5.94,
+    "text": "I've spent four summers measuring that ice. I never wanted anyone to have to climb it.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_last_night": {
+  "file": "res://assets/audio/voice/mara_last_night.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "They'll look for June. When it clears, they'll fly the east moraine. I keep telling myself she went east. Get some sleep. I'll watch the heater.",
+  "radio": false,
+  "kind": "in_person",
+  "duration_s": 14.02,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.7,
+    "text": "They'll look for June. When it clears, they'll fly the east moraine.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.095,
+    "d": 3.28,
+    "text": "I keep telling myself she went east.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 9.394,
+    "d": 3.21,
+    "text": "Get some sleep. I'll watch the heater.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_mine_arrive": {
+  "file": "res://assets/audio/voice/mara_mine_arrive.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Can you see the headframe? The adit's behind the bunkhouse. Owen's depot is in the first crosscut on the left. He painted the timbers orange so nobody could miss it.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 11.33,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.02,
+    "text": "Can you see the headframe?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 2.415,
+    "d": 2.05,
+    "text": "The adit's behind the bunkhouse.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 4.511,
+    "d": 6.77,
+    "text": "Owen's depot is in the first crosscut on the left. He painted the timbers orange so nobody could miss it.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_mine_inside": {
+  "file": "res://assets/audio/voice/mara_mine_inside.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "It's colder in there than it looks, and those timbers are ninety years old. Don't touch anything that's holding something up.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 7.75,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.33,
+    "text": "It's colder in there than it looks, and those timbers are ninety years old.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 4.734,
+    "d": 2.97,
+    "text": "Don't touch anything that's holding something up.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_night": {
+  "file": "res://assets/audio/voice/mara_night.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "It's getting dark down there. Don't travel at night if you can help it. Get a fire going and eat something. The wolves come down to the lake after dark.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 10.01,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.62,
+    "text": "It's getting dark down there. Don't travel at night if you can help it.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.018,
+    "d": 4.94,
+    "text": "Get a fire going and eat something. The wolves come down to the lake after dark.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_owen_found": {
+  "file": "res://assets/audio/voice/mara_owen_found.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Is it Owen? [keys the radio] Oh, Owen. He knew that bear. We all did. Old Grey. He'd walk right past the mine in September, fat as a barrel, and Owen would just wave at him. Take the gear. Please. And then get out of there.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 24.93,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 1.49,
+    "text": "Is it Owen?",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 1.888,
+    "d": 1.6,
+    "speaker": "Sam",
+    "text": "[keys the radio]"
+   },
+   {
+    "t": 5.558,
+    "d": 1.87,
+    "text": "Oh, Owen.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 8.947,
+    "d": 4.02,
+    "text": "He knew that bear. We all did. Old Grey.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 13.015,
+    "d": 6.85,
+    "text": "He'd walk right past the mine in September, fat as a barrel, and Owen would just wave at him.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 20.588,
+    "d": 2.43,
+    "text": "Take the gear. Please.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 23.064,
+    "d": 1.81,
+    "text": "And then get out of there.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_relay_explain": {
+  "file": "res://assets/audio/voice/mara_relay_explain.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Elias thought it was ice on the antenna. It wasn't. June said so the morning it went down. The link didn't fade. It just stopped. You'll need the spare transceiver module from stores, bin C-4, and a battery pack. The lithium one on the charging rack. The old ones won't hold a charge at minus thirty.",
+  "radio": false,
+  "kind": "in_person",
+  "duration_s": 23.2,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.23,
+    "text": "Elias thought it was ice on the antenna. It wasn't.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 4.629,
+    "d": 5.49,
+    "text": "June said so the morning it went down. The link didn't fade. It just stopped.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 10.172,
+    "d": 5.67,
+    "text": "You'll need the spare transceiver module from stores, bin C-4, and a battery pack.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 15.894,
+    "d": 5.89,
+    "text": "The lithium one on the charging rack. The old ones won't hold a charge at minus thirty.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_relay_guide": {
+  "file": "res://assets/audio/voice/mara_relay_guide.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Two thumbscrews on the old module, then the ribbon cable. Gently. New module in until the latch clicks. Battery pack in the tray, red to red. Power switch on the side. Then wait for the green light. It takes a minute to find the satellite.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 16.83,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.78,
+    "text": "Two thumbscrews on the old module, then the ribbon cable. Gently.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.18,
+    "d": 5.12,
+    "text": "New module in until the latch clicks. Battery pack in the tray, red to red.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 10.35,
+    "d": 6.43,
+    "text": "Power switch on the side. Then wait for the green light. It takes a minute to find the satellite.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_relay_online": {
+  "file": "res://assets/audio/voice/mara_relay_online.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "I've got carrier. I've got a link. Stand by.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 5.55,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 1.69,
+    "text": "I've got carrier.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 2.159,
+    "d": 1.57,
+    "text": "I've got a link.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 4.252,
+    "d": 1.25,
+    "text": "Stand by.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_station_approach": {
+  "file": "res://assets/audio/voice/mara_station_approach.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "I can see you. I can actually see you. East module, the door with the red handle. It sticks. Put your shoulder into it.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 10.13,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 1.6,
+    "text": "I can see you.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 2.273,
+    "d": 1.76,
+    "text": "I can actually see you.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 4.082,
+    "d": 6.0,
+    "text": "East module, the door with the red handle. It sticks. Put your shoulder into it.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_station_meet": {
+  "file": "res://assets/audio/voice/mara_station_meet.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Hi. Sorry. You're real. I've been talking to a radio for two weeks. Come in, shut the door. The heat's the only thing I've got left.",
+  "radio": false,
+  "kind": "in_person",
+  "duration_s": 12.62,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 1.05,
+    "text": "Hi.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 1.925,
+    "d": 4.8,
+    "text": "Sorry. You're real. I've been talking to a radio for two weeks.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 6.779,
+    "d": 4.42,
+    "text": "Come in, shut the door. The heat's the only thing I've got left.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_summit_depart": {
+  "file": "res://assets/audio/voice/mara_summit_depart.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "Take two bottles. The route follows the east ridge to the relay hut. Rope in on the cornice. If the weather turns, come back. I mean it. I can't lose anyone else.",
+  "radio": false,
+  "kind": "in_person",
+  "duration_s": 14.14,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 6.52,
+    "text": "Take two bottles. The route follows the east ridge to the relay hut. Rope in on the cornice.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 6.92,
+    "d": 2.41,
+    "text": "If the weather turns, come back.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 9.65,
+    "d": 3.07,
+    "text": "I mean it. I can't lose anyone else.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_summit_storm": {
+  "file": "res://assets/audio/voice/mara_summit_storm.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "The barometer's dropping like a stone. You've got maybe two hours before it hits. Keep going.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 7.07,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 5.31,
+    "text": "The barometer's dropping like a stone. You've got maybe two hours before it hits.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 5.708,
+    "d": 1.31,
+    "text": "Keep going.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "mara_treeline": {
+  "file": "res://assets/audio/voice/mara_treeline.ogg",
+  "speaker": "Mara Voss",
+  "speaker_id": "mara",
+  "text": "You're above the trees now. No more firewood from here. The wind will find every gap in what you're wearing. If you made the hide coat, wear it.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 9.3,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 3.65,
+    "text": "You're above the trees now. No more firewood from here.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 4.05,
+    "d": 5.2,
+    "text": "The wind will find every gap in what you're wearing. If you made the hide coat, wear it.",
+    "speaker": "Mara Voss"
+   }
+  ]
+ },
+ "pro_01": {
+  "file": "res://assets/audio/voice/pro_01.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Sam, you still with me back there? That's the Aldous coming up on the right. Forty minutes to the glacier, if this holds.",
+  "radio": false,
+  "kind": "cockpit",
+  "duration_s": 8.32,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.84,
+    "text": "Sam, you still with me back there? That's the Aldous coming up on the right.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 5.244,
+    "d": 3.03,
+    "text": "Forty minutes to the glacier, if this holds.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_02": {
+  "file": "res://assets/audio/voice/pro_02.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Terrace Dispatch, Otter Kilo Tango Lima, position report.",
+  "radio": false,
+  "kind": "radio_tx",
+  "duration_s": 4.75,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.35,
+    "text": "Terrace Dispatch, Otter Kilo Tango Lima, position report.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_03": {
+  "file": "res://assets/audio/voice/pro_03.ogg",
+  "speaker": "Terrace Dispatch",
+  "speaker_id": "dispatch",
+  "text": "Kilo Tango Lima, Terrace Dispatch. Go ahead, Dale.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 4.52,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.12,
+    "text": "Kilo Tango Lima, Terrace Dispatch. Go ahead, Dale.",
+    "speaker": "Terrace Dispatch"
+   }
+  ]
+ },
+ "pro_04": {
+  "file": "res://assets/audio/voice/pro_04.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Over the Nass headwaters at six thousand five hundred, estimating the Corrigan névé at seventeen-oh-five. Ceilings are coming down faster than the forecast said. Light snow.",
+  "radio": false,
+  "kind": "radio_tx",
+  "duration_s": 12.33,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 7.32,
+    "text": "Over the Nass headwaters at six thousand five hundred, estimating the Corrigan névé at seventeen-oh-five.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 7.717,
+    "d": 4.57,
+    "text": "Ceilings are coming down faster than the forecast said. Light snow.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_05": {
+  "file": "res://assets/audio/voice/pro_05.ogg",
+  "speaker": "Terrace Dispatch",
+  "speaker_id": "dispatch",
+  "text": "Copy that. Kestrel's weather station has the col at minus fourteen, wind two-seven-zero at thirty-five, gusting fifty. That was twenty minutes ago.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 9.73,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 7.3,
+    "text": "Copy that. Kestrel's weather station has the col at minus fourteen, wind two-seven-zero at thirty-five, gusting fifty.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 7.703,
+    "d": 1.98,
+    "text": "That was twenty minutes ago.",
+    "speaker": "Terrace Dispatch"
+   }
+  ]
+ },
+ "pro_06": {
+  "file": "res://assets/audio/voice/pro_06.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "So their weather station's still transmitting. They've got power, anyway.",
+  "radio": false,
+  "kind": "radio_tx",
+  "duration_s": 4.6,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.2,
+    "text": "So their weather station's still transmitting. They've got power, anyway.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_07": {
+  "file": "res://assets/audio/voice/pro_07.ogg",
+  "speaker": "Terrace Dispatch",
+  "speaker_id": "dispatch",
+  "text": "Still nothing from the crew. Northern Heli turned back twice last week. The RCMP want somebody to lay eyes on it. Your call, Dale. Nobody's going to blame you for turning around.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 11.47,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 4.33,
+    "text": "Still nothing from the crew. Northern Heli turned back twice last week.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 4.73,
+    "d": 6.69,
+    "text": "The RCMP want somebody to lay eyes on it. Your call, Dale. Nobody's going to blame you for turning around.",
+    "speaker": "Terrace Dispatch"
+   }
+  ]
+ },
+ "pro_08": {
+  "file": "res://assets/audio/voice/pro_08.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "I'll have a look at the icefall. If the col's socked in, I'll put down at Loon Lake and wait it out. Kilo Tango Lima.",
+  "radio": false,
+  "kind": "radio_tx",
+  "duration_s": 8.86,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 6.95,
+    "text": "I'll have a look at the icefall. If the col's socked in, I'll put down at Loon Lake and wait it out.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 7.349,
+    "d": 1.46,
+    "text": "Kilo Tango Lima.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_09": {
+  "file": "res://assets/audio/voice/pro_09.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Your relay's up on that summit, if we could see it. Nineteen days nobody's heard a word from that station. Five people.",
+  "radio": false,
+  "kind": "cockpit",
+  "duration_s": 8.29,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 3.3,
+    "text": "Your relay's up on that summit, if we could see it.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 3.7,
+    "d": 4.54,
+    "text": "Nineteen days nobody's heard a word from that station. Five people.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_10": {
+  "file": "res://assets/audio/voice/pro_10.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Hear that? She's running a little rough. Carb ice, maybe. Carb heat's coming on. Wet snow like this, the intake packs up.",
+  "radio": false,
+  "kind": "cockpit",
+  "duration_s": 9.86,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 3.18,
+    "text": "Hear that? She's running a little rough.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 3.654,
+    "d": 6.16,
+    "text": "Carb ice, maybe. Carb heat's coming on. Wet snow like this, the intake packs up.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_11": {
+  "file": "res://assets/audio/voice/pro_11.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Come on, girl.",
+  "radio": false,
+  "kind": "cockpit",
+  "duration_s": 1.6,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 1.2,
+    "text": "Come on, girl.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_12": {
+  "file": "res://assets/audio/voice/pro_12.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Dispatch, Kilo Tango Lima. I've got some roughness. Carb heat's on, manifold pressure's still dropping. Turning back for the lake.",
+  "radio": false,
+  "kind": "radio_tx",
+  "duration_s": 9.59,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 7.57,
+    "text": "Dispatch, Kilo Tango Lima. I've got some roughness. Carb heat's on, manifold pressure's still dropping.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 7.968,
+    "d": 1.57,
+    "text": "Turning back for the lake.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_13": {
+  "file": "res://assets/audio/voice/pro_13.ogg",
+  "speaker": "Terrace Dispatch",
+  "speaker_id": "dispatch",
+  "text": "Kilo Tango Lima, copy rough running, turning for Loon Lake. Say souls on board and fuel.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 6.08,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 5.68,
+    "text": "Kilo Tango Lima, copy rough running, turning for Loon Lake. Say souls on board and fuel.",
+    "speaker": "Terrace Dispatch"
+   }
+  ]
+ },
+ "pro_14": {
+  "file": "res://assets/audio/voice/pro_14.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Two souls. Three hours of fuel.",
+  "radio": false,
+  "kind": "radio_tx",
+  "duration_s": 3.37,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.97,
+    "text": "Two souls. Three hours of fuel.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_15": {
+  "file": "res://assets/audio/voice/pro_15.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Sam. Tighten your belt. All the way. Put that case under the seat.",
+  "radio": false,
+  "kind": "cockpit",
+  "duration_s": 5.58,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 5.18,
+    "text": "Sam. Tighten your belt. All the way. Put that case under the seat.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_16": {
+  "file": "res://assets/audio/voice/pro_16.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Mixture, rich. Fuel selector, front tank. Primer. Mags, both.",
+  "radio": false,
+  "kind": "cockpit",
+  "duration_s": 6.63,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 1.37,
+    "text": "Mixture, rich.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 1.773,
+    "d": 2.28,
+    "text": "Fuel selector, front tank.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 4.106,
+    "d": 1.17,
+    "text": "Primer.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 5.322,
+    "d": 1.26,
+    "text": "Mags, both.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_17": {
+  "file": "res://assets/audio/voice/pro_17.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Not catching. She's not catching.",
+  "radio": false,
+  "kind": "cockpit",
+  "duration_s": 3.65,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 1.56,
+    "text": "Not catching.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 2.235,
+    "d": 1.37,
+    "text": "She's not catching.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_18": {
+  "file": "res://assets/audio/voice/pro_18.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Mayday, mayday, mayday. Terrace Dispatch, Otter Kilo Tango Lima. Engine failure. Forced landing, Aldous valley, one mile west of Loon Lake. Two souls on board. ELT is armed.",
+  "radio": false,
+  "kind": "radio_tx",
+  "duration_s": 14.36,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 5.16,
+    "text": "Mayday, mayday, mayday. Terrace Dispatch, Otter Kilo Tango Lima.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 5.558,
+    "d": 7.07,
+    "text": "Engine failure. Forced landing, Aldous valley, one mile west of Loon Lake. Two souls on board.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 12.677,
+    "d": 1.63,
+    "text": "ELT is armed.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_19": {
+  "file": "res://assets/audio/voice/pro_19.ogg",
+  "speaker": "Terrace Dispatch",
+  "speaker_id": "dispatch",
+  "text": "Kilo Tango Lima, Terrace. copy your mayday. one mile west of Loon. soon as the weather",
+  "radio": true,
+  "kind": "radio_weak",
+  "duration_s": 9.66,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 2.64,
+    "text": "Kilo Tango Lima, Terrace.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 3.035,
+    "d": 1.53,
+    "text": "copy your mayday.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 4.784,
+    "d": 2.01,
+    "text": "one mile west of Loon.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 7.311,
+    "d": 1.59,
+    "text": "soon as the weather",
+    "speaker": "Terrace Dispatch"
+   }
+  ]
+ },
+ "pro_20": {
+  "file": "res://assets/audio/voice/pro_20.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "There's a meadow past the river. Trees at the far end. I'll hold her off as long as I can.",
+  "radio": false,
+  "kind": "cockpit",
+  "duration_s": 6.37,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 3.77,
+    "text": "There's a meadow past the river. Trees at the far end.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 4.169,
+    "d": 2.15,
+    "text": "I'll hold her off as long as I can.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_21": {
+  "file": "res://assets/audio/voice/pro_21.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Sam. When I say, head down, arms over your head. It's going to be loud.",
+  "radio": false,
+  "kind": "cockpit",
+  "duration_s": 5.84,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 5.44,
+    "text": "Sam. When I say, head down, arms over your head. It's going to be loud.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "pro_22": {
+  "file": "res://assets/audio/voice/pro_22.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Brace. Brace. Brace.",
+  "radio": false,
+  "kind": "cockpit",
+  "duration_s": 3.5,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 3.1,
+    "text": "Brace. Brace. Brace.",
+    "speaker": "Dale Morrow"
+   }
+  ]
+ },
+ "prologue": {
+  "file": "res://assets/audio/voice/prologue.ogg",
+  "speaker": "Dale Morrow",
+  "speaker_id": "dale",
+  "text": "Dale Morrow: Sam, you still with me back there? That's the Aldous coming up on the right. Dale Morrow: Forty minutes to the glacier, if this holds. Dale Morrow: Terrace Dispatch, Otter Kilo Tango Lima, position report. Terrace Dispatch: Kilo Tango Lima, Terrace Dispatch. Go ahead, Dale. Dale Morrow: Over the Nass headwaters at six thousand five hundred, estimating the Corrigan névé at seventeen-oh-five. Dale Morrow: Ceilings are coming down faster than the forecast said. Light snow. Terrace Dispatch: Copy that. Kestrel's weather station has the col at minus fourteen, wind two-seven-zero at thirty-five, gusting fifty. Terrace Dispatch: That was twenty minutes ago. Dale Morrow: So their weather station's still transmitting. They've got power, anyway. Terrace Dispatch: Still nothing from the crew. Northern Heli turned back twice last week. Terrace Dispatch: The RCMP want somebody to lay eyes on it. Your call, Dale. Nobody's going to blame you for turning around. Dale Morrow: I'll have a look at the icefall. If the col's socked in, I'll put down at Loon Lake and wait it out. Dale Morrow: Kilo Tango Lima. Dale Morrow: Your relay's up on that summit, if we could see it. Dale Morrow: Nineteen days nobody's heard a word from that station. Five people. Dale Morrow: Hear that? She's running a little rough. Dale Morrow: Carb ice, maybe. Carb heat's coming on. Wet snow like this, the intake packs up. Dale Morrow: Come on, girl. Dale Morrow: Dispatch, Kilo Tango Lima. I've got some roughness. Carb heat's on, manifold pressure's still dropping. Dale Morrow: Turning back for the lake. Terrace Dispatch: Kilo Tango Lima, copy rough running, turning for Loon Lake. Say souls on board and fuel. Dale Morrow: Two souls. Three hours of fuel. Dale Morrow: Sam. Tighten your belt. All the way. Put that case under the seat. Dale Morrow: Mixture, rich. Dale Morrow: Fuel selector, front tank. Dale Morrow: Primer. Dale Morrow: Mags, both. Dale Morrow: Not catching. Dale Morrow: She's not catching. Dale Morrow: Mayday, mayday, mayday. Terrace Dispatch, Otter Kilo Tango Lima. Dale Morrow: Engine failure. Forced landing, Aldous valley, one mile west of Loon Lake. Two souls on board. Dale Morrow: ELT is armed. Terrace Dispatch: Kilo Tango Lima, Terrace. Terrace Dispatch: copy your mayday. Terrace Dispatch: one mile west of Loon. Terrace Dispatch: soon as the weather Dale Morrow: There's a meadow past the river. Trees at the far end. Dale Morrow: I'll hold her off as long as I can. Dale Morrow: Sam. When I say, head down, arms over your head. It's going to be loud. Dale Morrow: Brace. Brace. Brace.",
+  "radio": true,
+  "kind": "scene",
+  "duration_s": 231.65,
+  "segments": [
+   {
+    "t": 3.55,
+    "d": 4.91,
+    "text": "Sam, you still with me back there? That's the Aldous coming up on the right.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 8.512,
+    "d": 3.39,
+    "text": "Forty minutes to the glacier, if this holds.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 14.697,
+    "d": 4.71,
+    "text": "Terrace Dispatch, Otter Kilo Tango Lima, position report.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 21.003,
+    "d": 4.25,
+    "text": "Kilo Tango Lima, Terrace Dispatch. Go ahead, Dale.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 27.153,
+    "d": 7.32,
+    "text": "Over the Nass headwaters at six thousand five hundred, estimating the Corrigan névé at seventeen-oh-five.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 34.519,
+    "d": 4.92,
+    "text": "Ceilings are coming down faster than the forecast said. Light snow.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 41.142,
+    "d": 7.38,
+    "text": "Copy that. Kestrel's weather station has the col at minus fourteen, wind two-seven-zero at thirty-five, gusting fifty.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 48.574,
+    "d": 2.07,
+    "text": "That was twenty minutes ago.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 52.648,
+    "d": 4.56,
+    "text": "So their weather station's still transmitting. They've got power, anyway.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 59.105,
+    "d": 4.33,
+    "text": "Still nothing from the crew. Northern Heli turned back twice last week.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 63.48,
+    "d": 6.74,
+    "text": "The RCMP want somebody to lay eyes on it. Your call, Dale. Nobody's going to blame you for turning around.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 72.521,
+    "d": 6.88,
+    "text": "I'll have a look at the icefall. If the col's socked in, I'll put down at Loon Lake and wait it out.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 79.455,
+    "d": 1.82,
+    "text": "Kilo Tango Lima.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 86.377,
+    "d": 3.31,
+    "text": "Your relay's up on that summit, if we could see it.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 89.739,
+    "d": 4.89,
+    "text": "Nineteen days nobody's heard a word from that station. Five people.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 103.232,
+    "d": 3.18,
+    "text": "Hear that? She's running a little rough.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 106.535,
+    "d": 6.51,
+    "text": "Carb ice, maybe. Carb heat's coming on. Wet snow like this, the intake packs up.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 116.448,
+    "d": 1.56,
+    "text": "Come on, girl.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 120.809,
+    "d": 7.5,
+    "text": "Dispatch, Kilo Tango Lima. I've got some roughness. Carb heat's on, manifold pressure's still dropping.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 128.36,
+    "d": 1.93,
+    "text": "Turning back for the lake.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 131.885,
+    "d": 5.74,
+    "text": "Kilo Tango Lima, copy rough running, turning for Loon Lake. Say souls on board and fuel.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 139.523,
+    "d": 3.32,
+    "text": "Two souls. Three hours of fuel.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 147.446,
+    "d": 5.54,
+    "text": "Sam. Tighten your belt. All the way. Put that case under the seat.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 156.783,
+    "d": 1.37,
+    "text": "Mixture, rich.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 158.206,
+    "d": 2.28,
+    "text": "Fuel selector, front tank.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 160.539,
+    "d": 1.17,
+    "text": "Primer.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 161.754,
+    "d": 1.62,
+    "text": "Mags, both.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 165.369,
+    "d": 1.56,
+    "text": "Not catching.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 167.254,
+    "d": 1.72,
+    "text": "She's not catching.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 171.174,
+    "d": 5.23,
+    "text": "Mayday, mayday, mayday. Terrace Dispatch, Otter Kilo Tango Lima.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 176.458,
+    "d": 7.03,
+    "text": "Engine failure. Forced landing, Aldous valley, one mile west of Loon Lake. Two souls on board.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 183.537,
+    "d": 1.99,
+    "text": "ELT is armed.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 187.131,
+    "d": 2.63,
+    "text": "Kilo Tango Lima, Terrace.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 189.815,
+    "d": 1.53,
+    "text": "copy your mayday.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 191.565,
+    "d": 2.01,
+    "text": "one mile west of Loon.",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 194.091,
+    "d": 1.59,
+    "text": "soon as the weather",
+    "speaker": "Terrace Dispatch"
+   },
+   {
+    "t": 200.18,
+    "d": 3.77,
+    "text": "There's a meadow past the river. Trees at the far end.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 204.001,
+    "d": 2.5,
+    "text": "I'll hold her off as long as I can.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 210.105,
+    "d": 5.79,
+    "text": "Sam. When I say, head down, arms over your head. It's going to be loud.",
+    "speaker": "Dale Morrow"
+   },
+   {
+    "t": 220.698,
+    "d": 3.45,
+    "text": "Brace. Brace. Brace.",
+    "speaker": "Dale Morrow"
+   }
+  ],
+  "events": {
+   "engine_rough": 99.23,
+   "engine_quit": 154.38,
+   "brace": 220.35,
+   "impact": 222.65
+  }
+ },
+ "rescue_dawn": {
+  "file": "res://assets/audio/voice/rescue_dawn.ogg",
+  "speaker": "Rescue One-Six",
+  "speaker_id": "heli",
+  "text": "Kestrel Station, Rescue One-Six. Ten miles southwest, I have the ridge. Say winds at the pad. Mara Voss: Rescue One-Six, Kestrel. Wind two-seven-zero at fifteen, gusting twenty. The pad's clear. We're coming out. Kestrel, One-Six. I have you in sight. Two minutes.",
+  "radio": true,
+  "kind": "radio",
+  "duration_s": 20.29,
+  "segments": [
+   {
+    "t": 0.35,
+    "d": 6.45,
+    "text": "Kestrel Station, Rescue One-Six. Ten miles southwest, I have the ridge. Say winds at the pad.",
+    "speaker": "Rescue One-Six"
+   },
+   {
+    "t": 7.522,
+    "d": 8.36,
+    "text": "Rescue One-Six, Kestrel. Wind two-seven-zero at fifteen, gusting twenty. The pad's clear. We're coming out.",
+    "speaker": "Mara Voss"
+   },
+   {
+    "t": 16.403,
+    "d": 3.83,
+    "text": "Kestrel, One-Six. I have you in sight. Two minutes.",
+    "speaker": "Rescue One-Six"
+   }
+  ]
+ }
+}
