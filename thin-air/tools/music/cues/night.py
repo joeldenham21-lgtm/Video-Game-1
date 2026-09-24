@@ -46,7 +46,7 @@ def build() -> Cue:
     c.add(SawPad("pad", notes=pad_notes, voices=5, detune_cents=11, attack=5.0, release=6.0,
                  cutoff=[(0, 380), (24, 720), (48, 420), (84, 640), (100, 900), (120, 520), (144, 760),
                          (168, 380)],
-                 resonance=0.8, sine_mix=0.5, gain_db=-4.0, send=0.55, hp=62, seed=21))
+                 resonance=0.8, sine_mix=0.5, gain_db=-6.5, send=0.55, hp=62, seed=21))
     c.add(Glass("stars", notes=[("A6", 34, 10, -6), ("E6", 38, 8, -9), ("D7", 102, 12, -8),
                                 ("A6", 108, 8, -10), ("E7", 146, 10, -11), ("A6", 150, 8, -8)],
                 attack=3.0, release=5.0, gain_db=-8.0, send=0.9, dry_db=-6.0, hp=900))

@@ -29,4 +29,25 @@ restarts at sample 0, `loop_offset=0`; `bpm`/`beat_count` stay 0 so the loop poi
 QA (`lib/qa.py`, printed by every build): instrument ranges, parallel 5ths/8ves between all voice
 pairs and inside chord parts (declared doublings exempt), thirds below C3 / seconds below C4,
 texture density; loop-seam continuity; spectrogram + loudness-envelope PNGs per cue.
+Listening aids (`analyze.py`, on the cached renders): `bands [cue..]` octave-band balance vs 1 kHz +
+stereo correlation, `clicks <cue>` broadband-click scan of the master and every stem,
+`section <cue> <beat0> <beat1>` approximate loudness of each part inside a passage (finds a part
+that buries another, e.g. a timpani heartbeat over the horn calls).
 Requires `python3.12` (the system python that has numpy/scipy), fluidsynth, sox, ffmpeg.
+
+| Cue (`data/music.json` key) | Title | Form | Length | Key / tempo |
+|---|---|---|---|---|
+| `menu` | Thin Air (main theme) | one-shot: solo piano → celli → strings/harp → choir + horns climax → piano coda | 2:41 | D Dorian, 58–68 BPM rubato |
+| `explore` | Open Country | loop, piano + harp + soft strings, lots of air | 3:20 | G Lydian, 72 |
+| `forest` | Under the Canopy | loop, pizzicato 'footsteps', clarinet/flute/bassoon, low strings | 3:00 | E Dorian, 66 (3/4) |
+| `night` | Long Night | loop, dark saw pad, distant piano fragments, celesta, glass stars | 3:00 | D Aeolian, 56 |
+| `alpine` | Thin Air (Altitude) | loop, high strings, solo violin, choir oohs, glass, thin air noise | 3:00 | E Lydian, 60 |
+| `station` | Kestrel Station | loop, electric piano, solo cello (theme inverted), pad, beacon pings | 2:31 | F# minor, 70 |
+| `danger` | Hunted | loop, spiccato/pizz ostinato, corrupted-fifth brass, taiko/timpani/bass drum | 1:30 | C Phrygian, 120 |
+| `blizzard` | Whiteout | loop, string clusters swelling and collapsing, low drones, storm noise | 2:00 | B clusters, 60 |
+| `summit` | The Summit | one-shot: build on a D pedal → E-major tutti statement ×2 → release | 2:25 | D minor → E major, 66–72 |
+| `finale` | Dawn over the Aldous Range | one-shot: the theme resolved in D major, piano → strings → warm tutti → piano | 2:56 | D major, 66–72 |
+| `stinger_discovery` / `_danger` / `_objective` / `_death` / `_blueprint` | stingers | one-shots, 5–10 s, -16 LUFS | | |
+
+Loops are mastered so the file end flows into sample 0; the Audio director (`src/audio/`) may cross-fade
+on `phrase_starts_s` (every 4 bars) listed per cue in `data/music.json`.
