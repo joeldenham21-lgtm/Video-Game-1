@@ -1,0 +1,252 @@
+extends MeleeTool
+## Hand torch (and kerosene lantern): a flickering warm OmniLight with flame, ember and smoke particles.
+## While lit it is a heat source (group "heat_source": heat_radius/heat_celsius/is_heat_active) that also
+## keeps wildlife wary. Burns down over its fuel time (item fuel.burn_minutes), goes out underwater,
+## `torch_toggle` douses/relights (relighting uses a match or the lighter when those items exist).
+## `use` swings it (fire damage).
+
+var lit := true
+var heat_radius := 1.8
+var heat_celsius := 7.0
+var is_lantern := false
+
+var _light: OmniLight3D = null
+var _flame: CPUParticles3D = null
+var _embers: CPUParticles3D = null
+var _smoke: CPUParticles3D = null
+var _burn_s := 360.0
+var _burn_acc := 0.0
+var _t := 0.0
+var _base_energy := 1.7
+var _loop: AudioStreamPlayer3D = null
+var _head := Vector3.ZERO
+var _holder: Node3D = null
+
+
+func setup(p: Player, vm: Node3D, id: StringName) -> void:
+	is_lantern = StringName(ItemDB.get_item(id).get("tool", {}).get("type", "")) == &"lantern"
+	t_windup = 0.26
+	t_strike = 0.1
+	t_follow = 0.1
+	t_recover = 0.32
+	super.setup(p, vm, id)
+	damage_type = &"fire"
+	harvest_family = &"hand"
+	swing_sfx = &"axe_swing"
+	noise_radius = 10.0
+	var fuel: Dictionary = def.get("fuel", {})
+	_burn_s = float(fuel.get("burn_minutes", tool.get("burn_minutes", 60.0 if is_lantern else 6.0))) * 60.0
+	if is_lantern:
+		heat_radius = 1.0
+		heat_celsius = 3.0
+		windup_rot = Vector3(10.0, -4.0, -6.0)
+		strike_rot = Vector3(-12.0, 4.0, 6.0)
+		follow_rot = Vector3(-14.0, 4.0, 6.0)
+	else:
+		windup_pos = Vector3(0.04, 0.1, 0.08)
+		windup_rot = Vector3(40.0, -10.0, -24.0)
+		strike_pos = Vector3(-0.1, -0.05, -0.1)
+		strike_rot = Vector3(-45.0, 12.0, 14.0)
+		follow_pos = Vector3(-0.12, -0.1, -0.06)
+		follow_rot = Vector3(-60.0, 14.0, 18.0)
+	sprint_pos = Vector3(0.02, -0.04, 0.06)
+	sprint_rot = Vector3(-12.0, 10.0, 8.0)
+	add_to_group(&"heat_source")
+
+
+func build_visual() -> void:
+	rest_pos = Vector3(0.24, -0.4, 0.02)
+	_holder = Node3D.new()
+	_holder.name = "Torch"
+	model.add_child(_holder)
+	var mi := MeshInstance3D.new()
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var ext := FPModels.external(item_id)
+	if is_lantern:
+		# Lantern hangs from the bail in the right hand, a little forward.
+		var grip_cam := Vector3(0.2, -0.16, -0.42)
+		var basis := Basis.from_euler(Vector3(0.0, deg_to_rad(-20.0), 0.0))
+		_holder.transform = Transform3D(basis, grip_cam - rest_pos - basis * Vector3(0.0, 0.25, 0.0))
+		mi.mesh = FPModels.lantern_mesh()
+		_head = Vector3(0.0, 0.1, 0.0)
+		var arm := FPHands.make_arm(&"grip_loose", false, Vector3(0.0, 0.25, 0.0), Vector3(1, 0, 0), basis.inverse() * Vector3(0.3, -0.35, 0.88))
+		_holder.add_child(arm)
+		_register(arm)
+	else:
+		var handle_dir := Vector3(-0.22, 0.9, -0.36).normalized()
+		var grip_cam := Vector3(0.2, -0.22, -0.4)
+		var y := handle_dir
+		var zn := (Vector3.BACK - y * Vector3.BACK.dot(y)).normalized()
+		var x := y.cross(zn).normalized()
+		var basis := Basis(x, y, zn)
+		var grip_y := 0.12
+		_holder.transform = Transform3D(basis, grip_cam - rest_pos - basis * Vector3(0.0, grip_y, 0.0))
+		mi.mesh = FPModels.torch_mesh()
+		_head = Vector3(0.0, 0.49, 0.0)
+		var arm := FPHands.make_arm(&"grip", false, Vector3(0.0, grip_y, 0.0), Vector3.UP, basis.inverse() * Vector3(0.38, -0.5, 0.78))
+		_holder.add_child(arm)
+		_register(arm)
+	if ext:
+		_holder.add_child(ext)
+	else:
+		_holder.add_child(mi)
+	_light = OmniLight3D.new()
+	_light.name = "Light"
+	_light.position = _head + Vector3(0.0, 0.06, 0.0)
+	_light.light_color = Color(1.0, 0.58, 0.28) if not is_lantern else Color(1.0, 0.72, 0.42)
+	_base_energy = 1.7 if not is_lantern else 1.25
+	_light.omni_range = 10.0 if not is_lantern else 8.0
+	_light.omni_attenuation = 1.25
+	_light.light_size = 0.05
+	_light.shadow_enabled = not Settings.is_mobile() and int(Settings.get_value(&"shadow_quality", 2)) >= 2
+	_light.shadow_bias = 0.08
+	_holder.add_child(_light)
+	var mobile := Settings.is_mobile() or int(Settings.get_value(&"particles", 2)) == 0
+	if is_lantern:
+		_flame = _make_particles(&"flame", 6, 0.35, 0.03, 0.05, 0.05, 0.1, Vector3(0, 0.3, 0))
+		_flame.position = _head
+	else:
+		_flame = _make_particles(&"flame", 10 if mobile else 20, 0.55, 0.07, 0.13, 0.2, 0.55, Vector3(0, 1.6, 0))
+		_flame.position = _head + Vector3(0.0, -0.03, 0.0)
+		_flame.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		_flame.emission_sphere_radius = 0.028
+		_embers = _make_particles(&"spark", 4 if mobile else 9, 1.3, 0.006, 0.012, 0.4, 1.3, Vector3(0, 0.6, 0))
+		_embers.position = _head
+		_embers.spread = 35.0
+		if not mobile:
+			_smoke = _make_particles(&"smoke", 10, 2.6, 0.09, 0.2, 0.3, 0.7, Vector3(0, 0.45, 0))
+			_smoke.position = _head + Vector3(0.0, 0.1, 0.0)
+	_set_lit(lit, true)
+
+
+func _register(arm: MeshInstance3D) -> void:
+	if viewmodel and viewmodel.has_method(&"register_arm"):
+		viewmodel.call(&"register_arm", arm)
+
+
+func _make_particles(kind: StringName, amount: int, life: float, s_min: float, s_max: float, v_min: float, v_max: float, grav: Vector3) -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	var q := QuadMesh.new()
+	q.size = Vector2.ONE
+	q.material = FPMaterials.fx(kind)
+	p.mesh = q
+	p.amount = amount
+	p.lifetime = life
+	p.local_coords = false
+	p.direction = Vector3.UP
+	p.spread = 12.0
+	p.initial_velocity_min = v_min
+	p.initial_velocity_max = v_max
+	p.gravity = grav
+	p.damping_min = 0.2
+	p.damping_max = 0.6
+	p.scale_amount_min = s_min
+	p.scale_amount_max = s_max
+	var curve := Curve.new()
+	var g := Gradient.new()
+	match kind:
+		&"flame":
+			curve.add_point(Vector2(0.0, 0.55))
+			curve.add_point(Vector2(0.3, 1.0))
+			curve.add_point(Vector2(1.0, 0.15))
+			g.offsets = PackedFloat32Array([0.0, 0.25, 0.6, 1.0])
+			g.colors = PackedColorArray([Color(1.0, 0.85, 0.55, 0.9), Color(1.0, 0.55, 0.18, 0.85), Color(0.9, 0.22, 0.05, 0.5), Color(0.4, 0.05, 0.0, 0.0)])
+		&"spark":
+			curve.add_point(Vector2(0.0, 1.0))
+			curve.add_point(Vector2(1.0, 0.3))
+			g.offsets = PackedFloat32Array([0.0, 0.7, 1.0])
+			g.colors = PackedColorArray([Color(1.0, 0.7, 0.3, 1.0), Color(1.0, 0.3, 0.05, 0.8), Color(0.6, 0.1, 0.0, 0.0)])
+		_:
+			curve.add_point(Vector2(0.0, 0.3))
+			curve.add_point(Vector2(1.0, 1.0))
+			g.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
+			g.colors = PackedColorArray([Color(0.3, 0.28, 0.26, 0.0), Color(0.3, 0.28, 0.26, 0.35), Color(0.4, 0.4, 0.4, 0.0)])
+	p.scale_amount_curve = curve
+	p.color_ramp = g
+	_holder.add_child(p)
+	return p
+
+
+func on_equip() -> void:
+	if lit:
+		_loop = Audio.play_loop(&"torch_loop", _light if _light else self, -6.0)
+
+
+func on_holster() -> void:
+	_stop_loop()
+
+
+func _stop_loop() -> void:
+	if _loop and is_instance_valid(_loop):
+		_loop.stop()
+		_loop.queue_free()
+	_loop = null
+
+
+func is_heat_active() -> bool:
+	return lit
+
+
+func item_process(delta: float, can_act: bool) -> void:
+	super.item_process(delta, can_act)
+	_t += delta
+	if can_act and Input.is_action_just_pressed(&"torch_toggle"):
+		_toggle()
+	if lit:
+		# Flame flicker: layered noise, slightly stronger when moving.
+		var move := clampf(player.ground_speed / 5.0, 0.0, 1.0)
+		var fl := 0.82 + 0.1 * sin(_t * 23.0) * sin(_t * 7.3) + 0.08 * sin(_t * 41.0 + 1.3) - 0.08 * move * absf(sin(_t * 13.0))
+		if is_lantern:
+			fl = 0.95 + 0.05 * sin(_t * 11.0) * sin(_t * 5.1)
+		_light.light_energy = _base_energy * fl
+		_light.position.x = sin(_t * 9.0) * 0.01
+		# Going under water puts it out.
+		if player.water_level > -1e20 and _light.global_position.y < player.water_level:
+			_set_lit(false)
+			Audio.play_sfx(&"splash", _light.global_position, -8.0, 1.6)
+		# Burn down.
+		_burn_acc += delta
+		if _burn_acc >= 1.0:
+			var idx := inventory_index()
+			if idx >= 0 and player.inventory.use_durability(idx, _burn_acc / _burn_s):
+				Game.notify("Your %s burned out" % ("lantern ran dry" if is_lantern else "torch"), &"warning")
+				depleted.emit()
+			_burn_acc = 0.0
+
+
+func _toggle() -> void:
+	if lit:
+		_set_lit(false)
+		Audio.play_sfx(&"fire_ignite", _light.global_position, -10.0, 0.6)
+		return
+	# Relighting needs a flame source if the game defines one.
+	var sources := [&"lighter", &"matches"]
+	var defined := false
+	for s: StringName in sources:
+		if ItemDB.has_item(s):
+			defined = true
+			if player.inventory.has(s):
+				if s == &"matches":
+					player.inventory.remove(&"matches", 1)
+				_set_lit(true)
+				Audio.play_sfx(&"fire_ignite", _light.global_position, -4.0)
+				return
+	if not defined:
+		_set_lit(true)
+		Audio.play_sfx(&"fire_ignite", _light.global_position, -4.0)
+	else:
+		Game.notify("Nothing to light it with", &"warning")
+
+
+func _set_lit(on: bool, instant := false) -> void:
+	lit = on
+	if _light:
+		_light.visible = on
+	for p in [_flame, _embers, _smoke]:
+		if p:
+			(p as CPUParticles3D).emitting = on
+	if not on:
+		_stop_loop()
+	elif not instant and _loop == null:
+		_loop = Audio.play_loop(&"torch_loop", _light, -6.0)
+	damage_type = &"fire" if on else &"blunt"

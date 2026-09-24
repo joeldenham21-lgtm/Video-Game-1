@@ -60,11 +60,14 @@ var speed_cap := INF              # held items can cap movement speed (bow drawn
 var look_scale := 1.0             # held items can slow look (binocular zoom)
 var last_impact := 0.0
 var air_time := 0.0
+## True while build mode (or similar) owns the use/aim buttons — held items don't act.
+var tool_blocked := false
 
 # ---- Nodes -------------------------------------------------------------------------------------
 @onready var head: PlayerCameraRig = $Head
 @onready var camera: Camera3D = $Head/Shake/Camera3D
 @onready var interactor: PlayerInteractor = $Head/InteractRay
+@onready var melee_cast: ShapeCast3D = $Head/MeleeCast
 @onready var viewmodel: Node3D = $Head/Shake/Camera3D/Viewmodel
 @onready var collision: CollisionShape3D = $Collision
 @onready var sounds: PlayerSounds = $Sounds
@@ -280,9 +283,15 @@ func equip(id: StringName) -> bool:
 			idx = hotbar.find(&"")
 		if idx < 0:
 			idx = maxi(active_slot, 0)
+		var prev := get_active_item()
 		hotbar[idx] = id
 		if active_slot != idx:
 			select_hotbar(idx)
+		elif get_active_item() != prev:
+			Events.active_item_changed.emit(id)
+			Audio.play_sfx(&"equip", null, -8.0)
+			if viewmodel and viewmodel.has_method(&"set_item"):
+				viewmodel.call(&"set_item", id)
 		return true
 	if not inventory.has(id):
 		return false
@@ -1554,6 +1563,8 @@ func _capture_mouse(on: bool) -> void:
 
 
 func _on_ui_opened(screen: StringName) -> void:
+	if screen == &"build":
+		tool_blocked = true
 	if NON_BLOCKING_SCREENS.has(screen):
 		return
 	if not _ui_screens.has(screen):
@@ -1564,6 +1575,8 @@ func _on_ui_opened(screen: StringName) -> void:
 
 
 func _on_ui_closed(screen: StringName) -> void:
+	if screen == &"build":
+		tool_blocked = false
 	_ui_screens.erase(screen)
 	if _ui_screens.is_empty() and not _dead and Game.state != Game.State.CINEMATIC:
 		_capture_mouse(true)

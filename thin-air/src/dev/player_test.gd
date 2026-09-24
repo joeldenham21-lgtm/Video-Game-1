@@ -94,6 +94,10 @@ static func inject_test_items() -> void:
 			"clothing": {"insulation": 12, "windproof": 0.7, "waterproof": 0.6}},
 		&"wool_hat": {"name": "Wool Hat", "category": "clothing", "stack": 1, "weight": 0.1, "equip_slot": "head",
 			"clothing": {"insulation": 3, "windproof": 0.1, "waterproof": 0.0}},
+		&"work_gloves": {"name": "Work Gloves", "category": "clothing", "stack": 1, "weight": 0.2, "equip_slot": "hands",
+			"clothing": {"insulation": 2, "windproof": 0.3, "waterproof": 0.2}},
+		&"fur_mitts": {"name": "Fur Mitts", "category": "clothing", "stack": 1, "weight": 0.3, "equip_slot": "hands",
+			"clothing": {"insulation": 5, "windproof": 0.6, "waterproof": 0.3}},
 		&"stick": {"name": "Stick", "category": "resource", "stack": 20, "weight": 0.3},
 		&"stone": {"name": "Stone", "category": "resource", "stack": 20, "weight": 1.2},
 		&"_test_boulder": {"name": "Test Boulder", "category": "resource", "stack": 1, "weight": 22.0},
@@ -900,10 +904,162 @@ func _trial_interact() -> void:
 	_check(player.inventory.count(&"stick") == before + 3, "interact picks up 3 sticks")
 
 
+func _held() -> HeldItem:
+	var vm := player.viewmodel as Viewmodel
+	return vm.get_current() if vm else null
+
+
+func _give_and_equip(id: StringName, count := 1) -> void:
+	player.inventory.add(id, count)
+	player.equip(id)
+	await _wait(0.75)
+
+
 func _trial_tools() -> void:
-	# Tool behaviour is exercised in _trial_tools_impl once held items exist.
-	if has_method(&"_trial_tools_impl"):
-		await call(&"_trial_tools_impl")
+	# Hotbar: tools picked up land in free slots; number keys select them.
+	player.hotbar.fill(&"")
+	player.select_hotbar(-1)
+	player.inventory.add(&"stone_axe", 1)
+	Events.item_picked_up.emit(&"stone_axe", 1)
+	await _frames(2)
+	_check(player.hotbar.has(&"stone_axe"), "picked-up tool auto-assigned to the hotbar")
+	var slot := player.hotbar.find(&"stone_axe")
+	await _tap(StringName("hotbar_%d" % (slot + 1)))
+	await _wait(0.7)
+	_check(player.get_active_item() == &"stone_axe", "hotbar key selects the axe")
+	_check(_held() != null and _held().item_id == &"stone_axe", "viewmodel shows the axe")
+	# --- Axe on the stump.
+	await _reset(Vector3(4.0, Y0 + 0.05, 7.25), 0.0, -38.0)
+	var dur0 := float(player.inventory.get_slot(player.inventory.find(&"stone_axe")).get("durability", 1.0))
+	Input.action_press(&"use")
+	await _wait(1.3)
+	Input.action_release(&"use")
+	await _wait(0.8)
+	_check(stump.hits >= 1, "axe swing harvest_hit()s the stump (%d hits)" % stump.hits)
+	_check(stump.hits == 0 or absf(stump.total_power / stump.hits - 1.0) < 0.01, "harvest power = tool chop (%.2f)" % (stump.total_power / maxf(stump.hits, 1)))
+	_check(player.vitals.stamina < 100.0, "chopping costs stamina (%.1f)" % player.vitals.stamina)
+	var dur1 := float(player.inventory.get_slot(player.inventory.find(&"stone_axe")).get("durability", 1.0))
+	_check(dur1 < dur0, "chopping wears the axe (%.3f → %.3f)" % [dur0, dur1])
+	# --- Knife on the damage dummy.
+	await _give_and_equip(&"knife")
+	await _reset(Vector3(-4.0, Y0 + 0.05, 7.0), 0.0, -5.0)
+	var dmg0 := target.damage_taken
+	Input.action_press(&"use")
+	await _wait(0.6)
+	Input.action_release(&"use")
+	await _wait(0.4)
+	_check(target.damage_taken > dmg0, "knife slash damages the dummy (%.1f, %s)" % [target.damage_taken - dmg0, target.last_type])
+	# --- Bow: draw, release, arrow flies and sticks.
+	await _give_and_equip(&"bow")
+	player.inventory.add(&"arrow", 5)
+	await _reset(Vector3(-4.0, Y0 + 0.05, 16.0), 0.0, 2.0)
+	Input.action_press(&"use")
+	await _wait(1.1)
+	var bow := _held()
+	_check(bow != null and float(bow.get(&"draw")) > 0.95, "holding use draws the bow to full")
+	Input.action_release(&"use")
+	await _frames(3)
+	_check(player.inventory.count(&"arrow") == 4, "loosing consumes an arrow (%d left)" % player.inventory.count(&"arrow"))
+	var arrows := _projectiles(PlayerProjectile.Kind.ARROW)
+	_check(arrows.size() >= 1, "arrow projectile launched")
+	await _wait(1.2)
+	var stuck := false
+	for a in _projectiles(PlayerProjectile.Kind.ARROW):
+		stuck = stuck or a.stuck
+	_check(stuck, "arrow hits and sticks (dummy damage %.1f)" % target.damage_taken)
+	# --- Spear throw.
+	await _give_and_equip(&"spear")
+	await _reset(Vector3(8.0, Y0 + 0.05, 10.0), 0.0, 5.0)
+	Input.action_press(&"aim")
+	await _wait(0.5)
+	await _tap(&"use")
+	Input.action_release(&"aim")
+	await _wait(1.0)
+	_check(player.inventory.count(&"spear") == 0, "thrown spear leaves the inventory")
+	var spears := _projectiles(PlayerProjectile.Kind.SPEAR)
+	_check(spears.size() == 1 and spears[0].stuck, "spear flies and sticks")
+	if spears.size() == 1:
+		spears[0].interact(player)
+		await _frames(2)
+		_check(player.inventory.count(&"spear") == 1, "stuck spear can be picked back up")
+	# --- Torch: light + heat source + toggle.
+	await _give_and_equip(&"torch")
+	var torch := _held()
+	_check(torch != null and torch.is_in_group(&"heat_source") and torch.call(&"is_heat_active"), "lit torch is an active heat source")
+	await _tap(&"torch_toggle")
+	_check(torch != null and not torch.call(&"is_heat_active"), "torch_toggle douses it")
+	await _tap(&"torch_toggle")
+	_check(torch != null and torch.call(&"is_heat_active"), "torch_toggle relights it")
+	# --- Flare: strike, then throw.
+	await _give_and_equip(&"flare", 2)
+	await _tap(&"use")
+	await _wait(0.6)
+	var fl := _held()
+	_check(fl != null and bool(fl.get(&"lit")), "flare ignites")
+	await _tap(&"use")
+	await _wait(0.8)
+	_check(player.inventory.count(&"flare") == 1, "lit flare thrown (1 left)")
+	var flares := _projectiles(PlayerProjectile.Kind.FLARE)
+	_check(flares.size() >= 1 and flares[0].burn_time > 100.0, "thrown flare keeps burning")
+	# --- Scanner.
+	await _give_and_equip(&"survey_scanner")
+	await _reset(Vector3(0.0, Y0 + 0.05, 9.6), 180.0, -24.0)
+	_scans.clear()
+	Input.action_press(&"use")
+	await _wait(3.2)
+	Input.action_release(&"use")
+	_check(_scans.has(&"test_wreck"), "holding use scans the wreck (%s)" % str(_scans))
+	var bps: Variant = Game.get_flag(&"blueprints", [])
+	_check(bps is Array and (bps as Array).has("test_blueprint"), "scan unlocks its blueprint")
+	# --- Eating.
+	await _give_and_equip(&"ration_bar", 2)
+	player.vitals.food = 50.0
+	await _tap(&"use")
+	await _wait(1.9)
+	_check(player.vitals.food > 60.0, "eating a ration bar restores food (%.1f)" % player.vitals.food)
+	_check(player.inventory.count(&"ration_bar") == 1, "eating consumes one bar")
+	# --- Canteen sips.
+	await _give_and_equip(&"canteen")
+	player.vitals.water = 40.0
+	await _tap(&"use")
+	await _wait(1.9)
+	var fill := float(player.inventory.get_slot(player.inventory.find(&"canteen")).get("durability", 0.0))
+	_check(player.vitals.water > 60.0 and absf(fill - 0.75) < 0.01, "canteen sip: water %.1f, fill %.2f" % [player.vitals.water, fill])
+	# --- Binoculars zoom.
+	await _give_and_equip(&"binoculars")
+	Input.action_press(&"aim")
+	await _wait(1.2)
+	var zoom_fov := player.camera.fov
+	Input.action_release(&"aim")
+	_check(zoom_fov < 25.0, "binoculars zoom the view (fov %.1f)" % zoom_fov)
+	await _wait(0.8)
+	# --- Empty hands shove a crate.
+	player.select_hotbar(-1)
+	await _wait(0.7)
+	var crate: RigidBody3D = null
+	for c in get_children():
+		if c is DevCrate:
+			crate = c
+			break
+	if crate:
+		await _reset(Vector3(crate.global_position.x, Y0 + 0.05, crate.global_position.z + 0.6), 0.0, -55.0)
+		await _tap(&"crouch")
+		await _wait(0.4)
+		var c0 := crate.global_position
+		await _tap(&"use")
+		await _wait(0.8)
+		_check(crate.global_position.distance_to(c0) > 0.05, "hands shove a loose crate (%.2f m)" % crate.global_position.distance_to(c0))
+
+
+func _projectiles(kind: PlayerProjectile.Kind) -> Array[PlayerProjectile]:
+	var out: Array[PlayerProjectile] = []
+	for n in get_tree().get_nodes_in_group(&"_dummy_none"):
+		n.queue_free()
+	for n in find_children("*", "Node3D", true, false):
+		var p := n as PlayerProjectile
+		if p and p.kind == kind:
+			out.append(p)
+	return out
 
 
 # =================================================================================================
@@ -914,6 +1070,13 @@ func _setup_shot(item: StringName) -> void:
 	player.vitals.auto_simulate = false
 	player.teleport(Vector3(1.5, Y0 + 0.05, 9.0), 20.0)
 	player.set_look(20.0, -8.0)
+	var gloves := StringName(args.get("gloves", "work_gloves"))
+	if gloves != &"none" and ItemDB.has_item(gloves):
+		player.inventory.add(gloves, 1)
+		player.equip(gloves)
+	if args.has("body") and ItemDB.has_item(StringName(args["body"])):
+		player.inventory.add(StringName(args["body"]), 1)
+		player.equip(StringName(args["body"]))
 	if item != &"none" and ItemDB.has_item(item):
 		player.inventory.add(item, 1)
 		if item == &"bow":
