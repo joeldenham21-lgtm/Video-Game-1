@@ -8,7 +8,7 @@ func build_visual() -> void:
 	var holder := Node3D.new()
 	holder.name = "Item"
 	var basis := Basis.from_euler(Vector3(deg_to_rad(-10.0), deg_to_rad(-20.0), 0.0))
-	holder.transform = Transform3D(basis, Vector3(0.16, -0.21, -0.36) - rest_pos)
+	holder.transform = Transform3D(basis, Vector3(0.15, -0.16, -0.37) - rest_pos)
 	model.add_child(holder)
 	var ext := FPModels.external(item_id)
 	if ext == null:
@@ -26,7 +26,7 @@ func build_visual() -> void:
 		mi.mesh = FPModels.generic_mesh()
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		holder.add_child(mi)
-	var arm := FPHands.make_arm(&"hold", false, Vector3(0.012, -0.03, 0.0), Vector3(0, 1, 0), basis.inverse() * elbow_toward(Vector3(0.16, -0.21, -0.36), ELBOW_R))
+	var arm := FPHands.make_arm(&"hold", false, Vector3(0.012, -0.03, 0.0), Vector3(0, 1, 0), basis.inverse() * elbow_toward(Vector3(0.15, -0.16, -0.37), ELBOW_R))
 	holder.add_child(arm)
 	if viewmodel and viewmodel.has_method(&"register_arm"):
 		viewmodel.call(&"register_arm", arm)

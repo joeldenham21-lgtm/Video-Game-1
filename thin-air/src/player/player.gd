@@ -623,6 +623,7 @@ func _physics_step(delta: float) -> void:
 		_env_timer = 0.1
 		_sample_ground()
 		_sample_water_level()
+		_check_fell_through()
 	water_depth = maxf(water_level - global_position.y, 0.0) if water_level > -1e20 else 0.0
 	_update_water_state()
 	match move_state:
@@ -1316,6 +1317,22 @@ func _sample_ground() -> void:
 		snow_depth = PlayerMotion.snow_depth(TerrainData.get_masks(x, z).r, global_position.y)
 	else:
 		snow_depth = 0.0
+
+
+## Safety net: if a collision gap (terrain chunk not streamed in yet, a bad seam) lets the body drop far
+## below the heightfield in a long free fall, put it back on the surface without fall damage. Caves and
+## mine adits sit under the heightfield too, so this only triggers after seconds of fast falling.
+func _check_fell_through() -> void:
+	if move_state != Move.GROUND or air_time < 2.5 or velocity.y > -12.0:
+		return
+	if not TerrainData.in_bounds(global_position.x, global_position.z):
+		return
+	# (A heightfield that isn't loaded yet reports ~0 m, far below the valley: never triggers.)
+	var ground := TerrainData.get_height(global_position.x, global_position.z)
+	if not is_finite(ground) or global_position.y > ground - 12.0:
+		return
+	print("[Player] fell through the ground at %s — restored to the surface" % global_position)
+	teleport(Vector3(global_position.x, ground + 1.0, global_position.z), get_yaw_deg())
 
 
 func _sample_climate(dt: float) -> void:

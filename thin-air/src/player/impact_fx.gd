@@ -16,7 +16,7 @@ const KINDS := {
 }
 
 static var _mats: Dictionary = {}
-static var _mesh: QuadMesh = null
+static var _quads: Dictionary = {}       # additive -> shared QuadMesh with its material
 
 
 static func _material(additive: bool) -> StandardMaterial3D:
@@ -44,14 +44,14 @@ static func spawn(parent: Node, kind: StringName, point: Vector3, normal: Vector
 	if parent == null or not parent.is_inside_tree():
 		return
 	var cfg: Array = KINDS.get(kind, KINDS[&"dust"])
-	if _mesh == null:
-		_mesh = QuadMesh.new()
-		_mesh.size = Vector2.ONE
-	var p := CPUParticles3D.new()
 	var additive: bool = cfg[8]
-	var quad := _mesh.duplicate() as QuadMesh
-	quad.material = _material(additive)
-	p.mesh = quad
+	if not _quads.has(additive):
+		var q := QuadMesh.new()
+		q.size = Vector2.ONE
+		q.material = _material(additive)
+		_quads[additive] = q
+	var p := CPUParticles3D.new()
+	p.mesh = _quads[additive]
 	var mobile := Settings.is_mobile() or int(Settings.get_value(&"particles", 2)) == 0
 	p.amount = maxi(4, int(cfg[0]) / (2 if mobile else 1))
 	p.lifetime = float(cfg[1])

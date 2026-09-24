@@ -835,6 +835,17 @@ func _trial_falls() -> void:
 	await _wait(2.4)
 	_check(player.is_dead(), "15 m drop is lethal")
 	_check(player.vitals.death_cause == &"fall", "death cause = fall (%s)" % player.vitals.death_cause)
+	# Falling through a hole in the world (no ground past the course edge) gets rescued, unhurt.
+	await _reset(Vector3(150.0, Y0 - 1.0, 0.0), 0.0)
+	var restored := false
+	var prev_y := player.global_position.y
+	for i in 300:
+		await get_tree().physics_frame
+		if player.global_position.y > prev_y + 5.0:
+			restored = true
+			break
+		prev_y = player.global_position.y
+	_check(restored and player.vitals.health > 99.0, "fell through the world → put back on the surface unhurt")
 
 
 func _trial_swim() -> void:
