@@ -47,7 +47,7 @@ def _eighths(spec: str) -> str:
 def build() -> Cue:
     c = Cue("summit", bpm=66, meter=4, key="D minor -> E major", loop=False, bars=38, kind="oneshot",
             title="The Summit", intensity=1.0, tail_s=8.0, qa_ok=["choir/horns at bar 16 beat 3"], rt60=3.6, predelay_ms=30, wet_db=-4.0,
-            fade_out_s=2.5, ir_seed=37, leveler=dict(threshold_db=-5.0, ratio=1.5, attack_ms=1500.0, release_ms=4000.0),
+            fade_out_s=2.5, ir_seed=37, leveler=dict(threshold_db=-8.0, ratio=1.8, attack_ms=1500.0, release_ms=4000.0),
             comp=dict(threshold_db=2.0, ratio=2.0, attack_ms=30.0,
                                                   release_ms=400.0))
     t = c.tempo
@@ -57,7 +57,7 @@ def build() -> Cue:
     t.set(124.0, 60)
     t.set(128.0, 58)
 
-    vcs = c.part("vc_spicc", "vc_spicc", gain_db=-1.0, qa_voice=False)
+    vcs = c.part("vc_spicc", "vc_spicc", gain_db=2.0, qa_voice=False)   # the ostinato drives the build
     vc = c.part("vc", "vc", gain_db=-1.0, doubles=[("cb", 64, 160), ("tuba", 64, 130), ("trombones", 64, 130)])
     cb = c.part("cb", "cb", gain_db=-2.0)
     vla = c.part("vla", "vla", gain_db=-3.0)
@@ -76,19 +76,19 @@ def build() -> Cue:
     harp = c.part("harp", "harp", gain_db=-3.0)
     pno = c.part("piano", "piano", gain_db=-3.0, qa_voice=False)
     pnr = c.part("piano_rh", "piano", gain_db=0.0, shelf=[("high", 4200, -2.5)])
-    timp = c.part("timp", "timpani", gain_db=-3.0)
+    timp = c.part("timp", "timpani", gain_db=-8.0)       # heartbeat under the horns, not over them
 
     # ================================================================= BUILD 1 (1-8)
     for bar in range(8):
-        vcs.phrase(bar * 4, _eighths("D3 A3 D4 A3 D3 A3 D4 A3"), vel=48 + bar * 3)
-        timp.phrase(bar * 4, f"@{34 + bar * 3} D2:2 D2:2 |")
+        vcs.phrase(bar * 4, _eighths("D3 A3 D4 A3 D3 A3 D4 A3"), vel=58 + bar * 3)
+        timp.phrase(bar * 4, f"@{40 + bar * 3} D2:2 D2:2 |")
     cb.phrase(0, "D2:4 | ~:4 | ~:4 | ~:4 | ~:4 | ~:4 | ~:4 | ~:4 |")
     ooh.phrase(0, "[D4,F4,A4]:4 | ~:4 | [D4,F4,Bb4]:4 | ~:4 | [E4,G4,C5]:4 | ~:4 | [F4,A4,D5]:4 | ~:4 |")
     hn.phrase(0, "r:4 | D3:1 A3:3 | r:4 | F3:1 C4:3 | r:4 | G3:1 D4:3 | r:4 | A3:1 E4:3 |")
     # ================================================================= BUILD 2 (9-16)
     chords2 = ["Dm", "G/B", "C", "Am", "Dm", "Bb", "C", "Bsus"]
     for k, ch in enumerate(chords2):
-        vcs.phrase(32 + k * 4, _eighths(OST[ch] + " " + OST[ch]), vel=62 + k * 3)
+        vcs.phrase(32 + k * 4, _eighths(OST[ch] + " " + OST[ch]), vel=70 + k * 3)
     hn.phrase(32, "D4:1 A4:3 | B4:1.5 C5:0.5 D5:2 | E5:2 D5:1 C5:1 | A4:4 | "
                   "D4:1 A4:3 | Bb4:1.5 C5:0.5 D5:1 E5:1 | F5:2 E5:1 D5:1 | E5:2 D#5:2 |")
     v1t.phrase(32, "A4:4 | D5:4 | C5:4 | C5:4 | F5:4 | F5:4 | E5:4 | F#5:4 |")
@@ -152,8 +152,8 @@ def build() -> Cue:
     vc.phrase(128, "E3:4 | ~:4 | A2:4 | E3:4 | ~:4 | ~:2 r:2 |")
     cb.phrase(128, "E2:4 | ~:4 | A1:4 | E2:4 | ~:4 | ~:2 r:2 |")
     ooh.phrase(128, "[E4,G#4,B4]:4 | ~:4 | [E4,A4,B4]:4 | [E4,G#4,B4]:4 | ~:4 | ~:2 r:2 |")
-    pnr.phrase(128, "@46 r:1 E5:1 B5:2 | F#5:3 r:1 | r:1 E5:1 B5:2 | C#6:1.5 D#6:0.5 E6:2 | ~:4 | ~:4 |")
-    pno.phrase(128, "@40 [E2,B2]:4 | ~:4 | [A2,E3]:4 | [E2,B2]:4 | ~:4 | ~:4 |")
+    pnr.phrase(128, "@54 r:1 E5:1 B5:2 | F#5:3 r:1 | r:1 E5:1 B5:2 | C#6:1.5 D#6:0.5 E6:2 | ~:4 | ~:4 |")
+    pno.phrase(128, "@46 [E2,B2]:4 | ~:4 | [A2,E3]:4 | [E2,B2]:4 | ~:4 | ~:4 |")
     for p in (pno, pnr):
         p.pedal(128, 136)
         p.pedal(136, 140)
@@ -178,23 +178,23 @@ def build() -> Cue:
     c.add(Pluck("pluck", notes=pl, decay=0.12, cutoff=900, sub=0.4, gain_db=-8.0, send=0.25, hp=40))
 
     # ================================================================= dynamics
-    ooh.dyn((0, "pp"), (16, "p"), (30, "mp"), (32, "n"), (126, "n"), (128, "p"), (140, "pp"), (150, "n"))
-    hn.dyn((4, "p"), (12, "p"), (20, "mp"), (28, "mf"), (32, "mf"), (44, "f"), (56, "f"), (63, "ff"),
+    ooh.dyn((0, "p"), (16, "mp"), (30, "mf"), (32, "n"), (126, "n"), (128, "mp"), (140, "p"), (150, "n"))
+    hn.dyn((4, "mp"), (12, "mp"), (20, "mf"), (28, "mf"), (32, "mf"), (44, "f"), (56, "f"), (63, "ff"),
            (64, "ff"), (92, "ff"), (96, "f"), (112, "ff"), (124, "fff"), (127, "f"), (128, "n"))
-    v1t.dyn((32, "p"), (48, "mf"), (60, "f"), (63.5, "ff"), (64, "n"))
-    v2t.dyn((32, "p"), (48, "mf"), (60, "f"), (63.5, "ff"), (64, "n"), (126, "n"), (128, "pp"),
+    v1t.dyn((32, "mp"), (48, "mf"), (60, "f"), (63.5, "ff"), (64, "n"))
+    v2t.dyn((32, "mp"), (48, "mf"), (60, "f"), (63.5, "ff"), (64, "n"), (126, "n"), (128, "p"),
             (140, "p"), (150, "n"))
-    vla.dyn((32, "p"), (48, "mf"), (63, "f"), (64, "n"), (126, "n"), (128, "pp"), (140, "p"), (150, "n"))
+    vla.dyn((32, "mp"), (48, "mf"), (63, "f"), (64, "n"), (126, "n"), (128, "p"), (140, "mp"), (150, "n"))
     vlat.dyn((64, "f"), (92, "f"), (96, "ff"), (124, "fff"), (127, "f"), (128, "n"))
     v1.dyn((64, "ff"), (92, "f"), (96, "ff"), (116, "ff"), (124, "fff"), (127, "f"), (128, "n"))
     v2.dyn((64, "ff"), (92, "f"), (96, "ff"), (124, "fff"), (127, "f"), (128, "n"))
-    v1p.dyn((128, "pp"), (136, "p"), (144, "pp"), (150, "n"))
+    v1p.dyn((128, "p"), (136, "mp"), (144, "p"), (150, "n"))
     tpt.dyn((96, "f"), (116, "ff"), (124, "ff"), (127, "mf"), (128, "n"))
     aah.dyn((48, "mp"), (56, "f"), (63, "ff"), (64, "ff"), (92, "f"), (96, "ff"), (124, "fff"),
             (130, "mf"), (132, "n"))
     tbn.dyn((48, "mf"), (60, "f"), (64, "f"), (92, "f"), (96, "ff"), (124, "fff"), (129, "mf"), (130, "n"))
     tuba.dyn((48, "mf"), (60, "f"), (64, "f"), (96, "ff"), (124, "fff"), (129, "mf"), (130, "n"))
-    vc.dyn((64, "f"), (96, "ff"), (124, "fff"), (127, "mf"), (128, "pp"), (140, "p"), (150, "n"))
-    cb.dyn((0, "pp"), (16, "p"), (32, "mp"), (48, "mf"), (64, "f"), (96, "ff"), (124, "fff"), (127, "mf"),
+    vc.dyn((64, "f"), (96, "ff"), (124, "fff"), (127, "mf"), (128, "p"), (140, "mp"), (150, "n"))
+    cb.dyn((0, "p"), (16, "mp"), (32, "mp"), (48, "mf"), (64, "f"), (96, "ff"), (124, "fff"), (127, "mf"),
            (128, "pp"), (140, "p"), (150, "n"))
     return c

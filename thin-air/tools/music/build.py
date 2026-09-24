@@ -5,6 +5,7 @@
     python3.12 thin-air/tools/music/build.py menu night   # render some cues
     python3.12 thin-air/tools/music/build.py --qa-only    # score checks + MIDI score export (no audio)
     python3.12 thin-air/tools/music/build.py --json-only  # rewrite data/music.json + .import from OGGs
+    python3.12 thin-air/tools/music/build.py --prune-cache  # drop cached stems no current part uses
 
 Outputs: assets/audio/music/<cue>.ogg (+ .import with loop flags), data/music.json,
 QA pictures/reports in tools/music/_cache/qa/ (git-ignored).
@@ -115,10 +116,30 @@ def ogg_samples(path: str) -> int:
     return int(r.stdout.strip())
 
 
+def prune_cache() -> int:
+    """Delete cached fluidsynth stems that no current part uses (and stale master WAVs are kept:
+    analyze.py reads them). Frees several GB after a composing session."""
+    keep = set()
+    for cue in load_cues(CUES):
+        for p in cue.parts.values():
+            blob, _end, _path = render.part_to_midi(p)
+            keep.add(render.stem_key(blob) + ".wav")
+    d = os.path.join(render.CACHE, "stems")
+    freed = 0
+    for f in os.listdir(d) if os.path.isdir(d) else []:
+        if f not in keep:
+            freed += os.path.getsize(os.path.join(d, f))
+            os.remove(os.path.join(d, f))
+    print(f"pruned {freed / 1e9:.2f} GB of unused stems; {len(keep)} kept")
+    return 0
+
+
 def main(argv):
     qa_only = "--qa-only" in argv
     json_only = "--json-only" in argv
     names = [a for a in argv if not a.startswith("--")] or CUES
+    if "--prune-cache" in argv:
+        return prune_cache()
     os.makedirs(QA_DIR, exist_ok=True)
     os.makedirs(MUSIC_DIR, exist_ok=True)
     cues = load_cues(names)

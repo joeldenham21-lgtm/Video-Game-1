@@ -99,8 +99,12 @@ def part_to_midi(part: Part) -> tuple[bytes, float, str]:
     return blob, end, path
 
 
+def stem_key(blob: bytes) -> str:
+    return hashlib.sha1(blob + SF.encode() + b"v3").hexdigest()[:16]
+
+
 def fluid_render(midi_path: str, blob: bytes) -> np.ndarray:
-    h = hashlib.sha1(blob + SF.encode() + b"v3").hexdigest()[:16]
+    h = stem_key(blob)
     os.makedirs(os.path.join(CACHE, "stems"), exist_ok=True)
     wav = os.path.join(CACHE, "stems", f"{h}.wav")
     if not os.path.exists(wav):
