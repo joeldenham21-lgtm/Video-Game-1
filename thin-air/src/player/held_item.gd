@@ -148,12 +148,38 @@ func add_mesh(mesh: Mesh, xf := Transform3D.IDENTITY, n := "Mesh") -> MeshInstan
 
 
 ## Adds a posed arm to the model: grip point, handle direction toward the thumb, forearm direction.
-func add_arm(pose: StringName, left: bool, grip: Vector3, thumb_dir: Vector3, elbow_dir: Vector3, sleeve := 0.42) -> MeshInstance3D:
+func add_arm(pose: StringName, left: bool, grip: Vector3, thumb_dir: Vector3, elbow_dir: Vector3, sleeve := 0.42) -> Node3D:
 	var arm := FPHands.make_arm(pose, left, grip, thumb_dir, elbow_dir, sleeve)
 	model.add_child(arm)
 	if viewmodel and viewmodel.has_method(&"register_arm"):
 		viewmodel.call(&"register_arm", arm)
 	return arm
+
+
+## Adds a handle-less arm (open/relaxed hands) placed by wrist position, finger and back-of-hand directions.
+func add_arm_free(pose: StringName, left: bool, wrist: Vector3, finger_dir: Vector3, back_dir: Vector3, sleeve := 0.42,
+		elbow_dir := Vector3.ZERO) -> Node3D:
+	var arm := FPHands.make_arm_free(pose, left, wrist, finger_dir, back_dir, sleeve, elbow_dir)
+	model.add_child(arm)
+	if viewmodel and viewmodel.has_method(&"register_arm"):
+		viewmodel.call(&"register_arm", arm)
+	return arm
+
+
+## Registers an arm built directly with FPHands (inside a sub-holder) so it gets clothing materials.
+func register(arm: Node3D) -> void:
+	if viewmodel and viewmodel.has_method(&"register_arm"):
+		viewmodel.call(&"register_arm", arm)
+
+
+## Forearm direction for a hand at `hand_cam` whose elbow sits at `elbow_cam` (camera space).
+static func elbow_toward(hand_cam: Vector3, elbow_cam: Vector3) -> Vector3:
+	return (elbow_cam - hand_cam).normalized()
+
+
+## Typical elbow positions in camera space (below and slightly outside the shoulders).
+const ELBOW_R := Vector3(0.3, -0.56, 0.02)
+const ELBOW_L := Vector3(-0.3, -0.56, 0.02)
 
 
 ## Smooth 0..1 easing helpers for procedural animation.

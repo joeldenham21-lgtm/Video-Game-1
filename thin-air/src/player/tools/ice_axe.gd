@@ -49,7 +49,7 @@ func build_visual() -> void:
 		mi.mesh = FPModels.ice_axe_mesh()
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		holder.add_child(mi)
-	var elbow := basis.inverse() * Vector3(0.38, -0.5, 0.78)
+	var elbow := basis.inverse() * elbow_toward(grip_cam, ELBOW_R)
 	var arm := FPHands.make_arm(&"grip", false, Vector3(0.0, grip_y, 0.0), Vector3.UP, elbow)
 	holder.add_child(arm)
 	if viewmodel and viewmodel.has_method(&"register_arm"):

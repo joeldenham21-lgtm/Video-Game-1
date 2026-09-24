@@ -4,6 +4,8 @@
 Deterministic (fixed seeds). Writes to thin-air/scenes/player/textures/:
   <set>_albedo.png, <set>_normal.png (OpenGL / Y+), <set>_orm.png (R occlusion, G roughness, B metallic)
 Run from the repo root:  python3 thin-air/tools/player/gen_fp_textures.py
+Then import once (godot --headless --path thin-air --import) and run with --fix-imports to switch the
+.import files to VRAM compression + mipmaps (normal-map mode for *_normal), then import again.
 """
 import os
 import numpy as np
@@ -256,6 +258,23 @@ def canvas(prefix, n, seed):
     save_set(prefix, albedo, tex * 0.6 + slub * 0.4, 0.88 + 0.05 * dirt, np.zeros_like(t), 2.6)
 
 
+def stone(prefix, n, seed):
+    """Knapped chert/basalt: grey-brown matrix, speckles, conchoidal ripples on flake scars."""
+    base = spectral(n, 2.4, seed)
+    speck = spectral(n, 0.05, seed + 1)
+    scars = spectral(n, 2.8, seed + 2)
+    ripples = np.sin(scars * 60.0) * 0.5 + 0.5
+    t = norm01(base * 0.75 + scars * 0.25)
+    albedo = lerp_color(t, [(0.0, srgb((58, 56, 54))), (0.5, srgb((92, 89, 84))), (1.0, srgb((132, 127, 118)))])
+    dots = (speck > 0.82).astype(float)
+    albedo = albedo * (1 - dots[..., None] * 0.35) + dots[..., None] * 0.0
+    light = (speck < 0.12).astype(float)
+    albedo = albedo * (1 - light[..., None] * 0.3) + np.array(srgb((170, 165, 155)))[None, None, :] * light[..., None] * 0.3
+    height = base * 0.4 + ripples * 0.25 - dots * 0.2
+    rough = 0.5 + 0.25 * (1 - t) + 0.1 * dots
+    save_set(prefix, albedo, height, rough, np.zeros_like(t), 4.0)
+
+
 def topo_map(name, n, seed):
     """A believable 1:50,000 topographic sheet: contours, forest tint, glacier, river, grid, margins."""
     h = spectral(n, 3.4, seed)
@@ -344,9 +363,10 @@ def main():
     wood("wood_dark", 512, 23, srgb((58, 36, 22)), srgb((122, 82, 50)), 0.45)
     wood("wood_raw", 512, 31, srgb((84, 66, 50)), srgb((150, 126, 98)), 0.78, knots=True)
     steel("steel", 512, 41)
+    stone("stone", 512, 45)
     leather("leather", 512, 51, srgb((98, 70, 44)), srgb((168, 128, 84)))
     leather("leather_dark", 512, 57, srgb((34, 26, 20)), srgb((74, 56, 40)))
-    fabric("fabric", 512, 61, weave=32, ripstop=4)
+    fabric("fabric", 512, 61, weave=96, ripstop=6)
     knit("knit", 512, 71)
     rubber("rubber", 512, 81)
     aluminium("aluminium", 512, 91)
@@ -360,5 +380,24 @@ def main():
     print("wrote textures to", OUT)
 
 
+def fix_imports():
+    import glob
+    import re
+    for f in glob.glob(os.path.join(OUT, "*.import")):
+        txt = open(f).read()
+        txt = re.sub(r"compress/mode=\d", "compress/mode=2", txt)
+        txt = re.sub(r"mipmaps/generate=\w+", "mipmaps/generate=true", txt)
+        txt = re.sub(r"detect_3d/compress_to=\d", "detect_3d/compress_to=0", txt)
+        if "_normal" in os.path.basename(f):
+            txt = re.sub(r"compress/normal_map=\d", "compress/normal_map=1", txt)
+        txt = txt.replace('"vram_texture": false', '"vram_texture": true')
+        open(f, "w").write(txt)
+    print("patched imports in", OUT)
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--fix-imports" in sys.argv:
+        fix_imports()
+    else:
+        main()

@@ -50,7 +50,7 @@ var _kick := Vector3.ZERO
 var _kick_vel := Vector3.ZERO
 var _bob_amp := 0.0
 var _t := 0.0
-var _arms: Array[MeshInstance3D] = []
+var _arms: Array[Node3D] = []
 var _hand_kind: StringName = &"glove"
 var _sleeve_kind: StringName = &"sleeve"
 var _wet := 0.0
@@ -111,7 +111,7 @@ func on_move_state(_state: int) -> void:
 
 
 ## Called by HeldItem.add_arm(); applies the equipped clothing materials.
-func register_arm(arm: MeshInstance3D) -> void:
+func register_arm(arm: Node3D) -> void:
 	_arms.append(arm)
 	_apply_clothing(arm)
 
@@ -308,9 +308,13 @@ func _refresh_clothing_kinds() -> void:
 			_sleeve_kind = &"sleeve"
 
 
-func _apply_clothing(arm: MeshInstance3D) -> void:
-	if arm.mesh == null or arm.mesh.get_surface_count() < 3:
-		return
-	arm.set_surface_override_material(FPHands.SURF_HAND, FPMaterials.vm(_hand_kind))
-	arm.set_surface_override_material(FPHands.SURF_SLEEVE, FPMaterials.vm(_sleeve_kind))
-	arm.set_surface_override_material(FPHands.SURF_CUFF, FPMaterials.vm(&"cuff"))
+func _apply_clothing(arm: Node3D) -> void:
+	var fore := arm.get_node_or_null(^"Forearm") as MeshInstance3D
+	if fore == null or fore.mesh == null or fore.mesh.get_surface_count() < 3:
+		return   # external art: keep its own materials
+	var hand := arm.get_node_or_null(^"Hand") as MeshInstance3D
+	if hand:
+		hand.set_surface_override_material(FPHands.SURF_HAND, FPMaterials.vm(_hand_kind))
+	fore.set_surface_override_material(FPHands.SURF_GAUNTLET, FPMaterials.vm(_hand_kind))
+	fore.set_surface_override_material(FPHands.SURF_SLEEVE, FPMaterials.vm(_sleeve_kind))
+	fore.set_surface_override_material(FPHands.SURF_CUFF, FPMaterials.vm(&"cuff"))

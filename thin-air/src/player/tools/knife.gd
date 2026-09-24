@@ -27,9 +27,9 @@ func setup(p: Player, vm: Node3D, id: StringName) -> void:
 
 func build_visual() -> void:
 	rest_pos = Vector3(0.22, -0.36, 0.0)
-	var tip_dir := Vector3(-0.22, 0.32, -0.92).normalized()
-	var edge_dir := Vector3(-0.35, -0.9, 0.1)
-	var grip_cam := Vector3(0.17, -0.19, -0.33)
+	var tip_dir := Vector3(-0.28, 0.48, -0.83).normalized()
+	var edge_dir := Vector3(-0.45, -0.85, 0.2)
+	var grip_cam := Vector3(0.14, -0.15, -0.29)
 	# Model: tip toward −Z, edge toward −Y.
 	var zb := -tip_dir
 	var yb := -(edge_dir - tip_dir * edge_dir.dot(tip_dir)).normalized()
@@ -48,7 +48,7 @@ func build_visual() -> void:
 		mi.mesh = FPModels.knife_mesh(item_id)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		holder.add_child(mi)
-	var elbow := basis.inverse() * Vector3(0.35, -0.55, 0.76)
+	var elbow := basis.inverse() * elbow_toward(grip_cam, ELBOW_R)
 	var arm := FPHands.make_arm(&"grip", false, grip_local, Vector3(0, 0, -1), elbow)
 	holder.add_child(arm)
 	if viewmodel and viewmodel.has_method(&"register_arm"):

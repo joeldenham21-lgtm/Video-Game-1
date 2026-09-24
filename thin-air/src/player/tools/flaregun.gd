@@ -26,7 +26,7 @@ func build_visual() -> void:
 		_holder.add_child(mi)
 	# Pistol grip: the grip runs down-back from the frame; thumb toward the barrel side (up).
 	var grip_dir := Vector3(0.0, 0.94, 0.34).normalized()
-	var arm := FPHands.make_arm(&"grip", false, Vector3(0.0, -0.045, 0.03), grip_dir, basis.inverse() * Vector3(0.3, -0.45, 0.84))
+	var arm := FPHands.make_arm(&"grip", false, Vector3(0.0, -0.045, 0.03), grip_dir, basis.inverse() * elbow_toward(grip_cam, ELBOW_R))
 	_holder.add_child(arm)
 	if viewmodel and viewmodel.has_method(&"register_arm"):
 		viewmodel.call(&"register_arm", arm)

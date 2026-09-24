@@ -15,7 +15,7 @@ var _bow_mi: MeshInstance3D = null
 var _string_top: MeshInstance3D = null
 var _string_bot: MeshInstance3D = null
 var _arrow_mi: MeshInstance3D = null
-var _hand_r: MeshInstance3D = null
+var _hand_r: Node3D = null
 var _bow_root: Node3D = null
 var _loose_kick := 0.0
 var _warned := false
@@ -39,7 +39,7 @@ func build_visual() -> void:
 	_bow_mat = _bow_mi.mesh.surface_get_material(0) as ShaderMaterial
 	_bow_root.add_child(_bow_mi)
 	# Left hand around the grip: handle along +Y (thumb up), forearm toward the camera-left-down.
-	var elbow_l := _bow_root.basis.inverse() * Vector3(-0.2, -0.45, 0.87)
+	var elbow_l := _bow_root.basis.inverse() * elbow_toward(grip_cam, ELBOW_L)
 	var arm_l := FPHands.make_arm(&"grip", true, Vector3(0.0, 0.0, 0.0), Vector3.UP, elbow_l)
 	_bow_root.add_child(arm_l)
 	if viewmodel and viewmodel.has_method(&"register_arm"):
@@ -53,7 +53,7 @@ func build_visual() -> void:
 	_arrow_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_bow_root.add_child(_arrow_mi)
 	# Right hand on the string (three-finger hook).
-	_hand_r = FPHands.make_arm(&"hook", false, Vector3.ZERO, Vector3(0, -1, 0), Vector3(0.35, -0.3, 0.88))
+	_hand_r = FPHands.make_arm(&"hook", false, Vector3.ZERO, Vector3(0, -1, 0), Vector3(0.5, -0.2, 0.84))
 	_bow_root.add_child(_hand_r)
 	if viewmodel and viewmodel.has_method(&"register_arm"):
 		viewmodel.call(&"register_arm", _hand_r)
@@ -137,9 +137,11 @@ func _update_string() -> void:
 	var dir := (rest - nock).normalized()
 	_arrow_mi.transform = Transform3D(Basis.looking_at(dir, Vector3.UP), nock + dir * 0.36)
 	# Right hand hooks the string at the nock, forearm back toward the camera.
-	var elbow := Vector3(0.45, -0.25, 0.86)
-	_hand_r.transform = Transform3D(FPHands.grip_basis(Vector3(0.0, -1.0, 0.0), elbow, false), Vector3.ZERO)
-	_hand_r.transform.origin = nock - _hand_r.transform.basis * FPHands.grip_point(&"hook", false)
+	# Drawing elbow sits high and back (anchor at the cheek).
+	var elbow := Vector3(0.5, -0.2, 0.84)
+	var hb := FPHands.grip_basis(Vector3(0.0, -1.0, 0.0), elbow, false)
+	_hand_r.transform = Transform3D(hb, nock - hb * FPHands.grip_point(&"hook", false))
+	FPHands.aim_forearm(_hand_r, elbow)
 	_hand_r.visible = draw > 0.02 or drawing
 
 

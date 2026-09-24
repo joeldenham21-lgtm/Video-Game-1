@@ -69,7 +69,7 @@ func build_visual() -> void:
 		_holder.transform = Transform3D(basis, grip_cam - rest_pos - basis * Vector3(0.0, 0.25, 0.0))
 		mi.mesh = FPModels.lantern_mesh()
 		_head = Vector3(0.0, 0.1, 0.0)
-		var arm := FPHands.make_arm(&"grip_loose", false, Vector3(0.0, 0.25, 0.0), Vector3(1, 0, 0), basis.inverse() * Vector3(0.3, -0.35, 0.88))
+		var arm := FPHands.make_arm(&"grip_loose", false, Vector3(0.0, 0.25, 0.0), Vector3(1, 0, 0), basis.inverse() * elbow_toward(grip_cam, ELBOW_R))
 		_holder.add_child(arm)
 		_register(arm)
 	else:
@@ -83,7 +83,7 @@ func build_visual() -> void:
 		_holder.transform = Transform3D(basis, grip_cam - rest_pos - basis * Vector3(0.0, grip_y, 0.0))
 		mi.mesh = FPModels.torch_mesh()
 		_head = Vector3(0.0, 0.49, 0.0)
-		var arm := FPHands.make_arm(&"grip", false, Vector3(0.0, grip_y, 0.0), Vector3.UP, basis.inverse() * Vector3(0.38, -0.5, 0.78))
+		var arm := FPHands.make_arm(&"grip", false, Vector3(0.0, grip_y, 0.0), Vector3.UP, basis.inverse() * elbow_toward(grip_cam, ELBOW_R))
 		_holder.add_child(arm)
 		_register(arm)
 	if ext:
@@ -119,7 +119,7 @@ func build_visual() -> void:
 	_set_lit(lit, true)
 
 
-func _register(arm: MeshInstance3D) -> void:
+func _register(arm: Node3D) -> void:
 	if viewmodel and viewmodel.has_method(&"register_arm"):
 		viewmodel.call(&"register_arm", arm)
 

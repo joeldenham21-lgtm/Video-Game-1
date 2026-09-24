@@ -1,15 +1,18 @@
 class_name FPHands
 extends RefCounted
-## Procedural first-person arms: gloved (or bare) hand with posed fingers, gauntlet cuff, knit wrist cuff
-## and jacket sleeve. Right-hand local frame: wrist at the origin, fingers toward −Z, back of the hand +Y,
-## thumb on the −X side, forearm toward +Z. Left hands are mirrored geometry.
-##
-## Surfaces: 0 = hand (glove/skin), 1 = sleeve, 2 = wrist cuff — materials are swapped to match the
-## player's equipped clothing (see Viewmodel.refresh_clothing()).
+## Procedural first-person arms. Each arm is a Node3D with two meshes:
+##   "Hand"    — gloved (or bare) hand with posed fingers. Right-hand frame: wrist at the origin, fingers
+##               toward −Z, back of the hand +Y, thumb on the −X side. Placed by the grip it holds.
+##   "Forearm" — glove gauntlet + knit wrist cuff + jacket sleeve along +Z, pivoting at the wrist and aimed
+##               at the elbow (wrist bend clamped), so handles can sit at natural angles to the forearm.
+## Left arms are mirrored geometry. Materials are swapped to match the equipped gloves/jacket
+## (Viewmodel._apply_clothing): Hand surface 0; Forearm surfaces 0 gauntlet, 1 sleeve, 2 cuff.
 
 const SURF_HAND := 0
+const SURF_GAUNTLET := 0
 const SURF_SLEEVE := 1
 const SURF_CUFF := 2
+const MAX_WRIST_BEND := deg_to_rad(58.0)
 
 # Finger layout (right hand): knuckle (MCP) position, segment lengths, base radius, tip radius.
 const FINGERS := [
@@ -67,18 +70,37 @@ const POSES := {
 	},
 }
 
+const EXTERNAL_ARMS := "res://assets/models/fp/arms.glb"
+
 static var _mesh_cache: Dictionary = {}
+static var _external_checked := false
+static var _external_mesh: Mesh = null
 
 
-## Builds (cached) the arm mesh for `pose`. Sleeve length in metres from the wrist.
-static func get_mesh(pose: StringName, left: bool, sleeve_len := 0.42) -> ArrayMesh:
-	var key := "%s_%s_%d" % [pose, "L" if left else "R", int(sleeve_len * 100.0)]
+## Hand mesh for `pose` (cached). One surface: the glove/skin.
+static func get_hand_mesh(pose: StringName, left: bool) -> ArrayMesh:
+	var key := "hand_%s_%s" % [pose, "L" if left else "R"]
 	if _mesh_cache.has(key):
 		return _mesh_cache[key]
 	var mesh := ArrayMesh.new()
 	var b := FPMesh.new()
 	var p: Dictionary = POSES.get(pose, POSES[&"relaxed"])
 	_build_hand(b, p)
+	if left:
+		b.mirror_x_from(0, 0)
+	b.commit(mesh, FPMaterials.vm(&"glove"))
+	_mesh_cache[key] = mesh
+	return mesh
+
+
+## Forearm mesh (cached): surfaces 0 gauntlet, 1 sleeve, 2 wrist cuff.
+static func get_forearm_mesh(left: bool, sleeve_len := 0.42) -> ArrayMesh:
+	var key := "forearm_%s_%d" % ["L" if left else "R", int(sleeve_len * 100.0)]
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var mesh := ArrayMesh.new()
+	var b := FPMesh.new()
+	_build_gauntlet(b)
 	if left:
 		b.mirror_x_from(0, 0)
 	b.commit(mesh, FPMaterials.vm(&"glove"))
@@ -94,6 +116,22 @@ static func get_mesh(pose: StringName, left: bool, sleeve_len := 0.42) -> ArrayM
 	return mesh
 
 
+## Art override: assets/models/fp/arms.glb (first mesh = a right arm authored in the Hand frame: wrist at
+## the origin, fingers −Z, back of the hand +Y, forearm +Z). Replaces hand + forearm for every pose.
+static func _external_arm() -> Mesh:
+	if not _external_checked:
+		_external_checked = true
+		if ResourceLoader.exists(EXTERNAL_ARMS):
+			var ps := load(EXTERNAL_ARMS) as PackedScene
+			if ps:
+				var root := ps.instantiate()
+				var found := root.find_children("*", "MeshInstance3D", true, false)
+				if not found.is_empty():
+					_external_mesh = (found[0] as MeshInstance3D).mesh
+				root.free()
+	return _external_mesh
+
+
 ## Grip centre (handle axis point) of a pose, in hand space (mirrored for left).
 static func grip_point(pose: StringName, left: bool) -> Vector3:
 	var p: Dictionary = POSES.get(pose, POSES[&"relaxed"])
@@ -101,26 +139,98 @@ static func grip_point(pose: StringName, left: bool) -> Vector3:
 	return Vector3(-g.x, g.y, g.z) if left else g
 
 
-## Hand basis so the handle runs toward the thumb along `thumb_dir` and the forearm points to `elbow_dir`.
+## Hand basis so the handle runs toward the thumb along `thumb_dir` and the back of the hand turns toward
+## the elbow side (the natural forearm axis +Z is the elbow direction minus its along-handle part).
 static func grip_basis(thumb_dir: Vector3, elbow_dir: Vector3, left: bool) -> Basis:
 	var x := thumb_dir.normalized() if left else -thumb_dir.normalized()
-	var z := (elbow_dir - x * elbow_dir.dot(x)).normalized()
+	var e := elbow_dir.normalized()
+	var z := e - x * e.dot(x)
+	if z.length_squared() < 1e-6:
+		z = Vector3.BACK - x * Vector3.BACK.dot(x)
+	z = z.normalized()
 	var y := z.cross(x).normalized()
 	return Basis(x, y, z)
 
 
-## Creates a MeshInstance3D arm placed so the pose's grip point sits at `grip_pos` with the given axes.
+## Hand basis from where the fingers point and where the back of the hand faces (free poses).
+static func free_basis(finger_dir: Vector3, back_dir: Vector3) -> Basis:
+	var z := -finger_dir.normalized()
+	var y := (back_dir - z * back_dir.dot(z)).normalized()
+	var x := y.cross(z).normalized()
+	return Basis(x, y, z)
+
+
+## Builds an arm: root at the wrist with `hand_basis`; the forearm aims at `elbow_dir` (parent space).
+static func _build_arm(pose: StringName, left: bool, hand_basis: Basis, wrist: Vector3, elbow_dir: Vector3, sleeve_len: float) -> Node3D:
+	var root := Node3D.new()
+	root.name = "ArmL" if left else "ArmR"
+	root.transform = Transform3D(hand_basis, wrist)
+	root.set_meta(&"pose", pose)
+	root.set_meta(&"left", left)
+	var hand := MeshInstance3D.new()
+	hand.name = "Hand"
+	hand.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	hand.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+	root.add_child(hand)
+	var ext := _external_arm()
+	if ext:
+		hand.mesh = ext
+		if left:
+			hand.scale = Vector3(-1.0, 1.0, 1.0)
+		FPModels._convert_tree(hand)
+		return root
+	hand.mesh = get_hand_mesh(pose, left)
+	var fore := MeshInstance3D.new()
+	fore.name = "Forearm"
+	fore.mesh = get_forearm_mesh(left, sleeve_len)
+	fore.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	fore.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+	root.add_child(fore)
+	aim_forearm(root, elbow_dir)
+	return root
+
+
+## Re-aims an arm's forearm toward `elbow_dir` (in the arm's parent space), clamping the wrist bend.
+static func aim_forearm(arm: Node3D, elbow_dir: Vector3) -> void:
+	var fore := arm.get_node_or_null(^"Forearm") as Node3D
+	if fore == null:
+		return
+	var local := (arm.transform.basis.inverse() * elbow_dir).normalized()
+	var ang := Vector3.BACK.angle_to(local)
+	if ang > MAX_WRIST_BEND:
+		var axis := Vector3.BACK.cross(local)
+		if axis.length_squared() < 1e-8:
+			axis = Vector3.RIGHT
+		local = Vector3.BACK.rotated(axis.normalized(), MAX_WRIST_BEND)
+	var y := (Vector3.UP - local * Vector3.UP.dot(local)).normalized()
+	var x := y.cross(local).normalized()
+	fore.transform = Transform3D(Basis(x, y, local), Vector3.ZERO)
+
+
+## Swaps the finger pose of an existing arm.
+static func set_pose(arm: Node3D, pose: StringName) -> void:
+	var hand := arm.get_node_or_null(^"Hand") as MeshInstance3D
+	if hand == null or _external_arm() != null:
+		return
+	hand.mesh = get_hand_mesh(pose, bool(arm.get_meta(&"left", false)))
+	arm.set_meta(&"pose", pose)
+
+
+## Arm holding a handle: grip point at `grip_pos`, handle toward the thumb along `thumb_dir`, forearm toward
+## `elbow_dir` (all in the parent's space).
 static func make_arm(pose: StringName, left: bool, grip_pos: Vector3, thumb_dir: Vector3, elbow_dir: Vector3,
-		sleeve_len := 0.42) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	mi.name = "ArmL" if left else "ArmR"
-	mi.mesh = get_mesh(pose, left, sleeve_len)
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mi.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+		sleeve_len := 0.42) -> Node3D:
 	var basis := grip_basis(thumb_dir, elbow_dir, left)
-	mi.transform = Transform3D(basis, grip_pos - basis * grip_point(pose, left))
-	mi.set_meta(&"pose", pose)
-	return mi
+	return _build_arm(pose, left, basis, grip_pos - basis * grip_point(pose, left), elbow_dir, sleeve_len)
+
+
+## Arm for a free (handle-less) pose, placed by its wrist; the forearm continues straight unless
+## `elbow_dir` is given.
+static func make_arm_free(pose: StringName, left: bool, wrist_pos: Vector3, finger_dir: Vector3, back_dir: Vector3,
+		sleeve_len := 0.42, elbow_dir := Vector3.ZERO) -> Node3D:
+	var basis := free_basis(finger_dir, back_dir)
+	var e := elbow_dir if elbow_dir != Vector3.ZERO else basis.z
+	return _build_arm(pose, left, basis, wrist_pos, e, sleeve_len)
 
 
 # ---- Geometry ------------------------------------------------------------------------------------
@@ -172,14 +282,6 @@ static func _build_hand(b: FPMesh, pose: Dictionary) -> void:
 		var x := lerpf(-0.036, 0.036, float(k) / 6.0)
 		ridge.add(Vector3(x, 0.0125 - absf(x) * 0.05, -0.064 - (0.0045 - absf(x) * 0.08)), 0.0028, 0.002)
 	b.tube(ridge, 6, Vector3.UP, 30.0, true, true)
-	# Gauntlet of the glove, flaring toward the forearm.
-	var g := FPMesh.Tube.new()
-	g.add(Vector3(0.0, -0.001, -0.006), 0.0305, 0.0205)
-	g.add(Vector3(0.0, 0.0, 0.012), 0.034, 0.026)
-	g.add(Vector3(0.0, 0.001, 0.034), 0.038, 0.031)
-	g.add(Vector3(0.0, 0.002, 0.052), 0.0415, 0.0345)
-	g.add(Vector3(0.0, 0.002, 0.056), 0.0412, 0.0342)
-	b.tube(g, 18, Vector3.UP, 6.0, false, false, 2.0)
 
 
 static func _finger(b: FPMesh, mcp: Vector3, lens: Array, r0: float, r1: float, spread: float, a_mcp: float, a_pip: float, a_dip: float) -> void:
@@ -208,6 +310,18 @@ static func _finger(b: FPMesh, mcp: Vector3, lens: Array, r0: float, r1: float, 
 		t.add(path[k], r + swell, (r + swell) * 0.9)
 	t.dome_end(4, 0.95)
 	b.tube(t, 10, Vector3.UP, 12.0, true, false, 2.0)
+
+
+static func _build_gauntlet(b: FPMesh) -> void:
+	# Glove gauntlet: starts just inside the wrist (hidden by the palm) and flares toward the forearm.
+	var g := FPMesh.Tube.new()
+	g.add(Vector3(0.0, -0.001, -0.014), 0.027, 0.0185)
+	g.add(Vector3(0.0, -0.0005, 0.0), 0.03, 0.021)
+	g.add(Vector3(0.0, 0.0, 0.014), 0.0335, 0.026)
+	g.add(Vector3(0.0, 0.001, 0.034), 0.0378, 0.031)
+	g.add(Vector3(0.0, 0.002, 0.052), 0.0412, 0.0342)
+	g.add(Vector3(0.0, 0.002, 0.056), 0.041, 0.034)
+	b.tube(g, 18, Vector3.UP, 6.0, false, false, 2.0)
 
 
 static func _build_sleeve(b: FPMesh, length: float) -> void:

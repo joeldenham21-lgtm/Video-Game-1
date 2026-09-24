@@ -19,6 +19,7 @@ var _beam: SpotLight3D = null
 var _scanning := false
 var _holder: Node3D = null
 var _check_t := 0.0
+var _target_done := false
 
 
 func build_visual() -> void:
@@ -52,9 +53,9 @@ func build_visual() -> void:
 	screen.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_holder.add_child(screen)
 	# Right hand grips the lower body, left hand steadies it from the side.
-	var arm_r := FPHands.make_arm(&"hold", false, Vector3(0.03, 0.03, 0.0), Vector3(0, 1, 0), basis.inverse() * Vector3(0.45, -0.45, 0.77))
+	var arm_r := FPHands.make_arm(&"hold", false, Vector3(0.03, 0.03, 0.0), Vector3(0, 1, 0), basis.inverse() * elbow_toward(grip_cam, ELBOW_R))
 	_holder.add_child(arm_r)
-	var arm_l := FPHands.make_arm(&"hold", true, Vector3(-0.034, 0.045, 0.0), Vector3(0, 1, 0), basis.inverse() * Vector3(-0.45, -0.45, 0.77))
+	var arm_l := FPHands.make_arm(&"hold", true, Vector3(-0.034, 0.045, 0.0), Vector3(0, 1, 0), basis.inverse() * elbow_toward(grip_cam, ELBOW_L))
 	_holder.add_child(arm_l)
 	if viewmodel and viewmodel.has_method(&"register_arm"):
 		viewmodel.call(&"register_arm", arm_r)
@@ -96,7 +97,8 @@ func item_process(delta: float, can_act: bool) -> void:
 			if _scanning:
 				_stop_scan(true)
 			target = t
-	var scannable := target != null and not _already_scanned(target)
+			_target_done = target != null and _already_scanned(target)
+	var scannable := target != null and not _target_done
 	var wants := can_act and not player.tool_blocked and Input.is_action_pressed(&"use")
 	if wants and scannable:
 		if not _scanning:

@@ -46,7 +46,7 @@ func build_visual() -> void:
 		_holder.add_child(ext)
 	else:
 		_holder.add_child(mi)
-	var arm := FPHands.make_arm(&"hold", false, hand_off + Vector3(0.012, -0.012, 0.0), Vector3(0, 1, 0), basis.inverse() * Vector3(0.4, -0.55, 0.74))
+	var arm := FPHands.make_arm(&"hold", false, hand_off + Vector3(0.012, -0.012, 0.0), Vector3(0, 1, 0), basis.inverse() * elbow_toward(grip_cam, ELBOW_R))
 	_holder.add_child(arm)
 	if viewmodel and viewmodel.has_method(&"register_arm"):
 		viewmodel.call(&"register_arm", arm)

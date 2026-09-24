@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://src/player/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://src/player/player_camera.gd" id="2_cam"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://src/player/viewmodel.gd" id="4_vm"]
 [ext_resource type="Script" path="res://src/survival/vitals.gd" id="5_vitals"]
 [ext_resource type="Script" path="res://src/player/player_sounds.gd" id="6_sounds"]
+[ext_resource type="Texture2D" path="res://scenes/player/textures/smoke.png" id="7_smoke"]
 
 [sub_resource type="CapsuleShape3D" id="Capsule"]
 radius = 0.3
@@ -23,7 +24,7 @@ radius = 0.16
 
 [sub_resource type="Gradient" id="VaporGradient"]
 offsets = PackedFloat32Array(0, 0.18, 0.55, 1)
-colors = PackedColorArray(0.92, 0.94, 0.97, 0, 0.92, 0.94, 0.97, 0.3, 0.9, 0.92, 0.95, 0.14, 0.9, 0.92, 0.95, 0)
+colors = PackedColorArray(0.82, 0.8, 0.78, 0, 0.82, 0.8, 0.78, 0.13, 0.8, 0.79, 0.77, 0.06, 0.8, 0.79, 0.77, 0)
 
 [sub_resource type="Curve" id="VaporScale"]
 _data = [Vector2(0, 0.35), 0.0, 1.6, 0, 0, Vector2(1, 1), 0.4, 0.0, 0, 0]
@@ -35,6 +36,7 @@ cull_mode = 2
 shading_mode = 2
 vertex_color_use_as_albedo = true
 albedo_color = Color(1, 1, 1, 1)
+albedo_texture = ExtResource("7_smoke")
 roughness = 1.0
 billboard_mode = 3
 billboard_keep_scale = true
@@ -45,7 +47,7 @@ proximity_fade_distance = 0.15
 
 [sub_resource type="QuadMesh" id="VaporQuad"]
 material = SubResource("VaporMat")
-size = Vector2(0.22, 0.22)
+size = Vector2(0.14, 0.14)
 
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 2

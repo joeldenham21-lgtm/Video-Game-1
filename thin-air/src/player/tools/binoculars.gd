@@ -31,7 +31,7 @@ func build_visual() -> void:
 	for side: float in [-1.0, 1.0]:
 		var left := side < 0.0
 		var arm := FPHands.make_arm(&"hold", left, Vector3(side * 0.044, -0.012, -0.05), Vector3(0, 0, -1),
-			basis.inverse() * Vector3(side * 0.35, -0.6, 0.72))
+			basis.inverse() * elbow_toward(Vector3(side * 0.05, -0.2, -0.36), ELBOW_L if left else ELBOW_R))
 		_holder.add_child(arm)
 		if viewmodel and viewmodel.has_method(&"register_arm"):
 			viewmodel.call(&"register_arm", arm)

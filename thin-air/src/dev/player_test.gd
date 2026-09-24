@@ -1068,8 +1068,11 @@ func _projectiles(kind: PlayerProjectile.Kind) -> Array[PlayerProjectile]:
 
 func _setup_shot(item: StringName) -> void:
 	player.vitals.auto_simulate = false
-	player.teleport(Vector3(1.5, Y0 + 0.05, 9.0), 20.0)
-	player.set_look(20.0, -8.0)
+	var pos := String(args.get("at", "1.5,9.0,20,-8")).split(",")
+	player.teleport(Vector3(float(pos[0]), Y0 + 0.05, float(pos[1])), float(pos[2]))
+	player.set_look(float(pos[2]), float(pos[3]))
+	if args.has("night"):
+		_make_night()
 	var gloves := StringName(args.get("gloves", "work_gloves"))
 	if gloves != &"none" and ItemDB.has_item(gloves):
 		player.inventory.add(gloves, 1)
@@ -1077,8 +1080,41 @@ func _setup_shot(item: StringName) -> void:
 	if args.has("body") and ItemDB.has_item(StringName(args["body"])):
 		player.inventory.add(StringName(args["body"]), 1)
 		player.equip(StringName(args["body"]))
-	if item != &"none" and ItemDB.has_item(item):
-		player.inventory.add(item, 1)
-		if item == &"bow":
-			player.inventory.add(&"arrow", 12)
-		player.equip(item)
+	var items := String(item).split(",")
+	var per := int(args.get("per", "26"))
+	for i in items.size():
+		var id := StringName(items[i])
+		if id != &"none" and ItemDB.has_item(id):
+			player.inventory.add(id, 1)
+			if id == &"bow":
+				player.inventory.add(&"arrow", 12)
+			if id == &"flare":
+				player.inventory.add(&"flare", 1)
+			player.equip(id)
+		elif id == &"none":
+			player.select_hotbar(-1)
+		print("SHOT %s frames %d-%d" % [id, i * per, i * per + per - 1])
+		var hold := String(args.get("hold", ""))
+		if hold != "":
+			for f in 8:
+				await get_tree().process_frame
+			Input.action_press(StringName(hold))
+		for f in per:
+			await get_tree().process_frame
+		if hold != "":
+			Input.action_release(StringName(hold))
+	if args.has("tap_at"):
+		pass
+
+
+func _make_night() -> void:
+	for c in get_children():
+		if c is DirectionalLight3D:
+			(c as DirectionalLight3D).light_energy = 0.03
+			(c as DirectionalLight3D).light_color = Color(0.5, 0.6, 0.9)
+		if c is WorldEnvironment:
+			var env := (c as WorldEnvironment).environment
+			env.ambient_light_energy = 0.04
+			env.background_energy_multiplier = 0.03
+			env.fog_light_color = Color(0.02, 0.025, 0.04)
+			env.tonemap_exposure = 1.0

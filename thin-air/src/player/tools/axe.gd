@@ -65,9 +65,10 @@ func build_visual() -> void:
 	var grip_y := 0.085
 	var grip_cam := Vector3(0.19, -0.2, -0.37)
 	if two_handed:
-		handle_dir = Vector3(-0.38, 0.7, -0.6).normalized()
+		handle_dir = Vector3(-0.6, 0.6, -0.52).normalized()
+		blade_dir = Vector3(-0.75, -0.2, -0.6)
 		grip_y = 0.07
-		grip_cam = Vector3(0.2, -0.26, -0.32)
+		grip_cam = Vector3(0.2, -0.21, -0.36)
 	var y := handle_dir
 	var zn := -(blade_dir - y * blade_dir.dot(y)).normalized()
 	var x := y.cross(zn).normalized()
@@ -84,14 +85,16 @@ func build_visual() -> void:
 		mi.mesh = FPModels.axe_mesh(variant)
 		holder.add_child(mi)
 	# Hands (in the axe's own frame so they swing with it).
-	var elbow_r := basis.inverse() * Vector3(0.38, -0.5, 0.78)
+	var elbow_r := basis.inverse() * elbow_toward(grip_cam, ELBOW_R)
 	var arm := FPHands.make_arm(&"grip", false, Vector3(0.0, grip_y, 0.0), Vector3.UP, elbow_r)
 	holder.add_child(arm)
 	if viewmodel and viewmodel.has_method(&"register_arm"):
 		viewmodel.call(&"register_arm", arm)
 	if two_handed:
-		var elbow_l := basis.inverse() * Vector3(-0.35, -0.55, 0.75)
-		var arm_l := FPHands.make_arm(&"grip", true, Vector3(0.0, grip_y + 0.3, 0.0), Vector3.UP, elbow_l)
+		var up_hand := grip_y + 0.3
+		var hand_l_cam := grip_cam + handle_dir * 0.3
+		var elbow_l := basis.inverse() * elbow_toward(hand_l_cam, ELBOW_L)
+		var arm_l := FPHands.make_arm(&"grip", true, Vector3(0.0, up_hand, 0.0), Vector3.UP, elbow_l)
 		holder.add_child(arm_l)
 		if viewmodel and viewmodel.has_method(&"register_arm"):
 			viewmodel.call(&"register_arm", arm_l)

@@ -62,6 +62,9 @@ var last_impact := 0.0
 var air_time := 0.0
 ## True while build mode (or similar) owns the use/aim buttons — held items don't act.
 var tool_blocked := false
+## Smoothed / decaying-peak cost of this script's _physics_process (µs) — perf budget monitoring.
+var perf_physics_us := 0.0
+var perf_physics_peak_us := 0.0
 
 # ---- Nodes -------------------------------------------------------------------------------------
 @onready var head: PlayerCameraRig = $Head
@@ -137,6 +140,7 @@ var _phys_prev := Vector3.ZERO
 var _phys_curr := Vector3.ZERO
 var _own_interp := true
 var _was_under := false
+var _sleep_hours := 0.0
 
 # motion test (step-up), preallocated
 var _tm_params := PhysicsTestMotionParameters3D.new()
@@ -181,6 +185,7 @@ func _ready() -> void:
 	Events.ui_screen_opened.connect(_on_ui_opened)
 	Events.ui_screen_closed.connect(_on_ui_closed)
 	Events.item_picked_up.connect(_on_item_picked_up)
+	Events.sleep_started.connect(_on_sleep_started)
 	Events.sleep_ended.connect(_on_sleep_ended)
 	Events.cinematic_started.connect(_on_cinematic_started)
 	Events.cinematic_ended.connect(_on_cinematic_ended)
@@ -576,6 +581,14 @@ func _gather_input(delta: float) -> void:
 # =================================================================================================
 
 func _physics_process(delta: float) -> void:
+	var t0 := Time.get_ticks_usec()
+	_physics_step(delta)
+	var us := float(Time.get_ticks_usec() - t0)
+	perf_physics_us = lerpf(perf_physics_us, us, 0.02)
+	perf_physics_peak_us = maxf(perf_physics_peak_us * 0.999, us)
+
+
+func _physics_step(delta: float) -> void:
 	_phys_prev = _phys_curr
 	if _dead:
 		_physics_dead(delta)
@@ -1590,9 +1603,18 @@ func _on_cinematic_ended(_id: StringName) -> void:
 	pass
 
 
+func _on_sleep_started(hours: float) -> void:
+	_sleep_hours = hours
+	vitals.env_sleeping = true
+	set_input_enabled(false)
+
+
 func _on_sleep_ended() -> void:
-	var hours := 7.0
-	vitals.on_slept(hours)
+	vitals.env_sleeping = false
+	vitals.on_slept(_sleep_hours)
+	_sleep_hours = 0.0
+	if not _dead:
+		set_input_enabled(true)
 
 
 func _on_died(_cause: StringName) -> void:

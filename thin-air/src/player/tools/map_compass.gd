@@ -32,7 +32,7 @@ func build_visual() -> void:
 		_needle.position = Vector3(0.0, 0.0065, 0.0)
 		_needle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_holder.add_child(_needle)
-		var arm := FPHands.make_arm(&"hold", false, Vector3(0.004, -0.02, 0.02), Vector3(0, 0, -1), basis.inverse() * Vector3(0.4, -0.6, 0.7))
+		var arm := FPHands.make_arm(&"hold", false, Vector3(0.004, -0.02, 0.02), Vector3(0, 0, -1), basis.inverse() * elbow_toward(Vector3(0.1, -0.2, -0.3), ELBOW_R))
 		_holder.add_child(arm)
 		_register(arm)
 	else:
@@ -44,12 +44,12 @@ func build_visual() -> void:
 		_holder.add_child(mi)
 		for side in [-1.0, 1.0]:
 			var arm := FPHands.make_arm(&"pinch", side < 0.0, Vector3(float(side) * 0.15, -0.04, -0.012), Vector3(0, 1, 0),
-				basis.inverse() * Vector3(float(side) * 0.3, -0.6, 0.74))
+				basis.inverse() * elbow_toward(Vector3(float(side) * 0.15, -0.26, -0.36), ELBOW_L if side < 0.0 else ELBOW_R))
 			_holder.add_child(arm)
 			_register(arm)
 
 
-func _register(arm: MeshInstance3D) -> void:
+func _register(arm: Node3D) -> void:
 	if viewmodel and viewmodel.has_method(&"register_arm"):
 		viewmodel.call(&"register_arm", arm)
 

@@ -4,8 +4,8 @@ extends MeleeTool
 
 const PUSH_IMPULSE := 5.5
 
-var arm_r: MeshInstance3D = null
-var arm_l: MeshInstance3D = null
+var arm_r: Node3D = null
+var arm_l: Node3D = null
 var _base_r := Transform3D.IDENTITY
 var _base_l := Transform3D.IDENTITY
 var _guard := 0.0
@@ -38,8 +38,9 @@ func setup(p: Player, vm: Node3D, id: StringName) -> void:
 
 func build_visual() -> void:
 	rest_pos = Vector3.ZERO
-	arm_r = add_arm(&"relaxed", false, Vector3(0.17, -0.235, -0.3), Vector3(-0.35, 0.8, -0.3), Vector3(0.3, -0.55, 0.78))
-	arm_l = add_arm(&"relaxed", true, Vector3(-0.19, -0.25, -0.31), Vector3(0.35, 0.8, -0.3), Vector3(-0.32, -0.55, 0.78))
+	# Wrists low at the edges of view, fingers forward and slightly in, palms turned down-in.
+	arm_r = add_arm_free(&"relaxed", false, Vector3(0.21, -0.27, -0.27), Vector3(-0.22, 0.42, -0.88), Vector3(0.55, 0.8, 0.2))
+	arm_l = add_arm_free(&"relaxed", true, Vector3(-0.23, -0.28, -0.28), Vector3(0.22, 0.42, -0.88), Vector3(-0.55, 0.8, 0.2))
 	_base_r = arm_r.transform
 	_base_l = arm_l.transform
 
@@ -59,16 +60,11 @@ func item_process(delta: float, can_act: bool) -> void:
 	arm_r.transform = Transform3D(rot_r * _base_r.basis, _base_r.origin + jab_pos + Vector3(-0.03, 0.12, -0.05) * g)
 	arm_l.transform = Transform3D(_base_l.basis, _base_l.origin + Vector3(0.03, 0.12, -0.05) * g)
 	if fist > 0.5 and arm_r.get_meta(&"pose", &"") != &"fist":
-		_set_pose(arm_r, &"fist", false)
+		FPHands.set_pose(arm_r, &"fist")
+		register(arm_r)
 	elif fist < 0.5 and arm_r.get_meta(&"pose", &"") == &"fist":
-		_set_pose(arm_r, &"relaxed", false)
-
-
-func _set_pose(arm: MeshInstance3D, pose: StringName, left: bool) -> void:
-	arm.mesh = FPHands.get_mesh(pose, left)
-	arm.set_meta(&"pose", pose)
-	if viewmodel and viewmodel.has_method(&"register_arm"):
-		viewmodel.call(&"register_arm", arm)
+		FPHands.set_pose(arm_r, &"relaxed")
+		register(arm_r)
 
 
 ## Shove loose physics props instead of punching them (mostly horizontal, a little lift).

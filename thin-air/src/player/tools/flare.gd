@@ -49,7 +49,7 @@ func build_visual() -> void:
 	_tip.mesh = am
 	_tip.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_holder.add_child(_tip)
-	var arm := FPHands.make_arm(&"grip", false, Vector3(0.0, 0.07, 0.0), Vector3.UP, basis.inverse() * Vector3(0.38, -0.5, 0.78))
+	var arm := FPHands.make_arm(&"grip", false, Vector3(0.0, 0.07, 0.0), Vector3.UP, basis.inverse() * elbow_toward(grip_cam, ELBOW_R))
 	_holder.add_child(arm)
 	if viewmodel and viewmodel.has_method(&"register_arm"):
 		viewmodel.call(&"register_arm", arm)

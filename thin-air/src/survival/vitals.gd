@@ -50,8 +50,8 @@ const TUNING := {
 	&"stamina_regen_delay": 0.9,       # s after spending stamina
 	&"exhausted_recover": 30.0,        # stamina needed to shake off "exhausted"
 	# Health.
-	&"regen_per_hour": 4.0,            # natural healing when fed, watered, warm
-	&"regen_sleep_per_hour": 9.0,
+	&"regen_per_hour": 2.0,            # natural healing when fed, watered, warm
+	&"regen_sleep_per_hour": 6.0,
 	&"starve_damage": 0.05,            # hp/s at food 0 (game-time scaled)
 	&"thirst_damage": 0.1,
 	&"bleed_damage": 0.35,             # hp/s at strength 1
@@ -563,7 +563,7 @@ func _simulate_health(gdt: float, rdt: float, hours: float) -> void:
 	if fed and warmth > 40.0 and oxygen > 55.0 and not has_effect(&"bleeding") and health < max_health:
 		var per_h := float(TUNING[&"regen_sleep_per_hour"]) if env_sleeping else float(TUNING[&"regen_per_hour"])
 		if has_effect(&"well_fed"):
-			per_h *= 2.5
+			per_h *= 2.0
 		if has_effect(&"rested"):
 			per_h *= 1.5
 		if has_effect(&"sick"):
