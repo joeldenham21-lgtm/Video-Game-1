@@ -30,9 +30,9 @@ GRAVEL_LITH = [
 	(0.16, (86, 88, 84), 0.3),      # basalt / greenstone
 	(0.12, (190, 184, 170), 0.2),   # quartzite / vein quartz
 	(0.12, (120, 112, 100), 0.4),   # greywacke
-	(0.10, (140, 110, 90), 0.3),    # red chert / jasper-ish, muted
+	(0.05, (132, 108, 92), 0.3),    # red chert / jasper-ish, muted
 	(0.10, (108, 114, 100), 0.4),   # greenschist
-	(0.08, (160, 142, 116), 0.4),   # sandstone
+	(0.06, (156, 142, 120), 0.4),   # sandstone
 	(0.06, (60, 60, 58), 0.2),      # black argillite
 ]
 
@@ -72,9 +72,12 @@ def layer_scree(t: tl.Tex) -> dict:
 		ix, py, px = hc.region(cy, cx, int(rmax) + 2, int(rmax) + 2)
 		surf = f(py, px)
 		under = hc.z[ix][~np.isnan(surf)]
-		rest = np.percentile(under, 35) if under.size else -0.2
-		z0 = max(rest, -0.16) - thick * (0.25 + 0.2 * r.random()) + r.normal(0, 0.01)
-		surf = surf + z0 + rough_n[ix] * thick * 0.035 + np.minimum(chip_n[ix], 0) * thick * 0.03
+		small = d_m < 0.16
+		rest = np.percentile(under, 8 if small else 35) if under.size else -0.2
+		if small:
+			rest = min(rest, -0.13)            # small clasts trickle into the gaps, not onto big blocks
+		z0 = max(rest, -0.16) - thick * ((0.4 if small else 0.25) + 0.2 * r.random()) + r.normal(0, 0.01)
+		surf = surf + z0 + rough_n[ix] * thick * 0.015 + np.minimum(chip_n[ix], 0) * thick * 0.012
 		hc.stamp(ix, surf, i)
 	height = hc.z
 	sid = hc.id
@@ -84,9 +87,9 @@ def layer_scree(t: tl.Tex) -> dict:
 	# stone colour: lithology × per-stone tone × speckle
 	gcol, _, _ = cm.granite_grain(t, grain_m=0.006, weather=0.35)
 	gnorm = gcol / np.maximum(gcol.mean(axis=(0, 1)), 1e-6)
-	tone = np.exp(r.normal(0, 0.12, n))[sidc]
+	tone = np.exp(r.normal(0, 0.09, n))[sidc]
 	col = lcol[sidc] * tone[..., None]
-	col = col * tl.lerp(1.0, gnorm, lspk[sidc][..., None] * 0.5)
+	col = col * tl.lerp(1.0, gnorm, lspk[sidc][..., None] * 0.25)
 	col *= np.exp(0.10 * tl.spectral(S, r, 20, 200, 0.8))[..., None]
 	# per-stone gradient (lighting-independent weathering: tops paler, undersides darker/stained)
 	top = tl.smoothstep(-0.05, 0.05, height - (height * 0 + tl.gauss(height, t.px(0.1))))
@@ -151,8 +154,8 @@ def layer_gravel(t: tl.Tex) -> dict:
 	col = tl.mix3(col, scol, dust * 0.55)
 	col = np.where(stone[..., None], col, scol)
 	# damp patches (darker, smoother)
-	wet = tl.smoothstep(0.3, 1.6, tl.spectral(S, r, 3, 16, 1.2))
-	col = col * (1 - 0.18 * wet)[..., None]
+	wet = tl.patches(S, r, 3, 24, 0.25, 0.6, detail=0.8)
+	col = col * (1 - 0.10 * wet)[..., None]
 	col = tl.mix3(col, tl.rgb(70, 66, 58), mcrack * 0.6)
 	rough = np.where(stone, 0.58 + 0.08 * r.random(n)[sidc], 0.9)
 	rough = rough - wet * np.where(stone, 0.15, 0.2)

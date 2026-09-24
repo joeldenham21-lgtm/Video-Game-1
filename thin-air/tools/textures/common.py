@@ -136,16 +136,16 @@ def angular_stone(rng, R_px: float, aspect: float, rot: float, thick: float):
 	cx0, cy0 = vx.mean(), vy.mean()
 	sign = np.sign((cx0 - vx) * nx + (cy0 - vy) * ny)
 	nx, ny = nx * sign, ny * sign
-	slopes = thick / (R_px * (0.12 + 0.35 * rng.random(nv)))       # steep side facets (height per px)
+	slopes = thick / (R_px * (0.06 + 0.16 * rng.random(nv)))       # steep side facets (height per px)
 	top_t = thick * (0.8 + 0.2 * rng.random())
-	gx, gy = (rng.random(2) - 0.5) * 2 * thick / R_px * 0.45         # tilted top face
+	gx, gy = (rng.random(2) - 0.5) * 2 * thick / R_px * 0.35         # tilted top face
 	# extra cutting planes → angular top facets (conchoidal fracture faces)
-	nc = int(rng.integers(2, 5))
+	nc = int(rng.integers(1, 3))
 	ca = rng.random(nc) * 2 * math.pi
 	cux, cuy = np.cos(ca), np.sin(ca)
 	coff = (rng.random(nc) * 0.7 - 0.1) * R_px
-	cslope = thick / R_px * (0.6 + 1.2 * rng.random(nc))
-	clev = thick * (0.55 + 0.4 * rng.random(nc))
+	cslope = thick / R_px * (0.3 + 0.6 * rng.random(nc))
+	clev = thick * (0.7 + 0.3 * rng.random(nc))
 
 	def f(py, px):
 		d = (px - vx[:, None, None]) * nx[:, None, None] + (py - vy[:, None, None]) * ny[:, None, None]
@@ -154,7 +154,7 @@ def angular_stone(rng, R_px: float, aspect: float, rot: float, thick: float):
 		hgt = np.minimum(hgt, top_t + gx * px + gy * py)
 		proj = px[None] * cux[:, None, None] + py[None] * cuy[:, None, None]
 		cut = clev[:, None, None] - cslope[:, None, None] * (proj - coff[:, None, None])
-		hgt = np.minimum(hgt, np.min(cut, axis=0))
+		hgt = np.maximum(np.minimum(hgt, np.min(cut, axis=0)), hgt * 0.45)   # bevels trim the top, never split
 		return np.where(inside, hgt, np.nan)
 
 	return f, rad.max()

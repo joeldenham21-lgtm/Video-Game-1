@@ -163,72 +163,66 @@ def layer_rock(t: tl.Tex) -> dict:
 def layer_cliff(t: tl.Tex) -> dict:
 	S = t.shape
 	r = t.rng
-	# small warp only: fractures are straight-ish planes, not blobs
-	wx = tl.spectral(S, r, 2, 12, 1.5) * t.px(0.04)
-	wy = tl.spectral(S, r, 2, 12, 1.5) * t.px(0.04)
-	# faceted fracture planes at three scales; cells squashed vertically → blocky horizontal ledges
-	h1, v1 = tl.planar_cells(S, r, 18, 0.45, 0.16, t.tile_w_m, sy=2.2, dx=wx, dy=wy)
-	h2, v2 = tl.planar_cells(S, r, 120, 0.35, 0.05, t.tile_w_m, sy=1.6, dx=wx, dy=wy)
-	h3, v3 = tl.planar_cells(S, r, 900, 0.25, 0.010, t.tile_w_m, sy=1.2, dx=wx, dy=wy)
-	height = h1 + h2 * 0.8 + h3 * 0.5
-	# sub-vertical master joints and bedding partings (stepped, partial)
-	crack1 = np.zeros(S)
-	for (p, q, n_l, step, width, amp) in ((1, 0, 3, 0.10, 0.025, 0.012), (0, 1, 5, 0.12, 0.02, 0.006),
-	                                      (1, 4, 2, 0.05, 0.012, 0.01)):
-		dist, near, ramp, slab = tl.line_family(S, p, q, r.random(n_l), tl.spectral(S, r, 2, 40, 1.4) * amp)
-		vis = tl.smoothstep(-0.4, 0.4, tl.spectral(S, r, 1, 4, 1.5))
+	px = t.px
+	wx = tl.spectral(S, r, 2, 12, 1.5) * px(0.05)
+	wy = tl.spectral(S, r, 2, 12, 1.5) * px(0.05)
+	# --- fractured relief: continuous facet envelopes (ridges + valleys, no stepped seams) at two scales
+	f1 = tl.facet_envelope(S, r, 60, 0.25, 0.35, t.tile_w_m, sy=1.6, dx=wx, dy=wy, mode="max")
+	f2 = tl.facet_envelope(S, r, 380, 0.25, 0.30, t.tile_w_m, sy=1.3, dx=wx, dy=wy, mode="min")
+	f2 = tl.gauss(f2, 1.6)
+	height = (f1 - f1.mean()) * 0.8 + (f2 - f2.mean()) * 0.45
+	# bedding: soft terraces -> ledges with steep risers and leaning tops (image up = world up)
+	yy, xx = t.grid()
+	bed = yy * 7 + tl.spectral(S, r, 1, 5, 1.6) * 0.35 + 0.15 * np.sin(2 * np.pi * (xx + r.random()))
+	fr = bed % 1.0
+	terr = tl.smoothstep(0.0, 0.18, fr) * 0.07 - fr * 0.07       # ~7 cm step per band, sloping face
+	bstrength = tl.smoothstep(-0.8, 0.6, tl.spectral(S, r, 1, 4, 1.5))
+	height += terr * bstrength
+	ledge_top = (1 - tl.smoothstep(0.0, 0.06, fr)) * bstrength
+	# master joints: a few sub-vertical fractures, open and shadowed, plus one oblique set
+	joint = np.zeros(S)
+	for (p, q, n_l, width, step) in ((1, 0, 3, 0.03, 0.08), (1, 3, 1, 0.018, 0.04)):
+		wig = tl.spectral(S, r, 2, 24, 1.5) * 0.008
+		dist, near, ramp, slab = tl.line_family(S, p, q, r.random(n_l), wig)
+		vis = tl.smoothstep(-0.2, 0.6, tl.spectral(S, r, 1, 5, 1.4))
 		d_m = dist * t.tile_w_m
-		c = (1.0 - tl.smoothstep(0.0, width * (0.5 + tl.norm01(tl.spectral(S, r, 4, 30, 1.0))), d_m)) * vis
-		crack1 = np.maximum(crack1, c)
+		ww = width * (0.3 + 1.2 * tl.norm01(tl.spectral(S, r, 3, 20, 1.2)) ** 2)
+		joint = np.maximum(joint, (1.0 - tl.smoothstep(ww * 0.3, ww, d_m)) * vis)
 		height += ramp * r.normal(0, step, n_l)[slab] * vis
-	e1 = v1.edge * t.tile_w_m
-	e2 = v2.edge * t.tile_w_m
-	open1 = tl.edge_pair_rand(v1, 1) < 0.22
-	open2 = tl.edge_pair_rand(v2, 2) < 0.06
-	crack1 = np.maximum(crack1, (1.0 - tl.smoothstep(0.0, 0.02, e1)) * open1)
-	crack2 = (1.0 - tl.smoothstep(0.0, 0.008, e2)) * open2
-	height -= crack1 * 0.14 + crack2 * 0.03
-	# fracture-surface roughness (conchoidal ridges) + large bulges
-	height += tl.ridged(tl.spectral(S, r, 10, 90, 1.1), 0.6) * 0.025 + tl.spectral(S, r, 20, 300, 1.2) * 0.007
-	height += tl.spectral(S, r, 1, 3, 1.6) * 0.10
-	# --- albedo: dark grey metamorphic rock (argillite/greywacke); subtle per-facet tone
-	col = tl.fill(S, tl.rgb(98, 96, 92))
-	col = col * np.exp(r.normal(0, 0.06, v1.count)[v1.cell] + r.normal(0, 0.05, v2.count)[v2.cell]
-	                   + r.normal(0, 0.035, v3.count)[v3.cell])[..., None]
+	height -= joint * 0.1
+	# rough rock skin
+	height += tl.ridged(tl.warp(tl.spectral(S, r, 8, 80, 1.1), wx, wy), 0.6) * 0.012
+	height += tl.spectral(S, r, 40, 450, 0.9) * 0.0025
+	# --- albedo: dark grey metasediment with subtle warm/cool drift
+	col = tl.fill(S, tl.rgb(100, 98, 94))
 	warm = tl.spectral(S, r, 1, 6, 1.4)
-	col = tl.mix3(col, col * np.array([1.08, 1.0, 0.9]), tl.smoothstep(0.0, 1.5, warm) * 0.8)
-	col = tl.mix3(col, col * np.array([0.95, 1.02, 1.0]), tl.smoothstep(0.0, 1.5, -warm) * 0.8)
-	col *= np.exp(0.07 * tl.spectral(S, r, 2, 40, 1.2) + 0.07 * tl.spectral(S, r, 150, 512, 0.2))[..., None]
-	# quartz veins: thin pale bands
+	col = tl.mix3(col, col * np.array([1.07, 1.0, 0.92]), tl.smoothstep(0.0, 1.5, warm) * 0.7)
+	col = tl.mix3(col, col * np.array([0.95, 1.01, 1.02]), tl.smoothstep(0.0, 1.5, -warm) * 0.7)
+	col *= np.exp(0.06 * tl.spectral(S, r, 2, 40, 1.2) + 0.08 * tl.spectral(S, r, 150, 512, 0.2))[..., None]
 	vein = tl.line_family(S, 1, 3, r.random(2), tl.spectral(S, r, 2, 20, 1.4) * 0.03)[0] * t.tile_w_m
-	vein = (1 - tl.smoothstep(0.0, 0.012, vein)) * tl.smoothstep(0.0, 0.8, tl.spectral(S, r, 1, 5, 1.3))
-	col = tl.mix3(col, tl.rgb(188, 186, 180), vein * 0.7)
-	# fresh fracture faces (steep facets facing down = recent spalls) lighter
+	vein = (1 - tl.smoothstep(0.0, 0.01, vein)) * tl.patches(S, r, 1, 6, 0.4, 0.4)
+	col = tl.mix3(col, tl.rgb(178, 176, 170), vein * 0.55)
+	# fresh fracture scars on steep facets
 	gx, gy = tl.grad(height, t.texel_m)
-	fresh = tl.smoothstep(0.2, 0.8, gy) * tl.smoothstep(0.3, 1.2, tl.spectral(S, r, 2, 12, 1.2))
-	col = tl.mix3(col, tl.rgb(132, 132, 130), np.clip(fresh, 0, 1) * 0.45)
-	# streaks: water/varnish from ledges (where height drops going down the image) and cracks
-	ledge = tl.smoothstep(0.4, 1.5, -gy) + crack1 * 0.5
-	src = ledge * tl.smoothstep(-0.2, 1.0, tl.spectral(S, r, 4, 40, 1.0))
-	streak = tl.blur_dir(src, t.px(1.4), angle=math.pi / 2, taps=48, decay=3.0)
-	streak = np.clip(tl.gauss_aniso(streak, 1.0, 2.0) * 1.6, 0, 1)
-	varn = tl.smoothstep(0.2, 1.4, tl.spectral(S, r, 4, 40, 1.0, stretch=7, angle=math.pi / 2))
-	col = tl.mix3(col, tl.rgb(44, 41, 38), np.clip(streak * 0.55 + varn * 0.25, 0, 0.75))
-	rust = tl.blur_dir((r.random(S) < 0.00006).astype(float), t.px(1.0), math.pi / 2, 30, 1.5)
-	rust = np.clip(tl.gauss_aniso(rust, 3, 7) * 1200, 0, 1)
-	col = tl.mix3(col, tl.rgb(122, 80, 50), rust * 0.35)
-	calc = tl.blur_dir((r.random(S) < 0.00003).astype(float), t.px(0.8), math.pi / 2, 30, 1.5)
-	col = tl.mix3(col, tl.rgb(170, 168, 160), np.clip(tl.gauss_aniso(calc, 2, 5) * 900, 0, 1) * 0.3)
-	# lichen: sparse, mostly dark Umbilicaria + map lichen
-	la, lcol, lrim, lsp = cm.lichen_colonies(t, coverage=0.07, mean_r_m=0.05, species_w=(0.35, 0.03, 0.22, 0.40),
-	                                         mask=(1 - crack1))
-	col = tl.mix3(col, lcol, la * 0.8)
+	fresh = tl.patches(S, r, 2, 16, 0.15, 0.3) * tl.smoothstep(0.2, 0.7, np.hypot(gx, gy))
+	col = tl.mix3(col, tl.rgb(138, 138, 136), fresh * 0.4)
+	# ledge tops: paler (dust, lichen); water/varnish streaks below ledges and joints
+	col = tl.mix3(col, tl.rgb(132, 128, 120), ledge_top * 0.4)
+	src = (ledge_top * 0.9 + joint * 0.5) * tl.patches(S, r, 4, 40, 0.5, 0.5)
+	streak = tl.blur_dir(src, px(1.6), angle=math.pi / 2, taps=56, decay=2.6)
+	streak = np.clip(tl.gauss_aniso(streak, 1.0, 2.2) * 1.8, 0, 1)
+	varn = tl.patches(S, r, 3, 40, 0.3, 0.5, stretch=8, angle=math.pi / 2)
+	col = tl.mix3(col, tl.rgb(46, 43, 40), np.clip(streak * 0.5 + varn * 0.22, 0, 0.7))
+	rust = tl.blur_dir(tl.patches(S, r, 10, 80, 0.004, 0.2), px(1.0), math.pi / 2, 30, 1.5)
+	col = tl.mix3(col, tl.rgb(122, 82, 52), np.clip(rust * 6, 0, 1) * 0.35)
+	la, lcol, lrim, lsp = cm.lichen_colonies(t, coverage=0.07, mean_r_m=0.05, species_w=(0.2, 0.01, 0.3, 0.49),
+	                                         mask=(1 - joint))
+	col = tl.mix3(col, lcol, la * 0.65)
 	col = tl.mix3(col, cm.LICHEN_PROTHALLUS, lrim * (lsp == 0) * 0.6)
-	# soil/shade in major cracks
-	col = tl.mix3(col, tl.rgb(40, 37, 34), crack1 * 0.55 + crack2 * 0.25)
+	col = tl.mix3(col, tl.rgb(52, 48, 44), joint * 0.45)
 	rough = 0.82 + 0.04 * tl.spectral(S, r, 10, 200, 0.5) - streak * 0.15 - fresh * 0.05
 	rough = rough * (1 - la) + 0.9 * la
-	return dict(albedo=col, height=height, rough=rough, ao_bake=0.55, ao_radius=0.5, albedo_target=0.12)
+	return dict(albedo=col, height=height, rough=rough, ao_bake=0.55, ao_radius=0.3, albedo_target=0.12)
 
 
 # =============================================================================================

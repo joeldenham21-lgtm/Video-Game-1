@@ -1,0 +1,18 @@
+[gd_resource type="ORMMaterial3D" load_steps=4 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/textures/fabric_wool/fabric_wool_albedo.png" id="1_albedo"]
+[ext_resource type="Texture2D" path="res://assets/textures/fabric_wool/fabric_wool_orm.png" id="2_orm"]
+[ext_resource type="Texture2D" path="res://assets/textures/fabric_wool/fabric_wool_normal.png" id="3_normal"]
+
+[resource]
+resource_name = "fabric_wool"
+albedo_texture = ExtResource("1_albedo")
+orm_texture = ExtResource("2_orm")
+normal_enabled = true
+normal_scale = 1.000
+normal_texture = ExtResource("3_normal")
+rim_enabled = true
+rim = 0.350
+rim_tint = 0.600
+uv1_scale = Vector3(3.33333, 3.33333, 1)
+texture_filter = 5

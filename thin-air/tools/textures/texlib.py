@@ -681,6 +681,35 @@ def patches(shape, rng, k0: float, k1: float, coverage: float, soft: float = 0.2
 	return smoothstep(thr - soft, thr + soft, f)
 
 
+def facet_envelope(shape, rng, count: int, slope_sd: float, cone: float, tile_w_m: float, k: int = 6,
+                   sy: float = 1.0, dx=None, dy=None, mode: str = "max") -> np.ndarray:
+	"""Continuous faceted surface (metres): upper (or lower) envelope of randomly tilted cones
+	h_i(p) = g_i·(p - s_i) - cone*|p - s_i| over the k nearest seeds. Unlike piecewise planes there are no
+	height steps at cell borders — only creases (ridges for 'max', valleys for 'min'), like fractured rock."""
+	v = worley(shape, rng, count, k=k, sy=sy, dx=dx, dy=dy)
+	h, w = shape
+	Y, X = np.meshgrid((np.arange(h) + 0.5) / h, (np.arange(w) + 0.5) / w, indexing="ij")
+	if dy is not None:
+		Y = Y + dy / h
+	if dx is not None:
+		X = X + dx / w
+	gx = rng.normal(0, slope_sd, v.count)
+	gy = rng.normal(0, slope_sd, v.count)
+	best = np.full(shape, -np.inf if mode == "max" else np.inf)
+	for j in range(k):
+		ids = v.idx[..., j]
+		ddx = wrap_delta(X, v.seeds[ids, 1]) * tile_w_m
+		ddy = wrap_delta(Y, v.seeds[ids, 0]) * tile_w_m
+		dist = np.sqrt(ddx * ddx + (ddy * sy) ** 2)
+		val = gx[ids] * ddx + gy[ids] * ddy - cone * dist
+		if mode == "max":
+			np.maximum(best, val, out=best)
+		else:
+			val = -val
+			np.minimum(best, val, out=best)
+	return best
+
+
 def edge_pair_rand(v: "Voronoi", salt: int = 0) -> np.ndarray:
 	"""Per-pixel random value identifying the Voronoi edge (pair of nearest cells) — for masking a subset
 	of cell borders (open fractures, board joints)."""

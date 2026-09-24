@@ -74,6 +74,8 @@ func _ready() -> void:
 			_build_terrain(String(args.get("layer", "rock")), ah, nr)
 		"strips":
 			_build_strips(String(args.get("layers", "snow,rock,cliff")).split(","), ah, nr)
+		"wall":
+			_build_wall(String(args.get("layer", "cliff")), String(args.get("ground", "scree")), ah, nr)
 		"sets":
 			_build_sets(String(args.get("sets", "rock_boulder,wood_log")).split(","), ah, nr)
 		_:
@@ -293,6 +295,21 @@ func _build_terrain(layer_name: String, ah: Resource, nr: Resource) -> void:
 	_add_mesh(pm, _terrain_material(layer_name, ah, nr), Vector3.ZERO)
 	cam.position = Vector3(0, 1.7, 0)
 	cam.rotation_degrees = Vector3(-22, 0, 0)
+
+
+## A 60 m wide, 30 m high vertical face of a layer (world-Y mapped to V, as a triplanar terrain shader would)
+## rising from a ground layer, seen obliquely from eye height.
+func _build_wall(layer_name: String, ground_name: String, ah: Resource, nr: Resource) -> void:
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(300, 300)
+	pm.subdivide_width = 16
+	pm.subdivide_depth = 16
+	_add_mesh(pm, _terrain_material(ground_name, ah, nr), Vector3.ZERO)
+	var wall := QuadMesh.new()
+	wall.size = Vector2(60, 30)
+	_add_mesh(wall, _terrain_material(layer_name, ah, nr, true), Vector3(0, 15, -12))
+	cam.position = Vector3(-14, 1.7, 2)
+	cam.rotation_degrees = Vector3(8, -32, 0)
 
 
 ## Side-by-side strips (6 m wide, 300 m long) of several layers, from eye height.

@@ -1,0 +1,30 @@
+[remap]
+
+importer="2d_array_texture"
+type="CompressedTexture2DArray"
+uid="uid://de0njhmstylpd"
+path.bptc="res://.godot/imported/terrain_normal_rough.png-b52052c84303ca3a883107f7fa000b98.bptc.ctexarray"
+path.astc="res://.godot/imported/terrain_normal_rough.png-b52052c84303ca3a883107f7fa000b98.astc.ctexarray"
+metadata={
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
+}
+
+[deps]
+
+source_file="res://assets/textures/terrain/terrain_normal_rough.png"
+dest_files=["res://.godot/imported/terrain_normal_rough.png-b52052c84303ca3a883107f7fa000b98.bptc.ctexarray", "res://.godot/imported/terrain_normal_rough.png-b52052c84303ca3a883107f7fa000b98.astc.ctexarray"]
+
+[params]
+
+compress/mode=2
+compress/high_quality=true
+compress/lossy_quality=0.7
+compress/uastc_level=0
+compress/rdo_quality_loss=0.0
+compress/hdr_compression=1
+compress/channel_pack=0
+mipmaps/generate=true
+mipmaps/limit=-1
+slices/horizontal=1
+slices/vertical=9
