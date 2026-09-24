@@ -115,7 +115,7 @@
   "file": "res://assets/audio/voice/beacon_mara.ogg",
   "speaker": "Mara Voss",
   "speaker_id": "mara",
-  "text": "This is Kestrel Station, Aldous Range. This is Doctor Mara Voss. We have lost our satellite link. We have one injured, four missing. Anyone receiving this, please relay to R C M P Terrace. Kestrel Station, out.",
+  "text": "This is Kestrel Station, Aldous Range. This is Doctor Mara Voss. We have lost our satellite link. We have one injured, four missing. Anyone receiving this, please relay to RCMP Terrace. Kestrel Station, out.",
   "radio": true,
   "kind": "radio_weak",
   "duration_s": 19.49,
@@ -141,7 +141,7 @@
    {
     "t": 10.7,
     "d": 6.67,
-    "text": "Anyone receiving this, please relay to R C M P Terrace.",
+    "text": "Anyone receiving this, please relay to RCMP Terrace.",
     "speaker": "Mara Voss"
    },
    {
@@ -628,7 +628,7 @@
   "file": "res://assets/audio/voice/log_hale_03.ogg",
   "speaker": "Elias Hale",
   "speaker_id": "hale",
-  "text": "Elias Hale. The fourteenth, I think. Early. I'm in the lee of the relay hut. The weather came back an hour after I got here, and I've been sheltering since. It isn't the antenna. Water got into the transceiver housing, probably in the September rain, and froze, and split the board. The spare module is in stores. Bin C-four. And the battery pack up here is finished. Take the lithium pack from the charging rack. The old ones won't hold a charge in this cold. I've written it all down in the book as well. My hands aren't. I'm not doing very well, Mara. I'm very cold, and I'm very tired, and I know what that means. Don't let anyone come up here in weather. Tell my sister I was working. And that it was beautiful, before the cloud came in. It was. You could see all the way to the sea.",
+  "text": "Elias Hale. The fourteenth, I think. Early. I'm in the lee of the relay hut. The weather came back an hour after I got here, and I've been sheltering since. It isn't the antenna. Water got into the transceiver housing, probably in the September rain, and froze, and split the board. The spare module is in stores. Bin C-4. And the battery pack up here is finished. Take the lithium pack from the charging rack. The old ones won't hold a charge in this cold. I've written it all down in the book as well. My hands aren't. I'm not doing very well, Mara. I'm very cold, and I'm very tired, and I know what that means. Don't let anyone come up here in weather. Tell my sister I was working. And that it was beautiful, before the cloud came in. It was. You could see all the way to the sea.",
   "radio": false,
   "kind": "dictaphone",
   "duration_s": 60.48,
@@ -654,7 +654,7 @@
    {
     "t": 21.247,
     "d": 4.09,
-    "text": "The spare module is in stores. Bin C-four.",
+    "text": "The spare module is in stores. Bin C-4.",
     "speaker": "Elias Hale"
    },
    {
@@ -1989,7 +1989,7 @@
   "file": "res://assets/audio/voice/mara_relay_explain.ogg",
   "speaker": "Mara Voss",
   "speaker_id": "mara",
-  "text": "Elias thought it was ice on the antenna. It wasn't. June said so the morning it went down. The link didn't fade. It just stopped. You'll need the spare transceiver module from stores, bin C-four, and a battery pack. The lithium one on the charging rack. The old ones won't hold a charge at minus thirty.",
+  "text": "Elias thought it was ice on the antenna. It wasn't. June said so the morning it went down. The link didn't fade. It just stopped. You'll need the spare transceiver module from stores, bin C-4, and a battery pack. The lithium one on the charging rack. The old ones won't hold a charge at minus thirty.",
   "radio": false,
   "kind": "in_person",
   "duration_s": 23.2,
@@ -2009,7 +2009,7 @@
    {
     "t": 10.172,
     "d": 5.67,
-    "text": "You'll need the spare transceiver module from stores, bin C-four, and a battery pack.",
+    "text": "You'll need the spare transceiver module from stores, bin C-4, and a battery pack.",
     "speaker": "Mara Voss"
    },
    {

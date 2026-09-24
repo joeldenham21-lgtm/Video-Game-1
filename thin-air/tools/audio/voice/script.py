@@ -113,7 +113,7 @@ LINES = [
 	{"id": "beacon_mara", "speaker": "mara", "kind": "radio_weak", "parts": [
 		"This is Kestrel Station, Aldous Range.", ("drop", 0.3), "This is Doctor Mara Voss.",
 		"We have lost our satellite link. We have one injured, four missing.",
-		("drop", 0.6), "Anyone receiving this, please relay to R C M P Terrace.|Anyone receiving this, please relay to R. C. M. P. Terrace.",
+		("drop", 0.6), "Anyone receiving this, please relay to RCMP Terrace.|Anyone receiving this, please relay to R. C. M. P. Terrace.",
 		"Kestrel Station, out."]},
 	{"id": "beacon_live", "speaker": "mara", "kind": "radio_weak", "parts": [
 		"Anyone on this frequency.", ("drop", 0.8), "I heard an engine. In the valley.", ("pause", 0.5),
@@ -235,7 +235,7 @@ LINES = [
 	{"id": "mara_relay_explain", "speaker": "mara", "kind": "in_person", "parts": [
 		"Elias thought it was ice on the antenna. It wasn't.",
 		"June said so the morning it went down. The link didn't fade. It just stopped.",
-		"You'll need the spare transceiver module from stores, bin C-four, and a battery pack.|You'll need the spare transceiver module from stores, bin C four, and a battery pack.",
+		"You'll need the spare transceiver module from stores, bin C-4, and a battery pack.|You'll need the spare transceiver module from stores, bin C four, and a battery pack.",
 		"The lithium one on the charging rack. The old ones won't hold a charge at minus thirty."]},
 	{"id": "mara_about_elias", "speaker": "mara", "kind": "in_person", "parts": [
 		"Elias was my supervisor my first season here. Twenty-three summers on this glacier.",
@@ -345,7 +345,7 @@ LINES = [
 		"Elias Hale. The fourteenth, I think. Early.",
 		"I'm in the lee of the relay hut. The weather came back an hour after I got here, and I've been sheltering since.",
 		"It isn't the antenna. Water got into the transceiver housing, probably in the September rain, and froze, and split the board.",
-		"The spare module is in stores. Bin C-four.|The spare module is in stores. Bin C four.",
+		"The spare module is in stores. Bin C-4.|The spare module is in stores. Bin C four.",
 		"And the battery pack up here is finished. Take the lithium pack from the charging rack. The old ones won't hold a charge in this cold.",
 		"I've written it all down in the book as well.", ("pause", 1.2),
 		"My hands aren't.", ("pause", 0.8), "I'm not doing very well, Mara.",
