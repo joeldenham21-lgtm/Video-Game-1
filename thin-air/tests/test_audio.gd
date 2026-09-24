@@ -34,6 +34,10 @@ func run() -> void:
 	await _test_api()
 	await _test_music()
 	await _test_voice_api()
+	await _test_ambience()
+	Audio.stop_all()
+	Audio.ambience.enabled = false
+	await get_tree().create_timer(0.3).timeout
 
 
 # ------------------------------------------------------------------------------------------------ data
@@ -246,3 +250,60 @@ func _test_voice_api() -> void:
 		check(not Audio.voice.is_playing(), "stop_voice")
 	check(Audio.play_voice(&"no_such_line") == 0.0, "unknown voice line returns 0")
 	Events.subtitle.disconnect(cb)
+	# positional voice whose node disappears mid-line must still finish (story flow never stalls)
+	if not ids.is_empty():
+		var radio := Node3D.new()
+		add_child(radio)
+		var d3 := Audio.play_voice_3d(ids[0], radio)
+		check(d3 > 0.0 and Audio.voice.is_playing(), "play_voice_3d plays")
+		radio.queue_free()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		check(not Audio.voice.is_playing(), "voice finishes when its 3D node is freed")
+	# the prologue scene and every log recording referenced by logs.json can be played
+	for key in [&"prologue", &"beacon_mara", &"mara_contact_1", &"final_call"]:
+		check(Audio.voice_line_exists(key), "voice line %s exists" % key)
+
+
+func _test_ambience() -> void:
+	var amb = Audio.ambience
+	# a loop attached to a node that is not in the tree yet starts when it enters
+	var off := Node3D.new()
+	var lp := Audio.play_loop(&"torch_loop", off)
+	check(lp != null and lp.autoplay and not lp.playing, "play_loop on detached node defers playback")
+	add_child(off)
+	await get_tree().process_frame
+	check(lp.playing, "deferred loop plays once in tree")
+	off.queue_free()
+	# listener in a (stub) world: context and bed targets are computed without errors
+	var old_world: Node3D = Game.world
+	var w := Node3D.new()
+	add_child(w)
+	Game.world = w
+	var cam := Camera3D.new()
+	w.add_child(cam)
+	cam.global_position = Vector3(0, 1500, 0)
+	cam.make_current()
+	amb._update_listener()
+	amb._slow_timer = 0.0
+	amb._compute_targets()
+	check(amb.has_listener and not bool(amb.ctx.get("menu", true)), "ambience finds the listener in a world")
+	var wind_sum := 0.0
+	for b in [&"amb_wind_calm", &"amb_wind_breeze", &"amb_wind_strong", &"amb_wind_gale"]:
+		wind_sum += float(amb._t[b])
+	check(wind_sum > 0.3, "a wind layer is always audible outdoors (%.2f)" % wind_sum)
+	check(amb.event_weight(&"thunder") >= 0.0 and amb.event_weight(&"nope") == 0.0, "event weights safe")
+	amb._spawn_events(1000.0)
+	check(true, "spatial events spawn safely")
+	Audio.set_environment_reverb(&"cave")
+	Audio.env_kind = &"cave"
+	amb._compute_targets()
+	check(float(amb._t[&"amb_cave"]) > 0.9 and float(amb._t[&"amb_wind_calm"]) < 0.2, "cave bed replaces open wind")
+	Audio.set_environment_reverb(&"outdoor")
+	Audio.env_kind = &"outdoor"
+	Game.world = old_world
+	w.queue_free()
+	await get_tree().process_frame
+	amb._update_listener()
+	amb._compute_targets()
+	check(bool(amb.ctx.get("menu", false)), "no world → menu ambience")

@@ -13,7 +13,7 @@ extends Node
 ##   stingers). Calling the same ids directly as well is harmless (de-duplicated).
 ##
 ## Additions beyond the contract (see docs/audio_notes.md): play_voice_3d, play_ambient_event,
-## start_loop_with_intro, is_loop_active, get_listener_position, has_sfx, get_sfx_ids, voice_line_exists,
+## start_loop_with_intro, is_loop_active, stop_all, get_listener_position, has_sfx, get_sfx_ids, voice_line_exists,
 ## set_menu_ambience, env_kind, catalog/music/ambience/voice sub-systems.
 
 const SfxCatalog := preload("res://src/audio/sfx_catalog.gd")
@@ -177,12 +177,16 @@ func play_loop(id: StringName, node: Node3D, volume_db := 0.0) -> AudioStreamPla
 	if not e.loop:
 		p.finished.connect(p.play)
 	node.add_child(p)
+	_track_loop(p, id)
+	if not p.is_inside_tree():
+		# caller attached us to a node that is not in the scene yet: start when it enters
+		p.autoplay = true
+		return p
 	var target_db := p.volume_db
 	p.volume_db = target_db - 40.0
 	p.play(randf() * maxf(0.0, s.get_length() - 0.5) if e.loop else 0.0)
 	var tw := p.create_tween()
 	tw.tween_property(p, "volume_db", target_db, 0.4)
-	_loops.append([weakref(p), id])
 	return p
 
 
@@ -258,7 +262,10 @@ func start_loop_with_intro(intro_id: StringName, loop_id: StringName, node: Node
 	_configure3d(lp, el, volume_db)
 	lp.stream = catalog.stream_at(el, 0)
 	node.add_child(lp)
-	_loops.append([weakref(lp), loop_id])
+	_track_loop(lp, loop_id)
+	if not lp.is_inside_tree():
+		lp.autoplay = true
+		return lp
 	var delay := 0.0
 	if ei:
 		var s: AudioStream = catalog.pick_stream(ei)
@@ -283,6 +290,15 @@ func start_loop_with_intro(intro_id: StringName, loop_id: StringName, node: Node
 	return lp
 
 
+func _track_loop(p: AudioStreamPlayer3D, id: StringName) -> void:
+	if _loops.size() >= 32:
+		for i in range(_loops.size() - 1, -1, -1):
+			var q = _loops[i][0].get_ref()
+			if q == null or not is_instance_valid(q):
+				_loops.remove_at(i)
+	_loops.append([weakref(p), id])
+
+
 func is_loop_active(id: StringName) -> bool:
 	for i in range(_loops.size() - 1, -1, -1):
 		var p = _loops[i][0].get_ref()
@@ -292,6 +308,21 @@ func is_loop_active(id: StringName) -> bool:
 		if _loops[i][1] == id and p.playing:
 			return true
 	return false
+
+
+## Immediately silences every pooled one-shot, the voice and the ambience beds (music fades). Used when the
+## world is torn down and by tests.
+func stop_all() -> void:
+	for p in _pool:
+		p.stop()
+	for p2 in _pool2d:
+		p2.stop()
+	for pu in _ui:
+		pu.stop()
+	stop_voice()
+	music.set_state(&"silence")
+	if ambience and ambience.has_method("stop_all"):
+		ambience.stop_all()
 
 
 func has_sfx(id: StringName) -> bool:

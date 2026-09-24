@@ -149,8 +149,12 @@ func _process(delta: float) -> void:
 	if not player.stream_paused:
 		_clock += delta
 	_emit_due()
-	# lines without audio (missing file) still finish on time so story flow never stalls
-	if _missing_audio and _clock >= _duration:
+	# lines without audio (missing file) still finish on time so story flow never stalls; so do lines whose
+	# positional player was freed with its node (e.g. the wreck radio unloaded), or that overran their length
+	if _missing_audio:
+		if _clock >= _duration:
+			_on_finished()
+	elif _active == null or not is_instance_valid(_active) or _clock >= _duration + 3.0:
 		_on_finished()
 
 

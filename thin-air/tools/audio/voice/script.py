@@ -136,7 +136,7 @@ LINES = [
 		"Elias, our team lead, went up to the summit relay fifteen days ago and didn't come back.",
 		"Tomas and June tried to walk out through the icefall. They should have reached that cabin in a day.",
 		"Owen went down for his fuel cache.", ("pause", 0.8), "I'm the only one left up here.", ("breath",),
-		"I fell on the helipad stairs the second day of the storm. My leg's broken. It's splinted, but I can't walk down.",
+		"I fell on the helipad stairs two days into the storm. My leg's broken. It's splinted, but I can't walk down.",
 		"The generator ran dry six days ago. I've got a propane heater and one bottle left.",
 		"So I'm not going anywhere, and nobody's flying in this."]},
 	{"id": "mara_contact_3", "speaker": "mara", "kind": "radio", "parts": [
@@ -223,7 +223,7 @@ LINES = [
 
 	# ============================================================================================ ACT 5 — the station (in person)
 	{"id": "mara_station_meet", "speaker": "mara", "kind": "in_person", "parts": [
-		"Hi.", ("pause", 1.0), "Sorry. You're real. I've been talking to a radio for nine days.",
+		"Hi.", ("pause", 1.0), "Sorry. You're real. I've been talking to a radio for two weeks.",
 		"Come in, shut the door. The heat's the only thing I've got left."]},
 	{"id": "mara_generator", "speaker": "mara", "kind": "in_person", "parts": [
 		"The generator shed's across the helipad.",

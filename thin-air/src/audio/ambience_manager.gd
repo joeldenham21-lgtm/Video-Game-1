@@ -74,6 +74,16 @@ func _exit_tree() -> void:
 		e.stream = null
 
 
+## Silences all beds and water emitters at once (they fade back in from the next context update).
+func stop_all() -> void:
+	for b in BEDS:
+		_w[b] = 0.0
+	for id in _players:
+		(_players[id] as AudioStreamPlayer).stop()
+	for key in _emitters:
+		(_emitters[key] as AudioStreamPlayer3D).stop()
+
+
 func _bed_player(id: StringName) -> AudioStreamPlayer:
 	if _players.has(id):
 		return _players[id]

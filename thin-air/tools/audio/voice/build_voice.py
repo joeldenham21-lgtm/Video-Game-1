@@ -94,14 +94,28 @@ def render_tts(lines) -> None:
 			path = tts_key(spk, pace, say)
 			if not os.path.exists(path):
 				groups.setdefault((spk, pace), []).append((say, path))
+	# one piper process per chunk of ~12 sentences, several in parallel (piper itself is mostly single-threaded)
+	chunks = []
 	for (spk, pace), jobs in groups.items():
-		c = CAST[spk]
 		os.makedirs(os.path.join(CACHE, spk), exist_ok=True)
-		payload = "\n".join(json.dumps({"text": s, "speaker_id": c["sid"], "output_file": p}) for s, p in jobs) + "\n"
+		for k in range(0, len(jobs), 12):
+			chunks.append((spk, pace, jobs[k:k + 12]))
+
+	def run(chunk):
+		spk, pace, jobs = chunk
+		c = CAST[spk]
+		payload = "\n".join(json.dumps({"text": s, "speaker_id": c["sid"], "output_file": p + ".part"}) for s, p in jobs) + "\n"
 		print(f"piper: {spk} x{len(jobs)} (pace {pace})", flush=True)
 		subprocess.run([PIPER, "--model", MODEL, "--json-input", "-q", "--length_scale", f"{c['length'] * pace:.3f}",
 			"--noise_scale", str(c["noise"]), "--noise_w", str(c["noise_w"]), "--sentence_silence", "0.32"],
 			input=payload, text=True, check=True, capture_output=True)
+		for _, p in jobs:          # atomic: an interrupted render never leaves a truncated cache entry
+			if os.path.exists(p + ".part"):
+				os.replace(p + ".part", p)
+
+	from concurrent.futures import ThreadPoolExecutor
+	with ThreadPoolExecutor(max_workers=max(1, min(4, os.cpu_count() or 1))) as ex:
+		list(ex.map(run, chunks))
 
 
 def load_tts(spk: str, pace: float, text: str) -> np.ndarray:
