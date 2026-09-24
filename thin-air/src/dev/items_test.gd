@@ -328,7 +328,7 @@ func _give_starting_kit() -> void:
 func _setup_shot() -> void:
 	match shot:
 		"campfire_night":
-			_pose(Vector3(1.55, 1.38, 2.35), 32.0, -24.0)
+			_pose(Vector3(1.1, 1.08, 1.72), 32.0, -17.0)
 		"campfire_dusk":
 			_pose(Vector3(-2.3, 1.55, 3.0), -35.0, -20.0)
 		"pickups":

@@ -352,6 +352,19 @@ func _test_pickups() -> void:
 	check(pk.get_node_or_null(^"Visual") != null and pk.get_node_or_null(^"Shape") != null, "pickup built visual + collision")
 	check(pk.take_into(inv) == 3 and inv.count(&"stick") == 3 and pk.is_queued_for_deletion(), "pickup -> inventory")
 	check(int(_events["item_picked_up"]) == n0 + 1, "item_picked_up emitted")
+	# the player-facing path: interact() with a player-shaped node, toast + prompt
+	var pl := _make_player()
+	var toasts: Array[String] = []
+	var on_toast := func(text: String, _kind: StringName) -> void: toasts.append(text)
+	Events.notification.connect(on_toast)
+	Blueprints.lock(&"stone_knife")
+	var pk3 := root.spawn_pickup(&"flint", 2, Vector3(0, 1, 0))
+	await get_tree().process_frame
+	pk3.interact(pl)
+	Events.notification.disconnect(on_toast)
+	check((pl.get("inventory") as Inventory).count(&"flint") == 2 and toasts.has("+2 Flint"), "interact picks up with a '+2 Flint' toast %s" % str(toasts))
+	check(Blueprints.is_unlocked(&"stone_knife"), "picking up flint unlocked the stone knife blueprint")
+	pl.queue_free()
 	# partial pickup when the pack is full
 	var small := Inventory.new(1, 30.0)
 	small.add(&"stone", 8)

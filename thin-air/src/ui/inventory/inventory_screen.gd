@@ -1894,8 +1894,8 @@ func _update_station_card() -> void:
 	_station_card.visible = has_station
 	if not has_station:
 		return
-	var icon_id := station_id if ItemDB.get_icon(station_id) != null else &"campfire"
-	_station_icon.texture = ItemDB.get_icon(icon_id)
+	var icon_path := "res://assets/icons/%s.png" % station_id
+	_station_icon.texture = load(icon_path) as Texture2D if ResourceLoader.exists(icon_path) else ItemDB.get_icon(station_id)
 	_station_name.text = Crafting.station_name(station_id).to_upper()
 	var status := ""
 	if station_node != null and is_instance_valid(station_node) and station_node.has_method("get_station_status"):

@@ -8,6 +8,9 @@ extends SceneTree
 ## Run `godot --headless --path thin-air --import` first so class_names are registered.
 
 
+const EXTRA_IDS: Array[String] = ["fabricator"]
+
+
 func _init() -> void:
 	var args := {}
 	for a in OS.get_cmdline_user_args():
@@ -24,6 +27,9 @@ func _init() -> void:
 	for k in builds:
 		if not ids.has(String(k)):
 			ids.append(String(k))
+	for k in EXTRA_IDS:          # crafting stations that are neither items nor buildables
+		if not ids.has(k):
+			ids.append(k)
 	if args.has("ids"):
 		var want := String(args["ids"]).split(",")
 		ids = ids.filter(func(x: String) -> bool: return want.has(x))
