@@ -10,25 +10,11 @@
     "bars": 42,
     "key": "D Dorian",
     "intensity": 0.2,
-    "duration_s": 161.446,
+    "duration_s": 161.323,
     "lufs": -18.0,
-    "true_peak_db": -2.5,
+    "true_peak_db": -2.3,
     "fade_in_s": 4.0,
-    "fade_out_s": 5.0,
-    "bar_s": 4.1571,
-    "phrase_starts_s": [
-      0.0,
-      16.863,
-      31.863,
-      47.09,
-      61.635,
-      76.362,
-      90.907,
-      105.939,
-      120.057,
-      134.406,
-      150.843
-    ]
+    "fade_out_s": 5.0
   },
   "explore": {
     "file": "res://assets/audio/music/explore.ogg",
@@ -45,25 +31,7 @@
     "lufs": -18.0,
     "true_peak_db": -1.9,
     "fade_in_s": 4.0,
-    "fade_out_s": 5.0,
-    "bar_s": 3.3333,
-    "phrase_starts_s": [
-      0.0,
-      13.333,
-      26.667,
-      40.0,
-      53.333,
-      66.667,
-      80.0,
-      93.333,
-      106.667,
-      120.0,
-      133.333,
-      146.667,
-      160.0,
-      173.333,
-      186.667
-    ]
+    "fade_out_s": 5.0
   },
   "forest": {
     "file": "res://assets/audio/music/forest.ogg",
@@ -78,29 +46,9 @@
     "intensity": 0.3,
     "duration_s": 180.0,
     "lufs": -18.0,
-    "true_peak_db": -2.9,
+    "true_peak_db": -1.4,
     "fade_in_s": 4.0,
-    "fade_out_s": 5.0,
-    "bar_s": 2.7273,
-    "phrase_starts_s": [
-      0.0,
-      10.909,
-      21.818,
-      32.727,
-      43.636,
-      54.545,
-      65.455,
-      76.364,
-      87.273,
-      98.182,
-      109.091,
-      120.0,
-      130.909,
-      141.818,
-      152.727,
-      163.636,
-      174.545
-    ]
+    "fade_out_s": 5.0
   },
   "night": {
     "file": "res://assets/audio/music/night.ogg",
@@ -115,23 +63,9 @@
     "intensity": 0.15,
     "duration_s": 180.0,
     "lufs": -18.0,
-    "true_peak_db": -4.6,
+    "true_peak_db": -5.2,
     "fade_in_s": 4.0,
-    "fade_out_s": 5.0,
-    "bar_s": 4.2857,
-    "phrase_starts_s": [
-      0.0,
-      17.143,
-      34.286,
-      51.429,
-      68.571,
-      85.714,
-      102.857,
-      120.0,
-      137.143,
-      154.286,
-      171.429
-    ]
+    "fade_out_s": 5.0
   },
   "alpine": {
     "file": "res://assets/audio/music/alpine.ogg",
@@ -148,22 +82,7 @@
     "lufs": -18.0,
     "true_peak_db": -1.2,
     "fade_in_s": 4.0,
-    "fade_out_s": 5.0,
-    "bar_s": 4.0,
-    "phrase_starts_s": [
-      0.0,
-      16.0,
-      32.0,
-      48.0,
-      64.0,
-      80.0,
-      96.0,
-      112.0,
-      128.0,
-      144.0,
-      160.0,
-      176.0
-    ]
+    "fade_out_s": 5.0
   },
   "station": {
     "file": "res://assets/audio/music/station.ogg",
@@ -254,6 +173,36 @@
       80.0,
       96.0,
       112.0
+    ]
+  },
+  "summit": {
+    "file": "res://assets/audio/music/summit.ogg",
+    "title": "The Summit",
+    "kind": "oneshot",
+    "loop": false,
+    "loop_offset_s": 0.0,
+    "bpm": 66,
+    "meter": 4,
+    "bars": 38,
+    "key": "D minor -> E major",
+    "intensity": 1.0,
+    "duration_s": 145.101,
+    "lufs": -18.0,
+    "true_peak_db": -4.0,
+    "fade_in_s": 1.5,
+    "fade_out_s": 2.5,
+    "bar_s": 3.6364,
+    "phrase_starts_s": [
+      0.0,
+      14.545,
+      29.091,
+      43.636,
+      57.756,
+      71.089,
+      84.422,
+      97.756,
+      112.273,
+      128.825
     ]
   }
 }

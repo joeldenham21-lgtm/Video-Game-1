@@ -171,6 +171,13 @@ def main(argv):
         data[cue.name] = entry(cue, fname, stats)
         print(f"   done in {time.time() - t0:.0f}s")
     if not qa_only:
+        # merge into the file as it is NOW (another build may have written other cues meanwhile)
+        fresh = {}
+        if os.path.exists(DATA_JSON):
+            with open(DATA_JSON) as f:
+                fresh = json.load(f)
+        fresh.update({c.name: data[c.name] for c in cues if c.name in data})
+        data = fresh
         order = CUES[:-1]
         ordered = {k: data[k] for k in order if k in data}
         ordered.update({k: v for k, v in sorted(data.items()) if k not in ordered})
