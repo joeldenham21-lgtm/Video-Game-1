@@ -28,6 +28,12 @@ const BUILD: Array[StringName] = [&"campfire", &"stone_fire_pit", &"lean_to", &"
 	&"log_railing", &"stone_windbreak", &"storage_box", &"drying_rack", &"workbench", &"snow_melter", &"bough_bed",
 	&"bed", &"torch_stand", &"rope_ladder"]
 
+## Per-item icon framing where the category default hides the important side (labels, roof coverings).
+const POSE_OVERRIDES := {
+	&"canned_beans": {"view": "upright", "yaw": 20.0, "elev": 16.0},
+	&"lean_to": {"view": "upright", "yaw": 30.0, "elev": 18.0},
+}
+
 static var _cache: Dictionary = {}
 
 
@@ -99,6 +105,8 @@ static func build(id: StringName, detail := 1.0, with_materials := true, categor
 ## Icon framing hints consumed by tools/icons: view "flat" (lying, seen from above at 3/4) or "upright";
 ## yaw rotates the model about Y before framing; elev is the camera elevation in degrees.
 static func icon_pose(id: StringName) -> Dictionary:
+	if POSE_OVERRIDES.has(id):
+		return POSE_OVERRIDES[id]
 	if id in UPRIGHT:
 		return {"view": "upright", "yaw": -28.0, "elev": 16.0}
 	if id in BUILD:
@@ -148,7 +156,8 @@ static func populate(b: ItemMeshBuilder, id: StringName, category := "") -> bool
 		&"wool_blanket": _blanket(b, r)
 		&"emergency_blanket": _mylar(b)
 		&"coffee_grounds": _sachet(b)
-		&"o2_bottle", &"o2_bottle_empty": _o2(b)
+		&"o2_bottle": _o2(b, false)
+		&"o2_bottle_empty": _o2(b, true)
 		# ---- food & drink
 		&"berries": _berries(b, r)
 		&"mushroom": _mushroom(b)
@@ -205,7 +214,7 @@ static func populate(b: ItemMeshBuilder, id: StringName, category := "") -> bool
 		# ---- clothing
 		&"wool_hat": _toque(b)
 		&"fur_hat": _fur_hat(b)
-		&"field_jacket": _jacket(b, &"weave_charcoal", 0.04, 0.006)
+		&"field_jacket": _jacket(b, &"weave_olive", 0.04, 0.006)
 		&"wool_sweater": _sweater(b)
 		&"hide_coat": _hide_coat(b)
 		&"blanket_capote": _capote(b)
@@ -658,12 +667,23 @@ static func _tin_can(b: ItemMeshBuilder) -> void:
 	b.pop()
 
 
+## A one-litre steel can of lamp oil (kerosene): red enamel, screw cap on the shoulder, paper label.
 static func _lamp_oil(b: ItemMeshBuilder) -> void:
-	b.lathe(&"paint_blue", PackedVector2Array([Vector2(0.0, 0.0), Vector2(0.038, 0.0), Vector2(0.04, 0.004), Vector2(0.04, 0.15),
-		Vector2(0.036, 0.17), Vector2(0.02, 0.195), Vector2(0.013, 0.2), Vector2(0.013, 0.214)]), 24, 40.0)
-	b.lathe(&"plastic_red", PackedVector2Array([Vector2(0.0, 0.21), Vector2(0.0152, 0.21), Vector2(0.0155, 0.232),
-		Vector2(0.0145, 0.234), Vector2(0.0, 0.234)]), 16, 40.0)
-	b.lathe(&"paper", PackedVector2Array([Vector2(0.0405, 0.04), Vector2(0.0405, 0.11)]), 24, 40.0)
+	b.push(_at(Vector3(0, 0.095, 0)))
+	b.box(&"paint_red", Vector3(0.105, 0.19, 0.055), 0.007)
+	b.pop()
+	b.push(_at(Vector3(0, 0.095, 0.0277)))
+	b.box(&"paper", Vector3(0.082, 0.1, 0.0015), 0.0)
+	b.pop()
+	b.push(_at(Vector3(0.028, 0.19, 0)))
+	b.cylinder(&"steel", 0.011, 0.012, 14)
+	b.pop()
+	b.push(_at(Vector3(0.028, 0.202, 0)))
+	b.cylinder(&"plastic_black", 0.0125, 0.012, 16)
+	b.pop()
+	b.push(_at(Vector3(-0.03, 0.192, 0)))
+	b.box(&"steel", Vector3(0.022, 0.006, 0.012), 0.002)
+	b.pop()
 
 
 static func _blanket(b: ItemMeshBuilder, r: RandomNumberGenerator) -> void:
@@ -690,7 +710,7 @@ static func _sachet(b: ItemMeshBuilder) -> void:
 		b.pop()
 
 
-static func _o2(b: ItemMeshBuilder) -> void:
+static func _o2(b: ItemMeshBuilder, empty := false) -> void:
 	b.push(_at(Vector3.ZERO, Vector3(0, 0, -90)))
 	var rr := 0.05
 	b.lathe(&"aluminium", PackedVector2Array([Vector2(0.0, 0.0), Vector2(rr * 0.8, 0.0), Vector2(rr, 0.012), Vector2(rr, 0.25)]), 24)
@@ -708,6 +728,12 @@ static func _o2(b: ItemMeshBuilder) -> void:
 	b.push(_at(Vector3(0, 0.387, 0)))
 	b.cylinder(&"plastic_black", 0.012, 0.012, 14)
 	b.pop()
+	if empty:
+		# a paper tag tied round the neck (cylinders go back to the fabricator for a refill)
+		b.tube(&"cord_orange", PackedVector3Array([Vector3(0.0, 0.352, 0.013), Vector3(-0.02, 0.33, 0.035), Vector3(-0.03, 0.3, 0.05)]), 0.0012, 4)
+		b.push(_at(Vector3(-0.034, 0.27, 0.052), Vector3(0, 0, 8)))
+		b.box(&"cardboard", Vector3(0.03, 0.055, 0.0012), 0.0)
+		b.pop()
 	b.pop()
 
 
@@ -1279,23 +1305,35 @@ static func _crampons(b: ItemMeshBuilder) -> void:
 		b.pop()
 
 
+## Mountaineering oxygen mask standing as if worn: soft silicone cup with a hard rim, front valve, a flat reservoir
+## bag hanging under it, corrugated delivery hose trailing to the side and an elastic head harness.
 static func _o2_mask(b: ItemMeshBuilder) -> void:
-	b.push(_at(Vector3(0, 0.055, 0), Vector3(90, 0, 0), Vector3(1.0, 1.0, 1.25)))
-	b.lathe(&"silicone", PackedVector2Array([Vector2(0.042, 0.0), Vector2(0.04, 0.02), Vector2(0.03, 0.045), Vector2(0.016, 0.06), Vector2(0.0, 0.065)]), 20, 50.0)
+	var c := Vector3(0, 0.165, 0)
+	b.push(_at(c, Vector3(90, 0, 0), Vector3(0.86, 1.06, 1.1)))
+	b.lathe(&"silicone_dark", PackedVector2Array([Vector2(0.047, 0.0), Vector2(0.046, 0.012), Vector2(0.039, 0.036),
+		Vector2(0.027, 0.055), Vector2(0.012, 0.066), Vector2(0.0, 0.069)]), 22, 50.0)
 	b.pop()
-	b.push(_at(Vector3(0, 0.05, 0.062), Vector3(90, 0, 0)))
-	b.cylinder(&"plastic_black", 0.014, 0.018, 16)
+	b.push(_at(c + Vector3(0, 0, 0.002), Vector3.ZERO, Vector3(0.86, 1.06, 1.0)))
+	_ring(b, Vector3.ZERO, Vector3.BACK, 0.046, 0.0055, &"silicone", 22)
 	b.pop()
-	b.push(_at(Vector3(0, 0.04, 0.1), Vector3.ZERO, Vector3(1.0, 1.25, 0.8)))
-	b.sphere(&"bag_green", 0.034, 16, 10)
+	b.push(_at(c + Vector3(0, -0.004, 0.066), Vector3(90, 0, 0)))
+	b.cylinder(&"plastic_black", 0.017, 0.022, 18)
 	b.pop()
-	b.tube(&"plastic_green", PackedVector3Array([Vector3(0.012, 0.045, 0.078), Vector3(0.04, 0.03, 0.09), Vector3(0.07, 0.012, 0.06),
-		Vector3(0.09, 0.008, 0.0), Vector3(0.1, 0.008, -0.06)]), 0.0045, 8)
+	b.disc(&"plastic_grey", 0.013, 16, c + Vector3(0, -0.004, 0.0885), Vector3.BACK)
+	# reservoir bag hanging from the valve
+	b.tube(&"plastic_black", PackedVector3Array([c + Vector3(0, -0.02, 0.078), c + Vector3(0, -0.036, 0.082)]), 0.008, 10)
+	b.push(_at(Vector3(0, 0.068, 0.084), Vector3(-8, 0, 0), Vector3(0.78, 1.35, 0.3)))
+	b.sphere(&"bag_green", 0.05, 18, 10)
+	b.pop()
+	# delivery hose from the bag's foot, trailing on the ground
+	b.tube(&"plastic_black", PackedVector3Array([Vector3(0.0, 0.03, 0.085), Vector3(0.02, 0.012, 0.1), Vector3(0.07, 0.009, 0.09),
+		Vector3(0.11, 0.009, 0.04), Vector3(0.12, 0.009, -0.03), Vector3(0.1, 0.009, -0.09)]), 0.0065, 8)
+	# elastic harness round the back of the (absent) head
 	var strap := PackedVector3Array()
-	for i in 11:
-		var a := lerpf(0.2, PI - 0.2, i / 10.0)
-		strap.append(Vector3(cos(a) * 0.075, 0.055, -sin(a) * 0.08))
-	b.tube(&"strap_black", strap, PackedVector2Array([Vector2(0.0015, 0.009)]), 4, true, true, &"", Vector3.UP)
+	for i in 13:
+		var a := lerpf(0.15, PI - 0.15, i / 12.0)
+		strap.append(c + Vector3(cos(a) * 0.041, 0.012 * sin(a), -sin(a) * 0.1))
+	b.tube(&"strap_black", strap, PackedVector2Array([Vector2(0.0015, 0.008)]), 4, true, true, &"", Vector3.UP)
 
 
 static func _goggles(b: ItemMeshBuilder) -> void:
@@ -1859,7 +1897,7 @@ static func _keycard(b: ItemMeshBuilder) -> void:
 
 static func _campfire(b: ItemMeshBuilder, r: RandomNumberGenerator, lit: bool) -> void:
 	b.lathe(&"ash", PackedVector2Array([Vector2(0.0, 0.035), Vector2(0.3, 0.03), Vector2(0.5, 0.015), Vector2(0.64, 0.0)]), 24, 60.0)
-	_stone_ring(b, r, 10, 0.6, 0.09, 0.13, 100)
+	_stone_ring(b, r, 11, 0.6, 0.08, 0.14, 100)
 	for i in 6:
 		var a := TAU * i / 6.0 + 0.3
 		var foot := Vector3(cos(a) * 0.36, 0.03, sin(a) * 0.36)
@@ -1885,8 +1923,10 @@ static func _stone_ring(b: ItemMeshBuilder, r: RandomNumberGenerator, count: int
 		var a := TAU * float(i) / count + r.randf_range(-0.12, 0.12)
 		var rad := r.randf_range(rmin, rmax)
 		var pos := Vector3(cos(a) * radius, y0 + rad * 0.42, sin(a) * radius)
-		b.push(_at(pos, Vector3(0, rad_to_deg(-a), 0)))
-		b.rock(&"granite_sooty" if i % 3 == 0 else &"granite", rad, seed0 + i, 2, 0.14, Vector3(1.25, 0.8, 0.95), 0.35)
+		b.push(_at(pos, Vector3(r.randf_range(-10.0, 10.0), rad_to_deg(-a) + r.randf_range(-25.0, 25.0), r.randf_range(-8.0, 8.0))))
+		var mat: StringName = [&"granite_sooty", &"cobble_dark", &"granite", &"cobble_sooty", &"granite_warm"][(i * 3 + seed0) % 5]
+		var sc := Vector3(r.randf_range(1.1, 1.45), r.randf_range(0.65, 0.85), r.randf_range(0.85, 1.05))
+		b.rock(mat, rad, seed0 + i, 2, 0.24, sc, 0.35, 0, 0.18, 1.5)
 		b.pop()
 
 
@@ -2008,7 +2048,7 @@ static func _roof(b: ItemMeshBuilder, r: RandomNumberGenerator) -> void:
 			for col in 6:
 				var t := (row + 0.5) / 4.0
 				var p := Vector3(lerpf(-1.25, 1.25, col / 5.0) + r.randf_range(-0.04, 0.04), rise * t + 0.08, sz * run * (1.0 - t))
-				b.push(_at(p, Vector3(sz * -pitch, r.randf_range(-4.0, 4.0), 0)))
+				b.push(_at(p, Vector3(sz * pitch, r.randf_range(-4.0, 4.0), 0)))
 				b.box(&"bark" if (row + col) % 3 else &"bark_dark", Vector3(0.56, 0.025, 0.6), 0.01)
 				b.pop()
 	_log(b, Vector3(-1.6, rise + 0.02, 0), Vector3(1.6, rise + 0.02, 0), 0.09, &"bark", &"endgrain", 12)

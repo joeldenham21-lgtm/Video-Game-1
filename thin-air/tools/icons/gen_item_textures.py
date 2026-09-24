@@ -906,31 +906,55 @@ def periodic_noise3(n, t, seed, beta=2.2, aniso=(1.0, 1.0, 1.0)):
 
 def gen_fx():
     os.makedirs(FX, exist_ok=True)
-    # Flame flipbook: 4x4 frames of 128px, looping (time-periodic 3D noise scrolled upward).
+    # Flame flipbook: 4x4 frames of 128 px, looping. Built from a handful of swaying flame tongues over a glowing
+    # bed, with licks that detach and rise, ragged by time-periodic noise. RGB = temperature colour, A = density.
     fr, grid, T = 128, 4, 16
-    noise = periodic_noise3(fr, T, 301, beta=2.0, aniso=(1.0, 1.8, 0.9))
-    fine = periodic_noise3(fr, T, 302, beta=1.2, aniso=(1.0, 1.6, 1.4))
+    edge = periodic_noise3(fr, T, 411, beta=1.6, aniso=(1.0, 0.5, 1.0))
     yy, xx = np.mgrid[0:fr, 0:fr].astype(np.float32)
     u = (xx + 0.5) / fr - 0.5
     v = 1.0 - (yy + 0.5) / fr          # 0 bottom, 1 top
+
+    def smooth(e0, e1, x):
+        t = np.clip((x - e0) / (e1 - e0), 0, 1)
+        return t * t * (3 - 2 * t)
+
+    # tongue: x0, width, height, sway amplitude, sway cycles per loop, phase, height cycles per loop
+    tongues = [(-0.02, 0.30, 0.78, 0.035, 1, 0.0, 2), (-0.13, 0.17, 0.55, 0.04, 2, 0.3, 3),
+               (0.12, 0.18, 0.60, 0.04, 1, 0.6, 2), (0.03, 0.12, 0.92, 0.06, 2, 0.15, 1),
+               (-0.2, 0.1, 0.35, 0.03, 3, 0.8, 2), (0.22, 0.1, 0.38, 0.03, 2, 0.45, 3)]
+    licks = [(-0.05, 0.05, 0.0), (0.09, 0.04, 0.5), (-0.1, 0.035, 0.25)]   # x0, radius, phase
     sheet = np.zeros((fr * grid, fr * grid, 4), np.float32)
     for k in range(T):
-        # scroll the noise upward over the loop: sample row offset proportional to k
-        shift = int(k * fr / T)
-        n1 = np.roll(noise[k], -shift, axis=0)
-        n2 = np.roll(fine[k], -shift * 2, axis=0)
-        turb = n1 * 0.7 + n2 * 0.3
-        width = 0.36 * (1.0 - v) ** 0.7 + 0.02
-        wob = (turb - 0.5) * 0.22 * v
-        body = np.clip(1.0 - np.abs(u + wob) / np.maximum(width, 1e-3), 0, 1)
-        body *= np.clip(v * 8.0, 0, 1)                           # soft base
-        body = body ** 1.2
-        heat = body * (0.55 + 0.9 * turb) - v * 0.55
-        inten = np.clip(heat * 1.8, 0, 1)
-        core = np.clip((inten - 0.55) * 2.2, 0, 1)
-        rgb = ramp(inten, [(0, (0.35, 0.03, 0.0)), (0.3, (0.9, 0.22, 0.02)), (0.6, (1.0, 0.55, 0.12)), (0.85, (1.0, 0.82, 0.45)), (1, (1.0, 0.95, 0.8))])
-        rgb = rgb * (1 - core[..., None] * 0.3) + core[..., None] * 0.3
-        a = np.clip(inten * 1.3, 0, 1)
+        t = k / T
+        e = np.roll(edge[k], -2 * int(round(k * fr / T)), axis=0)
+        uw = u + (e - 0.5) * 0.10 * (0.2 + v)
+        bed = np.clip(1 - np.sqrt((uw / 0.36) ** 2 + (v / 0.16) ** 2), 0, 1) ** 0.7
+        field = bed * 0.9
+        heat = bed * 0.95
+        for (x0, w0, h0, amp, fq, ph, hf) in tongues:
+            h = h0 * (0.82 + 0.18 * math.sin(2 * math.pi * (hf * t + ph)))
+            cx = x0 + amp * math.sin(2 * math.pi * (fq * t + ph))
+            vv = np.clip(v / h, 0, 1.2)
+            bend = amp * 1.6 * math.sin(2 * math.pi * (fq * t + ph + 0.25))
+            c = cx + bend * vv ** 2
+            w = w0 * 0.5 * (1 - np.clip(vv, 0, 1)) ** 0.9 * (0.6 + 0.4 * smooth(0, 0.3, vv)) + 1e-4
+            f = np.clip(1 - np.abs(uw - c) / w, 0, 1) ** 0.8 * (vv < 1)
+            field = np.maximum(field, f ** 0.7 * (1.0 - 0.3 * vv))
+            heat = np.maximum(heat, f ** 0.5 * (1.0 - 0.75 * np.clip(vv, 0, 1) ** 1.3))
+        for (x0, rr, ph) in licks:
+            p = (t + ph) % 1.0
+            cy = 0.62 + p * 0.45
+            cx = x0 + 0.04 * math.sin(2 * math.pi * (t + ph))
+            d = np.sqrt(((uw - cx) / rr) ** 2 + ((v - cy) / (rr * 2.2)) ** 2)
+            bl = np.clip(1 - d, 0, 1) ** 0.8 * (1 - p)
+            field = np.maximum(field, bl * 0.8)
+            heat = np.maximum(heat, bl * 0.3)
+        base = smooth(0.0, 0.06, v)
+        inten = np.clip(blur_f(np.clip(field * base * 1.25, 0, 1), 0.7), 0, 1)
+        temp = np.clip(blur_f(heat * base, 0.7) * 1.05, 0, 1)
+        rgb = ramp(temp, [(0.0, (0.45, 0.05, 0.0)), (0.2, (0.8, 0.18, 0.02)), (0.45, (1.0, 0.42, 0.07)),
+                          (0.7, (1.0, 0.64, 0.22)), (0.9, (1.0, 0.8, 0.45)), (1.0, (1.0, 0.88, 0.62))])
+        a = np.clip(inten * 1.4, 0, 1) * (0.55 + 0.45 * temp)
         gx, gy = k % grid, k // grid
         sheet[gy * fr:(gy + 1) * fr, gx * fr:(gx + 1) * fr, :3] = rgb
         sheet[gy * fr:(gy + 1) * fr, gx * fr:(gx + 1) * fr, 3] = a
@@ -945,10 +969,10 @@ def gen_fx():
     yy, xx = np.mgrid[0:sz, 0:sz].astype(np.float32)
     rr = np.sqrt(((xx + 0.5) / sz - 0.5) ** 2 + ((yy + 0.5) / sz - 0.5) ** 2) * 2
     for k in range(4):
-        n = spectral(sz, 310 + k, beta=2.4, lo=2) * 0.7 + spectral(sz, 320 + k, beta=1.6, lo=6) * 0.3
-        fall = np.clip(1.0 - rr, 0, 1) ** 1.5
-        dens = np.clip((n * 1.4 - 0.35) * fall * 1.8, 0, 1)
-        dens = blur_f(dens, 1.2)
+        n = spectral(sz, 310 + k, beta=3.0, lo=1.5, hi=14) * 0.75 + spectral(sz, 320 + k, beta=2.2, lo=4, hi=32) * 0.25
+        fall = np.clip(1.0 - rr, 0, 1) ** 1.2
+        dens = np.clip((n * 1.5 - 0.3) * fall * 1.9, 0, 1)
+        dens = blur_f(dens, 2.5)
         shade = 0.65 + 0.35 * np.clip(n * 1.2 - (yy / sz) * 0.2, 0, 1)
         gx, gy = k % 2, k // 2
         sheet[gy * sz:(gy + 1) * sz, gx * sz:(gx + 1) * sz, :3] = shade[..., None]

@@ -38,13 +38,15 @@ var _core: GPUParticles3D
 var _smoke: GPUParticles3D
 var _embers: GPUParticles3D
 var _light: OmniLight3D
+var _glow: MeshInstance3D
+var _glow_mat: StandardMaterial3D
 var _coal_mat: BaseMaterial3D
 var _loop: AudioStreamPlayer3D
 var _noise := FastNoiseLite.new()
 var _t := 0.0
 var _mobile := false
 var _wind_timer := 0.0
-var _light_base := Vector3(0, 0.5, 0)
+var _light_base := Vector3(0, 0.62, 0)
 
 
 func _init() -> void:
@@ -342,15 +344,37 @@ func _build_model() -> void:
 
 func _build_fx() -> void:
 	var q := int(Settings.get_value(&"particles", 2))
-	var amt := 1.0 if q >= 2 else (0.7 if q == 1 else 0.45)
-	_flames = _particles("Flames", int(26 * amt), 0.8, _flame_draw(Vector2(0.42, 0.6), 0.27), _flame_process(false))
-	_core = _particles("Core", int(12 * amt), 0.55, _flame_draw(Vector2(0.26, 0.36), 0.16), _flame_process(true))
-	_smoke = _particles("Smoke", int(16 * amt), 5.5, _smoke_draw(), _smoke_process())
-	_embers = _particles("Embers", int(24 * amt), 2.4, _ember_draw(), _ember_process())
-	_smoke.position.y = 0.4
-	_flames.position.y = 0.06
-	_core.position.y = 0.05
-	_embers.position.y = 0.1
+	var amt := 1.0 if q >= 2 else (0.7 if q == 1 else 0.5)
+	# Flames: a few large flipbook sprites (each frame is a whole cluster of tongues) + a hot bed at the base.
+	_flames = _particles("Flames", int(10 * amt), 0.95, _flame_draw(Vector2(0.66, 0.84), 0.37, 2.4), _flame_process(false))
+	_core = _particles("Core", int(6 * amt), 0.7, _flame_draw(Vector2(0.46, 0.4), 0.17, 3.0), _flame_process(true))
+	_smoke = _particles("Smoke", int(26 * amt), 6.5, _smoke_draw(), _smoke_process())
+	_embers = _particles("Embers", int(20 * amt), 2.4, _ember_draw(), _ember_process())
+	_smoke.position.y = 0.45
+	_flames.position.y = 0.05
+	_core.position.y = 0.04
+	_embers.position.y = 0.12
+	# soft halo: firelight scattering in the smoky air around the flames
+	_glow = MeshInstance3D.new()
+	_glow.name = "Glow"
+	var gq := QuadMesh.new()
+	gq.size = Vector2(1.7, 1.5)
+	_glow_mat = StandardMaterial3D.new()
+	_glow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_glow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_glow_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_glow_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	_glow_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	_glow_mat.albedo_texture = load("res://scenes/items/fx/glow.png")
+	_glow_mat.albedo_color = Color(1.0, 0.45, 0.16, 0.0)
+	if not _mobile:
+		_glow_mat.proximity_fade_enabled = true
+		_glow_mat.proximity_fade_distance = 0.6
+	gq.material = _glow_mat
+	_glow.mesh = gq
+	_glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_glow.position = Vector3(0, 0.38, 0)
+	add_child(_glow)
 	_light = OmniLight3D.new()
 	_light.name = "Light"
 	_light.light_color = Color(1.0, 0.56, 0.24)
@@ -374,12 +398,12 @@ func _particles(n: String, amount: int, lifetime: float, draw: Mesh, process: Pa
 	p.name = n
 	p.amount = maxi(2, amount)
 	p.lifetime = lifetime
-	p.randomness = 0.35
+	p.randomness = 0.3
 	p.fixed_fps = 30
 	p.draw_pass_1 = draw
 	p.process_material = process
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	p.visibility_aabb = AABB(Vector3(-2, -0.5, -2), Vector3(4, 7, 4))
+	p.visibility_aabb = AABB(Vector3(-3, -0.5, -3), Vector3(6, 8, 6))
 	p.emitting = false
 	add_child(p)
 	return p
@@ -410,7 +434,8 @@ static func _curve(points: Array) -> CurveTexture:
 	return t
 
 
-func _flame_draw(size: Vector2, lift: float) -> QuadMesh:
+## `hdr` > 1 pushes the flames above the glow threshold: they are the brightest thing in a night scene.
+func _flame_draw(size: Vector2, lift: float, hdr := 1.0) -> QuadMesh:
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -423,9 +448,10 @@ func _flame_draw(size: Vector2, lift: float) -> QuadMesh:
 	m.particles_anim_loop = true
 	m.vertex_color_use_as_albedo = true
 	m.albedo_texture = load("res://scenes/items/fx/flame_sheet.png")
+	m.albedo_color = Color(hdr, hdr * 0.94, hdr * 0.88)
 	if not _mobile:
 		m.proximity_fade_enabled = true
-		m.proximity_fade_distance = 0.22
+		m.proximity_fade_distance = 0.08
 	var q := QuadMesh.new()
 	q.size = size
 	q.center_offset = Vector3(0, lift, 0)
@@ -433,41 +459,40 @@ func _flame_draw(size: Vector2, lift: float) -> QuadMesh:
 	return q
 
 
+## The flipbook carries the flame motion, so the sprites barely travel: they swell in, sway and fade out.
 func _flame_process(core: bool) -> ParticleProcessMaterial:
 	var pm := ParticleProcessMaterial.new()
 	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	pm.emission_box_extents = Vector3(0.09, 0.02, 0.09) if core else Vector3(0.17, 0.03, 0.17)
+	pm.emission_box_extents = Vector3(0.07, 0.01, 0.07) if core else Vector3(0.13, 0.02, 0.13)
 	pm.direction = Vector3.UP
-	pm.spread = 8.0 if core else 14.0
-	pm.initial_velocity_min = 0.2 if core else 0.3
-	pm.initial_velocity_max = 0.42 if core else 0.65
-	pm.gravity = Vector3(0, 0.8, 0)
+	pm.spread = 6.0
+	pm.initial_velocity_min = 0.02 if core else 0.05
+	pm.initial_velocity_max = 0.08 if core else 0.16
+	pm.gravity = Vector3(0, 0.25, 0)
 	pm.damping_min = 0.2
-	pm.damping_max = 0.6
-	pm.angle_min = -14.0
-	pm.angle_max = 14.0
-	pm.scale_min = 0.75
-	pm.scale_max = 1.25
-	pm.scale_curve = _curve([[0.0, 0.45], [0.22, 1.0], [0.7, 0.75], [1.0, 0.2]])
-	pm.anim_speed_min = 1.0
-	pm.anim_speed_max = 1.3
+	pm.damping_max = 0.4
+	pm.angle_min = -7.0
+	pm.angle_max = 7.0
+	pm.scale_min = 0.8
+	pm.scale_max = 1.2
+	pm.scale_curve = _curve([[0.0, 0.55], [0.25, 1.0], [0.8, 0.95], [1.0, 0.6]])
+	pm.anim_speed_min = 0.8
+	pm.anim_speed_max = 1.1
 	pm.anim_offset_min = 0.0
 	pm.anim_offset_max = 1.0
 	if core:
-		pm.color_ramp = _gradient([[0.0, Color(1, 1, 1, 0)], [0.12, Color(1.0, 0.97, 0.88, 1)], [0.55, Color(1.0, 0.78, 0.45, 0.9)], [1.0, Color(1.0, 0.4, 0.1, 0)]])
+		pm.color_ramp = _gradient([[0.0, Color(1, 1, 1, 0)], [0.2, Color(1.0, 0.95, 0.85, 0.85)], [0.75, Color(1.0, 0.85, 0.7, 0.75)], [1.0, Color(1.0, 0.6, 0.4, 0)]])
 	else:
-		pm.color_ramp = _gradient([[0.0, Color(1, 1, 1, 0)], [0.1, Color(1.0, 0.9, 0.75, 0.95)], [0.45, Color(1.0, 0.6, 0.28, 0.8)], [0.8, Color(0.85, 0.26, 0.06, 0.4)], [1.0, Color(0.5, 0.1, 0.02, 0)]])
-	pm.turbulence_enabled = not _mobile
-	pm.turbulence_noise_strength = 0.8
-	pm.turbulence_noise_scale = 2.4
-	pm.turbulence_influence_min = 0.05
-	pm.turbulence_influence_max = 0.15
+		pm.color_ramp = _gradient([[0.0, Color(1, 1, 1, 0)], [0.15, Color(1.0, 0.93, 0.85, 0.85)], [0.7, Color(1.0, 0.82, 0.66, 0.7)], [1.0, Color(0.9, 0.5, 0.3, 0)]])
 	return pm
 
 
 func _smoke_draw() -> QuadMesh:
 	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	# Lit, so the column glows orange above the flames and fades into the night; per-vertex on mobile.
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX if _mobile else BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	m.diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT_WRAP
+	m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
@@ -477,11 +502,12 @@ func _smoke_draw() -> QuadMesh:
 	m.particles_anim_loop = false
 	m.vertex_color_use_as_albedo = true
 	m.albedo_texture = load("res://scenes/items/fx/smoke_sheet.png")
+	m.roughness = 1.0
 	if not _mobile:
 		m.proximity_fade_enabled = true
-		m.proximity_fade_distance = 0.5
+		m.proximity_fade_distance = 0.6
 	var q := QuadMesh.new()
-	q.size = Vector2(0.8, 0.8)
+	q.size = Vector2(0.7, 0.7)
 	q.material = m
 	return q
 
@@ -489,26 +515,31 @@ func _smoke_draw() -> QuadMesh:
 func _smoke_process() -> ParticleProcessMaterial:
 	var pm := ParticleProcessMaterial.new()
 	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	pm.emission_box_extents = Vector3(0.1, 0.05, 0.1)
+	pm.emission_box_extents = Vector3(0.09, 0.05, 0.09)
 	pm.direction = Vector3.UP
-	pm.spread = 10.0
-	pm.initial_velocity_min = 0.35
-	pm.initial_velocity_max = 0.65
-	pm.gravity = Vector3(0, 0.12, 0)
-	pm.damping_min = 0.1
-	pm.damping_max = 0.3
+	pm.spread = 7.0
+	pm.initial_velocity_min = 0.45
+	pm.initial_velocity_max = 0.7
+	pm.gravity = Vector3(0, 0.1, 0)
+	pm.damping_min = 0.08
+	pm.damping_max = 0.2
 	pm.angle_min = 0.0
 	pm.angle_max = 360.0
-	pm.angular_velocity_min = -18.0
-	pm.angular_velocity_max = 18.0
+	pm.angular_velocity_min = -14.0
+	pm.angular_velocity_max = 14.0
 	pm.scale_min = 0.8
 	pm.scale_max = 1.2
-	pm.scale_curve = _curve([[0.0, 0.35], [0.4, 1.2], [1.0, 2.6]])
+	pm.scale_curve = _curve([[0.0, 0.3], [0.3, 1.1], [1.0, 3.2]])
 	pm.anim_speed_min = 0.0
 	pm.anim_speed_max = 0.0
 	pm.anim_offset_min = 0.0
 	pm.anim_offset_max = 1.0
-	pm.color_ramp = _gradient([[0.0, Color(0.55, 0.36, 0.22, 0.0)], [0.08, Color(0.42, 0.33, 0.27, 0.42)], [0.35, Color(0.30, 0.29, 0.28, 0.3)], [1.0, Color(0.36, 0.36, 0.37, 0.0)]])
+	pm.turbulence_enabled = not _mobile
+	pm.turbulence_noise_strength = 0.6
+	pm.turbulence_noise_scale = 3.0
+	pm.turbulence_influence_min = 0.03
+	pm.turbulence_influence_max = 0.08
+	pm.color_ramp = _gradient([[0.0, Color(0.5, 0.45, 0.42, 0.0)], [0.1, Color(0.5, 0.47, 0.45, 0.26)], [0.45, Color(0.55, 0.54, 0.53, 0.17)], [1.0, Color(0.6, 0.6, 0.6, 0.0)]])
 	return pm
 
 
@@ -555,19 +586,17 @@ func _apply_visuals(delta: float) -> void:
 	var burning := state == FireState.BURNING
 	var embers := state == FireState.EMBERS
 	var i := intensity
-	_flames.emitting = burning and i > 0.05
-	_flames.amount_ratio = clampf(i * 1.1, 0.15, 1.0)
-	_core.emitting = (burning and i > 0.02) or (embers and ember_minutes > ember_minutes_max * 0.4)
-	_core.amount_ratio = clampf(i * 1.2, 0.2, 1.0) if burning else 0.25
-	_embers.emitting = burning and i > 0.25
-	_embers.amount_ratio = clampf(i, 0.2, 1.0)
-	_smoke.emitting = burning or embers
-	_smoke.amount_ratio = clampf(0.35 + (1.0 - i) * 0.5, 0.3, 1.0) if burning else 0.45
+	_emit(_flames, burning and i > 0.05, clampf(i * 1.1, 0.25, 1.0))
+	_emit(_core, (burning and i > 0.02) or (embers and ember_minutes > ember_minutes_max * 0.4), clampf(i * 1.2, 0.3, 1.0) if burning else 0.3)
+	_emit(_embers, burning and i > 0.25, clampf(i, 0.2, 1.0))
+	_emit(_smoke, burning or embers, clampf(0.45 + (1.0 - i) * 0.5, 0.4, 1.0) if burning else 0.5)
 	# flicker: layered sines + noise; embers pulse slowly
 	var flick := 0.86 + 0.07 * sin(_t * 9.3) + 0.05 * sin(_t * 15.1 + 1.7) + 0.12 * _noise.get_noise_1d(_t * 7.0)
 	if embers:
 		flick = 0.85 + 0.15 * sin(_t * 1.6) + 0.1 * _noise.get_noise_1d(_t * 1.5)
-	var energy := (3.2 * i) * flick
+	var energy := (2.4 * i) * flick
+	_glow_mat.albedo_color.a = clampf(0.09 * i * flick + (0.05 * (ember_minutes / ember_minutes_max) if embers else 0.0), 0.0, 0.12)
+	_glow.visible = _glow_mat.albedo_color.a > 0.004
 	_light.light_energy = energy
 	_light.visible = energy > 0.01
 	_light.omni_range = lerpf(3.5, 11.0, clampf(i, 0.0, 1.0))
@@ -591,10 +620,17 @@ func _apply_visuals(delta: float) -> void:
 			w = Climate.get_wind_at(global_position)
 		var wl := minf(w.length(), 14.0)
 		var wd := w.normalized() if wl > 0.01 else Vector3.ZERO
-		(_flames.process_material as ParticleProcessMaterial).gravity = Vector3(0, 0.8, 0) + wd * wl * 0.06
-		(_core.process_material as ParticleProcessMaterial).gravity = Vector3(0, 0.8, 0) + wd * wl * 0.04
-		(_smoke.process_material as ParticleProcessMaterial).gravity = Vector3(0, 0.12, 0) + wd * wl * 0.18
+		(_flames.process_material as ParticleProcessMaterial).gravity = Vector3(0, 0.25, 0) + wd * wl * 0.05
+		(_core.process_material as ParticleProcessMaterial).gravity = Vector3(0, 0.25, 0) + wd * wl * 0.03
+		(_smoke.process_material as ParticleProcessMaterial).gravity = Vector3(0, 0.1, 0) + wd * wl * 0.16
 		(_embers.process_material as ParticleProcessMaterial).gravity = Vector3(0, 0.3, 0) + wd * wl * 0.12
+
+
+static func _emit(p: GPUParticles3D, on: bool, ratio: float) -> void:
+	if p.emitting != on:
+		p.emitting = on
+	if on and not is_equal_approx(p.amount_ratio, ratio):
+		p.amount_ratio = ratio
 
 
 func _start_loop() -> void:

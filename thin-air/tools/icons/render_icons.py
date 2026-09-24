@@ -146,7 +146,22 @@ def build_material(key):
         nm.inputs["Strength"].default_value = float(d.get("normal_strength", 1.0))
         nt.links.new(tn.outputs["Color"], nm.inputs["Color"])
         nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
-    if d.get("glass"):
+    # "thin" glass (PET bottles, lantern chimneys) renders as a clear alpha shell so the contents stay lit: Cycles
+    # with refractive caustics off would otherwise leave anything inside a refractive shell unlit (black).
+    if d.get("glass") and d.get("thin"):
+        bsdf.inputs["Transmission Weight"].default_value = 1.0
+        bsdf.inputs["IOR"].default_value = float(d.get("ior", 1.45))
+        bsdf.inputs["Roughness"].default_value = min(rough, 1.0)
+        bsdf.inputs["Base Color"].default_value = (*[min(1.0, c * 1.05) for c in tint_lin], 1.0)
+        lp = nt.nodes.new("ShaderNodeLightPath")
+        tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+        tr.inputs["Color"].default_value = (*[min(1.0, c * 1.05) for c in tint_lin], 1.0)
+        mix = nt.nodes.new("ShaderNodeMixShader")
+        nt.links.new(lp.outputs["Is Shadow Ray"], mix.inputs["Fac"])
+        nt.links.new(bsdf.outputs["BSDF"], mix.inputs[1])
+        nt.links.new(tr.outputs["BSDF"], mix.inputs[2])
+        nt.links.new(mix.outputs["Shader"], out.inputs["Surface"])
+    elif d.get("glass"):
         bsdf.inputs["Transmission Weight"].default_value = 1.0
         bsdf.inputs["IOR"].default_value = float(d.get("ior", 1.45))
         bsdf.inputs["Roughness"].default_value = min(rough, 1.0)
