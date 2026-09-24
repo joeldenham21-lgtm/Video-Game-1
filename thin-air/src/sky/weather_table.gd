@@ -21,7 +21,7 @@ const STATES: Array[StringName] = [&"clear", &"cloudy", &"overcast", &"snow", &"
 ##  veer          deg the prevailing SW wind veers (clockwise) in this weather
 const PARAMS := {
 	&"clear": {
-		&"cloud_cover": 0.10, &"cloud_density": 0.35, &"cloud_base": 4300.0, &"cirrus": 0.30, &"overcast": 0.0,
+		&"cloud_cover": 0.0, &"cloud_density": 0.35, &"cloud_base": 4300.0, &"cirrus": 0.14, &"overcast": 0.0,
 		&"precipitation": 0.0, &"fog": 0.0, &"valley_fog": 0.0, &"haze": 0.0,
 		&"wind": 3.2, &"gust": 0.35, &"temp_day": 1.0, &"temp_night": -3.0, &"veer": 10.0,
 	},

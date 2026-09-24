@@ -21,6 +21,7 @@ func run() -> void:
 	_test_weather()
 	_test_save_load()
 	_test_misc()
+	await _test_sky_lighting()
 	Climate.load_state(saved)
 	Climate.locked = false
 
@@ -389,6 +390,86 @@ func _test_misc() -> void:
 	Climate.moon_phase_override = 0.0
 	check(Climate.get_light_level() < 0.05, "dark on a moonless night")
 	Climate.moon_phase_override = -1.0
+
+
+## The Sky scene: sun colour temperature, moonlight switch, exposure adaptation, fog colour, Settings hooks.
+func _test_sky_lighting() -> void:
+	var ps: PackedScene = load("res://scenes/world/sky.tscn")
+	check(ps != null, "sky.tscn loads")
+	if ps == null:
+		return
+	var sky: Node = ps.instantiate()
+	add_child(sky)
+	await get_tree().process_frame
+	var sun: DirectionalLight3D = sky.get_node("Sun")
+	var env: Environment = (sky.get_node("WorldEnvironment") as WorldEnvironment).environment
+	check(sun.is_in_group(&"sun") and sun.shadow_enabled, "Sun light in group 'sun' casting shadows")
+	check(env.tonemap_mode == Environment.TONE_MAPPER_AGX and env.fog_enabled and env.sky != null, "AgX + fog + sky")
+	Climate.day = 1
+	Climate.set_weather(&"clear", 0.0)
+	Climate.moon_phase_override = -1.0
+	# Noon: near-neutral white sunlight, bright, exposure ≈ 1.
+	Climate.hours = 12.5
+	sky.snap()
+	var c_noon := sun.light_color
+	var e_noon := sun.light_energy
+	var x_noon: float = sky.get_exposure()
+	# Golden hour: warm, dimmer.
+	Climate.hours = 16.9
+	sky.snap()
+	var c_gold := sun.light_color
+	var e_gold := sun.light_energy
+	print("  noon colour %s energy %.2f exp %.2f | golden %s energy %.2f exp %.2f" % [c_noon, e_noon, x_noon, c_gold, e_gold, sky.get_exposure()])
+	check(absf(c_noon.r - c_noon.b) < 0.25 * c_noon.g, "neutral white noon sun (%s)" % c_noon)
+	check(c_gold.r > c_gold.b * 1.6, "warm golden low sun (%s)" % c_gold)
+	check(e_gold < e_noon * 0.7, "low sun dimmer")
+	check(x_noon > 0.9 and x_noon < 1.5, "daylight exposure ≈ 1 (%.2f)" % x_noon)
+	check(not sky.is_moonlight(), "sun is the light by day")
+	# Full-moon night (day 7): the single directional light becomes cool, dim moonlight.
+	Climate.day = 7
+	Climate.hours = 23.5
+	sky.snap()
+	var c_moon := sun.light_color
+	print("  moonlight %s energy %.4f exp %.2f visible %s" % [c_moon, sun.light_energy, sky.get_exposure(), sun.visible])
+	check(sky.is_moonlight() and sun.visible, "moonlight at night under a full moon")
+	check(sun.light_energy < e_noon * 0.02 and sun.light_energy > 0.0, "moonlight far dimmer than sunlight")
+	check(c_moon.b > c_moon.r, "moonlight reads cool")
+	check(sky.get_exposure() > 4.0, "eyes adapt at night (%.2f)" % sky.get_exposure())
+	# New moon (day 22): no directional light at all – genuinely dark.
+	Climate.day = 22
+	Climate.hours = 23.5
+	sky.snap()
+	check(not sun.visible, "no light casting shadows on a moonless night")
+	var fog_night: Color = sky.get_fog_color()
+	Climate.day = 1
+	Climate.hours = 12.5
+	sky.snap()
+	var fog_day: Color = sky.get_fog_color()
+	check(fog_day.get_luminance() > fog_night.get_luminance() * 50.0, "fog colour follows the sky (day %s night %s)" % [fog_day, fog_night])
+	# Blizzard: whiteout fog, sky flattened by the precipitation veil.
+	Climate.set_weather(&"blizzard", 0.0)
+	sky.snap()
+	var u: Dictionary = sky.get_debug_uniforms()
+	check(float(u.get(&"veil", 0.0)) > 0.6, "blizzard veils the sky (%.2f)" % float(u.get(&"veil", 0.0)))
+	check(env.fog_density > 0.05, "blizzard whiteout fog density (%.3f/m)" % env.fog_density)
+	check(env.fog_sky_affect > 0.6, "blizzard fog covers the sky")
+	Climate.set_weather(&"clear", 0.0)
+	sky.snap()
+	check(env.fog_density < 0.0002, "clean-air fog on a clear day (%.6f/m)" % env.fog_density)
+	# Settings hooks.
+	var prev := Settings.preset
+	Settings.apply_preset(&"mobile_low")
+	await get_tree().process_frame
+	check(sky.sky.radiance_size == Sky.RADIANCE_SIZE_64 and sky.sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS, "mobile_low: small radiance map, 2 cascades")
+	check(String(sky.sky_material.shader.resource_path).ends_with("sky_mobile.gdshader"), "mobile_low uses the cheap sky shader")
+	check(not env.volumetric_fog_enabled and not env.ssao_enabled, "no volumetric fog / SSAO on mobile")
+	Settings.apply_preset(&"ultra")
+	await get_tree().process_frame
+	if Settings.is_forward_plus():
+		check(sky.sky.process_mode == Sky.PROCESS_MODE_REALTIME and sky.sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS, "ultra: realtime sky, 4 cascades")
+	Settings.apply_preset(prev)
+	sky.queue_free()
+	await get_tree().process_frame
 
 
 func _fire_script() -> GDScript:

@@ -1,0 +1,23 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://src/sky/sky_controller.gd" id="1_sky"]
+[ext_resource type="Script" path="res://src/sky/weather_fx.gd" id="2_wfx"]
+
+[sub_resource type="Environment" id="Environment_sky"]
+background_mode = 2
+tonemap_mode = 4
+fog_enabled = true
+
+[node name="Sky" type="Node3D"]
+script = ExtResource("1_sky")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_sky")
+
+[node name="Sun" type="DirectionalLight3D" parent="." groups=["sun"]]
+transform = Transform3D(1, 0, 0, 0, 0.5, 0.866025, 0, -0.866025, 0.5, 0, 0, 0)
+shadow_enabled = true
+sky_mode = 1
+
+[node name="WeatherFX" type="Node3D" parent="."]
+script = ExtResource("2_wfx")
