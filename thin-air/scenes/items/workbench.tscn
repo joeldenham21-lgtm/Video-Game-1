@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/items/stations/station.gd" id="1"]
+
+[node name="Workbench" type="StaticBody3D"]
+collision_layer = 64
+collision_mask = 0
+script = ExtResource("1")
+station_id = &"workbench"
+display_name = "Workbench"
+model_id = &"workbench"

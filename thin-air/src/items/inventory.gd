@@ -217,6 +217,133 @@ func use_durability(index: int, amount: float) -> bool:
 	return false
 
 
+func is_slot_empty(i: int) -> bool:
+	return i < 0 or i >= slots.size() or slots[i].is_empty()
+
+
+func slot_weight(i: int) -> float:
+	var s := get_slot(i)
+	if s.is_empty():
+		return 0.0
+	return float(ItemDB.get_item(s["id"]).get("weight", 0.1)) * int(s["count"])
+
+
+## Adds a whole stack dictionary ({id, count, durability}), keeping its durability. Returns the count NOT added.
+func add_stack(stack: Dictionary) -> int:
+	if stack.is_empty():
+		return 0
+	return add(StringName(stack.get("id", "")), int(stack.get("count", 1)), float(stack.get("durability", 1.0)))
+
+
+## Moves `amount` (-1 = all) from slot `from` to slot `to`: fills an empty slot, merges identical stacks, or swaps
+## whole stacks when the target holds something else. Returns true if anything changed.
+func move(from: int, to: int, amount := -1) -> bool:
+	if from == to or is_slot_empty(from) or to < 0 or to >= slots.size():
+		return false
+	var src := slots[from]
+	var n: int = int(src["count"]) if amount < 0 else mini(amount, int(src["count"]))
+	if n <= 0:
+		return false
+	var dst := slots[to]
+	if dst.is_empty():
+		if n == int(src["count"]):
+			slots[to] = src
+			slots[from] = {}
+		else:
+			slots[to] = {"id": src["id"], "count": n, "durability": src.get("durability", 1.0)}
+			src["count"] = int(src["count"]) - n
+		changed.emit()
+		return true
+	if dst["id"] == src["id"]:
+		var room := stack_limit(src["id"]) - int(dst["count"])
+		var k := mini(room, n)
+		if k <= 0:
+			return false
+		dst["count"] = int(dst["count"]) + k
+		src["count"] = int(src["count"]) - k
+		if int(src["count"]) <= 0:
+			slots[from] = {}
+		changed.emit()
+		return true
+	if n != int(src["count"]):
+		return false   # can't put part of a stack onto a different item
+	slots[to] = src
+	slots[from] = dst
+	changed.emit()
+	return true
+
+
+## Splits a stack in half into the first empty slot. Returns the new slot index or -1.
+func split(index: int) -> int:
+	var s := get_slot(index)
+	if s.is_empty() or int(s["count"]) < 2:
+		return -1
+	for i in slots.size():
+		if slots[i].is_empty():
+			var half := floori(int(s["count"]) * 0.5)
+			slots[i] = {"id": s["id"], "count": half, "durability": s.get("durability", 1.0)}
+			s["count"] = int(s["count"]) - half
+			changed.emit()
+			return i
+	return -1
+
+
+## Moves up to `amount` (-1 = all) of slot `index` into another inventory. Returns how many moved.
+func transfer(index: int, other: Inventory, amount := -1) -> int:
+	var s := get_slot(index)
+	if s.is_empty() or other == null or other == self:
+		return 0
+	var n: int = int(s["count"]) if amount < 0 else mini(amount, int(s["count"]))
+	var left := other.add(s["id"], n, float(s.get("durability", 1.0)))
+	var moved := n - left
+	if moved > 0:
+		remove_at(index, moved)
+	return moved
+
+
+## Compacts and orders stacks: by category, then name; merges partial stacks of the same item.
+func sort() -> void:
+	var stacks: Array[Dictionary] = []
+	for s in slots:
+		if not s.is_empty():
+			stacks.append(s)
+	var merged: Array[Dictionary] = []
+	for s in stacks:
+		var left := int(s["count"])
+		var limit := stack_limit(s["id"])
+		for m in merged:
+			if left <= 0:
+				break
+			if m["id"] == s["id"] and int(m["count"]) < limit:
+				var k := mini(limit - int(m["count"]), left)
+				m["count"] = int(m["count"]) + k
+				left -= k
+		if left > 0:
+			merged.append({"id": s["id"], "count": left, "durability": s.get("durability", 1.0)})
+	merged.sort_custom(_sort_less)
+	for i in slots.size():
+		slots[i] = merged[i] if i < merged.size() else {}
+	changed.emit()
+
+
+const _CATEGORY_ORDER := ["tool", "weapon", "light", "ammo", "clothing", "medical", "food", "drink", "fuel",
+	"resource", "quest", "placeable"]
+
+
+static func _sort_less(a: Dictionary, b: Dictionary) -> bool:
+	var da := ItemDB.get_item(a["id"])
+	var db := ItemDB.get_item(b["id"])
+	var ca := _CATEGORY_ORDER.find(String(da.get("category", "")))
+	var cb := _CATEGORY_ORDER.find(String(db.get("category", "")))
+	if ca != cb:
+		return ca < cb
+	var na := String(da.get("name", a["id"]))
+	var nb := String(db.get("name", b["id"]))
+	if na != nb:
+		return na < nb
+	return int(a["count"]) > int(b["count"])
+
+
 func to_dict() -> Dictionary:
 	var arr := []
 	for s in slots:
