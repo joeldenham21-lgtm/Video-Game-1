@@ -16,7 +16,7 @@ const MOON_E := 0.035              # full-moon irradiance, boosted for night ada
 const MOON_TINT := Color(0.72, 0.82, 1.0)   # Purkinje shift: moonlight reads cool
 const STAR_K := 0.35               # mag-0 star peak radiance (saturates at night exposure)
 const MILKY_WAY_K := 0.002         # Milky Way surface brightness at texture value 1
-const AIRGLOW := 0.00006           # natural night sky (airglow + starlight) radiance at the zenith (≪ moonlit sky)
+const AIRGLOW := 0.0002            # natural night sky (airglow + starlight + snow-lit air) at the zenith (≪ moonlit sky); lifted so ridgelines and snowfields read on moonless nights
 const KEY_REF := 2.6               # horizontal illuminance for exposure 1 (≈ sunny late-October midday)
 const EXPOSURE_MIN := 1.0
 const EXPOSURE_MAX := 8.5
@@ -443,6 +443,11 @@ func _update(delta: float) -> void:
 		# Extinction per metre: clean air ≈ 1e-4 (60 km visibility); snow murk and whiteouts are far denser.
 		environment.volumetric_fog_density = 0.00012 * (1.0 + 6.0 * haze) + 0.0025 * pow(precip, 1.5) + 0.03 * fog * fog + 0.004 * vf_inside
 		environment.volumetric_fog_anisotropy = lerpf(0.6, 0.25, clampf(precip + overcast * 0.5, 0.0, 1.0))
+		# Ice-crystal / snow murk is whiter than the slightly bluish humid haze; in whiteouts the murk also
+		# glows with multiply-scattered skylight that the froxel ambient injection alone underestimates.
+		environment.volumetric_fog_albedo = Color(0.86, 0.89, 0.93).lerp(Color(0.95, 0.96, 0.98), clampf(precip + fog, 0.0, 1.0))
+		var glow_fog := fog_col * (0.02 * whiteout * _pre)
+		environment.volumetric_fog_emission = Color(glow_fog.r * _white_balance.r, glow_fog.g * _white_balance.g, glow_fog.b * _white_balance.b)
 	if _pre_expose:
 		# Mobile stores the scene in RGB10A2 (0..2): physical night radiance (~1e-4) would quantise into
 		# coloured rings. The camera exposure multiplier scales lights, sky and ambient before the buffer

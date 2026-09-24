@@ -381,6 +381,9 @@ func _test_misc() -> void:
 	check(Climate.day == 3 and _near(Climate.hours, 2.5, 1e-3), "advance_time over midnight (day %d, %.2f)" % [Climate.day, Climate.hours])
 	check(hours_seen == [23, 0, 1, 2] and days_seen == [3], "hour_passed/day_started emitted (%s %s)" % [hours_seen, days_seen])
 	check(Climate.get_visibility_at(Vector3(0, 1400, 0)) > 1000.0 or Climate.weather != &"clear", "visibility sane")
+	Climate.set_weather(&"snow", 0.0)
+	var vis_snow := Climate.get_visibility_at(Vector3(0, 2500, 0))
+	check(vis_snow > 500.0 and vis_snow < 1400.0, "moderate snowfall visibility ≈ 900 m (%.0f)" % vis_snow)
 	Climate.set_weather(&"blizzard", 0.0)
 	check(Climate.get_visibility_at(Vector3(0, 2500, 0)) < 60.0, "blizzard visibility < 60 m (%.0f)" % Climate.get_visibility_at(Vector3(0, 2500, 0)))
 	Climate.set_weather(&"clear", 0.0)
@@ -456,10 +459,21 @@ func _test_sky_lighting() -> void:
 	Climate.set_weather(&"clear", 0.0)
 	sky.snap()
 	check(env.fog_density < 0.0002, "clean-air fog on a clear day (%.6f/m)" % env.fog_density)
+	# Weather FX: snowfall layers exist, the fog sea only shows with valley fog.
+	var wfx: Node = sky.get_node_or_null("WeatherFX")
+	check(wfx != null and wfx.get_node_or_null("Snow") is GPUParticles3D, "WeatherFX snowfall layer")
+	check(wfx != null and wfx.get_node_or_null("ValleyFogSea") is MeshInstance3D, "WeatherFX valley fog sea")
+	if Settings.is_forward_plus():
+		check(is_equal_approx(float(sky.get_pre_exposure()), 1.0), "no pre-exposure on Forward+")
 	# Settings hooks.
 	var prev := Settings.preset
 	Settings.apply_preset(&"mobile_low")
 	await get_tree().process_frame
+	var budget := 0
+	for c in wfx.get_children():
+		if c is GPUParticles3D:
+			budget += (c as GPUParticles3D).amount
+	check(budget <= 3000, "mobile particle budget ≤ 3k (%d)" % budget)
 	check(sky.sky.radiance_size == Sky.RADIANCE_SIZE_64 and sky.sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS, "mobile_low: small radiance map, 2 cascades")
 	check(String(sky.sky_material.shader.resource_path).ends_with("sky_mobile.gdshader"), "mobile_low uses the cheap sky shader")
 	check(not env.volumetric_fog_enabled and not env.ssao_enabled, "no volumetric fog / SSAO on mobile")

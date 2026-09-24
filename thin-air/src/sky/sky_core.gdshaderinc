@@ -294,22 +294,27 @@ vec3 aurora(vec3 dir, int quality_steps) {
 		float h = s * tan_el + s * s / (2.0 * 6371.0);
 		// Vertical rays and the ragged top of each ray.
 		float rx = x + t * 1.6;
-		float rays = 0.25 + 0.75 * pow(vnoise1(rx * 0.35), 2.0) * (0.6 + 0.4 * vnoise1(rx * 1.3 + 7.0));
+		float rays = 0.22 + 0.78 * pow(vnoise1(rx * 0.24), 2.0) * (0.5 + 0.5 * vnoise1(rx * 1.1 + 7.0));
 		float top = 170.0 + 140.0 * vnoise1(x * 0.21 + 3.0 + fk * 11.0);
 		float patchy = smoothstep(0.15, 0.7, vnoise1(x * 0.006 + t * 0.015 + fk * 5.0));
 		float base = 100.0 - 6.0 * aurora_intensity + 4.0 * vnoise1(x * 0.05 + 9.0);
 		float lower = smoothstep(base - 3.0, base + 2.5, h);
-		float green = lower * exp(-max(h - base - 12.0, 0.0) / 55.0) * (1.0 - smoothstep(top - 40.0, top, h));
+		// Green 557.7 nm: a bright band just above the sharp lower border (the arc), plus the fainter ray
+		// columns that climb out of it; red 630 nm glows only at the ragged tops.
+		float fade_top = 1.0 - smoothstep(top - 40.0, top, h);
+		float band = lower * exp(-max(h - base - 6.0, 0.0) / 20.0);
+		float column = lower * exp(-max(h - base - 12.0, 0.0) / 65.0) * fade_top;
 		float red = 0.22 * smoothstep(175.0, 235.0, h) * exp(-max(h - 235.0, 0.0) / 110.0) * (1.0 - smoothstep(380.0, 420.0, h));
 		float pink = 0.45 * aurora_intensity * exp(-pow((h - base + 1.5) / 3.5, 2.0));
-		vec3 e = vec3(0.30, 1.0, 0.52) * green + vec3(1.0, 0.18, 0.30) * red + vec3(0.9, 0.25, 0.55) * pink;
+		float green = band * (0.5 + 0.5 * rays) + column * rays * 0.75;
+		vec3 e = vec3(0.36, 1.0, 0.42) * green + vec3(1.0, 0.18, 0.30) * red * rays + vec3(0.9, 0.25, 0.55) * pink;
 		// Path through an 8 km-thick sheet: bright where seen edge-on.
 		float slope = (aurora_fold(x + 1.0, t, ph) - aurora_fold(x - 1.0, t, ph)) * 0.5;
 		vec2 nrm = normalize(vec2(-slope, 1.0));
 		float cos_inc = abs(dot(vec2(de, dn), nrm)) * cos_el;
 		float path = 8.0 / max(cos_inc, 0.12);
 		float strength = 1.0 / (1.0 + fk * 1.2);
-		acc += e * rays * patchy * path * strength;
+		acc += e * patchy * path * strength;
 	}
 	float airmass = 1.0 / max(dir.y + 0.05, 0.05);
 	return acc * aurora_intensity * 2.2e-3 * exp(-0.12 * (airmass - 1.0)) * smoothstep(-0.02, 0.05, dir.y);
@@ -333,7 +338,12 @@ float cloud_shape(vec2 uv, float cover) {
 	}
 #endif
 	float thr = mix(0.80, 0.18, cover);
+#ifdef SKY_MOBILE
+	// No detail octave on mobile: a softer edge keeps the cumulus from looking cut out.
+	return smoothstep(thr - 0.05, thr + 0.22, n);
+#else
 	return smoothstep(thr - 0.02, thr + 0.16, n);
+#endif
 }
 
 // Returns vec4(radiance, transmittance).
@@ -368,7 +378,10 @@ vec4 cloud_layer(vec3 dir, vec3 sky_here, bool cheap) {
 		}
 		tau_l += acc * (1.2 + 7.0 * cloud_density);
 	} else {
-		tau_l *= 2.0;
+		// One density probe toward the light: shaded bases and lit tops at a quarter of the cost.
+		vec2 step_uv = normalize(L.xz + vec2(1e-4)) * cloud_thickness / max(L.y, 0.08) * cloud_scale * 0.35;
+		step_uv = clamp(step_uv, vec2(-0.02), vec2(0.02));
+		tau_l += cloud_shape(uv + step_uv * 0.9, cloud_cover) * (2.0 + 9.0 * cloud_density);
 	}
 	tau_l += overcast * 12.0;
 	float cos_t = dot(dir, L);
@@ -405,14 +418,18 @@ vec4 cirrus_layer(vec3 dir) {
 	vec2 q = vec2(dot(pos, cirrus_axis), dot(pos, vec2(-cirrus_axis.y, cirrus_axis.x)));
 	vec2 uv = q * 0.000032 + cirrus_offset;
 	float c = texture(cloud_noise, uv).a;
+	// Fibrous fall streaks: the same field sampled finely across the jet axis, coarsely along it.
+	float fib = texture(cloud_noise, uv * vec2(2.3, 9.0) + vec2(0.21, 0.63)).a;
+	c *= 0.45 + 0.9 * fib;
 	// Coverage: sparse tufts at low cover, merging into a cirrostratus veil as cover rises.
 	float veil = smoothstep(0.55, 1.0, cirrus_cover) * 0.35 * texture(cloud_noise, uv * 0.31 + vec2(0.5)).r;
-	c = clamp(c * (0.35 + 1.3 * cirrus_cover) + veil, 0.0, 1.0);
-	float tau = c * 0.55 * min(1.0 / max(dir.y, 0.08), 6.0);
+	c = clamp(c * (0.3 + 1.3 * cirrus_cover) + veil, 0.0, 1.0);
+	float tau = c * 0.5 * min(1.0 / max(dir.y, 0.08), 6.0);
 	float trans = exp(-tau);
 	float cos_t = dot(dir, sun_dir);
+	// Thin ice cloud: mostly single scattering (phase normalised per steradian), strong forward peak.
 	float ph = mix(phase_hg(cos_t, 0.8), 1.0 / (4.0 * PI), 0.55) * 4.0 * PI;
-	vec3 rad = (cirrus_sun_color * ph * 0.55 + cloud_ambient_top * 0.9) * (1.0 - trans);
+	vec3 rad = (cirrus_sun_color * ph * 0.17 + cloud_ambient_top * 0.55) * (1.0 - trans);
 	float fade = exp(-t / 90000.0);
 	return vec4(rad * fade, mix(1.0, trans, fade));
 }
