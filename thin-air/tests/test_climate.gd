@@ -435,9 +435,11 @@ func _test_sky_lighting() -> void:
 	var c_moon := sun.light_color
 	print("  moonlight %s energy %.4f exp %.2f visible %s" % [c_moon, sun.light_energy, sky.get_exposure(), sun.visible])
 	check(sky.is_moonlight() and sun.visible, "moonlight at night under a full moon")
-	check(sun.light_energy < e_noon * 0.02 and sun.light_energy > 0.0, "moonlight far dimmer than sunlight")
+	check(sun.light_energy / sky.get_light_boost() < e_noon * 0.02 and sun.light_energy > 0.0, "moonlight far dimmer than sunlight")
 	check(c_moon.b > c_moon.r, "moonlight reads cool")
-	check(sky.get_exposure() > 4.0, "eyes adapt at night (%.2f)" % sky.get_exposure())
+	check(sky.get_eye_adaptation() > 4.0, "eyes adapt at night (%.2f)" % sky.get_eye_adaptation())
+	check(sky.get_exposure() <= sky.EXPOSURE_MAX + 1e-4 and sky.get_light_boost() > 1.0, "camera exposure capped at night (%.2f), sky lights boosted (×%.2f)" % [sky.get_exposure(), sky.get_light_boost()])
+	check(is_equal_approx(sky.get_exposure() * sky.get_light_boost(), sky.get_eye_adaptation()), "exposure × boost = eye adaptation")
 	# New moon (day 22): no directional light at all – genuinely dark.
 	Climate.day = 22
 	Climate.hours = 23.5
@@ -463,8 +465,6 @@ func _test_sky_lighting() -> void:
 	var wfx: Node = sky.get_node_or_null("WeatherFX")
 	check(wfx != null and wfx.get_node_or_null("Snow") is GPUParticles3D, "WeatherFX snowfall layer")
 	check(wfx != null and wfx.get_node_or_null("ValleyFogSea") is MeshInstance3D, "WeatherFX valley fog sea")
-	if Settings.is_forward_plus():
-		check(is_equal_approx(float(sky.get_pre_exposure()), 1.0), "no pre-exposure on Forward+")
 	# Settings hooks.
 	var prev := Settings.preset
 	Settings.apply_preset(&"mobile_low")

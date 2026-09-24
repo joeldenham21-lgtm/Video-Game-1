@@ -6,7 +6,10 @@ extends Node3D
 ##  * sky shader uniforms from a precomputed spectral atmosphere (assets/textures/sky/atmosphere_*.res),
 ##  * sun/moon light colour & energy from atmospheric transmittance at the camera altitude, dimmed by the
 ##    cloud deck actually crossing the sun, warm at golden hour, cool dim moonlight at night,
-##  * exposure that adapts like an eye (daylight → moonlit night ≈ 8.5× gain; moonless nights stay dark),
+##  * exposure that adapts like an eye (daylight → moonlit night ≈ 8.5× gain; moonless nights stay dark). The
+##    camera exposure itself is capped at EXPOSURE_MAX; adaptation beyond that is applied to the sky's own
+##    light sources instead (sun/moon/sky radiance × get_light_boost()), so night radiance stays in a range
+##    the Mobile colour buffer can hold (no banding) and torches/fires are not multiplied by the night gain,
 ##  * depth + height fog whose colour is the horizon sky (aerial perspective), valley fog banks, whiteouts,
 ##  * volumetric fog / SSAO / SSIL / SSR / glow / shadow cascades from Settings (on settings_changed).
 ## Other systems must not replace WorldEnvironment.environment; read get_exposure()/get_fog_color() instead.
@@ -19,7 +22,8 @@ const MILKY_WAY_K := 0.002         # Milky Way surface brightness at texture val
 const AIRGLOW := 0.0002            # natural night sky (airglow + starlight + snow-lit air) at the zenith (≪ moonlit sky); lifted so ridgelines and snowfields read on moonless nights
 const KEY_REF := 2.6               # horizontal illuminance for exposure 1 (≈ sunny late-October midday)
 const EXPOSURE_MIN := 1.0
-const EXPOSURE_MAX := 8.5
+const EYE_ADAPT_MAX := 8.5         # total adaptation daylight → night (camera exposure × light boost)
+const EXPOSURE_MAX := 2.5          # camera (tonemap) exposure cap; the rest is boost on the sky's own lights
 const ADAPT_SECONDS := 3.0
 const CLOUD_SCALE := 0.00005       # uv per metre on the cloud deck (one noise tile = 20 km)
 const LUT_ALTS: Array[float] = [1300.0, 2000.0, 2700.0, 3450.0]
@@ -45,12 +49,13 @@ var camera_attributes: CameraAttributesPractical
 var _cpu: Image
 var _cloud_img: Image
 var _white_balance := Color(1, 1, 1)
-var _exposure := 1.0
+var _exposure := 1.0                # camera / tonemap exposure (≤ EXPOSURE_MAX)
+var _eye := 1.0                     # adapted eye gain (≤ EYE_ADAPT_MAX) = _exposure × _boost
+var _boost := 1.0                   # night boost applied to sun/moon/sky radiance
 var _first := true
 var _sky_quality := 2
 var _mobile_shader := false
-var _pre_expose := false
-var _pre := 1.0
+var _dither_abs := 0.0
 var _update_interval := 0.0
 var _update_timer := 0.0
 var _cloud_offset := Vector2(0.37, 0.61)
@@ -182,7 +187,9 @@ func apply_settings() -> void:
 		return
 	var fp := Settings.is_forward_plus() if Settings.has_method("is_forward_plus") else true
 	var mobile := Settings.is_mobile() if Settings.has_method("is_mobile") else false
-	_pre_expose = RenderingServer.get_current_rendering_method() != "forward_plus"
+	# Mobile keeps the scene in a low-precision buffer: add ~1 LSB of blue-noise to the sky so the darkest
+	# gradients dither instead of banding (Forward+ uses a half-float buffer).
+	_dither_abs = 0.0 if RenderingServer.get_current_rendering_method() == "forward_plus" else 0.0009
 	environment.ssao_enabled = fp and bool(Settings.get_value(&"ssao", false))
 	environment.ssil_enabled = fp and bool(Settings.get_value(&"ssil", false))
 	environment.ssr_enabled = fp and bool(Settings.get_value(&"ssr", false))
@@ -245,6 +252,9 @@ func _process(delta: float) -> void:
 
 ## Jump straight to the current state (no exposure adaptation lag) – teleports, cinematics, screenshots.
 func snap() -> void:
+	# Twice: the first pass settles the eye gain, the second renders with the matching exposure/boost.
+	_first = true
+	_update(0.0)
 	_first = true
 	_update(0.0)
 
@@ -253,11 +263,16 @@ func get_exposure() -> float:
 	return _exposure
 
 
-## Mobile renderer only: the part of the exposure applied before the (low-precision) colour buffer.
-## Unshaded / emissive materials that must match lit surfaces at night multiply their output by this
-## (1.0 on Forward+). See the note at the pre-exposure code in _update().
-func get_pre_exposure() -> float:
-	return _pre
+## Total eye adaptation (1 by day … EYE_ADAPT_MAX at night) = get_exposure() × get_light_boost().
+func get_eye_adaptation() -> float:
+	return _eye
+
+
+## Factor by which the sky scales its own sources (sun/moon light, sky, fog colour, weather particles) once
+## the camera exposure is capped — i.e. the moonlit world is rendered brighter instead of the camera
+## gaining further. Emissive/unshaded content that should track the night sky can multiply by it.
+func get_light_boost() -> float:
+	return _boost
 
 
 func get_fog_color() -> Color:
@@ -304,10 +319,10 @@ func _update(delta: float) -> void:
 	var cloud_h := maxf(base_asl - cam_pos.y, 350.0)
 	var phase := float(Climate.get_moon_phase())
 	var moon_bright := Astronomy.moon_brightness(phase)
-	var moon_e := MOON_E * moon_bright
+	var moon_e := MOON_E * moon_bright * _boost
 	# Twilight adaptation: the eye gains sensitivity as the sun sinks, so the sun-lit sky is boosted
 	# (×1 at sunset → ×16 at −6° → ×250 at −12°), keeping blue hour blue and HDR values in half-float range.
-	var sun_e := SUN_E * minf(pow(10.0, 0.2 * maxf(-el_s, 0.0)), 400.0)
+	var sun_e := SUN_E * minf(pow(10.0, 0.2 * maxf(-el_s, 0.0)), 400.0) * _boost
 
 	# ---------------------------------------------------------------- atmosphere tables
 	var t_sun := _trans(alt, el_s)
@@ -317,7 +332,7 @@ func _update(delta: float) -> void:
 	var hor := _row4(ROW_HOR, alt, el_s) * sun_e + _row4(ROW_HOR, alt, el_m) * moon_e
 	var hor_anti := _row4(ROW_HOR_ANTI, alt, el_s) * sun_e + _row4(ROW_HOR, alt, el_m) * moon_e
 	var zen := _row4(ROW_ZEN, alt, el_s) * sun_e + _row4(ROW_ZEN, alt, el_m) * moon_e
-	var airglow_rad := Color(AIRGLOW, AIRGLOW, AIRGLOW) * 1.8
+	var airglow_rad := Color(AIRGLOW, AIRGLOW, AIRGLOW) * (1.8 * _boost)
 	hor += airglow_rad * 2.5
 	hor_anti += airglow_rad * 2.5
 	zen += airglow_rad
@@ -380,12 +395,15 @@ func _update(delta: float) -> void:
 	var key := _lum(sun_rgb) * maxf(sd.y, 0.0) + _lum(moon_rgb) * maxf(md.y, 0.0) + (_lum(irr_s) + _lum(irr_m)) * diffuse_t * enhance
 	if overcast > 0.0:
 		key = lerpf(key, under, overcast)
-	key = maxf(key, 1.0e-6) + 2.0e-5
-	var target := clampf(pow(KEY_REF / key, 0.6), EXPOSURE_MIN, EXPOSURE_MAX)
+	# Everything above is in boosted units: back to physical for the adaptation target.
+	key = maxf(key, 1.0e-6) / _boost + 2.0e-5
+	var target := clampf(pow(KEY_REF / key, 0.6), EXPOSURE_MIN, EYE_ADAPT_MAX)
+	# This frame renders with last frame's exposure/boost pair (consistent: radiance × exposure = eye gain).
+	var frame_exposure := _exposure
 	if _first:
-		_exposure = target
+		_eye = target
 	else:
-		_exposure = lerpf(_exposure, target, 1.0 - exp(-delta / ADAPT_SECONDS))
+		_eye = lerpf(_eye, target, 1.0 - exp(-delta / ADAPT_SECONDS))
 
 	# ---------------------------------------------------------------- light: sun, or moon at night
 	var sun_w := smoothstep(-2.0, -0.4, el_s)
@@ -446,24 +464,10 @@ func _update(delta: float) -> void:
 		# Ice-crystal / snow murk is whiter than the slightly bluish humid haze; in whiteouts the murk also
 		# glows with multiply-scattered skylight that the froxel ambient injection alone underestimates.
 		environment.volumetric_fog_albedo = Color(0.86, 0.89, 0.93).lerp(Color(0.95, 0.96, 0.98), clampf(precip + fog, 0.0, 1.0))
-		var glow_fog := fog_col * (0.02 * whiteout * _pre)
+		var glow_fog := fog_col * (0.02 * whiteout)
 		environment.volumetric_fog_emission = Color(glow_fog.r * _white_balance.r, glow_fog.g * _white_balance.g, glow_fog.b * _white_balance.b)
-	if _pre_expose:
-		# Mobile stores the scene in RGB10A2 (0..2): physical night radiance (~1e-4) would quantise into
-		# coloured rings. The camera exposure multiplier scales lights, sky and ambient before the buffer
-		# (and once more in the tonemapper), so pre-expose by p — as far as the brightest sky allows without
-		# clipping — and hand the rest of the exposure to the tonemapper: net = p·p·(E/p²) = E.
-		var peak := maxf(_lum(_row4(ROW_HOR_SUN, alt, el_s)) * sun_e * 3.0, _lum(hor) * 2.0)
-		peak = maxf(peak * (1.0 - 0.7 * overcast), _lum(zen))
-		_pre = clampf(1.6 / maxf(peak, 1e-6), 1.0, _exposure)
-		camera_attributes.exposure_multiplier = _pre
-		environment.tonemap_exposure = _exposure / (_pre * _pre)
-		# Fog, emission and unshaded materials are not pre-exposed by the engine: scale what the sky owns.
-		environment.fog_light_energy *= _pre
-	else:
-		_pre = 1.0
-		camera_attributes.exposure_multiplier = 1.0
-		environment.tonemap_exposure = _exposure
+	camera_attributes.exposure_multiplier = 1.0
+	environment.tonemap_exposure = frame_exposure
 	# Scotopic vision: colour drains from moonlit scenes.
 	var darkness := 1.0 - smoothstep(-10.0, -2.0, el_s)
 	environment.adjustment_saturation = lerpf(1.0, 0.78, darkness) * lerpf(1.0, 0.92, overcast)
@@ -479,9 +483,13 @@ func _update(delta: float) -> void:
 		e_down = lerpf(e_down, under, overcast)
 	var e_up := _lum(ground) * PI
 	var amb_tint := _norm(zen + hor).lerp(Color(1, 1, 1), 0.5 + 0.5 * overcast)
-	_particle_amb = _wb(_mulc(amb_tint, 0.9 * 0.5 * (e_down + e_up) / PI * _pre))
-	_particle_sun = _wb(_mulc(light_rgb, 0.9 * 0.5 / PI * _pre))
+	_particle_amb = _wb(_mulc(amb_tint, 0.9 * 0.5 * (e_down + e_up) / PI))
+	_particle_sun = _wb(_mulc(light_rgb, 0.9 * 0.5 / PI))
 	_particle_dir = light_dir
+
+	# Next frame's exposure/boost split of the adapted eye gain.
+	_exposure = clampf(_eye, EXPOSURE_MIN, EXPOSURE_MAX)
+	_boost = _eye / _exposure
 
 	# ---------------------------------------------------------------- sky material (throttled on mobile)
 	_update_timer -= delta
@@ -496,7 +504,7 @@ func _update(delta: float) -> void:
 	var night := 1.0 - smoothstep(-10.0, -1.0, el_s)
 	_u = {
 		&"sun_dir": sd, &"moon_dir": md, &"sun_irradiance": SUN_E, &"moon_irradiance": moon_e,
-		&"alt_index": alt_index, &"exposure": _exposure, &"fog": fog_col, &"sun_rgb": sun_rgb, &"moon_rgb": moon_rgb,
+		&"alt_index": alt_index, &"exposure": _exposure, &"eye": _eye, &"boost": _boost, &"fog": fog_col, &"sun_rgb": sun_rgb, &"moon_rgb": moon_rgb,
 		&"key": key, &"el_s": el_s, &"el_m": el_m, &"cloud_t_sun": ct_sun, &"veil": veil,
 	}
 	m.set_shader_parameter(&"sun_dir", sd)
@@ -507,14 +515,16 @@ func _update(delta: float) -> void:
 	m.set_shader_parameter(&"zenith_luminance", _lum(zen))
 	m.set_shader_parameter(&"white_balance", Vector3(_white_balance.r, _white_balance.g, _white_balance.b))
 	m.set_shader_parameter(&"ground_radiance", _v3(ground))
-	m.set_shader_parameter(&"airglow", AIRGLOW)
+	m.set_shader_parameter(&"airglow", AIRGLOW * _boost)
+	m.set_shader_parameter(&"night_boost", _boost)
+	m.set_shader_parameter(&"dither_abs", _dither_abs)
 	m.set_shader_parameter(&"haze_color", _v3(fog_col))
 	m.set_shader_parameter(&"horizon_haze", clampf(haze * 0.45 + vf * 0.2, 0.0, 0.9))
 	m.set_shader_parameter(&"precip_veil", veil)
 	m.set_shader_parameter(&"veil_zenith", _v3(fog_col.lerp(oc_zen, 0.35 * (1.0 - veil))))
 	m.set_shader_parameter(&"veil_horizon", _v3(fog_col))
 	# discs
-	m.set_shader_parameter(&"sun_disk_radiance", 55.0)
+	m.set_shader_parameter(&"sun_disk_radiance", 55.0 * _boost)
 	m.set_shader_parameter(&"sun_transmittance", _v3(t_sun))
 	m.set_shader_parameter(&"sun_angular_radius", deg_to_rad(Astronomy.SUN_ANGULAR_RADIUS_DEG))
 	m.set_shader_parameter(&"moon_angular_radius", deg_to_rad(Astronomy.MOON_ANGULAR_RADIUS_DEG) * 1.08)
@@ -522,13 +532,13 @@ func _update(delta: float) -> void:
 	m.set_shader_parameter(&"moon_right", moon_frame[0])
 	m.set_shader_parameter(&"moon_up", moon_frame[1])
 	# Physical lunar radiance relative to the sun (full moon ≈ 0.02·E_sun/sr); discs stay readable at night.
-	m.set_shader_parameter(&"moon_disk_radiance", 0.028 * SUN_E * 1.2)
+	m.set_shader_parameter(&"moon_disk_radiance", 0.028 * SUN_E * 1.2 * _boost)
 	m.set_shader_parameter(&"moon_transmittance", _v3(t_moon))
 	m.set_shader_parameter(&"earthshine", 0.012 * (1.0 - Astronomy.moon_illumination(phase)))
 	# night sky
 	m.set_shader_parameter(&"world_to_eq", Astronomy.equatorial_to_world_basis(Climate.get_sidereal_time()).transposed())
-	m.set_shader_parameter(&"star_brightness", STAR_K if el_s < -1.0 else 0.0)
-	m.set_shader_parameter(&"milky_way_brightness", MILKY_WAY_K * night)
+	m.set_shader_parameter(&"star_brightness", STAR_K * _boost if el_s < -1.0 else 0.0)
+	m.set_shader_parameter(&"milky_way_brightness", MILKY_WAY_K * night * _boost)
 	m.set_shader_parameter(&"pixel_angle", _pixel_angle(cam))
 	m.set_shader_parameter(&"twinkle_time", _twinkle_time)
 	m.set_shader_parameter(&"star_extinction", 0.22 + 0.5 * haze)

@@ -77,6 +77,8 @@ uniform float aurora_time = 0.0;
 uniform float aurora_distance = 600000.0;
 
 uniform int quality = 2;
+uniform float night_boost = 1.0;   // sky controller light boost once the camera exposure is capped
+uniform float dither_abs = 0.0;    // absolute blue-noise dither (≈1 LSB of the Mobile colour buffer)
 
 const float R_GROUND = 6360000.0;
 const float MIE_G = 0.8;
@@ -318,7 +320,7 @@ vec3 aurora(vec3 dir, int quality_steps) {
 		acc += e * patchy * path * strength;
 	}
 	float airmass = 1.0 / max(dir.y + 0.05, 0.05);
-	return acc * aurora_intensity * 2.2e-3 * exp(-0.12 * (airmass - 1.0)) * smoothstep(-0.02, 0.05, dir.y);
+	return acc * aurora_intensity * 2.2e-3 * night_boost * exp(-0.12 * (airmass - 1.0)) * smoothstep(-0.02, 0.05, dir.y);
 }
 
 // ------------------------------------------------------------------------------------------ clouds
@@ -540,5 +542,5 @@ vec3 overcast_sky(vec3 dir, vec3 base) {
 vec3 finish(vec3 col, vec2 screen_uv) {
 	float bn = texture(blue_noise, screen_uv).r;
 	col *= 1.0 + (bn - 0.5) * 0.018;
-	return max(col * white_balance, vec3(0.0));
+	return max(col * white_balance + (bn - 0.5) * dither_abs, vec3(0.0));
 }
