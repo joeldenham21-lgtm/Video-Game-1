@@ -1,0 +1,119 @@
+[
+ {
+  "index": 0,
+  "name": "snow",
+  "tiling_m": 6.0,
+  "avg_albedo_linear": [
+   0.7569,
+   0.7943,
+   0.8535
+  ],
+  "roughness_avg": 0.7182,
+  "height_range_m": 0.1254,
+  "surface": "snow"
+ },
+ {
+  "index": 1,
+  "name": "rock",
+  "tiling_m": 4.0,
+  "avg_albedo_linear": [
+   0.2973,
+   0.2879,
+   0.2584
+  ],
+  "roughness_avg": 0.7785,
+  "height_range_m": 0.3251,
+  "surface": "rock"
+ },
+ {
+  "index": 2,
+  "name": "cliff",
+  "tiling_m": 8.0,
+  "avg_albedo_linear": [
+   0.11,
+   0.1048,
+   0.0939
+  ],
+  "roughness_avg": 0.8166,
+  "height_range_m": 0.8895,
+  "surface": "rock"
+ },
+ {
+  "index": 3,
+  "name": "scree",
+  "tiling_m": 4.0,
+  "avg_albedo_linear": [
+   0.1783,
+   0.1715,
+   0.1525
+  ],
+  "roughness_avg": 0.7954,
+  "height_range_m": 0.2782,
+  "surface": "scree"
+ },
+ {
+  "index": 4,
+  "name": "gravel",
+  "tiling_m": 2.0,
+  "avg_albedo_linear": [
+   0.2014,
+   0.1861,
+   0.1544
+  ],
+  "roughness_avg": 0.6416,
+  "height_range_m": 0.04,
+  "surface": "gravel"
+ },
+ {
+  "index": 5,
+  "name": "grass",
+  "tiling_m": 3.0,
+  "avg_albedo_linear": [
+   0.1495,
+   0.1142,
+   0.0609
+  ],
+  "roughness_avg": 0.8175,
+  "height_range_m": 0.0703,
+  "surface": "grass"
+ },
+ {
+  "index": 6,
+  "name": "forest",
+  "tiling_m": 2.5,
+  "avg_albedo_linear": [
+   0.0613,
+   0.0415,
+   0.0219
+  ],
+  "roughness_avg": 0.8149,
+  "height_range_m": 0.042,
+  "surface": "forest"
+ },
+ {
+  "index": 7,
+  "name": "dirt",
+  "tiling_m": 3.0,
+  "avg_albedo_linear": [
+   0.113,
+   0.0878,
+   0.0627
+  ],
+  "roughness_avg": 0.8408,
+  "height_range_m": 0.0479,
+  "surface": "dirt"
+ },
+ {
+  "index": 8,
+  "name": "ice",
+  "tiling_m": 6.0,
+  "avg_albedo_linear": [
+   0.4151,
+   0.5033,
+   0.569
+  ],
+  "roughness_avg": 0.2094,
+  "height_range_m": 0.1318,
+  "surface": "ice"
+ }
+]

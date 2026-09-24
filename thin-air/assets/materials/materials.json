@@ -1,0 +1,650 @@
+{
+ "bark_dead": {
+  "material": "res://assets/materials/bark_dead.tres",
+  "size_px": [
+   512,
+   1024
+  ],
+  "tile_m": [
+   0.5,
+   1.0
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   2.0,
+   1.0
+  ],
+  "transparent": false,
+  "desc": "silvered snag wood, checks, beetle galleries",
+  "avg_albedo_linear": [
+   0.2439,
+   0.2256,
+   0.2011
+  ],
+  "roughness_avg": 0.89,
+  "metal_avg": 0.0,
+  "height_range_m": 0.0164
+ },
+ "bark_pine": {
+  "material": "res://assets/materials/bark_pine.tres",
+  "size_px": [
+   512,
+   1024
+  ],
+  "tile_m": [
+   0.6,
+   1.2
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   1.66667,
+   0.83333
+  ],
+  "transparent": false,
+  "desc": "mature pine: cinnamon plates, black fissures",
+  "avg_albedo_linear": [
+   0.132,
+   0.078,
+   0.0533
+  ],
+  "roughness_avg": 0.853,
+  "metal_avg": 0.0,
+  "height_range_m": 0.06373
+ },
+ "bark_spruce": {
+  "material": "res://assets/materials/bark_spruce.tres",
+  "size_px": [
+   512,
+   1024
+  ],
+  "tile_m": [
+   0.5,
+   1.0
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   2.0,
+   1.0
+  ],
+  "transparent": false,
+  "desc": "Engelmann/white spruce: thin grey-brown scales",
+  "avg_albedo_linear": [
+   0.1342,
+   0.1094,
+   0.0912
+  ],
+  "roughness_avg": 0.861,
+  "metal_avg": 0.0,
+  "height_range_m": 0.02012
+ },
+ "canvas": {
+  "material": "res://assets/materials/canvas.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   0.5,
+   0.5
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   2.0,
+   2.0
+  ],
+  "transparent": false,
+  "desc": "heavy cotton duck tarp / tent, olive-khaki",
+  "avg_albedo_linear": [
+   0.1667,
+   0.1439,
+   0.0754
+  ],
+  "roughness_avg": 0.873,
+  "metal_avg": 0.0,
+  "height_range_m": 0.003
+ },
+ "concrete": {
+  "material": "res://assets/materials/concrete.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   2.0,
+   2.0
+  ],
+  "tiling": true,
+  "triplanar": true,
+  "uv1_scale": [
+   0.5,
+   0.5
+  ],
+  "transparent": false,
+  "desc": "weathered cast concrete",
+  "avg_albedo_linear": [
+   0.2496,
+   0.2417,
+   0.2193
+  ],
+  "roughness_avg": 0.856,
+  "metal_avg": 0.0,
+  "height_range_m": 0.00654
+ },
+ "fabric_nylon": {
+  "material": "res://assets/materials/fabric_nylon.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   0.3,
+   0.3
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   3.33333,
+   3.33333
+  ],
+  "transparent": false,
+  "desc": "ripstop nylon parka shell, expedition red",
+  "avg_albedo_linear": [
+   0.2651,
+   0.023,
+   0.0172
+  ],
+  "roughness_avg": 0.509,
+  "metal_avg": 0.0,
+  "height_range_m": 0.00272
+ },
+ "fabric_wool": {
+  "material": "res://assets/materials/fabric_wool.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   0.3,
+   0.3
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   3.33333,
+   3.33333
+  ],
+  "transparent": false,
+  "desc": "hand-knit wool blanket, heathered",
+  "avg_albedo_linear": [
+   0.2329,
+   0.1993,
+   0.1522
+  ],
+  "roughness_avg": 0.91,
+  "metal_avg": 0.0,
+  "height_range_m": 0.00144
+ },
+ "glass_grime": {
+  "material": "res://assets/materials/glass_grime.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   1.0,
+   1.0
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   1.0,
+   1.0
+  ],
+  "transparent": true,
+  "desc": "window glass: grime film / streaks (alpha) + roughness",
+  "avg_albedo_linear": [
+   0.1772,
+   0.1585,
+   0.1248
+  ],
+  "roughness_avg": 0.166,
+  "metal_avg": 0.0,
+  "height_range_m": 0.00155
+ },
+ "hide": {
+  "material": "res://assets/materials/hide.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   0.6,
+   0.6
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   1.66667,
+   1.66667
+  ],
+  "transparent": false,
+  "desc": "raw hide, flesh side, dried",
+  "avg_albedo_linear": [
+   0.464,
+   0.2962,
+   0.1327
+  ],
+  "roughness_avg": 0.587,
+  "metal_avg": 0.0,
+  "height_range_m": 0.00673
+ },
+ "ice_clear": {
+  "material": "res://assets/materials/ice_clear.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   1.0,
+   1.0
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   1.0,
+   1.0
+  ],
+  "transparent": false,
+  "desc": "clear lake/river ice, bubbles, white cracks",
+  "avg_albedo_linear": [
+   0.0346,
+   0.0529,
+   0.0692
+  ],
+  "roughness_avg": 0.112,
+  "metal_avg": 0.0,
+  "height_range_m": 0.00323
+ },
+ "leather": {
+  "material": "res://assets/materials/leather.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   0.3,
+   0.3
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   3.33333,
+   3.33333
+  ],
+  "transparent": false,
+  "desc": "worn brown leather",
+  "avg_albedo_linear": [
+   0.0958,
+   0.0387,
+   0.0175
+  ],
+  "roughness_avg": 0.543,
+  "metal_avg": 0.0,
+  "height_range_m": 0.0043
+ },
+ "metal_aircraft": {
+  "material": "res://assets/materials/metal_aircraft.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   1.5,
+   1.5
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   0.66667,
+   0.66667
+  ],
+  "transparent": false,
+  "desc": "white-painted aluminium skin, rivets, grime",
+  "avg_albedo_linear": [
+   0.7248,
+   0.7096,
+   0.6347
+  ],
+  "roughness_avg": 0.491,
+  "metal_avg": 0.014,
+  "height_range_m": 0.00512
+ },
+ "metal_bare": {
+  "material": "res://assets/materials/metal_bare.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   1.0,
+   1.0
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   1.0,
+   1.0
+  ],
+  "transparent": false,
+  "desc": "scratched, oxidised aluminium",
+  "avg_albedo_linear": [
+   0.7782,
+   0.7883,
+   0.7979
+  ],
+  "roughness_avg": 0.442,
+  "metal_avg": 0.963,
+  "height_range_m": 0.00074
+ },
+ "metal_corrugated": {
+  "material": "res://assets/materials/metal_corrugated.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   1.14,
+   1.14
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   0.87719,
+   0.87719
+  ],
+  "transparent": false,
+  "desc": "galvanised corrugated sheet, rust streaks",
+  "avg_albedo_linear": [
+   0.3873,
+   0.4039,
+   0.4202
+  ],
+  "roughness_avg": 0.546,
+  "metal_avg": 0.859,
+  "height_range_m": 0.02456
+ },
+ "metal_painted_green": {
+  "material": "res://assets/materials/metal_painted_green.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   1.0,
+   1.0
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   1.0,
+   1.0
+  ],
+  "transparent": false,
+  "desc": "industrial green enamel, chipped",
+  "avg_albedo_linear": [
+   0.064,
+   0.0807,
+   0.0513
+  ],
+  "roughness_avg": 0.535,
+  "metal_avg": 0.025,
+  "height_range_m": 0.00269
+ },
+ "metal_rusty": {
+  "material": "res://assets/materials/metal_rusty.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   1.0,
+   1.0
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   1.0,
+   1.0
+  ],
+  "transparent": false,
+  "desc": "rusted steel plate",
+  "avg_albedo_linear": [
+   0.0911,
+   0.0376,
+   0.0205
+  ],
+  "roughness_avg": 0.908,
+  "metal_avg": 0.018,
+  "height_range_m": 0.00547
+ },
+ "rock_boulder": {
+  "material": "res://assets/materials/rock_boulder.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   3.0,
+   3.0
+  ],
+  "tiling": true,
+  "triplanar": true,
+  "uv1_scale": [
+   0.33333,
+   0.33333
+  ],
+  "transparent": false,
+  "desc": "lichen-spotted granite for rock meshes (triplanar)",
+  "avg_albedo_linear": [
+   0.3127,
+   0.3047,
+   0.2704
+  ],
+  "roughness_avg": 0.779,
+  "metal_avg": 0.0,
+  "height_range_m": 0.20102
+ },
+ "rope": {
+  "material": "res://assets/materials/rope.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   0.168,
+   0.168
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   5.95238,
+   1.0
+  ],
+  "transparent": false,
+  "desc": "3-strand manila rope, U along rope (m), V around (0..1)",
+  "avg_albedo_linear": [
+   0.3358,
+   0.2257,
+   0.1036
+  ],
+  "roughness_avg": 0.891,
+  "metal_avg": 0.0,
+  "height_range_m": 0.00252
+ },
+ "rubber": {
+  "material": "res://assets/materials/rubber.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   0.5,
+   0.5
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   2.0,
+   2.0
+  ],
+  "transparent": false,
+  "desc": "black rubber, scuffed and dusty",
+  "avg_albedo_linear": [
+   0.02,
+   0.0195,
+   0.0182
+  ],
+  "roughness_avg": 0.764,
+  "metal_avg": 0.0,
+  "height_range_m": 0.00191
+ },
+ "snow_packed": {
+  "material": "res://assets/materials/snow_packed.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   2.0,
+   2.0
+  ],
+  "tiling": true,
+  "triplanar": true,
+  "uv1_scale": [
+   0.5,
+   0.5
+  ],
+  "transparent": false,
+  "desc": "dense snow on roofs/structures",
+  "avg_albedo_linear": [
+   0.7615,
+   0.7957,
+   0.847
+  ],
+  "roughness_avg": 0.631,
+  "metal_avg": 0.0,
+  "height_range_m": 0.03467
+ },
+ "wood_endgrain": {
+  "material": "res://assets/materials/wood_endgrain.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   0.42,
+   0.42
+  ],
+  "tiling": false,
+  "triplanar": false,
+  "uv1_scale": [
+   1.0,
+   1.0
+  ],
+  "transparent": false,
+  "desc": "log end cap disc (UV 0..1), rings, radial checks, saw marks",
+  "avg_albedo_linear": [
+   0.3153,
+   0.2117,
+   0.1148
+  ],
+  "roughness_avg": 0.864,
+  "metal_avg": 0.0,
+  "height_range_m": 0.0129
+ },
+ "wood_log": {
+  "material": "res://assets/materials/wood_log.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   1.0,
+   1.0
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   1.0,
+   1.0
+  ],
+  "transparent": false,
+  "desc": "peeled, weathered building log (grain along V)",
+  "avg_albedo_linear": [
+   0.3098,
+   0.2278,
+   0.1464
+  ],
+  "roughness_avg": 0.806,
+  "metal_avg": 0.0,
+  "height_range_m": 0.01363
+ },
+ "wood_painted": {
+  "material": "res://assets/materials/wood_painted.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   2.0,
+   2.0
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   0.5,
+   0.5
+  ],
+  "transparent": false,
+  "desc": "chipped dull-red painted boards",
+  "avg_albedo_linear": [
+   0.1813,
+   0.0735,
+   0.0605
+  ],
+  "roughness_avg": 0.729,
+  "metal_avg": 0.0,
+  "height_range_m": 0.01985
+ },
+ "wood_planks": {
+  "material": "res://assets/materials/wood_planks.tres",
+  "size_px": [
+   1024,
+   1024
+  ],
+  "tile_m": [
+   2.0,
+   2.0
+  ],
+  "tiling": true,
+  "triplanar": false,
+  "uv1_scale": [
+   0.5,
+   0.5
+  ],
+  "transparent": false,
+  "desc": "old weathered cabin boards, vertical",
+  "avg_albedo_linear": [
+   0.1646,
+   0.1449,
+   0.1227
+  ],
+  "roughness_avg": 0.89,
+  "metal_avg": 0.0,
+  "height_range_m": 0.02135
+ }
+}
