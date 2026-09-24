@@ -21,7 +21,7 @@ func build_visual() -> void:
 	model.add_child(_holder)
 	if is_compass:
 		var basis := Basis.from_euler(Vector3(deg_to_rad(50.0), deg_to_rad(-10.0), 0.0))
-		_holder.transform = Transform3D(basis, Vector3(0.1, -0.2, -0.3) - rest_pos)
+		_holder.transform = Transform3D(basis, Vector3(0.09, -0.155, -0.32) - rest_pos)
 		var data := FPModels.compass_mesh()
 		var mi := MeshInstance3D.new()
 		mi.mesh = data["mesh"]
@@ -29,15 +29,15 @@ func build_visual() -> void:
 		_holder.add_child(mi)
 		_needle = MeshInstance3D.new()
 		_needle.mesh = data["needle"]
-		_needle.position = Vector3(0.0, 0.0065, 0.0)
+		_needle.position = Vector3(0.0, 0.0092, 0.0)
 		_needle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_holder.add_child(_needle)
-		var arm := FPHands.make_arm(&"hold", false, Vector3(0.004, -0.02, 0.02), Vector3(0, 0, -1), basis.inverse() * elbow_toward(Vector3(0.1, -0.2, -0.3), ELBOW_R))
+		var arm := FPHands.make_arm(&"hold", false, Vector3(0.004, -0.02, 0.02), Vector3(0, 0, -1), basis.inverse() * elbow_toward(Vector3(0.09, -0.155, -0.32), ELBOW_R))
 		_holder.add_child(arm)
 		_register(arm)
 	else:
 		var basis := Basis.from_euler(Vector3(deg_to_rad(-38.0), 0.0, 0.0))
-		_holder.transform = Transform3D(basis, Vector3(0.0, -0.22, -0.36) - rest_pos)
+		_holder.transform = Transform3D(basis, Vector3(0.0, -0.2, -0.36) - rest_pos)
 		var mi := MeshInstance3D.new()
 		mi.mesh = FPModels.map_mesh()
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

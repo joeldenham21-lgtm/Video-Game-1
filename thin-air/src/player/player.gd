@@ -27,6 +27,9 @@ const INTERACT_MASK := 1 | (1 << 3) | (1 << 4) | (1 << 6) | (1 << 9)
 const BODY_MASK := 1 | (1 << 2) | (1 << 3) | (1 << 6) | (1 << 9)     # world, creatures, items, building, vegetation
 const NON_BLOCKING_SCREENS: Array[StringName] = [&"build", &"hud"]
 const HOTBAR_ACTIONS: Array[StringName] = [&"hotbar_1", &"hotbar_2", &"hotbar_3", &"hotbar_4", &"hotbar_5", &"hotbar_6"]
+## Loose item pickups lighter than this (kg) don't block the body — you walk over sticks and stones instead
+## of snagging on them. Heavier pickups (logs) and physics props (crates, felled logs) still collide.
+const PASS_THROUGH_PICKUP_KG := 8.0
 
 # ---- CONTRACT public state -------------------------------------------------------------------
 var inventory: Inventory
@@ -135,6 +138,7 @@ var _work_exertion := 0.0
 var _water_volumes: Array[Area3D] = []
 var _ladders: Array[Area3D] = []
 var _near_bodies: Array[RigidBody3D] = []
+var _pass_bodies: Array[RigidBody3D] = []
 var _o2_timer := 0.0
 var _phys_prev := Vector3.ZERO
 var _phys_curr := Vector3.ZERO
@@ -1388,14 +1392,36 @@ func _on_area_exited(a: Area3D) -> void:
 
 func _on_body_entered(b: Node3D) -> void:
 	var rb := b as RigidBody3D
-	if rb and not _near_bodies.has(rb):
+	if rb == null:
+		return
+	if _is_light_pickup(rb):
+		if not _pass_bodies.has(rb):
+			_pass_bodies.append(rb)
+			add_collision_exception_with(rb)
+		return
+	if not _near_bodies.has(rb):
 		_near_bodies.append(rb)
 
 
 func _on_body_exited(b: Node3D) -> void:
 	var rb := b as RigidBody3D
-	if rb:
-		_near_bodies.erase(rb)
+	if rb == null:
+		return
+	_near_bodies.erase(rb)
+	if _pass_bodies.has(rb):
+		_pass_bodies.erase(rb)
+		if is_instance_valid(rb) and rb.is_inside_tree():
+			remove_collision_exception_with(rb)
+
+
+static func _is_light_pickup(rb: RigidBody3D) -> bool:
+	var id: Variant = rb.get(&"item_id")
+	if id == null or not (id is StringName or id is String) or String(id) == "":
+		return false
+	var d: Dictionary = ItemDB.get_item(StringName(id))
+	var c: Variant = rb.get(&"count")
+	var n := maxi(int(c), 1) if c is int else 1
+	return float(d.get("weight", rb.mass)) * float(n) < PASS_THROUGH_PICKUP_KG
 
 
 # =================================================================================================

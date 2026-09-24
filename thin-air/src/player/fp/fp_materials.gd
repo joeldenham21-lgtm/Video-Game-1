@@ -69,6 +69,9 @@ static var _world_cache: Dictionary = {}
 static var _tex_cache: Dictionary = {}
 static var _shader_cache: Dictionary = {}
 static var _fx_cache: Dictionary = {}
+## Per-instance viewmodel materials (emissive tips, bow bend, scanner screen) — weakly tracked so FOV and
+## wetness changes reach them too.
+static var _unique_refs: Array[WeakRef] = []
 static var vm_fov := 62.0
 static var wet_amount := 0.0
 
@@ -127,7 +130,20 @@ static func vm(kind: StringName) -> ShaderMaterial:
 
 ## A unique (non-shared) copy for per-instance parameters (bow bend, emission).
 static func vm_unique(kind: StringName) -> ShaderMaterial:
-	return vm(kind).duplicate() as ShaderMaterial
+	var m := vm(kind).duplicate() as ShaderMaterial
+	_track(m)
+	return m
+
+
+static func _track(m: ShaderMaterial) -> void:
+	# Prune freed materials occasionally so the list stays small.
+	if _unique_refs.size() > 64:
+		var live: Array[WeakRef] = []
+		for r in _unique_refs:
+			if r.get_ref() != null:
+				live.append(r)
+		_unique_refs = live
+	_unique_refs.append(weakref(m))
 
 
 ## Emissive viewmodel material (flare tip, embers).
@@ -160,15 +176,26 @@ static func fx(kind: StringName) -> ShaderMaterial:
 		_:
 			m.shader = _shader(FX_MIX_PATH)
 			m.set_shader_parameter(&"tex", tex("smoke.png"))
-	m.set_shader_parameter(&"vm_fov", vm_fov)
+	if _fx_world_projection(kind):
+		# Smoke drifts away from the hand into the world: normal projection + depth test, so it never
+		# floats in front of walls or lingers "glued" to the viewmodel layer.
+		m.set_shader_parameter(&"vm_fov", 0.0)
+		m.set_shader_parameter(&"vm_depth_scale", 1.0)
+	else:
+		m.set_shader_parameter(&"vm_fov", vm_fov)
 	_fx_cache[kind] = m
 	return m
+
+
+static func _fx_world_projection(kind: StringName) -> bool:
+	return kind != &"flame" and kind != &"spark" and kind != &"glow"
 
 
 static func screen() -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = _shader(SCREEN_PATH)
 	m.set_shader_parameter(&"vm_fov", vm_fov)
+	_track(m)
 	return m
 
 
@@ -212,7 +239,12 @@ static func set_vm_fov(fov: float) -> void:
 	for k in _vm_cache:
 		(_vm_cache[k] as ShaderMaterial).set_shader_parameter(&"vm_fov", fov)
 	for k in _fx_cache:
-		(_fx_cache[k] as ShaderMaterial).set_shader_parameter(&"vm_fov", fov)
+		if not _fx_world_projection(k):
+			(_fx_cache[k] as ShaderMaterial).set_shader_parameter(&"vm_fov", fov)
+	for r in _unique_refs:
+		var m := r.get_ref() as ShaderMaterial
+		if m:
+			m.set_shader_parameter(&"vm_fov", fov)
 
 
 ## Wet hands/tools look (after swimming / in rain).
@@ -222,6 +254,10 @@ static func set_wet(w: float) -> void:
 	wet_amount = w
 	for k in _vm_cache:
 		(_vm_cache[k] as ShaderMaterial).set_shader_parameter(&"wet", w)
+	for r in _unique_refs:
+		var m := r.get_ref() as ShaderMaterial
+		if m and m.shader == _shader(VM_SHADER_PATH):
+			m.set_shader_parameter(&"wet", w)
 
 
 ## Converts an imported (glTF) StandardMaterial3D into a viewmodel ShaderMaterial.

@@ -18,7 +18,7 @@ func build_visual() -> void:
 	_holder = Node3D.new()
 	_holder.name = "Binoculars"
 	var basis := Basis.from_euler(Vector3(deg_to_rad(-12.0), 0.0, 0.0))
-	_holder.transform = Transform3D(basis, Vector3(0.0, -0.18, -0.32) - rest_pos)
+	_holder.transform = Transform3D(basis, Vector3(0.0, -0.145, -0.33) - rest_pos)
 	model.add_child(_holder)
 	var ext := FPModels.external(item_id)
 	if ext:
@@ -31,7 +31,7 @@ func build_visual() -> void:
 	for side: float in [-1.0, 1.0]:
 		var left := side < 0.0
 		var arm := FPHands.make_arm(&"hold", left, Vector3(side * 0.044, -0.012, -0.05), Vector3(0, 0, -1),
-			basis.inverse() * elbow_toward(Vector3(side * 0.05, -0.2, -0.36), ELBOW_L if left else ELBOW_R))
+			basis.inverse() * elbow_toward(Vector3(side * 0.05, -0.165, -0.37), ELBOW_L if left else ELBOW_R))
 		_holder.add_child(arm)
 		if viewmodel and viewmodel.has_method(&"register_arm"):
 			viewmodel.call(&"register_arm", arm)

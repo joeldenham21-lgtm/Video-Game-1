@@ -12,8 +12,8 @@ func build_visual() -> void:
 	sprint_rot = Vector3(-24.0, 12.0, 14.0)
 	_holder = Node3D.new()
 	_holder.name = "FlareGun"
-	var grip_cam := Vector3(0.16, -0.19, -0.36)
-	var basis := Basis.from_euler(Vector3(deg_to_rad(4.0), deg_to_rad(4.0), 0.0))
+	var grip_cam := Vector3(0.14, -0.15, -0.35)
+	var basis := Basis.from_euler(Vector3(deg_to_rad(5.0), deg_to_rad(9.0), deg_to_rad(-4.0)))
 	_holder.transform = Transform3D(basis, grip_cam - rest_pos)
 	model.add_child(_holder)
 	var ext := FPModels.external(item_id)

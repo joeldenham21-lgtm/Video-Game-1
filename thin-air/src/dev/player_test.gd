@@ -569,6 +569,26 @@ class DevCrate extends RigidBody3D:
 		add_child(mi)
 
 
+class DevLoosePickup extends RigidBody3D:
+	var item_id: StringName = &"stone"
+	var count := 1
+
+	func _init() -> void:
+		collision_layer = 1 << 3
+		collision_mask = 1
+		freeze = true
+		var col := CollisionShape3D.new()
+		var sh := BoxShape3D.new()
+		sh.size = Vector3(0.24, 0.2, 0.26)
+		col.shape = sh
+		add_child(col)
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = sh.size
+		mi.mesh = bm
+		add_child(mi)
+
+
 # =================================================================================================
 # Automated trials — shared by `-- --auto` and tests/test_player.gd
 # =================================================================================================
@@ -610,9 +630,10 @@ func _release_all() -> void:
 			Input.action_release(a)
 
 
+## Waits `seconds` of *simulated* time (physics ticks), so measurements don't depend on machine load.
 func _wait(seconds: float) -> void:
-	var end := Time.get_ticks_msec() + int(seconds * 1000.0)
-	while Time.get_ticks_msec() < end:
+	var n := maxi(int(roundf(seconds * float(Engine.physics_ticks_per_second))), 1)
+	for i in n:
 		await get_tree().physics_frame
 
 
@@ -771,8 +792,7 @@ func _trial_slopes() -> void:
 func _walk_max_height(seconds: float) -> float:
 	var top := player.global_position.y
 	Input.action_press(&"move_forward")
-	var end := Time.get_ticks_msec() + int(seconds * 1000.0)
-	while Time.get_ticks_msec() < end:
+	for i in maxi(int(roundf(seconds * float(Engine.physics_ticks_per_second))), 1):
 		await get_tree().physics_frame
 		top = maxf(top, player.global_position.y)
 	Input.action_release(&"move_forward")
@@ -789,6 +809,14 @@ func _trial_steps() -> void:
 	await _reset(Vector3(-34.0, Y0 + 0.05, -4.0), 0.0)
 	h = await _walk_max_height(1.4)
 	_check(h < 0.1, "blocked by a 0.5 m ledge (max y +%.2f)" % h)
+	# A light loose pickup (a stone) lying in the path doesn't snag or lift the body.
+	var stone := DevLoosePickup.new()
+	stone.position = Vector3(-40.0, Y0 + 0.1, -7.0)
+	add_child(stone)
+	await _reset(Vector3(-40.0, Y0 + 0.05, -4.0), 0.0)
+	h = await _walk_max_height(1.4)
+	_check(h < 0.05 and player.global_position.z < -7.6, "walks over a loose stone pickup (z %.2f, max y +%.2f)" % [player.global_position.z, h])
+	stone.queue_free()
 
 
 func _trial_falls() -> void:

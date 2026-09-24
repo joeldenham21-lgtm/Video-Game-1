@@ -21,6 +21,7 @@ var _base_energy := 1.7
 var _loop: AudioStreamPlayer3D = null
 var _head := Vector3.ZERO
 var _holder: Node3D = null
+var _globe_mat: ShaderMaterial = null
 
 
 func setup(p: Player, vm: Node3D, id: StringName) -> void:
@@ -64,12 +65,15 @@ func build_visual() -> void:
 	var ext := FPModels.external(item_id)
 	if is_lantern:
 		# Lantern hangs from the bail in the right hand, a little forward.
-		var grip_cam := Vector3(0.2, -0.16, -0.42)
+		var grip_cam := Vector3(0.18, -0.05, -0.5)
 		var basis := Basis.from_euler(Vector3(0.0, deg_to_rad(-20.0), 0.0))
 		_holder.transform = Transform3D(basis, grip_cam - rest_pos - basis * Vector3(0.0, 0.25, 0.0))
 		mi.mesh = FPModels.lantern_mesh()
+		_globe_mat = FPMaterials.vm_emissive(&"glass_dark", Color(1.0, 0.64, 0.32), 0.0)
+		mi.set_surface_override_material(1, _globe_mat)
 		_head = Vector3(0.0, 0.1, 0.0)
-		var arm := FPHands.make_arm(&"grip_loose", false, Vector3(0.0, 0.25, 0.0), Vector3(1, 0, 0), basis.inverse() * elbow_toward(grip_cam, ELBOW_R))
+		var elbow := basis.inverse() * Vector3(0.12, -0.32, 1.0).normalized()
+		var arm := FPHands.make_arm(&"grip", false, Vector3(0.0, 0.25, 0.0), Vector3(-1, 0, 0), elbow)
 		_holder.add_child(arm)
 		_register(arm)
 	else:
@@ -106,11 +110,11 @@ func build_visual() -> void:
 		_flame = _make_particles(&"flame", 6, 0.35, 0.03, 0.05, 0.05, 0.1, Vector3(0, 0.3, 0))
 		_flame.position = _head
 	else:
-		_flame = _make_particles(&"flame", 10 if mobile else 20, 0.55, 0.07, 0.13, 0.2, 0.55, Vector3(0, 1.6, 0))
-		_flame.position = _head + Vector3(0.0, -0.03, 0.0)
+		_flame = _make_particles(&"flame", 14 if mobile else 28, 0.38, 0.06, 0.11, 0.12, 0.32, Vector3(0, 1.1, 0))
+		_flame.position = _head + Vector3(0.0, -0.035, 0.0)
 		_flame.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-		_flame.emission_sphere_radius = 0.028
-		_embers = _make_particles(&"spark", 4 if mobile else 9, 1.3, 0.006, 0.012, 0.4, 1.3, Vector3(0, 0.6, 0))
+		_flame.emission_sphere_radius = 0.03
+		_embers = _make_particles(&"spark", 4 if mobile else 9, 0.8, 0.005, 0.011, 0.4, 1.1, Vector3(0, 0.5, 0))
 		_embers.position = _head
 		_embers.spread = 35.0
 		if not mobile:
@@ -150,7 +154,7 @@ func _make_particles(kind: StringName, amount: int, life: float, s_min: float, s
 			curve.add_point(Vector2(0.3, 1.0))
 			curve.add_point(Vector2(1.0, 0.15))
 			g.offsets = PackedFloat32Array([0.0, 0.25, 0.6, 1.0])
-			g.colors = PackedColorArray([Color(1.0, 0.85, 0.55, 0.9), Color(1.0, 0.55, 0.18, 0.85), Color(0.9, 0.22, 0.05, 0.5), Color(0.4, 0.05, 0.0, 0.0)])
+			g.colors = PackedColorArray([Color(1.0, 0.72, 0.36, 0.95), Color(1.0, 0.46, 0.12, 0.85), Color(0.85, 0.18, 0.03, 0.45), Color(0.35, 0.04, 0.0, 0.0)])
 		&"spark":
 			curve.add_point(Vector2(0.0, 1.0))
 			curve.add_point(Vector2(1.0, 0.3))
@@ -198,6 +202,8 @@ func item_process(delta: float, can_act: bool) -> void:
 		var fl := 0.82 + 0.1 * sin(_t * 23.0) * sin(_t * 7.3) + 0.08 * sin(_t * 41.0 + 1.3) - 0.08 * move * absf(sin(_t * 13.0))
 		if is_lantern:
 			fl = 0.95 + 0.05 * sin(_t * 11.0) * sin(_t * 5.1)
+			if _globe_mat:
+				_globe_mat.set_shader_parameter(&"emission_energy", 1.6 * fl)
 		_light.light_energy = _base_energy * fl
 		_light.position.x = sin(_t * 9.0) * 0.01
 		# Going under water puts it out.
@@ -242,6 +248,8 @@ func _set_lit(on: bool, instant := false) -> void:
 	lit = on
 	if _light:
 		_light.visible = on
+	if _globe_mat:
+		_globe_mat.set_shader_parameter(&"emission_energy", 1.6 if on else 0.0)
 	for p in [_flame, _embers, _smoke]:
 		if p:
 			(p as CPUParticles3D).emitting = on

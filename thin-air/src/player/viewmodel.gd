@@ -112,7 +112,8 @@ func on_move_state(_state: int) -> void:
 
 ## Called by HeldItem.add_arm(); applies the equipped clothing materials.
 func register_arm(arm: Node3D) -> void:
-	_arms.append(arm)
+	if not _arms.has(arm):
+		_arms.append(arm)
 	_apply_clothing(arm)
 
 

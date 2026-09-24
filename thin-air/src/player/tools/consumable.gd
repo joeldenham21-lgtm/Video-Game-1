@@ -28,7 +28,9 @@ func build_visual() -> void:
 	sprint_rot = Vector3(-20.0, 10.0, 10.0)
 	_holder = Node3D.new()
 	_holder.name = "Item"
-	var grip_cam := Vector3(0.16, -0.21, -0.36)
+	var grip_cam := Vector3(0.15, -0.16, -0.37)
+	if is_canteen:
+		grip_cam = Vector3(0.17, -0.155, -0.42)
 	var basis := Basis.from_euler(Vector3(deg_to_rad(-10.0), deg_to_rad(-25.0), deg_to_rad(-6.0)))
 	_holder.transform = Transform3D(basis, grip_cam - rest_pos)
 	model.add_child(_holder)
