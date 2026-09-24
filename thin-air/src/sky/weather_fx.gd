@@ -8,7 +8,9 @@ extends Node3D
 ##  * Spindrift: wisps of blowing snow skimming the ground in strong wind wherever there is snow cover.
 ##  * Diamond dust: sparse glinting ice crystals on clear, calm, very cold days (and sunlit light snow sparkles).
 ##  * Valley fog bank: a FogVolume with a soft top and noise banks (Forward+ with volumetric fog).
-## Budgets (Settings.particles 0/1/2): ≤ 3,000 particles on mobile, 18,000 on desktop high.
+## Budgets (Settings.particles 0/1/2): 3,000 particles on mobile (all layers), ≈12k medium, ≈25k desktop high.
+## Flakes live in a small wrap-around box (≤ 10 m radius): that is where individual flakes are resolvable;
+## beyond it the snowfall is carried by the sky's precipitation veil and the fog.
 ## Particles are hidden inside shelters (Climate shelter factor at the camera).
 
 const PROCESS_SHADER := "res://assets/shaders/weather_particles.gdshader"
@@ -17,14 +19,14 @@ const FLAKES := "res://assets/textures/sky/flakes.png"
 
 ## Particle counts per Settings.particles level (0 = mobile).
 const AMOUNTS := {
-	&"snow": [1900, 9000, 24000],
+	&"snow": [1900, 8000, 20000],
 	&"streaks": [500, 1500, 3200],
 	&"drift": [400, 900, 1800],
 	&"dust": [200, 400, 700],
 }
 const BOXES := {
-	&"snow": [Vector3(16, 10, 16), Vector3(22, 13, 22), Vector3(28, 16, 28)],
-	&"streaks": [Vector3(12, 8, 12), Vector3(14, 9, 14), Vector3(16, 10, 16)],
+	&"snow": [Vector3(12, 8, 12), Vector3(16, 10, 16), Vector3(20, 12, 20)],
+	&"streaks": [Vector3(10, 6, 10), Vector3(12, 7, 12), Vector3(14, 8, 14)],
 	&"drift": [Vector3(30, 2.4, 30), Vector3(36, 2.4, 36), Vector3(44, 2.6, 44)],
 	&"dust": [Vector3(14, 10, 14), Vector3(18, 12, 18), Vector3(22, 14, 22)],
 }
@@ -38,6 +40,10 @@ var _sky: Node
 var _shelter := 0.0
 var _enabled := true
 var _pixel_angle := 0.0017
+var _fog_density := 0.0
+## TAA averages away moving specks narrower than ~4 px (no motion vectors for blended particles), so
+## flakes get a larger minimum footprint when it is on.
+var _min_pixels := 3.0
 
 
 func _ready() -> void:
@@ -174,6 +180,7 @@ func _process(delta: float) -> void:
 	global_position = cp
 	var vh := vp.get_visible_rect().size.y * vp.scaling_3d_scale
 	_pixel_angle = deg_to_rad(cam.fov) / maxf(vh, 1.0)
+	_min_pixels = 5.5 if vp.use_taa else 3.0
 	var p: Dictionary = Climate.params
 	var precip := Climate.precipitation
 	var wind: Vector3 = Climate.get_wind_at(cp)
@@ -195,6 +202,8 @@ func _process(delta: float) -> void:
 	var amb_v := Vector3(amb.r, amb.g, amb.b)
 	var sun_v := Vector3(sun_c.r, sun_c.g, sun_c.b)
 	var sunlit := clampf(sun_v.length() / maxf(amb_v.length() * 3.0, 1e-5), 0.0, 1.0)
+	var env: Environment = _sky.get(&"environment") if _sky else null
+	_fog_density = env.fog_density if env and env.fog_enabled else 0.0
 
 	# ------------------------------------------------------------------ snowfall / sleet / rain
 	var snow: Dictionary = _layers.get(&"snow", {})
@@ -234,7 +243,7 @@ func _process(delta: float) -> void:
 				# The eye tracks gently falling flakes as dots; only a gale smears them into streaks.
 				draw.set_shader_parameter(&"shutter", lerpf(1.0 / 250.0, 1.0 / 60.0, heavy))
 				draw.set_shader_parameter(&"round_mix", 0.0)
-				draw.set_shader_parameter(&"opacity", 0.95)
+				draw.set_shader_parameter(&"opacity", 1.0)
 				draw.set_shader_parameter(&"tint", Vector3(1.0, 1.0, 1.0))
 		proc.set_shader_parameter(&"wind", wind)
 		proc.set_shader_parameter(&"density", d)
@@ -305,6 +314,8 @@ func _process(delta: float) -> void:
 
 func _set_light(m: ShaderMaterial, amb: Vector3, sun: Vector3, sd: Vector3) -> void:
 	m.set_shader_parameter(&"pixel_angle", _pixel_angle)
+	m.set_shader_parameter(&"min_pixels", _min_pixels)
+	m.set_shader_parameter(&"fog_density", _fog_density)
 	m.set_shader_parameter(&"light_ambient", amb)
 	m.set_shader_parameter(&"light_sun", sun)
 	m.set_shader_parameter(&"sun_dir", sd)

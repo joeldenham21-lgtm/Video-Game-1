@@ -29,6 +29,8 @@ func _ready() -> void:
 	timelapse = float(args.get("timelapse", "0"))
 	if args.has("preset"):
 		Settings.apply_preset(StringName(args["preset"]))
+	if args.has("taa"):
+		Settings.set_value(&"taa", args["taa"] == "1")
 	var W = load("res://src/world/world.gd")
 	W.dev_no_player = true
 	Game.is_new_game = false
@@ -82,12 +84,17 @@ func _particle_debug(mode: int) -> void:
 	if snow == null:
 		print("SKY no snow node")
 		return
+	if args.has("pamount"):
+		snow.amount = int(args["pamount"])
 	if mode == 1:
 		var sm := StandardMaterial3D.new()
 		sm.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 		sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		sm.albedo_color = Color(1, 0, 0)
+		sm.disable_fog = true
 		(snow.draw_pass_1 as QuadMesh).material = sm
+		if args.has("psize"):
+			(snow.draw_pass_1 as QuadMesh).size = Vector2.ONE * float(args["psize"])
 	elif mode == 2:
 		var pm := ParticleProcessMaterial.new()
 		pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
@@ -98,12 +105,20 @@ func _particle_debug(mode: int) -> void:
 	elif mode == 9:
 		var pm9 := snow.process_material as ShaderMaterial
 		var big := args.has("pbig")
-		pm9.set_shader_parameter(&"box_size", Vector3(28, 16, 28) if big else Vector3(4, 3, 4))
-		pm9.set_shader_parameter(&"box_offset", Vector3(0, 4, -16) if big else Vector3(0, 0, -6))
+		var bs := Vector3(28, 16, 28) if big else Vector3(4, 3, 4)
+		var bo := Vector3(0, 4, -16) if big else Vector3(0, 0, -6)
+		if args.has("pbox"):
+			var b := String(args["pbox"]).split(",")
+			bs = Vector3(float(b[0]), float(b[1]), float(b[2]))
+		if args.has("poff"):
+			var o := String(args["poff"]).split(",")
+			bo = Vector3(float(o[0]), float(o[1]), float(o[2]))
+		pm9.set_shader_parameter(&"box_size", bs)
+		pm9.set_shader_parameter(&"box_offset", bo)
 		((snow.draw_pass_1 as QuadMesh).material as ShaderMaterial).set_shader_parameter(&"debug_mode", 1)
 	elif mode >= 3:
 		var dm := ((snow.draw_pass_1 as QuadMesh).material as ShaderMaterial)
-		dm.set_shader_parameter(&"debug_mode", mode - 2)
+		dm.set_shader_parameter(&"debug_mode", mode - 2 if mode < 10 else mode - 10)
 		print("SKY size range ", (snow.process_material as ShaderMaterial).get_shader_parameter(&"size_min"), " far ", dm.get_shader_parameter(&"far_fade"))
 	print("SKY particle debug mode ", mode)
 
