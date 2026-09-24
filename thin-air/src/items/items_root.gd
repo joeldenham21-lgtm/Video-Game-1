@@ -156,7 +156,12 @@ func save_state() -> Dictionary:
 		var n: Node = _registered[k]
 		if is_instance_valid(n) and n.has_method("save_state"):
 			nodes[k] = n.save_state()
-	return {"dropped": dropped, "collected": collected, "nodes": nodes}
+	var out := {"dropped": dropped, "collected": collected, "nodes": nodes}
+	# A timed craft already took its ingredients: save them as a refund so a save mid-craft loses nothing.
+	var screen := InventoryScreen.get_instance()
+	if screen != null and screen.craft_job != null and screen.craft_job.is_running():
+		out["craft_refund"] = (screen.craft_job.recipe.get("ingredients", {}) as Dictionary).duplicate()
+	return out
 
 
 func load_state(d: Dictionary) -> void:
@@ -180,6 +185,9 @@ func load_state(d: Dictionary) -> void:
 		if p:
 			p.global_transform = SaveUtil.to_xform(ed.get("xf", []))
 			p.sleeping = true
+	var refund: Variant = d.get("craft_refund", null)
+	if refund is Dictionary and not (refund as Dictionary).is_empty():
+		_refund_after_load.call_deferred(refund)
 	var nodes: Dictionary = d.get("nodes", {})
 	for k in nodes:
 		var n: Node = _registered.get(k)
@@ -187,3 +195,15 @@ func load_state(d: Dictionary) -> void:
 			n.load_state(nodes[k])
 		else:
 			_pending[k] = nodes[k]
+
+
+## Runs after every persistent node has loaded (the player's inventory included).
+func _refund_after_load(refund: Dictionary) -> void:
+	var inv := ItemActions.inventory_of(Game.player)
+	for k in refund:
+		var id := StringName(k)
+		if not ItemDB.has_item(id):
+			continue
+		var left := inv.add(id, int(refund[k])) if inv != null else int(refund[k])
+		if left > 0:
+			ItemActions.drop_stack(Game.player, {"id": id, "count": left, "durability": 1.0})

@@ -557,9 +557,43 @@ func _test_screen() -> void:
 	for i in 40:
 		screen._process(0.5)
 	check(inv.count(&"meat_cooked") == 1, "timed campfire craft completes")
+	# a save taken mid-craft carries the ingredients as a refund, applied after the load
+	var root := (load("res://scenes/items/items_root.tscn") as PackedScene).instantiate() as ItemsRoot
+	add_child(root)
+	await get_tree().process_frame
+	inv.add(&"meat_raw", 1)
+	screen.select_recipe(ItemDB.get_recipe(&"meat_cooked"))
+	screen._on_craft_pressed()
+	var raw_before := inv.count(&"meat_raw")
+	var mid: Dictionary = JSON.parse_string(JSON.stringify(root.save_state()))
+	check(mid.has("craft_refund") and int((mid["craft_refund"] as Dictionary).get("meat_raw", 0)) == 1, "mid-craft save records a refund")
+	root.load_state(mid)
+	Events.game_loaded.emit(0)
+	await get_tree().process_frame
+	check(screen.craft_job == null and inv.count(&"meat_raw") == raw_before + 1, "load refunds the interrupted craft")
+	root.queue_free()
+	await get_tree().process_frame
 	var closed: int = _events["ui_screen_closed"]
 	screen.close()
 	check(not screen.is_open and int(_events["ui_screen_closed"]) == closed + 1, "close emits ui_screen_closed")
+	# touch buttons inject actions with Input.action_press (no InputEvent): the screen polls for them
+	Input.action_press(&"inventory")
+	await get_tree().process_frame
+	Input.action_release(&"inventory")
+	check(screen.is_open, "injected 'inventory' action opens the screen")
+	await get_tree().process_frame
+	Input.action_press(&"inventory")
+	await get_tree().process_frame
+	Input.action_release(&"inventory")
+	check(not screen.is_open, "injected 'inventory' action closes it again")
+	Events.ui_screen_opened.emit(&"journal")
+	check(not screen._can_open(), "doesn't open over another screen")
+	Events.ui_screen_closed.emit(&"journal")
+	# grid fitting: 28 slots in a wide, short panel -> several columns, sensible slot size
+	var g := GridContainer.new()
+	var z := InventoryScreen._grid_fit(g, 28, 900.0, 520.0, true)
+	check(g.columns >= 7 and z >= 60.0 and z <= 112.0 and ceili(28.0 / g.columns) * z <= 520.0, "grid fit %d cols x %d px" % [g.columns, int(z)])
+	g.free()
 	Game.player = prev_player
 	Game.state = prev_state
 	screen.queue_free()

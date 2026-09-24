@@ -168,7 +168,7 @@ func _apply_time_of_day() -> void:
 	_env.fog_light_color = _sky_mat.sky_horizon_color.darkened(0.2)
 	_env.fog_density = lerpf(0.035, 0.006, day)
 	_env.fog_sky_affect = 0.4
-	_env.tonemap_exposure = lerpf(1.25, 1.0, day)
+	_env.tonemap_exposure = lerpf(1.1, 1.0, day)
 
 
 func _build_ground() -> void:
@@ -184,7 +184,7 @@ func _build_ground() -> void:
 	var mat := (ItemMaterials.get_material(&"forest_floor") as BaseMaterial3D).duplicate() as BaseMaterial3D
 	mat.uv1_triplanar = true
 	mat.uv1_world_triplanar = true
-	mat.uv1_scale = Vector3(0.55, 0.55, 0.55)
+	mat.uv1_scale = Vector3(1.25, 1.25, 1.25)
 	mi.material_override = mat
 	body.add_child(mi)
 	body.position.y = GROUND_Y

@@ -40,12 +40,15 @@ var _embers: GPUParticles3D
 var _light: OmniLight3D
 var _glow: MeshInstance3D
 var _glow_mat: StandardMaterial3D
+var _smoke_mat: StandardMaterial3D
 var _coal_mat: BaseMaterial3D
 var _loop: AudioStreamPlayer3D
 var _noise := FastNoiseLite.new()
 var _t := 0.0
 var _mobile := false
 var _wind_timer := 0.0
+var _burn_t := 0.0
+var _burn_acc := 0.0
 var _light_base := Vector3(0, 0.62, 0)
 
 
@@ -81,8 +84,12 @@ func _process(delta: float) -> void:
 	_t += delta
 	var simulate := always_simulate or Game.is_playing()
 	if simulate:
-		var minutes := delta * Climate.time_scale * 1440.0 / maxf(1.0, Climate.day_length_minutes * 60.0)
-		_burn(minutes)
+		_burn_acc += delta * Climate.time_scale * 1440.0 / maxf(1.0, Climate.day_length_minutes * 60.0)
+		_burn_t -= delta
+		if _burn_t <= 0.0:          # fuel bookkeeping (wind/shelter/weather queries) a few times a second
+			_burn_t = 0.3
+			_burn(_burn_acc)
+			_burn_acc = 0.0
 	var target := _target_intensity()
 	var rate := 0.35 if target > intensity else 0.6
 	intensity = move_toward(intensity, target, delta * rate)
@@ -489,8 +496,10 @@ func _flame_process(core: bool) -> ParticleProcessMaterial:
 
 func _smoke_draw() -> QuadMesh:
 	var m := StandardMaterial3D.new()
-	# Lit, so the column glows orange above the flames and fades into the night; per-vertex on mobile.
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX if _mobile else BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	_smoke_mat = m
+	# Desktop: lit, so the column glows orange above the flames and fades into the night. Mobile: unshaded and
+	# tinted by daylight (a vertex-lit billboard reads as a flat dark disc).
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED if _mobile else BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	m.diffuse_mode = BaseMaterial3D.DIFFUSE_LAMBERT_WRAP
 	m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -624,6 +633,10 @@ func _apply_visuals(delta: float) -> void:
 		(_core.process_material as ParticleProcessMaterial).gravity = Vector3(0, 0.25, 0) + wd * wl * 0.03
 		(_smoke.process_material as ParticleProcessMaterial).gravity = Vector3(0, 0.1, 0) + wd * wl * 0.16
 		(_embers.process_material as ParticleProcessMaterial).gravity = Vector3(0, 0.3, 0) + wd * wl * 0.12
+		if _mobile and _smoke_mat.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED:
+			var day := float(Climate.get_daylight()) if Climate.has_method("get_daylight") else 1.0
+			var v := 0.16 + 0.6 * day
+			_smoke_mat.albedo_color = Color(v * 1.08, v, v * 0.95)
 
 
 static func _emit(p: GPUParticles3D, on: bool, ratio: float) -> void:

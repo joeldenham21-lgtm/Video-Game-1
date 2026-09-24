@@ -101,6 +101,10 @@ var _prev_mouse_mode: Input.MouseMode = Input.MOUSE_MODE_VISIBLE
 var _tween: Tween
 var _silhouette: ShaderMaterial
 var _hover_sfx_cd := 0.0
+var _evt_toggle := false      ## the inventory/pause key already toggled us this frame through an InputEvent
+var _slow_t := 0.0
+var _craft_secs := -1
+var _other_screens: Dictionary = {}   ## other UI screens currently open (journal, map, pause, build…)
 
 
 static func get_instance() -> InventoryScreen:
@@ -143,6 +147,11 @@ func _ready() -> void:
 	Events.inventory_changed.connect(_mark_dirty)
 	Events.equipment_changed.connect(func(_s: StringName, _i: StringName) -> void: _mark_dirty())
 	Events.blueprint_unlocked.connect(func(_i: StringName) -> void: _mark_dirty())
+	Events.ui_screen_opened.connect(func(sc: StringName) -> void:
+		if sc != SCREEN:
+			_other_screens[sc] = true)
+	Events.ui_screen_closed.connect(func(sc: StringName) -> void: _other_screens.erase(sc))
+	Events.game_loaded.connect(_on_game_loaded)
 	_layout()
 
 
@@ -150,7 +159,7 @@ func _ready() -> void:
 
 func _can_open() -> bool:
 	return Game.player != null and is_instance_valid(Game.player) and not get_tree().paused \
-		and (Game.state == Game.State.PLAYING)
+		and (Game.state == Game.State.PLAYING) and _other_screens.is_empty()
 
 
 func open(to_tab: Tab = Tab.INVENTORY) -> void:
@@ -255,6 +264,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if is_open:
 		return
 	if event.is_action_pressed("inventory") and _can_open():
+		_evt_toggle = true
 		open()
 		get_viewport().set_input_as_handled()
 
@@ -264,6 +274,7 @@ func _input(event: InputEvent) -> void:
 		return
 	_track_device(event)
 	if event.is_action_pressed("inventory") or event.is_action_pressed("pause"):
+		_evt_toggle = true
 		close()
 		get_viewport().set_input_as_handled()
 		return
@@ -313,6 +324,20 @@ func _input(event: InputEvent) -> void:
 				_select_slot(s)
 				_focus_first_action()
 			get_viewport().set_input_as_handled()
+
+
+## Touch buttons press actions with Input.action_press() (no InputEvent, CONTRACT §5): poll for those.
+func _poll_injected_actions() -> void:
+	if _evt_toggle:
+		_evt_toggle = false
+		return
+	if Input.is_action_just_pressed("inventory"):
+		if is_open:
+			close()
+		elif _can_open():
+			open()
+	elif is_open and Input.is_action_just_pressed("pause"):
+		close()
 
 
 func _track_device(event: InputEvent) -> void:
@@ -1048,6 +1073,7 @@ func _mark_dirty() -> void:
 
 func _process(delta: float) -> void:
 	_hover_sfx_cd -= delta
+	_poll_injected_actions()
 	_process_craft(delta)
 	if _status_timer > 0.0:
 		_status_timer -= delta
@@ -1070,15 +1096,20 @@ func _process(delta: float) -> void:
 		station_id = &"hand"
 		station_node = null
 		_dirty = true
-	_update_header_info()
+	_slow_t -= delta
+	if _slow_t <= 0.0:
+		_slow_t = 0.25            # clock / temperature / station status need not update every frame
+		_update_header_info()
+		if tab == Tab.CRAFTING and not _dirty:
+			_update_station_card()
 	# An anchored container that once grew to a (transient) large minimum size keeps its offsets: snap it back.
-	if _frame.size.y > _root.size.y + 0.5 and (_tween == null or not _tween.is_running()):
+	if _frame.size.y > _root.size.y + 0.5 and (_tween == null or not _tween.is_running()) \
+			and _frame.get_combined_minimum_size().y <= _root.size.y:
 		_frame.set_offsets_preset(Control.PRESET_FULL_RECT)
 	if _dirty:
 		_dirty = false
 		_refresh_all()
 	elif tab == Tab.CRAFTING:
-		_update_station_card()
 		_update_craft_progress()
 
 
@@ -1796,6 +1827,15 @@ func _nearest_station(sid: StringName) -> Node:
 	return best
 
 
+## A load replaces the inventory the running job took its ingredients from: drop the job without refunding
+## (ItemsRoot's save carries the refund for a job that was running when the game was saved).
+func _on_game_loaded(_slot: int) -> void:
+	if craft_job != null and craft_job.is_running():
+		craft_job.aborted = true
+	craft_job = null
+	_mark_dirty()
+
+
 func _cancel_craft() -> void:
 	if craft_job and craft_job.is_running():
 		var overflow := craft_job.cancel()
@@ -1808,7 +1848,7 @@ func _cancel_craft() -> void:
 
 
 func _process_craft(delta: float) -> void:
-	if craft_job == null or not craft_job.is_running():
+	if craft_job == null or not craft_job.is_running() or get_tree().paused:
 		return
 	if craft_job.station != &"hand":
 		var sn := craft_station_node
@@ -1841,7 +1881,12 @@ func _update_craft_progress() -> void:
 	prog.visible = running
 	if running:
 		prog.value = craft_job.progress()
-		(_rd["craft"] as Button).text = "Crafting…  %s" % ItemInfo.format_seconds(craft_job.remaining())
+		var secs := ceili(craft_job.remaining())
+		if secs != _craft_secs:
+			_craft_secs = secs
+			(_rd["craft"] as Button).text = "Crafting…  %s" % ItemInfo.format_seconds(craft_job.remaining())
+	else:
+		_craft_secs = -1
 
 
 func _update_station_card() -> void:
