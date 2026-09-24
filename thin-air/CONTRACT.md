@@ -382,6 +382,28 @@ Categories: resource, food, drink, tool, weapon, ammo, clothing, medical, light,
   "lakes": [{"id","x","z","radius","level","polygon"?}], "rivers": [{"id","points": [[x,y,z,width]...]}],
   "trails": [...], "spawn": {"x","y","z","yaw"}, "zones": [...] }`
 
+### 6.1 Canonical item ids (all streams use exactly these; the Items stream may ADD more)
+
+- **Resources**: `stick`, `log` (12 kg, carried on shoulder), `stone`, `flint`, `fiber`, `bark`, `resin`, `feather`,
+  `bone`, `hide_raw`, `hide_cured`, `wool`, `cloth`, `scrap_metal`, `wire`, `duct_tape`, `rope`, `nails`,
+  `fuel_can`, `battery`, `electronics`, `charcoal`, `tinder`
+- **Food/drink**: `berries`, `mushroom`, `meat_raw`, `meat_cooked`, `fish_raw`, `fish_cooked`, `ration_bar`,
+  `canned_beans`, `pine_tea`, `coffee`, `water_unsafe`, `water_boiled`, `bottle_empty`
+- **Tools/weapons**: `stone_axe`, `hatchet`, `felling_axe`, `knife`, `stone_knife`, `spear`, `bow`, `arrow`,
+  `torch`, `flare`, `flare_gun`, `flare_shell`, `lantern`, `ice_axe`, `canteen`, `cooking_pot`, `binoculars`,
+  `survey_scanner`, `map`, `compass`, `hammer`, `lighter`, `matches`, `o2_bottle`
+- **Gear (equipped, `gear` tags)**: `crampons` (feet add-on, tag crampons), `climbing_rope` (rope), `o2_mask` (o2_mask),
+  `goggles` (goggles)
+- **Medical**: `bandage`, `first_aid_kit`, `painkillers`, `splint`, `herbal_poultice`
+- **Clothing**: head `wool_hat`, `fur_hat`; face `goggles`, `o2_mask`; body `parka`, `hide_coat`, `down_suit`;
+  legs `hiking_pants`, `insulated_pants`; hands `work_gloves`, `fur_mitts`; feet `boots`, `mountaineering_boots`;
+  back `backpack_torn`, `backpack`, `expedition_pack`
+- **Quest**: `survival_manual`, `radio_handheld`, `transceiver_module`, `battery_pack`, `mine_key`, `station_keycard`,
+  `dale_logbook`
+
+Blueprint unlocks are stored as `Game.flags[&"blueprints"]` (Array of recipe/buildable id Strings) via the static
+helper `Blueprints` (`src/items/blueprints.gd`: `is_unlocked(id)`, `unlock(id)` → emits `Events.blueprint_unlocked`).
+
 ## 7. Assets
 
 - Models: glTF binary (`.glb`) from Blender scripts in `tools/blender/`. Real-world scale, +Y up, −Z forward.
