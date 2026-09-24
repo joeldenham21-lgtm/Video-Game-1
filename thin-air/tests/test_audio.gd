@@ -238,6 +238,18 @@ func _test_music() -> void:
 	check(not m.play_stinger(&"discovery"), "stinger cooldown")
 	Audio.play_stinger(&"objective")
 	check(true, "stinger without cues is safe")
+	# the music stream's schema: cue id = state, per-cue fades, phrase starts, oneshot vs loop
+	m.set_catalog({
+		"station": {"file": f, "kind": "loop", "loop": true, "duration_s": 150.857, "fade_in_s": 4.0, "fade_out_s": 5.0,
+			"phrase_starts_s": [0.0, 13.714, 27.429, 41.143, 54.857, 68.571, 82.286, 96.0, 109.714, 123.429, 137.143]},
+		"summit": {"file": f, "kind": "oneshot", "loop": false, "duration_s": 145.1, "fade_in_s": 1.5, "fade_out_s": 2.5},
+	})
+	check(m.has_cues_for(&"station") and m.has_cues_for(&"summit"), "music.json schema maps cue ids to states")
+	m._start_cue(&"station", 4.0)
+	check(absf(m._limit - 137.143) < 0.01, "ambient loop fades out on a phrase boundary (%.1f)" % m._limit)
+	m._start_cue(&"summit", 2.5)
+	check(m._limit == 0.0 and m._gap >= 8.0, "urgent one-shot plays through, then breathes before repeating")
+	m.stop_now()
 	m.load_catalog()
 
 

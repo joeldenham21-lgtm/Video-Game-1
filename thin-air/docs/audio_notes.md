@@ -24,8 +24,10 @@ sox/ffmpeg, piper TTS). Nothing is sampled from outside sources. Rebuild: see `t
 - **Music:** `set_music_state` accepts the contract states. `explore` is automatic (refined to night / forest /
   alpine / blizzard from Climate + altitude + forest mask when cues exist). `danger` auto-releases after 45 s unless
   re-requested. Cue ids in `data/music.json` map to states by prefix (`forest_2` → forest, `stinger_discovery`
-  → discovery stinger) or explicit `"state"`/`"stinger"` fields. Ambient states: a cue plays once, then 1–4 min of
-  silence; urgent states (danger, blizzard, summit, finale, menu) start immediately and continue.
+  → discovery stinger) or explicit `"state"`/`"stinger"` fields. Ambient states: a cue plays about once (≤ 3 min; loop cues fade out
+  with their own `fade_out_s` on the last `phrase_starts_s` boundary before the end), then 1–4 min of silence;
+  urgent states (danger, blizzard, summit, finale, menu) start immediately (cue `fade_in_s`) and continue — loop
+  cues loop from `loop_offset_s`, through-composed ones repeat after an 8–15 s breath.
 - **Environment:** `set_environment_reverb(&"cave"|&"interior"|&"station"|&"forest")`; `&"outdoor"` returns to
   automatic detection (Climate shelter ≥ 0.85 → interior, forest mask > 0.5 → forest). `station` switches the
   ambience to the station interior (hum if `Game.flags.station_power` or `generator_loop` is playing, silent and

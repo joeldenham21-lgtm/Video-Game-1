@@ -109,6 +109,10 @@ func set_catalog(data: Dictionary) -> void:
 			"intensity": float(d.get("intensity", 0.5)),
 			"duration_s": float(d.get("duration_s", 0.0)),
 			"bpm": float(d.get("bpm", 0.0)),
+			"fade_in_s": float(d.get("fade_in_s", -1.0)),
+			"fade_out_s": float(d.get("fade_out_s", -1.0)),
+			"loop_offset_s": float(d.get("loop_offset_s", 0.0)),
+			"phrases": PackedFloat32Array(d.get("phrase_starts_s", [])),
 		}
 		var stg := _stinger_of(String(k), d)
 		if stg != &"":
@@ -261,11 +265,15 @@ func _process(delta: float) -> void:
 	if playing:
 		_elapsed += delta
 		if _limit > 0.0 and _elapsed >= _limit:
-			_fade_out(_active, FADE_AMBIENT)
+			_limit = 0.0
+			_fade_out(_active, _cue_fade_out(_cue_of[_active], FADE_AMBIENT))
 			_gap = randf_range(gap_range.x, gap_range.y)
 		return
 	if URGENT.has(state) and has_cues_for(state):
-		_start_cue(state, CROSSFADE_URGENT)
+		# urgent states keep music going; a through-composed (non-loop) cue gets a short breath before it repeats
+		_gap -= delta
+		if _gap <= 0.0:
+			_start_cue(state, CROSSFADE_URGENT)
 		return
 	_gap -= delta
 	if _gap <= 0.0 and has_cues_for(state):
@@ -351,6 +359,7 @@ func _on_state_changed(old: StringName, new_state: StringName) -> void:
 		if new_state == &"danger":
 			play_stinger(&"danger")
 		if has_cues_for(new_state):
+			_gap = 0.0
 			_start_cue(new_state, CROSSFADE_URGENT)
 		elif cur_playing and URGENT.has(old):
 			_fade_out(_active, FADE_AMBIENT)
@@ -393,6 +402,10 @@ func _start_cue(s: StringName, fade: float) -> void:
 	var stream := _load(cue["file"], urgent and bool(cue["loop"]))
 	if stream == null:
 		return
+	if float(cue.get("fade_in_s", -1.0)) >= 0.0:
+		fade = float(cue["fade_in_s"]) if not urgent else minf(fade, float(cue["fade_in_s"]))
+	if urgent and bool(cue["loop"]) and "loop_offset" in stream:
+		stream.set("loop_offset", float(cue.get("loop_offset_s", 0.0)))
 	var nxt := 1 - _active
 	if _players[_active].playing:
 		_fade_out(_active, fade)
@@ -410,9 +423,26 @@ func _start_cue(s: StringName, fade: float) -> void:
 	var dur := float(cue["duration_s"])
 	if dur <= 0.0:
 		dur = stream.get_length()
-	# ambient loop cues play for a limited time then fade (music comes and goes)
-	_limit = minf(maxf(dur * 2.0, 60.0), 180.0) if (not urgent and bool(cue["loop"])) else 0.0
+	_limit = 0.0
+	if not urgent and bool(cue["loop"]):
+		# an ambient loop cue plays through about once (≤ 3 min), fading out on a phrase boundary so it ends
+		# like music rather than at the loop seam; then silence (music comes and goes)
+		var fo := _cue_fade_out(cid, FADE_AMBIENT)
+		var want := minf(dur, 180.0) - fo
+		var phrases: PackedFloat32Array = cue.get("phrases", PackedFloat32Array())
+		var best := -1.0
+		for ph in phrases:
+			if ph >= 45.0 and ph <= want and ph > best:
+				best = ph
+		_limit = best if best > 0.0 else maxf(want, 30.0)
+	_gap = randf_range(8.0, 15.0) if urgent and not bool(cue["loop"]) else 0.0
 	cue_started.emit(cid, s)
+
+
+func _cue_fade_out(cid: StringName, fallback: float) -> float:
+	var c: Dictionary = cues.get(cid, {})
+	var f := float(c.get("fade_out_s", -1.0))
+	return f if f > 0.0 else fallback
 
 
 func _fade_out(i: int, seconds: float) -> void:
