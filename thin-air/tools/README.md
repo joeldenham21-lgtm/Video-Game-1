@@ -37,3 +37,8 @@ roughness. UV = world metres / `tiling_m` (cliff: world XZ/Y triplanar, image-up
 baked cavity AO, there is no AO map. Recommended anti-tiling (see `--macro=1` in the preview shader):
 multiply albedo by `terrain_macro_noise.png` sampled at world XZ / 256 m (R 1, G 3, B 9 cycles per repeat),
 and beyond ~10 m blend in a second fetch of the same layer at 1/3.7 scale with a rotated UV.
+The per-layer PNGs (`terrain/<layer>_{albedo,normal,roughness,height}.png`) are the sources of the arrays and stay
+importable for tools/other uses; if nothing loads them at runtime, exclude them from exports (≈31 MB of ETC2 on
+Android) with the preset exclude filter
+`assets/textures/terrain/*_albedo.png, assets/textures/terrain/*_normal.png, assets/textures/terrain/*_roughness.png, assets/textures/terrain/*_height.png`.
+VRAM: the two arrays are 12.6 MB each (BPTC on desktop, ASTC 4x4 on Android, mipmapped).
