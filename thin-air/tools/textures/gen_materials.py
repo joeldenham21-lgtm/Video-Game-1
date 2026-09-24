@@ -111,8 +111,11 @@ def write_tres(name: str, spec: tuple, d: dict) -> None:
 		lines += ["transparency = 1", "depth_draw_mode = 1"]
 	if opt.get("cull_disabled"):
 		lines.append("cull_mode = 2")
+	# ORMMaterial3D only applies the R (occlusion) channel when ao_enabled is set; ao_light_affect stays 0 so the
+	# baked occlusion darkens ambient/sky light only (direct sun is shadowed by real geometry).
 	lines += ['albedo_texture = ExtResource("1_albedo")',
 	          'orm_texture = ExtResource("2_orm")',
+	          "ao_enabled = true",
 	          "normal_enabled = true",
 	          f"normal_scale = {d.get('normal_scale', 1.0):.3f}",
 	          'normal_texture = ExtResource("3_normal")']

@@ -118,7 +118,7 @@ def canvas(t: tl.Tex) -> dict:
 # =============================================================================================
 def fabric_wool(t: tl.Tex) -> dict:
 	"""Hand-knit stockinette wool blanket: V-stitches (64 wales x 80 courses per 30 cm), plied yarn twist,
-	fibre halo, heathered charcoal-brown yarn with oatmeal stripe courses."""
+	fibre halo, undyed oatmeal heathered yarn."""
 	S = t.shape
 	r = t.rng
 	yy, xx = np.mgrid[0:t.h, 0:t.w].astype(np.float64)
@@ -157,11 +157,13 @@ def fabric_wool(t: tl.Tex) -> dict:
 	height += halo * 0.00004
 	rowid = leg_id // (ncol * 2)
 	stripe = np.zeros(S, dtype=bool)   # plain heathered yarn (reusable for blanket, sweater, hat)
-	base = tl.rgb(72, 66, 60)
+	# undyed oatmeal/grey heather (natural sheep's wool): pale fibres with darker grey-brown flecks, so
+	# albedo_color can tint it for other garments
+	base = tl.rgb(146, 136, 120)
 	light = tl.rgb(170, 160, 140)
 	heather = tl.smoothstep(0.8, 1.6, tl.spectral(S, r, 80, 512, 0.2))
 	col = tl.fill(S, base)
-	col = tl.mix3(col, tl.rgb(104, 96, 86), heather * 0.6)
+	col = tl.mix3(col, tl.rgb(96, 88, 78), heather * 0.55)
 	col = np.where(stripe[..., None], tl.fill(S, light) * (0.9 + 0.1 * heather)[..., None], col)
 	col *= np.exp(r.normal(0, 0.05, nrow * ncol * 2)[leg_id])[..., None]
 	col *= (0.7 + 0.3 * best)[..., None]

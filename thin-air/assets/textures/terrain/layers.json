@@ -17,12 +17,12 @@
   "name": "rock",
   "tiling_m": 4.0,
   "avg_albedo_linear": [
-   0.3261,
-   0.3158,
-   0.2836
+   0.2973,
+   0.2879,
+   0.2584
   ],
-  "roughness_avg": 0.7752,
-  "height_range_m": 0.3293,
+  "roughness_avg": 0.7785,
+  "height_range_m": 0.3251,
   "surface": "rock"
  },
  {
@@ -43,12 +43,12 @@
   "name": "scree",
   "tiling_m": 4.0,
   "avg_albedo_linear": [
-   0.1777,
-   0.1708,
-   0.1519
+   0.1783,
+   0.1715,
+   0.1525
   ],
-  "roughness_avg": 0.8029,
-  "height_range_m": 0.2822,
+  "roughness_avg": 0.7954,
+  "height_range_m": 0.2782,
   "surface": "scree"
  },
  {
@@ -82,9 +82,9 @@
   "name": "forest",
   "tiling_m": 2.5,
   "avg_albedo_linear": [
-   0.0611,
+   0.0613,
    0.0415,
-   0.0218
+   0.0219
   ],
   "roughness_avg": 0.8149,
   "height_range_m": 0.042,
@@ -95,11 +95,11 @@
   "name": "dirt",
   "tiling_m": 3.0,
   "avg_albedo_linear": [
-   0.1082,
-   0.0839,
-   0.06
+   0.113,
+   0.0878,
+   0.0627
   ],
-  "roughness_avg": 0.816,
+  "roughness_avg": 0.8408,
   "height_range_m": 0.0479,
   "surface": "dirt"
  },
@@ -108,12 +108,12 @@
   "name": "ice",
   "tiling_m": 6.0,
   "avg_albedo_linear": [
-   0.3858,
-   0.4798,
-   0.5514
+   0.4151,
+   0.5033,
+   0.569
   ],
-  "roughness_avg": 0.1933,
-  "height_range_m": 0.1317,
+  "roughness_avg": 0.2094,
+  "height_range_m": 0.1318,
   "surface": "ice"
  }
 ]

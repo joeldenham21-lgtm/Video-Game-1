@@ -11,6 +11,7 @@ depth_draw_mode = 1
 cull_mode = 2
 albedo_texture = ExtResource("1_albedo")
 orm_texture = ExtResource("2_orm")
+ao_enabled = true
 normal_enabled = true
 normal_scale = 1.000
 normal_texture = ExtResource("3_normal")

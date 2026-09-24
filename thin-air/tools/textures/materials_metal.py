@@ -155,9 +155,10 @@ def metal_bare(t: tl.Tex) -> dict:
 	col *= np.exp(0.03 * brush)[..., None]
 	col = tl.mix3(col, tl.rgb(196, 198, 198), oxid * 0.15)
 	col = tl.mix3(col, ALU, np.clip(scr + scr2, 0, 1) * 0.5)
-	rough = 0.38 + 0.04 * brush + 0.10 * oxid - 0.04 * smudge + 0.08 * np.clip(scr + scr2, 0, 1)
+	rough = 0.42 + 0.04 * brush + 0.10 * oxid - 0.04 * smudge + 0.08 * np.clip(scr + scr2, 0, 1)
 	metal = 1.0 - 0.12 * oxid
-	height = tl.spectral(S, r, 1, 8, 1.6) * 0.0006 - np.clip(scr + scr2, 0, 1) * 0.00004 + brush * 0.000003
+	# sheet flatness: only a faint waviness (strong low-frequency relief reads as dented, blotchy reflections)
+	height = tl.spectral(S, r, 1, 8, 1.6) * 0.00012 - np.clip(scr + scr2, 0, 1) * 0.00004 + brush * 0.000003
 	return dict(albedo=col, height=height, rough=rough, metal=metal, ao_radius=0.003, ao_bake=0.05)
 
 

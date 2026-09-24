@@ -96,19 +96,30 @@ def layer_rock(t: tl.Tex) -> dict:
 	height = tl.spectral(S, r, 1, 5, 1.6) * 0.05
 	crack = np.zeros(S)
 	edge_round = np.zeros(S)
-	# joint families (rational directions so they wrap), partial so fractures terminate
-	for (p, q, n_l, step, width) in ((1, 2, 2, 0.05, 0.018), (2, -1, 1, 0.04, 0.012), (1, 0, 1, 0.03, 0.008)):
-		offs = r.random(n_l)
-		jag = tl.spectral(S, r, 6, 60, 1.2) * 0.0045
-		dist, near, ramp, slab = tl.line_family(S, p, q, offs, wrp + jag)
-		d_m = dist * t.tile_w_m
-		vis = tl.smoothstep(-0.5, 0.3, tl.spectral(S, r, 1, 4, 1.5))
-		ww = width * (0.3 + 1.2 * tl.norm01(tl.spectral(S, r, 3, 24, 1.0)) ** 1.5)
-		c = (1.0 - tl.smoothstep(ww * 0.4, ww, d_m)) * vis
+	# one long master joint (wraps as a rational line, heavily wiggled so it does not read as a ruled line)
+	jag = tl.spectral(S, r, 3, 24, 1.4) * 0.010 + tl.spectral(S, r, 40, 160, 1.0) * 0.0008
+	dist, near, ramp, slab = tl.line_family(S, 1, 2, r.random(1), wrp + jag)
+	d_m = dist * t.tile_w_m
+	vis = tl.smoothstep(-0.9, 0.2, tl.spectral(S, r, 1, 4, 1.5))
+	ww = 0.016 * (0.3 + 1.2 * tl.norm01(tl.spectral(S, r, 3, 24, 1.0)) ** 1.5)
+	crack = np.maximum(crack, (1.0 - tl.smoothstep(ww * 0.4, ww, d_m)) * vis)
+	height += (ramp - 0.5) * 0.05 * vis
+	edge_round = np.maximum(edge_round, (1.0 - tl.smoothstep(0.0, 0.12, d_m)) * vis)
+	# polygonal cooling/unloading joints (periodic Voronoi borders): only some borders are open, they meet at
+	# T/Y junctions and terminate, and each block sits a few cm higher/lower than its neighbours
+	for (cells, open_p, width, step, salt) in ((9, 0.45, 0.012, 0.025, 3), (32, 0.14, 0.005, 0.006, 5)):
+		jx = tl.spectral(S, r, 2, 10, 1.4) * t.px(0.10) + tl.spectral(S, r, 20, 120, 1.0) * t.px(0.004)
+		jy = tl.spectral(S, r, 2, 10, 1.4) * t.px(0.10) + tl.spectral(S, r, 20, 120, 1.0) * t.px(0.004)
+		v = tl.worley(S, r, cells, k=2, sx=1.5, dx=jx, dy=jy)       # blocks elongated along the joint set
+		d_m = v.edge * 0.5 * t.tile_w_m
+		open_ = (tl.edge_pair_rand(v, salt) < open_p).astype(float)
+		open_ = tl.gauss(open_, t.px(0.04))                      # joints taper out instead of stopping dead
+		ww = width * (0.3 + 1.4 * tl.norm01(tl.spectral(S, r, 4, 40, 1.0)) ** 1.6)
+		c = (1.0 - tl.smoothstep(ww * 0.4, ww, d_m)) * open_
 		crack = np.maximum(crack, c)
-		stepv = r.normal(0, 1.0, n_l)[slab] * step * vis
-		height += ramp * stepv
-		edge_round = np.maximum(edge_round, (1.0 - tl.smoothstep(0.0, 0.12, d_m)) * vis)
+		off = tl.gauss(r.normal(0, step, v.count)[v.cell], t.px(0.02))
+		height += off
+		edge_round = np.maximum(edge_round, (1.0 - tl.smoothstep(0.0, 0.10, d_m)) * open_)
 	height -= edge_round ** 2 * 0.03 + crack * 0.05
 	# exfoliation: thin sheets spalled off, leaving fresher stepped scars
 	ex = tl.warp(tl.spectral(S, r, 2, 24, 1.3), *(tl.spectral(S, r, 4, 40, 1.2) * t.px(0.05) for _ in range(2)))
@@ -116,21 +127,22 @@ def layer_rock(t: tl.Tex) -> dict:
 	scar2 = tl.smoothstep(1.35, 1.45, ex)
 	height -= (scar + scar2) * 0.004
 	# surface: weathered granular relief + pits
-	height += tl.spectral(S, r, 2, 150, 1.3) * 0.010
+	height += tl.spectral(S, r, 2, 150, 1.4) * 0.008
 	pits = tl.worley(S, r, 1500, k=1)
 	pit = (1 - tl.smoothstep(0.0, 0.004, pits.f1)) * (r.random(pits.count)[pits.cell] < 0.35)
-	height -= pit * 0.003
+	height -= pit * 0.0012
 	gcol, gmicro, mineral = cm.granite_grain(t, grain_m=0.0055, weather=0.45)
 	height += gmicro * 0.0005
 	# --- albedo
-	col = gcol * np.exp(0.07 * tl.spectral(S, r, 1, 10, 1.3))[..., None]
+	col = gcol * 0.88 * np.exp(0.07 * tl.spectral(S, r, 1, 10, 1.3))[..., None]
 	# fresh scars: less weathered (more speckle contrast, lighter)
 	col = tl.mix3(col, gcol * 1.12, np.clip(scar + scar2, 0, 1) * 0.6)
 	# weathering: faint iron staining + grey-black water tracks along joints
 	stain = tl.smoothstep(0.5, 1.8, tl.spectral(S, r, 2, 16, 1.2))
 	col = tl.mix3(col, tl.rgb(150, 132, 108), stain * 0.25)
+	# dark organic/lichen staining seeping from the joints (dry, not wet: no roughness change)
 	wet = tl.gauss(edge_round, t.px(0.03)) * tl.smoothstep(-0.3, 0.8, tl.spectral(S, r, 2, 12, 1.2))
-	col = tl.mix3(col, tl.rgb(70, 70, 68), np.clip(wet, 0, 1) * 0.45)
+	col = tl.mix3(col, tl.rgb(84, 80, 72), np.clip(wet, 0, 1) * 0.35)
 	dark = tl.smoothstep(0.6, 1.8, tl.spectral(S, r, 2, 24, 1.1))
 	col = tl.mix3(col, tl.rgb(92, 92, 90), dark * 0.3)
 	# soil, grit and moss in cracks
@@ -152,7 +164,6 @@ def layer_rock(t: tl.Tex) -> dict:
 	rough = np.where(mineral == 2, rough - 0.12, rough)
 	rough = rough * (1 - la) + 0.88 * la
 	rough = np.maximum(rough, crack * 0.95)
-	rough -= np.clip(wet, 0, 1) * 0.08
 	return dict(albedo=col, height=height, rough=rough, ao_bake=0.45, ao_radius=0.12, albedo_target=0.26)
 
 
@@ -249,15 +260,15 @@ def layer_ice(t: tl.Tex) -> dict:
 	blue = tl.smoothstep(0.6, 1.8, band)                      # bubble-poor blue ice bands
 	dirt = tl.smoothstep(1.3, 2.4, -band) * tl.smoothstep(-0.6, 0.8, tl.spectral(S, r, 3, 30, 1.2))
 	# weathering crust: granular white rind on humps, thin/absent in wet hollows
-	crust = tl.smoothstep(0.5, 0.95, cup + 0.3 * tl.spectral(S, r, 10, 80, 1.0)) * (1 - blue * 0.6)
+	crust = tl.smoothstep(0.25, 1.05, cup + 0.22 * tl.spectral(S, r, 6, 60, 1.2)) * (1 - blue * 0.5)
 	gran = tl.worley(S, r, 30000, k=2)
 	granules = tl.smoothstep(0.0, 0.003, gran.edge) * 0.0012
 	height += crust * (granules + tl.spectral(S, r, 120, 512, 0.3) * 0.0004) + tl.spectral(S, r, 20, 200, 1.2) * 0.001
 	# cracks: a couple of long fractures + hairline network
 	crk = np.zeros(S)
 	for (p, q, nl, w) in ((1, 3, 2, 0.006), (2, 1, 1, 0.004)):
-		d_, _, _, _ = tl.line_family(S, p, q, r.random(nl), tl.spectral(S, r, 2, 40, 1.3) * 0.01)
-		vis = tl.smoothstep(-0.4, 0.4, tl.spectral(S, r, 1, 4, 1.5))
+		d_, _, _, _ = tl.line_family(S, p, q, r.random(nl), tl.spectral(S, r, 2, 24, 1.4) * 0.016)
+		vis = tl.smoothstep(0.0, 0.8, tl.spectral(S, r, 1, 5, 1.5))
 		crk = np.maximum(crk, (1 - tl.smoothstep(0.0, w, d_ * t.tile_w_m)) * vis)
 	height -= crk * 0.015
 	# cryoconite holes: small round water-filled pits with dark sediment, favouring dirty bands
@@ -272,7 +283,7 @@ def layer_ice(t: tl.Tex) -> dict:
 	blue_c = tl.rgb(118, 158, 184)
 	col = tl.fill(S, white)
 	# bare (crust-free) ice shows the deeper blue; blue bands bluer still
-	clear = (1 - crust) * 0.85 + blue * 0.5
+	clear = (1 - crust) * 0.75 + blue * 0.4
 	col = tl.mix3(col, blue_c, np.clip(clear, 0, 1) * 0.8)
 	# bubble-rich foliation streaks inside the clear ice
 	streaks = tl.smoothstep(0.8, 2.2, tl.spectral(S, r, 20, 200, 0.8, stretch=5.0, angle=0.05) + band * 0.3)
@@ -283,8 +294,9 @@ def layer_ice(t: tl.Tex) -> dict:
 	grit = tl.smoothstep(0.3, 2.0, tl.spectral(S, r, 60, 500, 0.3)) * (0.25 + 0.75 * dirt + 0.4 * (1 - cup))
 	col = tl.mix3(col, tl.rgb(112, 106, 96), np.clip(dirt * 0.35 + grit * 0.35 + runnel * 0.15, 0, 0.7))
 	# bubbles: tiny bright specks in clearer ice
-	bub = (r.random(S) < 0.003) * (1 - crust)
-	col = tl.mix3(col, tl.rgb(236, 240, 242), tl.gauss(bub.astype(float), 0.5) * 2.5)
+	bdens = tl.smoothstep(0.3, 1.6, tl.spectral(S, r, 6, 40, 1.0, stretch=3.0, angle=0.05) + band * 0.3)
+	bub = (r.random(S) < 0.0025 * bdens) * (1 - crust)
+	col = tl.mix3(col, tl.rgb(226, 232, 236), np.clip(tl.gauss(bub.astype(float), 0.6) * 1.6, 0, 0.8))
 	# cracks: white fractured planes with dark cores; cryoconite: black-brown sediment under water
 	col = tl.mix3(col, tl.rgb(232, 238, 242), tl.gauss(crk, 1.5) * 0.5)
 	col = tl.mix3(col, tl.rgb(60, 84, 100), crk * 0.5)

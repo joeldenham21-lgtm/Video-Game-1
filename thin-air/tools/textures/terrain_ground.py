@@ -55,9 +55,9 @@ def layer_scree(t: tl.Tex) -> dict:
 	hc = tl.HeightCanvas(S, fines * 0.5 - 0.20)
 	area = t.tile_w_m * t.tile_h_m
 	n = 7000
-	D = cm.powerlaw_sizes(r, n, 0.06, 0.45, alpha=0.9)
+	D = cm.powerlaw_sizes(r, n, 0.06, 0.55, alpha=0.55)
 	cum = np.cumsum(np.pi * (D / 2) ** 2 * 0.75)
-	n = min(len(D), int(np.searchsorted(cum, area * 3.2)) + 1)
+	n = min(len(D), int(np.searchsorted(cum, area * 4.6)) + 1)
 	D = np.sort(D[:n])[::-1]
 	rough_n = tl.spectral(S, r, 30, 400, 1.0)
 	chip_n = tl.spectral(S, r, 60, 300, 0.8)
@@ -65,9 +65,11 @@ def layer_scree(t: tl.Tex) -> dict:
 	for i in range(n):
 		d_m = D[i]
 		R_px = t.px(d_m / 2)
-		thick = d_m * (0.22 + 0.25 * r.random())
+		thick = d_m * (0.30 + 0.30 * r.random())
 		thick_all[i] = thick
-		f, rmax = cm.angular_stone(r, R_px, 0.55 + 0.45 * r.random(), r.random() * math.pi, thick)
+		# chunky frost-shattered blocks: broad sloping facets, not flat slabs
+		f, rmax = cm.angular_stone(r, R_px, 0.55 + 0.45 * r.random(), r.random() * math.pi, thick,
+		                           bevel=(0.22, 0.45))
 		cy, cx = r.random() * t.h, r.random() * t.w
 		ix, py, px = hc.region(cy, cx, int(rmax) + 2, int(rmax) + 2)
 		surf = f(py, px)
@@ -100,7 +102,7 @@ def layer_scree(t: tl.Tex) -> dict:
 	col = tl.mix3(col, lc, la * 0.85)
 	col = tl.mix3(col, cm.LICHEN_PROTHALLUS, lrim * (lsp == 0) * 0.6 * big[sidc])
 	# fines: dark grey-brown grit and soil
-	fcol = tl.fill(S, tl.rgb(64, 61, 57)) * np.exp(0.2 * tl.spectral(S, r, 100, 512, 0.2) + 0.1 * tl.spectral(S, r, 2, 30, 1.0))[..., None]
+	fcol = tl.fill(S, tl.rgb(84, 80, 74)) * np.exp(0.2 * tl.spectral(S, r, 100, 512, 0.2) + 0.1 * tl.spectral(S, r, 2, 30, 1.0))[..., None]
 	col = np.where(stone[..., None], col, fcol)
 	rough = np.where(stone, 0.78 + 0.05 * rough_n.clip(-2, 2) * 0.5, 0.92)
 	rough = rough * (1 - la) + 0.88 * la
@@ -432,11 +434,55 @@ def layer_forest(t: tl.Tex) -> dict:
 	# damp shade in the lowest duff, slightly lighter dry litter on humps
 	col *= (0.9 + 0.2 * tl.smoothstep(-0.006, 0.006, duff_h))[..., None]
 	rough = np.where(above, np.select([kind == 0, kind == 1, kind == 2], [0.62, 0.82, 0.78], 0.7), 0.92)
+	height, col, rough = _spruce_cones(T, r, height, col, rough, count=14)
 	n_hi = tl.normal_from_height(height, T.texel_m)
 	n = tl.downsample(n_hi, SS)
 	n /= np.linalg.norm(n, axis=-1, keepdims=True)
 	return dict(albedo=tl.downsample(col, SS), height=tl.downsample(height, SS), rough=tl.downsample(rough, SS),
 	            normal=n, ao_bake=0.55, ao_radius=0.04, albedo_target=0.08)
+
+
+def _spruce_cones(T: tl.Tex, r, height, col, rough, count: int):
+	"""Fallen spruce cones (Engelmann/white spruce: 3–7 cm, papery scales) as height stamps with a spiral
+	scale pattern; older cones are greyer and sink into the litter. Wrap-around, drawn over the litter."""
+	h, w = height.shape
+	for k in range(count):
+		L = 0.035 + 0.035 * r.random()                    # length (m)
+		W = L * (0.36 + 0.10 * r.random())                 # closed-cone diameter
+		a = r.random() * 2 * math.pi
+		cy, cx = r.random() * h, r.random() * w
+		ext = int(T.px(L * 0.6)) + 3
+		yy, xx = np.mgrid[-ext:ext + 1, -ext:ext + 1].astype(np.float64)
+		iy = (np.floor(cy).astype(int) + yy.astype(int)) % h
+		ix = (np.floor(cx).astype(int) + xx.astype(int)) % w
+		py, px_ = yy - (cy % 1.0), xx - (cx % 1.0)
+		u = (px_ * math.cos(a) + py * math.sin(a)) * T.texel_m / (L * 0.5)        # -1 base .. +1 tip
+		v = (-px_ * math.sin(a) + py * math.cos(a)) * T.texel_m / (W * 0.5)
+		taper = np.clip(1.0 - 0.45 * np.clip(u, 0, 1) ** 1.5 - 0.15 * np.clip(-u, 0, 1) ** 2, 0.05, 1)
+		r2 = u * u + (v / taper) ** 2
+		inside = r2 < 1.0
+		if not inside.any():
+			continue
+		age = r.random()
+		sink = W * (0.15 + 0.35 * age)
+		z0 = np.percentile(height[iy, ix][inside], 60)
+		body = np.sqrt(np.clip(1.0 - r2, 0, 1)) * W * 0.5 * taper
+		# spiral scale rows (Fibonacci parastichies): diamond scales with dark shadowed gaps
+		ph = 2 * math.pi * r.random()
+		s1 = np.sin(2 * math.pi * (u * 5.5 + v * 1.6) + ph)
+		s2 = np.sin(2 * math.pi * (u * 5.5 - v * 1.6) + ph * 0.7)
+		scale = np.clip(s1 * s2, -1, 1)
+		hgt = z0 - sink + body + 0.0012 * scale * (1 - r2) + 0.004
+		cur = height[iy, ix]
+		m = inside & (hgt > cur)
+		base = tl.lerp(tl.rgb(146, 102, 64), tl.rgb(122, 108, 92), age) * np.exp(r.normal(0, 0.1))
+		ccol = base * (0.72 + 0.28 * (0.5 + 0.5 * scale))[..., None] * (0.85 + 0.15 * (1 - r2))[..., None]
+		tips = tl.smoothstep(0.55, 0.9, scale) * (1 - age)
+		ccol = tl.mix3(ccol, tl.rgb(150, 116, 84), tips * 0.35)
+		height[iy[m], ix[m]] = hgt[m]
+		col[iy[m], ix[m]] = ccol[m]
+		rough[iy[m], ix[m]] = 0.8
+	return height, col, rough
 
 
 # =============================================================================================
@@ -472,10 +518,10 @@ def layer_dirt(t: tl.Tex) -> dict:
 	height = hc.z
 	sid = hc.id
 	stone = sid >= 0
-	moist = tl.smoothstep(0.2, 1.8, pud + 0.4 * tl.spectral(S, r, 6, 50, 1.1))
+	moist = tl.smoothstep(0.4, 2.2, pud + 0.6 * tl.spectral(S, r, 8, 60, 1.0))
 	dry = tl.fill(S, tl.rgb(98, 86, 72))
 	damp = tl.fill(S, tl.rgb(70, 60, 50))
-	col = tl.mix3(dry, damp, moist * 0.8)
+	col = tl.mix3(dry, damp, moist * 0.42)      # subtle: strong mid-scale patches betray the tiling from afar
 	col *= np.exp(0.06 * tl.spectral(S, r, 3, 30, 1.2) + 0.10 * tl.spectral(S, r, 120, 512, 0.2))[..., None]
 	# pale dusty silt on scuffed highs, organic dark in cracks/low ground
 	col = tl.mix3(col, tl.rgb(128, 118, 104), tl.smoothstep(0.0, 0.003, scuff + grain) * (1 - moist) * 0.45)
@@ -487,7 +533,7 @@ def layer_dirt(t: tl.Tex) -> dict:
 	# stones half-coated with mud near the soil line
 	coat = 1 - tl.smoothstep(0.0, 0.004, height - soil)
 	stone_col = tl.mix3(stone_col, col, coat * 0.6)
-	col = np.where(stone[..., None], stone_col * (1 - 0.3 * moist)[..., None], col)
+	col = np.where(stone[..., None], stone_col * (1 - 0.2 * moist)[..., None], col)
 	# a little forest litter kicked onto the trail (thin needles, grass bits)
 	st = Strokes(S)
 	for i in range(900):
@@ -501,6 +547,6 @@ def layer_dirt(t: tl.Tex) -> dict:
 	deb = R["valid"] & (moist < 0.7) & ~stone
 	col = np.where(deb[..., None], tl.lerp(col, dpal[st.attr("col")[R["obj"]]], 0.8), col)
 	height = np.where(deb, np.maximum(height, soil + 0.001), height)
-	rough = 0.88 - 0.3 * moist + 0.03 * tl.spectral(S, r, 30, 300, 0.5)
+	rough = 0.88 - 0.22 * moist + 0.03 * tl.spectral(S, r, 30, 300, 0.5)
 	rough = np.where(stone, 0.72 - 0.2 * moist, rough)
 	return dict(albedo=col, height=height, rough=rough, ao_bake=0.5, ao_radius=0.05, albedo_target=0.1)

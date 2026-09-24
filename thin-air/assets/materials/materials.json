@@ -45,9 +45,9 @@
   "transparent": false,
   "desc": "mature pine: cinnamon plates, black fissures",
   "avg_albedo_linear": [
-   0.1521,
-   0.0786,
-   0.0497
+   0.132,
+   0.078,
+   0.0533
   ],
   "roughness_avg": 0.853,
   "metal_avg": 0.0,
@@ -72,13 +72,13 @@
   "transparent": false,
   "desc": "Engelmann/white spruce: thin grey-brown scales",
   "avg_albedo_linear": [
-   0.1496,
-   0.1146,
-   0.0908
+   0.1342,
+   0.1094,
+   0.0912
   ],
-  "roughness_avg": 0.867,
+  "roughness_avg": 0.861,
   "metal_avg": 0.0,
-  "height_range_m": 0.0235
+  "height_range_m": 0.02012
  },
  "canvas": {
   "material": "res://assets/materials/canvas.tres",
@@ -180,9 +180,9 @@
   "transparent": false,
   "desc": "hand-knit wool blanket, heathered",
   "avg_albedo_linear": [
-   0.059,
-   0.0497,
-   0.041
+   0.2329,
+   0.1993,
+   0.1522
   ],
   "roughness_avg": 0.91,
   "metal_avg": 0.0,
@@ -342,13 +342,13 @@
   "transparent": false,
   "desc": "scratched, oxidised aluminium",
   "avg_albedo_linear": [
-   0.7781,
-   0.7882,
-   0.7978
+   0.7782,
+   0.7883,
+   0.7979
   ],
-  "roughness_avg": 0.402,
+  "roughness_avg": 0.442,
   "metal_avg": 0.963,
-  "height_range_m": 0.00369
+  "height_range_m": 0.00074
  },
  "metal_corrugated": {
   "material": "res://assets/materials/metal_corrugated.tres",
@@ -558,13 +558,13 @@
   "transparent": false,
   "desc": "log end cap disc (UV 0..1), rings, radial checks, saw marks",
   "avg_albedo_linear": [
-   0.315,
-   0.2112,
-   0.1141
+   0.3153,
+   0.2117,
+   0.1148
   ],
   "roughness_avg": 0.864,
   "metal_avg": 0.0,
-  "height_range_m": 0.01291
+  "height_range_m": 0.0129
  },
  "wood_log": {
   "material": "res://assets/materials/wood_log.tres",

@@ -47,42 +47,49 @@ def bark_spruce(t: tl.Tex) -> dict:
 	furrow = tl.spectral(S, r, 2, 24, 1.3, stretch=5, angle=math.pi / 2, aspect=asp)
 	base_h = furrow * 0.003 + tl.spectral(S, r, 60, 300, 0.8, stretch=4, angle=math.pi / 2, aspect=asp) * 0.0003
 	hc = tl.HeightCanvas(S, base_h - 0.0015)
-	n = 6000
+	# thin, loose, roundish scales 2–5 cm across, shingled: each lies on the ones below it and its lower
+	# edge lifts off the stem ("potato-chip" curl), so every scale throws a small shadow downward
+	n = 2600
 	tone = np.empty(n)
 	for i in range(n):
-		R = px(0.006 + 0.010 * r.random())
-		f, rmax = cm.angular_stone(r, R, 0.6 + 0.25 * r.random(), (r.random() - 0.5) * 0.8, 1.0)
+		R = px(0.010 + 0.014 * r.random() ** 1.3)
+		wob = cm.round_stone(r, R, 0.70 + 0.25 * r.random(), (r.random() - 0.5) * 0.9, 1.0, power=0.5)
+		rmax = R * 1.2
 		cy, cx = r.random() * t.h, r.random() * t.w
 		ix, py, pxx = hc.region(cy, cx, int(rmax) + 2, int(rmax) + 2)
-		foot = ~np.isnan(f(py, pxx))
+		foot = ~np.isnan(wob(py, pxx))
+		if not foot.any():
+			continue
 		s = np.clip((py / rmax + 1) * 0.5, 0, 1)            # 0 top .. 1 bottom edge
-		thick = 0.0008 + 0.0012 * r.random()
-		curl = thick * 1.5 * tl.smoothstep(0.7, 1.0, s) * r.random()
-		z0 = hc.z[ix].mean() + furrow[ix].mean() * 0.0005 + r.normal(0, 0.0005)
-		surf = np.where(foot, z0 + thick * (0.3 + 0.7 * s) + curl, np.nan)
+		thick = 0.0006 + 0.0010 * r.random()
+		curl = thick * 2.5 * tl.smoothstep(0.55, 1.0, s) * (0.3 + 0.7 * r.random())
+		under = hc.z[ix][foot]
+		z0 = np.percentile(under, 70) + r.normal(0, 0.0003)
+		dish = -thick * 0.6 * (1 - ((pxx / rmax) ** 2 + ((py / rmax) * 1.2) ** 2))   # slightly concave scales
+		surf = np.where(foot, z0 + thick * (0.4 + 0.6 * s) + curl + dish, np.nan)
 		hc.stamp(ix, surf, i)
 		tone[i] = r.random()
 	height = hc.z
 	sid = hc.id
 	on = sid >= 0
 	sidc = np.maximum(sid, 0)
-	pal = np.stack([tl.rgb(112, 100, 92), tl.rgb(100, 88, 80), tl.rgb(126, 116, 106), tl.rgb(108, 92, 84)])
+	pal = np.stack([tl.rgb(104, 96, 90), tl.rgb(94, 84, 78), tl.rgb(116, 109, 102), tl.rgb(102, 89, 83)])
 	pid = (tone * 4).astype(int) % 4
-	col = pal[pid[sidc]] * np.exp(r.normal(0, 0.06, n)[sidc])[..., None]
+	col = pal[pid[sidc]] * np.exp(r.normal(0, 0.05, n)[sidc])[..., None]
 	# flake margins weather paler; a few fresh flakes show reddish undersides
 	lo = height - tl.gauss(height, px(0.005))
-	col = tl.mix3(col, tl.rgb(140, 132, 122), tl.smoothstep(0.0003, 0.0012, lo) * 0.3)
+	col = tl.mix3(col, tl.rgb(134, 126, 118), tl.smoothstep(0.0003, 0.0015, lo) * 0.22)
 	inner = tl.fill(S, tl.rgb(80, 62, 52)) * np.exp(0.15 * tl.spectral(S, r, 30, 300, 0.6, aspect=asp))[..., None]
 	fresh = tl.patches(S, r, 3, 30, 0.12, 0.3, aspect=asp)
-	col = tl.mix3(col, tl.rgb(128, 86, 64), fresh * on * 0.7)
+	col = tl.mix3(col, tl.rgb(124, 88, 68), fresh * on * 0.5)
 	col = np.where(on[..., None], col, inner)
 	col *= np.exp(0.07 * tl.spectral(S, r, 1, 12, 1.3, aspect=asp) - 0.06 * np.clip(-furrow, 0, 2))[..., None]
 	# pale crustose lichen and a greenish algal film in the furrows
 	la, lc, lrim, lsp = cm.lichen_colonies(t, coverage=0.08, mean_r_m=0.01, species_w=(0.08, 0.02, 0.75, 0.15))
-	col = tl.mix3(col, lc, la * 0.65)
+	col = tl.mix3(col, lc, la * 0.45)
 	col = tl.mix3(col, tl.rgb(96, 104, 74), tl.patches(S, r, 2, 16, 0.15, 0.4, aspect=asp) * 0.25)
 	rough = np.where(on, 0.86, 0.9) + 0.04 * tl.spectral(S, r, 20, 200, 0.5, aspect=asp)
-	return dict(albedo=col, height=height, rough=rough, ao_radius=0.008, ao_bake=0.35, normal_scale=1.0)
+	return dict(albedo=col, height=height, rough=rough, ao_radius=0.012, ao_bake=0.5, normal_scale=1.0)
 
 
 # =============================================================================================
@@ -110,11 +117,11 @@ def bark_pine(t: tl.Tex) -> dict:
 	height += tl.spectral(S, r, 40, 256, 0.8, aspect=asp) * 0.0004
 	# colour: cinnamon plates, each jigsaw piece its own tone; near-black fissures
 	ptone = np.exp(r.normal(0, 0.12, pieces.count))[pieces.cell]
-	pal = np.stack([tl.rgb(136, 90, 66), tl.rgb(150, 104, 76), tl.rgb(118, 80, 60), tl.rgb(116, 104, 96)])
+	pal = np.stack([tl.rgb(124, 90, 70), tl.rgb(136, 100, 78), tl.rgb(110, 82, 66), tl.rgb(114, 104, 96)])
 	plate_pal = pal[r.choice(4, plates.count, p=[0.35, 0.25, 0.25, 0.15])][pid]
 	col = plate_pal * ptone[..., None]
 	col = tl.mix3(col, tl.rgb(70, 52, 42), piece_line * 0.45)
-	col = tl.mix3(col, tl.rgb(38, 31, 27) * np.exp(0.2 * wall)[..., None], fiss)
+	col = tl.mix3(col, tl.rgb(48, 39, 33) * np.exp(0.2 * wall)[..., None], fiss)
 	col *= np.exp(0.05 * tl.spectral(S, r, 1, 8, 1.3, aspect=asp))[..., None]
 	# grey weathering on exposed plate faces, pale lichen crusts
 	col = tl.mix3(col, tl.rgb(120, 112, 106), tl.patches(S, r, 2, 20, 0.25, 0.35, aspect=asp) * (1 - fiss) * 0.45)
@@ -294,7 +301,7 @@ def wood_endgrain(t: tl.Tex) -> dict:
 	shape = 1 + 0.035 * np.sin(2 * ang + r.random() * 6) + 0.02 * np.sin(3 * ang + r.random() * 6)
 	radn = rad * shape + tl.spectral(S, r, 2, 20, 1.5) * 0.004
 	# ring radii: wide juvenile rings, narrowing with age, climate noise
-	nring = 95
+	nring = 62                                     # ~60 rings: slow-grown subalpine spruce, 35–40 cm log
 	w = np.exp(-np.linspace(0, 1.6, nring)) * r.lognormal(0, 0.35, nring)
 	bnd = np.concatenate([[0], np.cumsum(w)])
 	bnd = bnd / bnd[-1] * 0.5

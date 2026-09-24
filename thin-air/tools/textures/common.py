@@ -116,8 +116,10 @@ def lichen_colonies(t: tl.Tex, coverage: float, mean_r_m: float, salt: int = 21,
 # ---------------------------------------------------------------------------------------------
 # stones (angular talus + rounded pebbles), rasterised into a HeightCanvas
 # ---------------------------------------------------------------------------------------------
-def angular_stone(rng, R_px: float, aspect: float, rot: float, thick: float):
-	"""Returns a function (py, px) -> height(px units) or NaN outside, for a faceted convex stone."""
+def angular_stone(rng, R_px: float, aspect: float, rot: float, thick: float, bevel=(0.06, 0.16)):
+	"""Returns a function (py, px) -> height(px units) or NaN outside, for a faceted convex stone.
+	bevel = (min, extra) width of the side facets as a fraction of the radius: small -> flat-topped slab with
+	near-vertical sides, large -> chunky block whose broad sloping facets catch the light (talus)."""
 	nv = rng.integers(5, 9)
 	ang = np.sort(rng.random(nv) * 2 * math.pi)
 	# enforce reasonable spread
@@ -136,7 +138,7 @@ def angular_stone(rng, R_px: float, aspect: float, rot: float, thick: float):
 	cx0, cy0 = vx.mean(), vy.mean()
 	sign = np.sign((cx0 - vx) * nx + (cy0 - vy) * ny)
 	nx, ny = nx * sign, ny * sign
-	slopes = thick / (R_px * (0.06 + 0.16 * rng.random(nv)))       # steep side facets (height per px)
+	slopes = thick / (R_px * (bevel[0] + bevel[1] * rng.random(nv)))       # steep side facets (height per px)
 	top_t = thick * (0.8 + 0.2 * rng.random())
 	gx, gy = (rng.random(2) - 0.5) * 2 * thick / R_px * 0.35         # tilted top face
 	# extra cutting planes → angular top facets (conchoidal fracture faces)
