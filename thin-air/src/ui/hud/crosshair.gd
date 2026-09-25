@@ -59,8 +59,13 @@ func set_progress(t: float) -> void:
 	queue_redraw()
 
 
+## Touch: the interact pill shows the prompt, the centre keeps only the dot and ring.
+var text_hidden := false
+
+
 func _process(delta: float) -> void:
 	var want := 1.0 if prompt_text != "" else 0.0
+	_prompt.visible = not text_hidden
 	var old_a := _prompt_a
 	_prompt_a = move_toward(_prompt_a, want, delta * (8.0 if want > _prompt_a else 5.0))
 	_prompt.modulate.a = _prompt_a

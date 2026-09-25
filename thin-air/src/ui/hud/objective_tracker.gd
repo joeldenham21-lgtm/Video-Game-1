@@ -9,6 +9,7 @@ const IDLE_ALPHA := 0.7
 const IDLE_AFTER := 12.0
 
 var _rows := {}           # id -> {root, label, mark, done_t}
+var left_aligned := false
 var _order: Array[StringName] = []
 var _header: Label
 var _idle := 0.0
@@ -61,6 +62,26 @@ func complete_objective(id: StringName) -> void:
 	_idle = 0.0
 
 
+## Touch layout puts the tracker on the left: flip the alignment of every row.
+func set_left_aligned(on: bool) -> void:
+	left_aligned = on
+	_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if on else HORIZONTAL_ALIGNMENT_RIGHT
+	for id in _rows:
+		_apply_align(_rows[id])
+
+
+func _apply_align(r: Dictionary) -> void:
+	var lab: Label = r["label"]
+	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if left_aligned else HORIZONTAL_ALIGNMENT_RIGHT
+	var row: HBoxContainer = lab.get_parent()
+	row.alignment = BoxContainer.ALIGNMENT_BEGIN if left_aligned else BoxContainer.ALIGNMENT_END
+	var mark: Control = r["mark"]
+	row.move_child(mark, 0 if left_aligned else row.get_child_count() - 1)
+	var cap: Label = r.get("cap")
+	if cap and is_instance_valid(cap):
+		cap.horizontal_alignment = lab.horizontal_alignment
+
+
 func open_count() -> int:
 	var n := 0
 	for id in _rows:
@@ -94,6 +115,7 @@ func _add_row(id: StringName, text: String, animate: bool) -> void:
 	add_child(root)
 	move_child(root, 1)
 	_rows[id] = {"root": root, "label": lab, "mark": mark, "done_t": -1.0, "cap": cap, "cap_t": 6.0}
+	_apply_align(_rows[id])
 	_order.push_front(id)
 	if animate:
 		root.modulate = Color(1.4, 1.3, 1.1, 0.0)

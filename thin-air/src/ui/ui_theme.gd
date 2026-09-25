@@ -125,17 +125,20 @@ static func fit_root(root: Control, min_w := 1180.0, min_h := 620.0) -> float:
 	return s
 
 
-## Physical size → logical units of `ctrl`'s canvas (after its own scale). Uses the screen DPI when known.
+## Physical size → logical units of `ctrl`'s canvas (after its own scale). Uses the screen DPI when known;
+## headless / unknown displays assume a 1080-unit-high canvas on a ~90 mm tall screen.
 static func mm_to_units(ctrl: Control, mm: float) -> float:
-	var dpi := float(DisplayServer.screen_get_dpi())
-	if dpi < 60.0 or DisplayServer.get_name() == "headless":
-		dpi = 96.0 if not Settings.is_mobile() else 500.0
-	var px := mm * dpi / 25.4
-	var xf := ctrl.get_global_transform_with_canvas() if ctrl.is_inside_tree() else Transform2D.IDENTITY
-	var win_scale := 1.0
+	var own := 1.0
 	if ctrl.is_inside_tree():
-		win_scale = ctrl.get_viewport().get_final_transform().x.x
-	return px / maxf(0.01, win_scale * xf.x.length())
+		own = maxf(0.01, ctrl.get_global_transform_with_canvas().x.length())
+	var dpi := float(DisplayServer.screen_get_dpi())
+	if DisplayServer.get_name() == "headless" or dpi < 60.0 or not ctrl.is_inside_tree():
+		return mm * 12.0 / own
+	var px := mm * dpi / 25.4
+	var win_scale := ctrl.get_viewport().get_final_transform().x.x
+	var units := px / maxf(0.01, win_scale * own)
+	# guard against odd window/DPI reports: stay within 4–40 canvas units per mm
+	return clampf(units, mm * 4.0 / own, mm * 40.0 / own)
 
 
 # ================================================================================================ styles
@@ -552,6 +555,5 @@ static func duration(seconds: float) -> String:
 
 
 static func clock(hours: float) -> String:
-	var h := int(floorf(fposmod(hours, 24.0)))
-	var m := int(floorf(fposmod(hours, 1.0) * 60.0))
-	return "%02d:%02d" % [h, m]
+	var total := posmod(int(floorf(fposmod(hours, 24.0) * 60.0 + 0.001)), 1440)
+	return "%02d:%02d" % [total / 60, total % 60]

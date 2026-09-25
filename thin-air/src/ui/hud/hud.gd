@@ -213,16 +213,35 @@ func _layout() -> void:
 	hotbar.size = hotbar.custom_minimum_size
 	vitals.size = vitals.custom_minimum_size
 	if touch_mode:
-		vitals.position = Vector2(m, 22.0)
-		status.position = Vector2(m, 22.0 + vitals.size.y + 8.0)
+		# pause button sits in the top-left corner; the right side belongs to the thumb cluster
+		vitals.position = Vector2(m + 70.0, 20.0)
+		status.position = Vector2(m + 70.0, 20.0 + vitals.size.y + 8.0)
 		hotbar.position = Vector2((W - hb_w) * 0.5, H - hotbar.size.y - 22.0)
+		# objectives under the status row on the left, toasts drop in under the compass
+		_reparent(objectives, root)
+		objectives.set_left_aligned(true)
+		objectives.size = Vector2(360.0, 10.0)
+		objectives.position = Vector2(m + 70.0, status.position.y + 46.0)
+		right_col.position = Vector2((W - 400.0) * 0.5, readout.position.y + 34.0)
 	else:
+		_reparent(objectives, right_col)
+		right_col.move_child(objectives, 0)
+		objectives.set_left_aligned(false)
 		vitals.position = Vector2(m, H - m - vitals.size.y + 10.0)
 		status.position = Vector2(m, vitals.position.y - 48.0)
 		hotbar.position = Vector2((W - hb_w) * 0.5, H - hotbar.size.y - 26.0)
 	hotbar.interactive = touch_mode
 	hotbar.always_visible = touch_mode
+	crosshair.text_hidden = touch_mode
 	fps_label.position = Vector2(12.0, 8.0)
+
+
+func _reparent(n: Control, to: Node) -> void:
+	if n.get_parent() == to:
+		return
+	if n.get_parent():
+		n.get_parent().remove_child(n)
+	to.add_child(n)
 
 
 # ============================================================================================== events

@@ -385,8 +385,10 @@ func _draw_controls() -> void:
 		var ts := _font.get_string_size(prompt_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
 		var h := maxf(64.0 * scale_k, UITheme.mm_to_units(root, MIN_MM))
 		var w := ts.x + h + 34.0 * scale_k
-		var use_c: Vector2 = _centers[&"use"]
-		var pos := Vector2(minf(use_c.x - 230.0 * scale_k - w, root.size.x - w - 20.0), use_c.y - 290.0 * scale_k)
+		# left of the jump / crouch buttons, level with crouch: the right thumb slides onto it
+		var jc: Vector2 = _centers[&"jump"]
+		var cc: Vector2 = _centers[&"crouch"]
+		var pos := Vector2(jc.x - float(_radii[&"jump"]) - 26.0 * scale_k - w, cc.y - h * 0.5)
 		pos.x = maxf(pos.x, root.size.x * LOOK_ZONE_X)
 		_interact_rect = Rect2(pos, Vector2(w, h))
 		var on2 := _pressed.has(&"interact")
