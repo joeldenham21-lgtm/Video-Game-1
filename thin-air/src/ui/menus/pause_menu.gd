@@ -65,10 +65,14 @@ func _build() -> void:
 		_buttons.append(b)
 		if entry[0] == "Save game":
 			_save_btn = b
-			_save_note = UITheme.label("", UITheme.FS_CAPTION, UITheme.TEXT_FAINT)
-			_save_note.custom_minimum_size.x = 380
+			_save_note = UITheme.label("", UITheme.FS_SMALL, UITheme.TEXT_DIM)
+			_save_note.custom_minimum_size.x = 360
 			_save_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			v.add_child(_save_note)
+			var nm := UITheme.margin(0)
+			nm.add_theme_constant_override("margin_left", 25)
+			nm.add_theme_constant_override("margin_bottom", 6)
+			nm.add_child(_save_note)
+			v.add_child(nm)
 	# right: objective card
 	var card := PanelContainer.new()
 	card.name = "Card"
@@ -174,7 +178,7 @@ func _refresh() -> void:
 	_where.text = "  ·  ".join(parts)
 	var ok := can_save()
 	_save_btn.disabled = not ok
-	_save_note.visible = not ok
+	_save_note.get_parent().visible = not ok
 	if not ok:
 		_save_note.text = "On Whiteout you can only save by sleeping in a bed." if Game.difficulty == &"whiteout" else "You can't save right now."
 	var obj := ""

@@ -156,7 +156,7 @@ func _build() -> void:
 	tabs.position = Vector2(0, 10)
 	tabs_box.add_child(tabs)
 	for i in TABS.size():
-		var tb := UITheme.button(TABS[i], "TabButton")
+		var tb := UITheme.button(String(TABS[i]).to_upper(), "TabButton")
 		tb.focus_mode = Control.FOCUS_NONE
 		tb.pressed.connect(_set_tab.bind(i, true))
 		tabs.add_child(tb)
