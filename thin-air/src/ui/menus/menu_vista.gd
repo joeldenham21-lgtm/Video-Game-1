@@ -275,7 +275,8 @@ func _packed(i: int, j: int) -> float:
 func _add_lakes() -> void:
 	var lakes: Array = TerrainData.layout.get("lakes", []) if real_terrain else []
 	if lakes.is_empty() and not real_terrain:
-		lakes = [{"x": 260.0, "z": 640.0, "radius": 230.0, "level": _fallback_height(260.0, 640.0) + 1.5}]
+		# the stand-in range carves Loon Lake's basin at (260, 640): fill it to ~1,428 m
+		lakes = [{"x": 260.0, "z": 640.0, "radius": 520.0, "level": _fallback_height(260.0, 640.0) + 12.0}]
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.03, 0.05, 0.06)
 	mat.roughness = 0.04
@@ -333,7 +334,7 @@ func _scatter_trees() -> void:
 			if density <= 0.0 or rng.randf() > density:
 				continue
 			var y := height_at(px, pz)
-			var s := rng.randf_range(0.75, 1.35) * lerpf(1.0, 0.55, clampf((y - 1900.0) / 350.0, 0.0, 1.0))
+			var s := rng.randf_range(1.7, 2.9) * lerpf(1.0, 0.5, clampf((y - 1900.0) / 350.0, 0.0, 1.0))
 			var b := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.9, 1.15), s))
 			xf.append(Transform3D(b, Vector3(px, y - 0.4, pz)))
 			var larch := y > 1850.0 and y < 2250.0 and rng.randf() < 0.28

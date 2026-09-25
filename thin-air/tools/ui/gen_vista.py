@@ -209,10 +209,12 @@ def main():
     relief = np.clip((h - 1400.0) / 1700.0, 0.0, 1.0)
     h = h + fbm(X / 180.0, Z / 180.0, 4) * (4.0 + 26.0 * relief) + (ridged(X / 700.0, Z / 700.0, 4) - 0.4) * 60.0 * relief
     # valley floor, Loon Lake basin
-    dl = np.sqrt((X - 260) ** 2 + (Z - 640) ** 2)
+    th = np.arctan2(Z - 640, X - 260)
+    lobes = 1.0 + 0.22 * np.sin(3 * th + 1.0) + 0.12 * np.sin(5 * th + 2.3) + 0.35 * np.cos(th)   # an elongated, lobed lake
+    dl = np.sqrt((X - 260) ** 2 + (Z - 640) ** 2) / lobes + 18.0 * fbm(X / 120.0, Z / 120.0, 3)
     floor = 1392.0 + 0.004 * (X + 6000.0)
     h = np.where(valley < 0.3, floor + (h - floor) * smoothstep(0.02, 0.3, valley), h)
-    h = np.where(dl < 320, np.minimum(h, 1414.0 + (dl / 320.0) ** 2 * 26.0), h)
+    h = np.where(dl < 340, np.minimum(h, 1398.0 + (dl / 320.0) ** 2 * 26.0), h)
     h = thermal(h, CELL, iters=10, talus_deg=45.0)
     print("fine flow accumulation…")
     rec, dist, _ = receivers(h, CELL)
@@ -241,8 +243,8 @@ def main():
     gully = smoothstep(4.0, 7.0, np.log10(area * CELL * CELL + 1.0)) * smoothstep(18, 32, slope_deg)
     rock = smoothstep(33.0, 46.0, slope_deg + 8 * (n1 - 0.5)) * (1 - snow * 0.6)
     scree = np.clip(gully * (1 - snow) + smoothstep(26, 34, slope_deg) * smoothstep(1900, 2300, h) * (1 - snow) * 0.6, 0, 1)
-    forest = (1 - smoothstep(1980.0, 2180.0, h + 120 * (n1 - 0.5))) * smoothstep(1398.0, 1440.0, h) \
-        * (1 - smoothstep(30.0, 40.0, slope_deg)) * smoothstep(0.35, 0.6, fbm(X / 260.0, Z / 260.0, 3) * 0.5 + 0.55)
+    forest = (1 - smoothstep(1980.0, 2180.0, h + 120 * (n1 - 0.5))) * smoothstep(1385.0, 1405.0, h) \
+        * (1 - smoothstep(30.0, 40.0, slope_deg)) * smoothstep(0.3, 0.5, fbm(X / 420.0, Z / 420.0, 3) * 0.5 + 0.55)
     forest *= (dl > 330)
     masks = np.stack([snow, rock, scree, forest], -1)
     # ---- write

@@ -109,8 +109,21 @@ void fragment() {
 			n = normalize(texture(normal_tex, nuv).rgb * 2.0 - 1.0);
 		}
 	}
-	float slope = 1.0 - n.y;
 	float dist = length(wpos - CAMERA_POSITION_WORLD);
+	// procedural relief below the heightfield resolution (lighting only, rock only): ribs and gullies that
+	// catch the low sun. Masks use the unperturbed normal.
+	vec3 n_light = n;
+	{
+		float e2 = 6.0;
+		vec2 q = wpos.xz / 55.0;
+		float f0 = fbm(q);
+		float fx = fbm(q + vec2(e2 / 55.0, 0.0));
+		float fz = fbm(q + vec2(0.0, e2 / 55.0));
+		vec2 grad = vec2(fx - f0, fz - f0) * 9.0;
+		float steep = smoothstep(0.25, 0.55, 1.0 - n.y);
+		n_light = normalize(n + vec3(-grad.x, 0.0, -grad.y) * steep * (1.0 - smoothstep(2500.0, 9000.0, dist)));
+	}
+	float slope = 1.0 - n.y;
 	float big = fbm(wpos.xz * 0.0011);
 	float mid = fbm(wpos.xz * 0.009);
 	float fine = vnoise(wpos.xz * 0.11);
@@ -172,7 +185,7 @@ void fragment() {
 	float s_rock = 1.0 / 7.0;
 	vec3 rock = tri(rock_albedo, wpos, bw, s_rock);
 	vec3 cliff = tri(cliff_albedo, wpos, bw, 1.0 / 19.0);
-	rock = mix(rock, cliff, smoothstep(0.5, 0.75, slope)) * (0.72 + 0.5 * big) * (0.9 + 0.2 * mid) * vec3(0.78, 0.8, 0.84);
+	rock = mix(rock, cliff, smoothstep(0.45, 0.7, slope)) * (0.62 + 0.45 * big) * (0.85 + 0.25 * mid) * vec3(0.66, 0.68, 0.72);
 	vec3 snow = texture(snow_albedo, wpos.xz / 5.0).rgb * vec3(0.97, 0.985, 1.0);
 	vec3 grass = texture(grass_albedo, wpos.xz / 6.0).rgb;
 	// late-October meadows: cured, tawny
@@ -183,7 +196,7 @@ void fragment() {
 	vec3 canopy = mix(vec3(0.035, 0.05, 0.04), vec3(0.06, 0.075, 0.05), fine);
 	canopy = mix(canopy, vec3(0.42, 0.27, 0.07), larch * 0.75);
 	forest = mix(forest, canopy, smoothstep(40.0, 400.0, dist) * 0.85 + 0.15);
-	vec3 scree = texture(scree_albedo, wpos.xz / 6.0).rgb;
+	vec3 scree = texture(scree_albedo, wpos.xz / 6.0).rgb * vec3(0.8, 0.82, 0.86);
 	vec3 ice = texture(ice_albedo, wpos.xz / 12.0).rgb * vec3(0.9, 0.97, 1.05);
 
 	vec3 base = grass;
@@ -195,9 +208,7 @@ void fragment() {
 	base = mix(base, snow, sw);
 	// distant forest reads as a dark texture of trees, even under a dusting
 	ALBEDO = base;
-	if (has_normal_tex) {
-		NORMAL = normalize((VIEW_MATRIX * vec4(n, 0.0)).xyz);
-	}
+	NORMAL = normalize((VIEW_MATRIX * vec4(mix(n, n_light, 1.0 - sw), 0.0)).xyz);
 	ROUGHNESS = mix(0.9, 0.55, sw);
 	SPECULAR = 0.35 + 0.15 * sw;
 
