@@ -14,7 +14,7 @@ uniform sampler2D end_normal : hint_normal, filter_linear_mipmap_anisotropic, re
 uniform sampler2D end_orm : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform vec2 wood_scale = vec2(1.0, 1.0);        // 1 / tile size in metres (materials.json)
 uniform vec2 bark_scale = vec2(2.0, 1.0);
-uniform vec3 wood_tint : source_color = vec3(1.0, 0.97, 0.93);
+uniform vec3 wood_tint : source_color = vec3(0.84, 0.74, 0.62);
 uniform float bark_amount : hint_range(0.0, 2.0) = 1.0;
 uniform vec3 chink_color : source_color = vec3(0.55, 0.51, 0.45);
 uniform vec3 moss_color : source_color = vec3(0.22, 0.25, 0.13);
@@ -51,7 +51,11 @@ void fragment() {
 		alb *= 0.88;
 	} else {
 		vec2 wuv = (UV + seed) * wood_scale;
-		vec3 w_alb = texture(wood_albedo, wuv).rgb * wood_tint;
+		// each log a slightly different tree: tone and how far it has silvered in the weather
+		float lh = fract(sin(dot(floor(UV2 * 7.0), vec2(12.9898, 78.233)) + v_seed * 17.0) * 43758.5453);
+		vec3 w_alb = texture(wood_albedo, wuv).rgb * wood_tint * (0.84 + 0.3 * lh);
+		float silver = clamp(0.12 + 0.25 * lh * v_exposed, 0.0, 0.45);
+		w_alb = mix(w_alb, vec3(dot(w_alb, vec3(0.3, 0.59, 0.11))) * vec3(0.98, 0.97, 0.96), silver);
 		vec3 w_nrm = texture(wood_normal, wuv).rgb;
 		vec3 w_orm = texture(wood_orm, wuv).rgb;
 		vec2 buv = (UV + seed * 1.3) * bark_scale;
@@ -60,7 +64,7 @@ void fragment() {
 		vec3 b_orm = texture(bark_orm, buv).rgb;
 		// bark strips left by the drawknife: elongated along the grain, denser on log bellies (COLOR.b)
 		float dens = COLOR.b * bark_amount;
-		float th = 1.0 - dens * 0.62;
+		float th = 1.0 - dens * 0.62 - smoothstep(0.7, 1.0, dens) * 0.5;
 		float m = texture(noise_tex, (UV + seed) * vec2(0.9, 0.16)).r * 0.75 + n * 0.25;
 		float bark = smoothstep(th - 0.025, th + 0.01, m);
 		float rim = smoothstep(th - 0.09, th - 0.02, m) * (1.0 - bark);

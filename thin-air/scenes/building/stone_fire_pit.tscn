@@ -1,0 +1,14 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/items/campfire.tscn" id="1"]
+[ext_resource type="Script" path="res://src/building/pieces/built_fire_pit.gd" id="2"]
+
+[sub_resource type="CylinderShape3D" id="Shape_pit"]
+height = 0.5
+radius = 0.86
+
+[node name="StoneFirePit" instance=ExtResource("1")]
+script = ExtResource("2")
+
+[node name="Shape" parent="." index="0"]
+shape = SubResource("Shape_pit")

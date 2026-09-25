@@ -30,6 +30,14 @@ const FAMILY_PREFIX := [
 	["floor", "misc"], ["stairs", "misc"], ["pillar", "misc"], ["railing", "misc"], ["door_leaf", "misc"],
 ]
 
+## Camp pieces modelled in Blender (tools/blender/building/pieces_camp.py).
+const FREE_MODELS := {
+	&"stone_fire_pit": "camp_fire_pit.glb", &"torch_stand": "camp_torch_stand.glb",
+	&"drying_rack": "camp_drying_rack.glb", &"snow_melter": "camp_snow_melter.glb",
+	&"bough_bed": "camp_bough_bed.glb", &"bed": "camp_bed.glb", &"lean_to": "camp_lean_to.glb",
+	&"rope_ladder": "camp_rope_ladder.glb", &"stone_windbreak": "camp_windbreak.glb",
+}
+
 static var _meshes: Dictionary = {}       # StringName -> Mesh
 static var _families: Dictionary = {}     # family -> true once loaded
 static var _scenes: Dictionary = {}       # path -> PackedScene
@@ -169,6 +177,24 @@ static func _apply_roles_once(n: Node) -> void:
 			mesh.set_meta(&"building_roles", true)
 	for c in n.get_children():
 		_apply_roles_once(c)
+
+
+## A display model for a free piece (ghost preview, icons): the camp glb's "Model" part, or the items
+## stream's procedural model (campfire, storage box, workbench).
+static func free_model(id: StringName) -> Node3D:
+	if FREE_MODELS.has(id):
+		var n := instantiate_model(FREE_MODELS[id])
+		if n:
+			for c in n.find_children("*", "MeshInstance3D", true, false):
+				if c.name != "Model":
+					c.queue_free()
+			return n
+	var mesh: Mesh = ItemVisuals.campfire_mesh() if id == &"campfire" else ItemVisuals.get_mesh(id)
+	if mesh == null:
+		return null
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	return mi
 
 
 ## Mesh parts of a grid piece in the piece's local frame: [[mesh_name, Transform3D], ...].

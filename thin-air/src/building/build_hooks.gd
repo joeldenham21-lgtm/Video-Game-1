@@ -74,6 +74,11 @@ static func refresh_ghost(n: Node) -> void:
 
 
 static func _set_override(n: Node, mat: Material) -> void:
+	if n.has_meta(&"build_reveal"):
+		# Blender-built models reveal step by step instead of ghosting whole.
+		var c := component(n.get_parent())
+		BuildObject._apply_frame(n, c.fraction() if c else 1.0, c == null or c.complete)
+		return
 	if n is GeometryInstance3D and not (n is GPUParticles3D or n is CPUParticles3D):
 		(n as GeometryInstance3D).material_override = mat
 	for ch in n.get_children():

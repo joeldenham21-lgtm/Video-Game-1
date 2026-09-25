@@ -36,6 +36,16 @@ func _ready() -> void:
 			add_child(model)
 	elif model:
 		BuildCatalog._apply_roles_once(model)
+	var has_shape := false
+	for c in get_children():
+		if c is CollisionShape3D:
+			has_shape = true
+	if not has_shape:
+		for sh in collision_shapes():
+			var cs := CollisionShape3D.new()
+			cs.shape = sh[0]
+			cs.transform = sh[1]
+			add_child(cs)
 	_refresh_frame()
 	if build.complete:
 		_on_built.call_deferred()
@@ -70,6 +80,15 @@ func _completed() -> void:
 	_refresh_frame()
 	Events.structure_built.emit(buildable_id, self)
 	_on_built()
+
+
+## [[Shape3D, Transform3D]] used when the scene defines no CollisionShape3D. Default: a box from buildables
+## "size", resting on the ground.
+func collision_shapes() -> Array:
+	var sz := BuildCatalog.size_of(buildable_id)
+	var b := BoxShape3D.new()
+	b.size = sz
+	return [[b, Transform3D(Basis.IDENTITY, Vector3(0.0, sz.y * 0.5, 0.0))]]
 
 
 ## Called once the object is fully built (and after loading a built one).

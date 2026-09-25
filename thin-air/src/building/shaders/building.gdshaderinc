@@ -39,8 +39,11 @@ float building_seed(mat4 model, vec4 custom) {
 float building_snow(float n) {
 	float s = clamp(snow_cover * 1.3 + smoothstep(snow_line_low, snow_line_high, v_world_pos.y) * 0.6, 0.0, 1.0);
 	s *= v_exposed;
-	float up = v_world_n.y + (n - 0.5) * 0.35;
-	return smoothstep(0.62 - 0.35 * s, 0.9 - 0.25 * s, up) * smoothstep(0.0, 0.25, s);
+	// up-facing, then patchy: light cover settles in drifts, heavy cover buries everything
+	float up = smoothstep(0.45, 0.9, v_world_n.y + (n - 0.5) * 0.2);
+	float wn = texture(noise_tex, v_world_pos.xz * 0.21 + v_world_pos.y * 0.05).r * 0.75 + n * 0.25;
+	float th = 1.0 - s * 1.7;
+	return up * smoothstep(th - 0.1, th + 0.1, wn) * smoothstep(0.0, 0.1, s);
 }
 
 void apply_weather(inout vec3 albedo, inout float rough, inout vec3 nrm_ts, float n) {

@@ -5,6 +5,8 @@ extends Area3D
 ## monitoring.
 
 var shelter_factor := 0.0
+## False for helper volumes that only mark a region (e.g. a lean-to's fire reach).
+var is_shelter := true
 
 
 func _init() -> void:
@@ -15,7 +17,8 @@ func _init() -> void:
 
 
 func _enter_tree() -> void:
-	add_to_group(&"shelter")
+	if is_shelter:
+		add_to_group(&"shelter")
 
 
 ## True if a world point is inside one of the room's boxes.

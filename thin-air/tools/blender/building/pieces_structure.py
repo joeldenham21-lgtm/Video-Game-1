@@ -28,7 +28,7 @@ DECK_R = 1.0 / 7.0                     # puncheon (split log) half-width: 7 acro
 SILL_R = 0.15
 SILL_Y = -DECK_R - SILL_R              # sill log centre
 POST_TOP = SILL_Y - SILL_R + 0.02
-POST_R = 0.12
+POST_R = 0.15
 EAVE = 0.5                             # eave overhang (horizontal)
 GABLE_OVER = 0.35                      # roof overhang past the gable wall
 DOOR_W = 0.96
@@ -62,12 +62,12 @@ def gable_courses(parity, y_max):
     return out
 
 
-def _log_course(soup, y, kind, x0, x1, seed, step, cap0=True, cap1=True, bark=0.3, ao_up=0.4, ao_down=0.4, r=LOG_R):
+def _log_course(soup, y, kind, x0, x1, seed, step, cap0=True, cap1=True, bark=0.4, ao_up=0.4, ao_down=0.4, r=LOG_R):
     rr = random.Random(seed)
     rad = r * rr.uniform(0.93, 1.05)
     if kind == "full":
-        log(soup, (x0, y, 0.0), (x1, y, 0.0), rad, rad * rr.uniform(0.97, 1.0), seed=seed, bark=bark, step=step,
-            ao_up=ao_up, ao_down=ao_down, cap0=cap0, cap1=cap1, sides=14, seg=0.34)
+        log(soup, (x0, y, 0.0), (x1, y, 0.0), rad, rad * rr.uniform(0.97, 1.0), seed=seed, bark=bark * rr.uniform(0.6, 1.4),
+            step=step, ao_up=ao_up, ao_down=ao_down, cap0=cap0, cap1=cap1, sides=14, seg=0.3, bulge=0.05, wobble=0.012)
     else:
         face = (0, -1, 0) if kind == "half_down" else (0, 1, 0)
         log(soup, (x0, y, 0.0), (x1, y, 0.0), rad, rad, seed=seed, bark=bark, step=step, profile="half",
@@ -268,7 +268,7 @@ def post(length, seed):
 
 def footing(seed):
     s = Soup()
-    stone(s, (0.0, 0.02, 0.0), 0.26, seed=seed, squash=(1.1, 0.42, 0.95), subdiv=2)
+    stone(s, (0.0, 0.02, 0.0), 0.36, seed=seed, squash=(1.1, 0.42, 0.95), subdiv=2)
     return s
 
 
@@ -398,6 +398,12 @@ def roof(shape, eave, variant, region):
         # grain along local -X (toward the butt at the bottom); taper so the upper end is thin
         board(sh, cen, (L, th, w), rot, seed=sd, grain_axis=0, step=min(1.0, 0.2 + 0.8 * sc / 2.6),
               weather=0.85, ao_bottom=0.5, bevel=0.0)
+        if shape == "peak":
+            # each slope's top course stops at the ridge (the ridge cap covers the joint)
+            n_side = Vector((float(side), 0.0, 0.0))
+            segs = sh.clip(n_side, 0.015)
+            if segs:
+                blib.cap_from_segments(sh, segs, n_side, "planks", (0.2, 0.9), (0.9, 0.5, 0.8, blib.FLAG_WOOD))
         bs.extend(sh)
     # clip everything to the region (z) and to the piece's x range
     def clip_plane(sp, n, d):

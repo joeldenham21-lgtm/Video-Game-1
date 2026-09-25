@@ -114,9 +114,9 @@ static func ground_height(x: float, z: float, from_y: float = INF) -> float:
 	if root != null and root.is_inside_tree():
 		var space := root.get_world_3d().direct_space_state
 		if space:
-			var top := (from_y if is_finite(from_y) else td) + 4.0
-			top = maxf(top, td + 4.0)
-			var q := PhysicsRayQueryParameters3D.create(Vector3(x, top, z), Vector3(x, top - 400.0, z), 1)
+			# From just above a known surface (so an overhang above doesn't count), else from high up.
+			var top := maxf(from_y + 4.0, td + 4.0) if is_finite(from_y) else td + 400.0
+			var q := PhysicsRayQueryParameters3D.create(Vector3(x, top, z), Vector3(x, minf(top, td) - 600.0, z), 1)
 			q.collide_with_areas = false
 			var hit := space.intersect_ray(q)
 			if not hit.is_empty():

@@ -451,9 +451,11 @@ def _orient(cs, n):
 # ============================================================================================ stones
 
 def stone(soup, centre, radius, *, seed=0, squash=(1.0, 0.6, 0.85), rot_y=None, mat="stone", step=0.0,
-          subdiv=2, rough=0.22, flat_bottom=True):
+          subdiv=None, rough=0.22, flat_bottom=True):
     """Irregular field stone: noise-displaced icosphere, optionally flattened underneath."""
     rng = random.Random(seed)
+    if subdiv is None:
+        subdiv = 2 if radius > 0.2 else 1
     verts, faces = _icosphere(subdiv)
     c = V(centre)
     ry = rng.uniform(0, math.tau) if rot_y is None else rot_y
