@@ -1,14 +1,16 @@
 extends HeldItem
 ## Road flare. `use` strikes the cap (ignites after a short strike motion); lit, it burns a fierce red for
-## its fuel time (default 3 min) with sparks and dense smoke, lighting the snow around you and warning off
-## wildlife. `use` again (or `aim` + `use`) throws it; it keeps burning where it lands.
+## its light.burn_minutes (game minutes, items.json "light" block: radius, energy, color, heat_celsius) with
+## sparks and dense smoke, lighting the snow around you and warning off wildlife. `use` again (or `aim` +
+## `use`) throws it; it keeps burning where it lands.
 
 const THROW_SPEED := 13.0
 
 var lit := false
 var burn := 0.0
 var heat_radius := 1.0
-var heat_celsius := 3.0
+var heat_celsius := 2.0
+var light_energy := 3.2
 
 var _ignite_t := -1.0
 var _throw_t := -1.0
@@ -53,10 +55,14 @@ func build_visual() -> void:
 	_holder.add_child(arm)
 	if viewmodel and viewmodel.has_method(&"register_arm"):
 		viewmodel.call(&"register_arm", arm)
+	var ld: Dictionary = def.get("light", {})
+	light_energy = float(ld.get("energy", 3.2))
+	heat_celsius = float(ld.get("heat_celsius", heat_celsius))
 	_light = OmniLight3D.new()
 	_light.position = Vector3(0.0, 0.3, 0.0)
-	_light.light_color = Color(1.0, 0.16, 0.07)
-	_light.omni_range = 18.0
+	var col := String(ld.get("color", ""))
+	_light.light_color = Color.html(col) if col != "" and Color.html_is_valid(col) else Color(1.0, 0.16, 0.07)
+	_light.omni_range = float(ld.get("radius", 18.0))
 	_light.omni_attenuation = 1.3
 	_light.shadow_enabled = not Settings.is_mobile() and int(Settings.get_value(&"shadow_quality", 2)) >= 2
 	_light.visible = false
@@ -153,8 +159,8 @@ func item_process(delta: float, can_act: bool) -> void:
 	anim_pos = anim_pos.lerp(Vector3.ZERO, 1.0 - exp(-8.0 * delta))
 	anim_rot = anim_rot.lerp(Vector3.ZERO, 1.0 - exp(-8.0 * delta))
 	if lit:
-		burn -= delta
-		_light.light_energy = 3.2 * (0.8 + 0.12 * sin(_t * 41.0) * sin(_t * 17.0) + 0.08 * sin(_t * 67.0))
+		burn -= delta * maxf(Climate.time_scale, 0.0)
+		_light.light_energy = light_energy * (0.8 + 0.12 * sin(_t * 41.0) * sin(_t * 17.0) + 0.08 * sin(_t * 67.0))
 		if burn <= 0.0:
 			Game.notify("The flare sputters out", &"info")
 			_set_fx(false)
@@ -173,14 +179,20 @@ func item_process(delta: float, can_act: bool) -> void:
 
 func _ignite() -> void:
 	lit = true
-	var fuel: Dictionary = def.get("fuel", {})
-	burn = float(fuel.get("burn_minutes", 3.0)) * 60.0
+	burn = burn_seconds(def)
 	Audio.play_sfx(&"flare_ignite", player.get_eye_position(), 0.0)
 	_loop = Audio.play_loop(&"flare_loop", _light, -4.0)
 	_set_fx(true)
 	add_to_group(&"heat_source")
 	add_to_group(&"flare")
 	Events.noise_emitted.emit(player.global_position, 12.0, player)
+
+
+## Real seconds a flare burns: light.burn_minutes (game minutes; older data: fuel.burn_minutes).
+static func burn_seconds(d: Dictionary) -> float:
+	var ld: Dictionary = d.get("light", {})
+	var minutes := float(ld.get("burn_minutes", (d.get("fuel", {}) as Dictionary).get("burn_minutes", 15.0)))
+	return Climate.game_minutes_to_seconds(maxf(minutes, 0.1))
 
 
 func _set_fx(on: bool) -> void:

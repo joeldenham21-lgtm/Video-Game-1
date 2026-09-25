@@ -53,6 +53,10 @@ func _motion_math() -> void:
 	check(PlayerMotion.step_length(3.2) > 0.9 and PlayerMotion.step_length(3.2) < 1.2, "jogging stride ≈ 1 m")
 
 
+static func _clothing(id: StringName, key: String) -> float:
+	return float((ItemDB.get_item(id).get("clothing", {}) as Dictionary).get(key, 0.0))
+
+
 func _api(course: PlayerTestCourse) -> void:
 	var p := course.player
 	check(p is CharacterBody3D and p.get_script().get_global_name() == &"Player", "Player is a CharacterBody3D with class_name Player")
@@ -67,8 +71,13 @@ func _api(course: PlayerTestCourse) -> void:
 	p.inventory.add(&"wool_hat", 1)
 	p.inventory.add(&"crampons", 1)
 	check(p.equip(&"parka") and p.equip(&"wool_hat"), "equip clothing")
-	check(is_equal_approx(p.get_insulation(), 15.0), "insulation sums worn clothing (%.1f)" % p.get_insulation())
-	check(p.get_windproof() > 0.7 and p.get_windproof() < 0.75, "windproof combines layers (%.2f)" % p.get_windproof())
+	var ins_parka := _clothing(&"parka", "insulation")
+	var ins_hat := _clothing(&"wool_hat", "insulation")
+	check(is_equal_approx(p.get_insulation(), ins_parka + ins_hat), "insulation sums worn clothing (%.1f = %.1f + %.1f)" % [p.get_insulation(), ins_parka, ins_hat])
+	var parka_only := float(ItemActions.clothing_totals({&"body": &"parka"})["windproof"])
+	var shown := float(ItemActions.clothing_totals(p.equipment)["windproof"])
+	check(p.get_windproof() > parka_only and p.get_windproof() < 1.0 and is_equal_approx(p.get_windproof(), shown),
+		"windproof combines layers, as the equipment page shows (%.2f > parka alone %.2f)" % [p.get_windproof(), parka_only])
 	check(not p.inventory.has(&"parka"), "worn clothing leaves the pack")
 	check(p.equip(&"crampons") and p.has_gear(&"crampons") and p.has_crampons(), "crampons → has_gear(crampons)")
 	check(p.equipment[&"feet_addon"] == &"crampons", "crampons go on as a boot add-on")
@@ -78,7 +87,10 @@ func _api(course: PlayerTestCourse) -> void:
 	p.unequip(&"face")
 	check(not p.has_gear(&"o2_mask") and p.inventory.has(&"o2_mask"), "unequip(face) takes the O2 mask off")
 	p.unequip(&"head")
-	check(p.inventory.has(&"wool_hat") and is_equal_approx(p.get_insulation(), 12.0), "unequip returns the item")
+	check(p.inventory.has(&"wool_hat") and is_equal_approx(p.get_insulation(), ins_parka), "unequip returns the item (%.1f)" % p.get_insulation())
+	check(ItemInfo.wear_slot(&"crampons") == &"feet_addon" and ItemInfo.wear_slot(&"o2_mask") == &"mask"
+		and p.get_equip_slot(&"crampons") == &"feet_addon" and ItemInfo.wear_slot(&"canteen") == &"hand",
+		"player and inventory UI agree on worn slots (crampons → feet_addon, O2 mask → mask)")
 	# Hotbar & active item.
 	p.inventory.add(&"knife", 1)
 	check(p.equip(&"knife") and p.get_active_item() == &"knife", "equip a tool → active item")

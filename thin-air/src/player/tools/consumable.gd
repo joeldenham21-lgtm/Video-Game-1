@@ -137,6 +137,8 @@ func _apply() -> void:
 	var idx2 := inventory_index()
 	if idx2 >= 0:
 		player.inventory.remove_at(idx2, 1)
+		# The empty tin / bottle comes back (items.json "container").
+		ItemActions.return_container(player, player.inventory, item_id)
 
 
 func _finish() -> void:

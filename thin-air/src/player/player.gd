@@ -190,6 +190,7 @@ func _ready() -> void:
 	Events.ui_screen_opened.connect(_on_ui_opened)
 	Events.ui_screen_closed.connect(_on_ui_closed)
 	Events.item_picked_up.connect(_on_item_picked_up)
+	Events.item_crafted.connect(_on_item_picked_up)
 	Events.sleep_started.connect(_on_sleep_started)
 	Events.sleep_ended.connect(_on_sleep_ended)
 	Events.cinematic_started.connect(_on_cinematic_started)
@@ -485,7 +486,7 @@ func drop_active_item() -> void:
 	var st := inventory.remove_at(idx, 1)
 	if st.is_empty():
 		return
-	_drop_to_world(id, 1)
+	_drop_to_world(id, 1, float(st.get("durability", 1.0)))
 	Events.item_dropped.emit(id, 1)
 	Audio.play_sfx(&"drop", global_position)
 
@@ -1335,10 +1336,14 @@ func _check_fell_through() -> void:
 	teleport(Vector3(global_position.x, ground + 1.0, global_position.z), get_yaw_deg())
 
 
+## Height of the body core above the feet where warmth is felt (fire heat, the torch in your hand, shelter).
+const CORE_HEIGHT := 1.0
+
+
 func _sample_climate(dt: float) -> void:
-	var pos := global_position
+	var pos := global_position + Vector3(0.0, CORE_HEIGHT, 0.0)
 	var wet := vitals.has_effect(&"wet")
-	vitals.env_altitude = pos.y
+	vitals.env_altitude = global_position.y
 	vitals.env_air_temp = Climate.get_air_temperature(pos)
 	_felt = Climate.get_felt_temperature(pos, _insulation, wet)
 	vitals.env_felt_temp = _felt
@@ -1348,16 +1353,20 @@ func _sample_climate(dt: float) -> void:
 	vitals.env_insulation = _insulation
 	vitals.env_waterproof = _waterproof
 	vitals.env_precipitation = float(Climate.precipitation) * (1.0 - is_sheltered)
-	# Bottled oxygen: mask + bottle feed you above 2,500 m and slowly empty the bottle.
+	# Bottled oxygen: mask + bottle feed you above 2,500 m and slowly empty the bottle (items.json
+	# o2.minutes, game minutes; the empty bottle is returned).
 	var supply := false
-	if pos.y > 2500.0 and has_gear(&"o2_mask"):
+	if global_position.y > 2500.0 and has_gear(&"o2_mask"):
 		var bi := inventory.find(&"o2_bottle")
 		if bi >= 0:
 			supply = true
 			_o2_timer += dt
 			if _o2_timer >= 1.0:
-				if inventory.use_durability(bi, _o2_timer / 900.0):
+				var o2: Dictionary = ItemDB.get_item(&"o2_bottle").get("o2", {})
+				var minutes := maxf(float(o2.get("minutes", 540.0)), 1.0)
+				if inventory.use_durability(bi, _o2_timer * Climate.game_minutes_per_second() / minutes):
 					Game.notify("Oxygen bottle empty", &"warning")
+					ItemActions.return_container(self, inventory, &"o2_bottle")
 				_o2_timer = 0.0
 			if randf() < dt / 3.0:
 				Audio.play_sfx(&"o2_hiss", null, -14.0)
@@ -1477,34 +1486,20 @@ static func _item_has_gear(id: StringName, tag: String) -> bool:
 
 
 func _equip_slot_for(def: Dictionary) -> StringName:
-	var g: Variant = def.get("gear", [])
-	if g is Array:
-		if (g as Array).has("crampons"):
-			return &"feet_addon"
-		if (g as Array).has("o2_mask"):
-			return &"mask"
-	var slot := StringName(def.get("equip_slot", ""))
-	if slot == &"" and def.has("tool"):
-		return &"hand"
+	# Shared rule with the inventory UI: crampons → feet_addon, O2 mask → mask, tools → hand.
+	var slot := ItemInfo.wear_slot_of(def)
 	if slot != &"hand" and slot != &"" and not EQUIP_SLOTS.has(slot):
 		return &""
 	return slot
 
 
 func _recalc_gear() -> void:
-	_insulation = 0.0
-	var wind_pass := 1.0
-	var water_pass := 1.0
-	for slot in EQUIP_SLOTS:
-		var id: StringName = equipment.get(slot, &"")
-		if id == &"":
-			continue
-		var c: Dictionary = ItemDB.get_item(id).get("clothing", {})
-		_insulation += float(c.get("insulation", 0.0))
-		wind_pass *= 1.0 - clampf(float(c.get("windproof", 0.0)), 0.0, 1.0)
-		water_pass *= 1.0 - clampf(float(c.get("waterproof", 0.0)), 0.0, 1.0)
-	_windproof = 1.0 - wind_pass
-	_waterproof = 1.0 - water_pass
+	# Same totals the inventory's equipment page shows: insulation sums, wind/waterproofing is weighted by
+	# the skin area each garment covers (a wool hat doesn't make a parka-less body windproof).
+	var tot := ItemActions.clothing_totals(equipment)
+	_insulation = float(tot["insulation"])
+	_windproof = float(tot["windproof"])
+	_waterproof = float(tot["waterproof"])
 	_crampons = has_gear(&"crampons")
 	_apply_pack_capacity()
 
@@ -1514,19 +1509,11 @@ func _apply_pack_capacity() -> void:
 	var slots := BASE_SLOTS
 	var weight := BASE_WEIGHT
 	if pack != &"":
-		var d: Dictionary = ItemDB.get_item(pack)
-		var bp: Dictionary = d.get("backpack", {})
-		if not bp.is_empty():
-			slots = int(bp.get("slots", slots))
-			weight = BASE_WEIGHT + float(bp.get("weight", 0.0))
-		else:
-			match pack:
-				&"backpack_torn":
-					slots = 28; weight = BASE_WEIGHT + 5.0
-				&"backpack":
-					slots = 36; weight = BASE_WEIGHT + 12.0
-				&"expedition_pack":
-					slots = 36; weight = BASE_WEIGHT + 22.0
+		# items.json "carry": {"slots", "weight"} — total slots and total comfortable load (kg) with this pack.
+		var carry: Dictionary = ItemDB.get_item(pack).get("carry", {})
+		if not carry.is_empty():
+			slots = maxi(int(carry.get("slots", slots)), BASE_SLOTS)
+			weight = maxf(float(carry.get("weight", weight)), BASE_WEIGHT)
 	if inventory.size() != slots:
 		inventory.resize(slots)
 	inventory.max_weight = weight
@@ -1573,40 +1560,24 @@ func _on_item_picked_up(id: StringName, _count: int) -> void:
 	_auto_hotbar.call_deferred(id)
 
 
-## New tools/weapons/lights go to the first free hotbar slot.
+## New tools/weapons/lights you can hold (picked up, crafted, taken from storage) go to the first free
+## hotbar slot. Worn gear (crampons), igniters, ammo and other pack items stay off the hotbar.
 func _auto_hotbar(id: StringName) -> void:
 	if hotbar.has(id) or not inventory.has(id):
 		return
-	var def: Dictionary = ItemDB.get_item(id)
-	var cat := String(def.get("category", ""))
-	if not (def.has("tool") or cat == "tool" or cat == "weapon" or cat == "light"):
-		return
-	if id == &"arrow" or id == &"flare_shell":
+	if _equip_slot_for(ItemDB.get_item(id)) != &"hand":
 		return
 	var idx := hotbar.find(&"")
 	if idx >= 0:
 		hotbar[idx] = id
 
 
-func _drop_to_world(id: StringName, count: int) -> void:
-	var path := "res://scenes/items/pickup.tscn"
-	if not ResourceLoader.exists(path):
-		return
-	var node := (load(path) as PackedScene).instantiate()
-	if node == null:
-		return
-	node.set(&"item_id", id)
-	node.set(&"count", count)
-	var parent: Node = null
-	if Game.world and Game.world.has_node(^"Items"):
-		parent = Game.world.get_node(^"Items")
-	if parent == null:
-		parent = get_tree().current_scene
-	parent.add_child(node)
-	if node is Node3D:
-		(node as Node3D).global_position = get_eye_position() + get_look_direction() * 0.7 + Vector3.DOWN * 0.3
-	if node is RigidBody3D:
-		(node as RigidBody3D).linear_velocity = get_look_direction() * 2.5 + velocity * 0.5
+## Spawns a dropped stack through ItemsRoot (a "dynamic" pickup: saved with the world, keeps durability).
+func _drop_to_world(id: StringName, count: int, durability := 1.0) -> void:
+	var at := get_eye_position() + get_look_direction() * 0.7 + Vector3.DOWN * 0.3
+	var node := ItemsRoot.spawn(id, count, at, Vector3.ZERO, durability)
+	if node:
+		node.linear_velocity = get_look_direction() * 2.5 + velocity * 0.5
 
 
 # =================================================================================================

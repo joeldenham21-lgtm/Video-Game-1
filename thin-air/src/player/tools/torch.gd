@@ -1,20 +1,27 @@
 extends MeleeTool
 ## Hand torch (and kerosene lantern): a flickering warm OmniLight with flame, ember and smoke particles.
+## Light, colour, burn time and warmth come from the item's "light" block in items.json
+## ({radius, energy, color, burn_minutes (game minutes), heat_celsius, fuel}).
 ## While lit it is a heat source (group "heat_source": heat_radius/heat_celsius/is_heat_active) that also
-## keeps wildlife wary. Burns down over its fuel time (item fuel.burn_minutes), goes out underwater,
-## `torch_toggle` douses/relights (relighting uses a match or the lighter when those items exist).
+## keeps wildlife wary. Burns down in game time (the inventory slot's 0..1 durability is what's left; the
+## next torch of a stack is lit from the last one), goes out underwater. `torch_toggle` douses it and
+## relights it from a nearby fire or with the best igniter carried (ItemActions.try_ignite: matches,
+## lighter, ferro rod…). An empty lantern is refilled with its light.fuel item (lamp oil) when relit.
 ## `use` swings it (fire damage).
+
+const RELIGHT_FIRE_DIST := 2.2
 
 var lit := true
 var heat_radius := 1.8
-var heat_celsius := 7.0
+var heat_celsius := 4.0
 var is_lantern := false
 
 var _light: OmniLight3D = null
 var _flame: CPUParticles3D = null
 var _embers: CPUParticles3D = null
 var _smoke: CPUParticles3D = null
-var _burn_s := 360.0
+var _burn_minutes := 40.0
+var _light_def: Dictionary = {}
 var _burn_acc := 0.0
 var _t := 0.0
 var _base_energy := 1.7
@@ -36,10 +43,11 @@ func setup(p: Player, vm: Node3D, id: StringName) -> void:
 	swing_sfx = &"axe_swing"
 	noise_radius = 10.0
 	var fuel: Dictionary = def.get("fuel", {})
-	_burn_s = float(fuel.get("burn_minutes", tool.get("burn_minutes", 60.0 if is_lantern else 6.0))) * 60.0
+	_burn_minutes = maxf(float(_light_def.get("burn_minutes", fuel.get("burn_minutes", tool.get("burn_minutes",
+		360.0 if is_lantern else 40.0)))), 0.5)
+	heat_celsius = float(_light_def.get("heat_celsius", 1.0 if is_lantern else 4.0))
 	if is_lantern:
 		heat_radius = 1.0
-		heat_celsius = 3.0
 		windup_rot = Vector3(10.0, -4.0, -6.0)
 		strike_rot = Vector3(-12.0, 4.0, 6.0)
 		follow_rot = Vector3(-14.0, 4.0, 6.0)
@@ -56,6 +64,9 @@ func setup(p: Player, vm: Node3D, id: StringName) -> void:
 
 
 func build_visual() -> void:
+	_light_def = def.get("light", {})
+	if is_lantern and _fuel_left() <= 0.001:
+		lit = false
 	rest_pos = Vector3(0.24, -0.4, 0.02)
 	_holder = Node3D.new()
 	_holder.name = "Torch"
@@ -97,9 +108,13 @@ func build_visual() -> void:
 	_light = OmniLight3D.new()
 	_light.name = "Light"
 	_light.position = _head + Vector3(0.0, 0.06, 0.0)
-	_light.light_color = Color(1.0, 0.58, 0.28) if not is_lantern else Color(1.0, 0.72, 0.42)
-	_base_energy = 1.7 if not is_lantern else 1.25
-	_light.omni_range = 10.0 if not is_lantern else 8.0
+	var col := String(_light_def.get("color", ""))
+	if col != "" and Color.html_is_valid(col):
+		_light.light_color = Color.html(col)
+	else:
+		_light.light_color = Color(1.0, 0.58, 0.28) if not is_lantern else Color(1.0, 0.72, 0.42)
+	_base_energy = float(_light_def.get("energy", 1.7 if not is_lantern else 1.25))
+	_light.omni_range = float(_light_def.get("radius", 10.0 if not is_lantern else 8.0))
 	_light.omni_attenuation = 1.25
 	_light.light_size = 0.05
 	_light.shadow_enabled = not Settings.is_mobile() and int(Settings.get_value(&"shadow_quality", 2)) >= 2
@@ -210,14 +225,46 @@ func item_process(delta: float, can_act: bool) -> void:
 		if player.water_level > -1e20 and _light.global_position.y < player.water_level:
 			_set_lit(false)
 			Audio.play_sfx(&"splash", _light.global_position, -8.0, 1.6)
-		# Burn down.
+		# Burn down (game minutes, so it also burns while time is fast-forwarded).
 		_burn_acc += delta
 		if _burn_acc >= 1.0:
-			var idx := inventory_index()
-			if idx >= 0 and player.inventory.use_durability(idx, _burn_acc / _burn_s):
-				Game.notify("Your %s burned out" % ("lantern ran dry" if is_lantern else "torch"), &"warning")
-				depleted.emit()
+			_burn(_burn_acc * Climate.game_minutes_per_second() / _burn_minutes)
 			_burn_acc = 0.0
+
+
+## Uses up `fraction` of one torch / of the lantern's fill.
+func _burn(fraction: float) -> void:
+	var idx := inventory_index()
+	if idx < 0:
+		return
+	var inv := player.inventory
+	if is_lantern:
+		# The lantern itself never burns away: it runs dry and waits for lamp oil.
+		var left := float(inv.get_slot(idx).get("durability", 1.0)) - fraction
+		_set_fuel(idx, maxf(left, 0.0))
+		if left <= 0.0:
+			_set_lit(false)
+			Game.notify("The lantern ran dry", &"warning")
+		return
+	if inv.use_durability(idx, fraction):
+		if inv.count(item_id) > 0:
+			Game.notify("The torch gutters out; you light a fresh one from it", &"info")
+		else:
+			Game.notify("Your torch burned out", &"warning")
+			depleted.emit()
+
+
+func _fuel_left() -> float:
+	var idx := inventory_index()
+	return float(player.inventory.get_slot(idx).get("durability", 1.0)) if idx >= 0 else 1.0
+
+
+func _set_fuel(idx: int, f: float) -> void:
+	var st := player.inventory.get_slot(idx).duplicate()
+	if st.is_empty():
+		return
+	st["durability"] = clampf(f, 0.0, 1.0)
+	player.inventory.set_slot(idx, st)
 
 
 func _toggle() -> void:
@@ -225,23 +272,46 @@ func _toggle() -> void:
 		_set_lit(false)
 		Audio.play_sfx(&"fire_ignite", _light.global_position, -10.0, 0.6)
 		return
-	# Relighting needs a flame source if the game defines one.
-	var sources := [&"lighter", &"matches"]
-	var defined := false
-	for s: StringName in sources:
-		if ItemDB.has_item(s):
-			defined = true
-			if player.inventory.has(s):
-				if s == &"matches":
-					player.inventory.remove(&"matches", 1)
-				_set_lit(true)
-				Audio.play_sfx(&"fire_ignite", _light.global_position, -4.0)
-				return
-	if not defined:
-		_set_lit(true)
-		Audio.play_sfx(&"fire_ignite", _light.global_position, -4.0)
-	else:
-		Game.notify("Nothing to light it with", &"warning")
+	relight()
+
+
+## Tries to light it again: an empty lantern takes a fill of its fuel item first; a burning fire within
+## reach lights it for free, otherwise the best igniter carried is struck (may fail in wind). Returns true
+## when it's burning.
+func relight() -> bool:
+	if lit:
+		return true
+	var inv := player.inventory
+	if is_lantern and _fuel_left() <= 0.001:
+		var oil := StringName(_light_def.get("fuel", "lamp_oil"))
+		if not inv.remove(oil, 1):
+			Game.notify("The lantern needs %s" % ItemInfo.name_of(oil).to_lower(), &"warning")
+			return false
+		_set_fuel(inventory_index(), 1.0)
+	if not _near_fire():
+		if ItemActions.find_igniter(inv) < 0:
+			Game.notify("Nothing to light it with", &"warning")
+			return false
+		var res := ItemActions.try_ignite(inv, 0.5)
+		if not bool(res.get("ok", false)):
+			Game.notify(String(res.get("text", "It won't catch.")), &"warning")
+			Audio.play_sfx(&"fire_ignite", _light.global_position, -18.0, 1.5)
+			return false
+	_set_lit(true)
+	Audio.play_sfx(&"fire_ignite", _light.global_position, -4.0)
+	return true
+
+
+## A burning campfire (group "fire") close enough to hold the torch into.
+func _near_fire() -> bool:
+	for n in get_tree().get_nodes_in_group(&"fire"):
+		if n == self or not (n is Node3D) or not (n as Node3D).is_inside_tree():
+			continue
+		if n.has_method(&"is_heat_active") and not n.call(&"is_heat_active"):
+			continue
+		if (n as Node3D).global_position.distance_to(player.global_position) <= RELIGHT_FIRE_DIST:
+			return true
+	return false
 
 
 func _set_lit(on: bool, instant := false) -> void:

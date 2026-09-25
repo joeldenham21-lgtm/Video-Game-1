@@ -212,6 +212,17 @@ func get_time_string() -> String:
 	return "%02d:%02d" % [(total_min / 60) % 24, total_min % 60]
 
 
+## Game minutes that pass per real second (includes time_scale while sleeping). Durations in item data
+## (fuel/light burn_minutes, medical duration_minutes, o2 minutes) are game minutes: burn them down with this.
+func game_minutes_per_second() -> float:
+	return maxf(time_scale, 0.0) * 1440.0 / maxf(1.0, day_length_minutes * 60.0)
+
+
+## Real seconds (at time_scale 1) that `minutes` game minutes last — 40 game minutes ≈ 67 s on a 40-min day.
+func game_minutes_to_seconds(minutes: float) -> float:
+	return minutes * maxf(1.0, day_length_minutes * 60.0) / 1440.0
+
+
 func get_sunrise_hour() -> float:
 	return Astronomy.sunrise_hour(day)
 

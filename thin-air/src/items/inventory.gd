@@ -211,7 +211,13 @@ func use_durability(index: int, amount: float) -> bool:
 		return false
 	s["durability"] = float(s.get("durability", 1.0)) - amount
 	if float(s["durability"]) <= 0.0:
-		remove_at(index, 1)
+		if int(s.get("count", 1)) > 1:
+			# One of a stack is used up (a torch burns out): the next one starts fresh.
+			s["count"] = int(s["count"]) - 1
+			s["durability"] = 1.0
+			changed.emit()
+		else:
+			remove_at(index, 1)
 		return true
 	changed.emit()
 	return false
@@ -350,7 +356,12 @@ func to_dict() -> Dictionary:
 		if s.is_empty():
 			arr.append(null)
 		else:
-			arr.append({"id": String(s["id"]), "count": int(s["count"]), "durability": float(s.get("durability", 1.0))})
+			var e := {"id": String(s["id"]), "count": int(s["count"]), "durability": float(s.get("durability", 1.0))}
+			# Extra per-stack state (e.g. a canteen's "unsafe" water) survives saving when it is JSON-safe.
+			for k in s:
+				if not e.has(String(k)) and (s[k] is bool or s[k] is int or s[k] is float or s[k] is String):
+					e[String(k)] = s[k]
+			arr.append(e)
 	return {"slots": arr, "max_weight": max_weight}
 
 
@@ -360,7 +371,11 @@ func from_dict(d: Dictionary) -> void:
 	slots.clear()
 	for e in arr:
 		if e is Dictionary and ItemDB.has_item(StringName(e.get("id", ""))):
-			slots.append({"id": StringName(e["id"]), "count": int(e.get("count", 1)), "durability": float(e.get("durability", 1.0))})
+			var st := {"id": StringName(e["id"]), "count": int(e.get("count", 1)), "durability": float(e.get("durability", 1.0))}
+			for k in e:
+				if not st.has(k):
+					st[k] = e[k]
+			slots.append(st)
 		else:
 			slots.append({})
 	changed.emit()

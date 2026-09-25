@@ -975,7 +975,8 @@ func _trial_tools() -> void:
 	Input.action_release(&"use")
 	await _wait(0.8)
 	_check(stump.hits >= 1, "axe swing harvest_hit()s the stump (%d hits)" % stump.hits)
-	_check(stump.hits == 0 or absf(stump.total_power / stump.hits - 1.0) < 0.01, "harvest power = tool chop (%.2f)" % (stump.total_power / maxf(stump.hits, 1)))
+	var chop := float((ItemDB.get_item(&"stone_axe").get("tool", {}) as Dictionary).get("chop", 0.2))
+	_check(stump.hits == 0 or absf(stump.total_power / stump.hits - chop) < 0.01, "harvest power = tool chop (%.2f, data %.2f)" % [stump.total_power / maxf(stump.hits, 1), chop])
 	_check(player.vitals.stamina < 100.0, "chopping costs stamina (%.1f)" % player.vitals.stamina)
 	var dur1 := float(player.inventory.get_slot(player.inventory.find(&"stone_axe")).get("durability", 1.0))
 	_check(dur1 < dur0, "chopping wears the axe (%.3f → %.3f)" % [dur0, dur1])
@@ -1027,8 +1028,18 @@ func _trial_tools() -> void:
 	_check(torch != null and torch.is_in_group(&"heat_source") and torch.call(&"is_heat_active"), "lit torch is an active heat source")
 	await _tap(&"torch_toggle")
 	_check(torch != null and not torch.call(&"is_heat_active"), "torch_toggle douses it")
-	await _tap(&"torch_toggle")
-	_check(torch != null and torch.call(&"is_heat_active"), "torch_toggle relights it")
+	# Relighting strikes a real igniter (items.json "ignite": a lighter can fail in wind — try a few times).
+	var had_lighter := player.inventory.has(&"lighter")
+	if ItemDB.has_item(&"lighter") and not had_lighter:
+		player.inventory.add(&"lighter", 1)
+	for _i in 6:
+		await _tap(&"torch_toggle")
+		if torch == null or torch.call(&"is_heat_active"):
+			break
+		await _wait(0.1)
+	_check(torch != null and torch.call(&"is_heat_active"), "torch_toggle relights it with the lighter")
+	if not had_lighter:
+		player.inventory.remove(&"lighter", 1)
 	# --- Flare: strike, then throw.
 	await _give_and_equip(&"flare", 2)
 	await _tap(&"use")
@@ -1039,7 +1050,9 @@ func _trial_tools() -> void:
 	await _wait(0.8)
 	_check(player.inventory.count(&"flare") == 1, "lit flare thrown (1 left)")
 	var flares := _projectiles(PlayerProjectile.Kind.FLARE)
-	_check(flares.size() >= 1 and flares[0].burn_time > 100.0, "thrown flare keeps burning")
+	var fl_minutes := float((ItemDB.get_item(&"flare").get("light", ItemDB.get_item(&"flare").get("fuel", {})) as Dictionary).get("burn_minutes", 15.0))
+	var fl_secs := Climate.game_minutes_to_seconds(fl_minutes)
+	_check(flares.size() >= 1 and flares[0].burn_time > fl_secs * 0.5, "thrown flare keeps burning (%.0f of %.0f s)" % [flares[0].burn_time if flares.size() > 0 else 0.0, fl_secs])
 	# --- Scanner.
 	await _give_and_equip(&"survey_scanner")
 	await _reset(Vector3(0.0, Y0 + 0.05, 9.6), 180.0, -24.0)
