@@ -118,11 +118,14 @@ def wall(kind, parity, seed):
         sd = seed * 100 + i
         bottom = y if ck == "half_down" else y - LOG_R
         top = y if ck == "half_up" else y + LOG_R
+        cs = Soup()
         if in_opening_bottom(bottom, top):
-            _log_course(s, y, ck, -HALF, -cut_w, sd, step, cap0=True, cap1=True)
-            _log_course(s, y, ck, cut_w, HALF, sd + 50, step, cap0=True, cap1=True)
+            _log_course(cs, y, ck, -HALF, -cut_w, sd, step, cap0=True, cap1=True)
+            _log_course(cs, y, ck, cut_w, HALF, sd + 50, step, cap0=True, cap1=True)
         else:
-            _log_course(s, y, ck, -HALF, HALF, sd, step, cap0=True, cap1=True)
+            _log_course(cs, y, ck, -HALF, HALF, sd, step, cap0=True, cap1=True)
+        _grime(cs, y)
+        s.extend(cs)
         if i < n - 1:
             yc = (y + courses[i + 1][0]) * 0.5
             split = (kind == "door" and yc < door_top) or (kind == "window" and win_lo - 0.02 < yc < win_hi + 0.02)
@@ -181,6 +184,16 @@ def _window_frame(s, lo, hi, seed):
     s.extend(sh, xf)
 
 
+def _grime(soup, y):
+    """Splash and moss darkening on the lowest courses (baked into the AO channel)."""
+    k = 1.0 - 0.3 * (1.0 - smoothstep(0.0, 0.7, y))
+    if k >= 0.999:
+        return
+    for corners, _m in soup.faces:
+        for c in corners:
+            c.col = (c.col[0] * k, c.col[1], c.col[2], c.col[3])
+
+
 def wall_stub(parity, seed, length=0.32):
     """Log ends projecting past a corner node (the node is at x = 0, logs run toward +X)."""
     s = Soup()
@@ -188,8 +201,11 @@ def wall_stub(parity, seed, length=0.32):
     n = len(courses)
     for i, (y, ck) in enumerate(courses):
         rr = random.Random(seed * 100 + i)
-        L = length * rr.uniform(0.9, 1.08)
-        _log_course(s, y, ck, 0.0, L, seed * 100 + i, i / max(1, n - 1), cap0=False, cap1=True, bark=0.25)
+        L = length * rr.uniform(0.78, 1.16)
+        cs = Soup()
+        _log_course(cs, y, ck, 0.0, L, seed * 100 + i, i / max(1, n - 1), cap0=False, cap1=True, bark=0.25)
+        _grime(cs, y)
+        s.extend(cs)
     return s
 
 

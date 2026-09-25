@@ -17,6 +17,8 @@ var _leaf_mesh: MeshInstance3D
 
 func _ready() -> void:
 	super._ready()
+	if build:
+		build.has_own_use = true
 	_leaf = AnimatableBody3D.new()
 	_leaf.name = "Leaf"
 	_leaf.collision_layer = BuildPiece.LAYER_BUILDING

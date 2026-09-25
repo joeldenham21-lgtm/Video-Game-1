@@ -32,3 +32,7 @@ func collision_shapes() -> Array:
 	var b := BoxShape3D.new()
 	b.size = Vector3(2.6, 1.1, 0.7)
 	return [[b, Transform3D(Basis.IDENTITY, Vector3(0.0, 0.55, 0.12))]]
+
+
+func has_own_use() -> bool:
+	return false

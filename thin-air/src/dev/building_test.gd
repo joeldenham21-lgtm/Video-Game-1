@@ -28,10 +28,10 @@ var _fp := false
 const SHOTS := {
 	# pos, look (yaw, pitch), hours, fov
 	"exterior": [Vector3(-7.8, 1.75, 10.6), Vector2(-36.0, 2.0), 16.55, 62.0],
-	"interior": [Vector3(0.8, 1.55, -2.3), Vector2(175.0, -4.0), 22.4, 76.0],
+	"interior": [Vector3(0.35, 1.55, -2.4), Vector2(186.0, -3.0), 22.4, 76.0],
 	"stilts": [Vector3(-3.5, 1.5, -2.5), Vector2(-28.0, 10.0), 15.2, 60.0],
 	"frames": [Vector3(3.5, 1.7, 15.5), Vector2(8.0, -8.0), 12.5, 66.0],
-	"camp": [Vector3(-11.0, 2.6, 17.0), Vector2(-28.0, -8.0), 16.7, 66.0],
+	"camp": [Vector3(13.5, 1.9, 4.5), Vector2(38.0, -9.0), 16.7, 64.0],
 	"aerial": [Vector3(-16.0, 13.0, 18.0), Vector2(-40.0, -30.0), 15.8, 55.0],
 	"closeup": [Vector3(-4.4, 1.5, 5.6), Vector2(-30.0, 4.0), 16.4, 55.0],
 	"perf200": [Vector3(-22.0, 6.0, 24.0), Vector2(-40.0, -10.0), 13.0, 70.0],
@@ -368,7 +368,7 @@ func _build_camp(shot: String) -> void:
 	if torch and torch.has_method(&"set_lit"):
 		torch.set(&"always_simulate", true)
 		torch.call(&"set_lit", true, true)
-	var fire := place.call(&"stone_fire_pit", cabin.world_of(Vector3(0.6, 0.0, 6.4)), 0.0) as Node3D
+	var fire := place.call(&"stone_fire_pit", cabin.world_of(Vector3(-0.1, 0.0, 6.2)), 0.0) as Node3D
 	if fire and fire.has_method(&"add_fuel"):
 		fire.set(&"always_simulate", true)
 		fire.set(&"fuel_minutes", 180.0)
@@ -377,7 +377,7 @@ func _build_camp(shot: String) -> void:
 			fire.call(&"_set_state", 1)
 		fire.set(&"intensity", 1.0)
 	# the old camp east of the cabin: lean-to facing its fire, windbreak on the weather side, bough bed inside
-	place.call(&"lean_to", cabin.world_of(Vector3(9.2, 0.0, -1.5)), 90.0 + 12.0)
+	place.call(&"lean_to", cabin.world_of(Vector3(9.2, 0.0, -1.5)), -78.0)
 	var fire2 := place.call(&"campfire", cabin.world_of(Vector3(6.6, 0.0, -1.2)), 0.0) as Node3D
 	if fire2:
 		fire2.set(&"always_simulate", true)
@@ -385,7 +385,7 @@ func _build_camp(shot: String) -> void:
 		fire2.set(&"has_kindling", true)
 		fire2.call(&"_set_state", 1)
 		fire2.set(&"intensity", 1.0)
-	place.call(&"bough_bed", cabin.world_of(Vector3(9.4, 0.0, -1.6)), 90.0 + 12.0)
+	place.call(&"bough_bed", cabin.world_of(Vector3(9.5, 0.0, -1.5)), -78.0)
 	place.call(&"stone_windbreak", cabin.world_of(Vector3(8.6, 0.0, -4.4)), 12.0)
 	place.call(&"drying_rack", cabin.world_of(Vector3(4.2, 0.0, 5.2)), -35.0)
 	place.call(&"snow_melter", cabin.world_of(Vector3(1.7, 0.0, 6.9)), 20.0)

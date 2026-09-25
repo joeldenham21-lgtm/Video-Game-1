@@ -43,3 +43,7 @@ func collision_shapes() -> Array:
 	c.radius = 0.06
 	c.height = 0.7
 	return [[c, Transform3D(Basis.IDENTITY, Vector3(0.0, 0.0, 0.17))]]
+
+
+func has_own_use() -> bool:
+	return false

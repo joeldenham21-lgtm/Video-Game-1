@@ -30,6 +30,7 @@ var _touch: Control
 var _hammer_btn: Button
 var _selected: StringName = &""
 var _first_card: Button = null
+var _pad := false
 
 
 func _ready() -> void:
@@ -241,6 +242,14 @@ func set_selected(id: StringName) -> void:
 		_hint_title.text = BuildCatalog.display_name(id)
 
 
+func _input(event: InputEvent) -> void:
+	# remember the last device for the control hints
+	if event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) > 0.4):
+		_pad = true
+	elif event is InputEventKey or event is InputEventMouseButton:
+		_pad = false
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not picker_open:
 		return
@@ -335,8 +344,7 @@ func update_hint(p: Dictionary) -> void:
 func _keys_text() -> String:
 	if Settings.is_mobile():
 		return "Place a blueprint, then fill it with materials"
-	var pads := Input.get_connected_joypads()
-	if not pads.is_empty() and mode and mode.player and bool(mode.player.get(&"_pad_active")):
+	if _pad:
 		return "RT place   LB/RB rotate   LT exit   D-pad up menu"
 	return "LMB place   Q/R or wheel rotate   RMB exit   B menu"
 

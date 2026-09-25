@@ -21,6 +21,9 @@ var added: Dictionary = {}         ## StringName -> int
 var complete := false
 ## Node that owns this frame (grid piece or free object); refreshes visuals on progress.
 var owner_node: Node3D = null
+## The owner has its own use once built (door, bed, fire…): then a hammer only dismantles it while build
+## mode is open, so you can still open doors and feed fires with the hammer in hand.
+var has_own_use := false
 
 
 func setup(buildable_id: StringName, done: bool) -> void:
@@ -130,6 +133,16 @@ static func _inventory(player: Node) -> Inventory:
 	return ItemActions.inventory_of(player) if player else null
 
 
+## True when interacting with this (built) piece means taking it apart.
+func dismantle_mode(player: Node) -> bool:
+	if not holds_hammer(player):
+		return false
+	if not complete or not has_own_use:
+		return true
+	var root := BuildingRoot.instance
+	return root != null and root.build_mode != null and is_instance_valid(root.build_mode) and bool(root.build_mode.get(&"active"))
+
+
 static func holds_hammer(player: Node) -> bool:
 	if player == null or not player.has_method(&"get_active_item"):
 		return false
@@ -143,7 +156,7 @@ static func holds_hammer(player: Node) -> bool:
 ## Prompt if the frame/dismantle interaction applies, else "" (owner handles it).
 func override_prompt(player: Node) -> String:
 	var nm := BuildCatalog.display_name(id)
-	if holds_hammer(player):
+	if dismantle_mode(player):
 		return ("Dismantle %s" % nm) if complete else ("Cancel %s blueprint" % nm)
 	if complete:
 		return ""
@@ -155,12 +168,12 @@ func override_prompt(player: Node) -> String:
 
 
 func override_hold_time(player: Node) -> float:
-	return DISMANTLE_HOLD if holds_hammer(player) else 0.0
+	return DISMANTLE_HOLD if dismantle_mode(player) else 0.0
 
 
 ## Returns true if handled.
 func override_interact(player: Node) -> bool:
-	if holds_hammer(player):
+	if dismantle_mode(player):
 		BuildingRoot.dismantle(owner_node, player)
 		return true
 	if complete:

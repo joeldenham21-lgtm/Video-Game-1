@@ -357,6 +357,19 @@ func _build_mode() -> void:
 	var before := inv.count(&"log")
 	BuildingRoot.dismantle(fr, p)
 	check(inv.count(&"log") == before + 2, "cancelling a frame returns everything added")
+	# a door (own use) opens with the hammer in hand; it is only dismantled while build mode is open
+	var door: BuildPiece = null
+	for st in root.structures():
+		if st.get_piece(&"door", Vector3i(0, 0, 3)):
+			door = st.get_piece(&"door", Vector3i(0, 0, 3))
+	if door:
+		check(door.get_interact_prompt(p).ends_with("door") and door.get_interact_hold_time() == 0.0,
+			"hammer in hand: the door still opens (%s)" % door.get_interact_prompt(p))
+		root.build_mode = bm
+		bm.active = true
+		check(door.get_interact_prompt(p).begins_with("Dismantle"), "in build mode the hammer dismantles the door")
+		bm.active = false
+		root.build_mode = null
 	p.active = &""
 	bm.queue_free()
 	await get_tree().process_frame

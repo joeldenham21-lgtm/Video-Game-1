@@ -62,3 +62,7 @@ func collision_shapes() -> Array:
 
 func own_prompt(_player: Node) -> String:
 	return ""
+
+
+func has_own_use() -> bool:
+	return false

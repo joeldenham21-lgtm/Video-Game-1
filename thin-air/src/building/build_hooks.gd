@@ -13,6 +13,7 @@ static func attach(n: Node, id: StringName, done: bool) -> BuildComponent:
 		n.add_child(c)
 	c.setup(id, done)
 	c.owner_node = n as Node3D
+	c.has_own_use = true
 	if not c.progressed.is_connected(_on_progress.bind(n)):
 		c.progressed.connect(_on_progress.bind(n))
 	if not c.completed.is_connected(_on_completed.bind(n)):

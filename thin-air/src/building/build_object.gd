@@ -61,6 +61,7 @@ func _ensure_build(done: bool) -> void:
 		add_child(build)
 		build.setup(buildable_id, done)
 	build.owner_node = self
+	build.has_own_use = has_own_use()
 	build.progressed.connect(func(_f: float) -> void: _refresh_frame())
 	build.completed.connect(_completed)
 
@@ -159,6 +160,11 @@ func get_harvest_tool_type() -> StringName:
 func harvest_hit(_tool_id: StringName, _power: float, _pos: Vector3, _normal: Vector3, player: Node) -> void:
 	if build and BuildComponent.holds_hammer(player):
 		build.on_hammer_hit(player)
+
+
+## Whether the built object has a use of its own (see BuildComponent.has_own_use).
+func has_own_use() -> bool:
+	return true
 
 
 func own_prompt(_player: Node) -> String:
