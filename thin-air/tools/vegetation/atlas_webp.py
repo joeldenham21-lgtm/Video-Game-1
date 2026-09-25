@@ -21,9 +21,16 @@ def convert(name: str) -> None:
 	Image.open(png).save(webp, lossless=True, quality=100, method=4, exact=True)
 	# keep the import settings (2D array slices, compression) and the uid
 	imp_png = png + ".import"
+	old_uid = None
+	if os.path.exists(webp + ".import"):
+		for ln in open(webp + ".import"):
+			if ln.startswith("uid="):
+				old_uid = ln.strip()
 	if os.path.exists(imp_png):
 		lines = [ln for ln in open(imp_png).read().splitlines()
 			if not ln.startswith(("path", "source_file", "dest_files", "metadata", '"imported', '"vram', "}"))]
+		if old_uid and not any(ln.startswith("uid=") for ln in lines):
+			lines.insert(lines.index('type="CompressedTexture2DArray"') + 1, old_uid)
 		txt = "\n".join(lines)
 		while "\n\n\n" in txt:
 			txt = txt.replace("\n\n\n", "\n\n")

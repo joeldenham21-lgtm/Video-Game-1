@@ -345,6 +345,20 @@ func _test_colliders(veg: Node) -> void:
 	check(layers_ok, "trunks on layer 10, boulders on layer 1, shrubs interact-only (layer 5)")
 	var all_trees: int = veg.query(c, 2000.0, [Cat.TREE]).size()
 	check(n < all_trees / 4, "never a body per tree (%d active vs %d trees)" % [n, all_trees])
+	# contract surface of the proxies (what the player's interaction ray / melee cast sees)
+	var tree_proxy: VegProxy = null
+	var interact_proxy: VegProxy = null
+	for id in col._active:
+		var p3: VegProxy = col._active[id]
+		if p3.cat == Cat.TREE and tree_proxy == null:
+			tree_proxy = p3
+		if p3.is_in_group(&"interactable") and p3.cat == Cat.SHRUB and interact_proxy == null:
+			interact_proxy = p3
+	check(tree_proxy != null and tree_proxy.is_in_group(&"harvestable") and tree_proxy.get_harvest_tool_type() == &"axe"
+		and tree_proxy.has_method("harvest_hit"), "tree proxies are harvestable with an axe (CONTRACT harvest_hit)")
+	if interact_proxy:
+		check(interact_proxy.get_interact_prompt(null) != "" and interact_proxy.get_interact_hold_time() > 0.0,
+			"shrub proxies are interactables with a hold time")
 	# moving away releases bodies back to the pool
 	var c2 := c + Vector3(0.0, 0.0, -300.0)
 	col.refresh(c2)

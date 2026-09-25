@@ -450,6 +450,10 @@ class Tree:
 		ao = 0.3 + 0.7 * radial ** 1.15
 		ao *= 0.72 + 0.28 * (1.0 - min(max(t, 0.0), 1.0))    # lower crown receives less skylight
 		ao *= 0.8 + 0.2 * min(1.0, max(z, 0.0) / 2.0)        # near-ground occlusion
+		# the leader and the top whorls stand in open sky (the radial term would make the spire black)
+		top = self.top_z if self.top_z else H
+		exposed = float(np.clip((z - (top - 0.12 * H)) / max(0.12 * H, 0.3), 0.0, 1.0))
+		ao = max(ao, ao + (0.95 - ao) * exposed)
 		return float(np.clip(ao, 0.18, 1.0))
 
 	def crown_normal(self, p: np.ndarray) -> np.ndarray:

@@ -10,7 +10,9 @@ extends Node3D
 ##                   a lake, forested slopes, an escarpment and a treeline bench, rendered as a terrain mesh
 ##                   with collision [--density=1.0] [--flat = the flat TerrainData stub instead]
 ##   --mode=fell     forest + chops the tree nearest to the camera (--hits=N, default: fell it) at frame
-##                   --chop_at (default 20); the tree falls to the camera's right (--fall=left|right|away)
+##                   --chop_at (default 20); the tree falls to the camera's right (--fall=left|right|away);
+##                   --frame_tree=dist[,height]: first move the camera to that distance from the nearest mature
+##                   conifer (keeping the --cam bearing) and look at its trunk
 ## Camera: --cam=x,y,z (y may be "g" = ground + --height) --look=yaw,pitch (yaw 0 = north/-Z) --fov=deg
 ## Light/weather: --hours=H (sun from time of day) or --sun=elev,az ; --wind=0..1.5 ; --snow=0..1 ; --wet=0..1
 ## --preset=P (Settings preset) --perf (prints PERF line at --perf_at frame) --fog=density --exposure=f
@@ -81,6 +83,8 @@ func _process(_d: float) -> void:
 	if cam:
 		lib.set_view_origin(cam.global_position)
 		RenderingServer.global_shader_parameter_set(&"player_position", cam.global_position)
+	if args.get("mode", "") == "fell" and args.has("frame_tree") and frame == 3:
+		_frame_tree()
 	if args.get("mode", "") == "fell" and frame == int(args.get("chop_at", "20")):
 		_chop_nearest()
 	if vegetation and frame == 2:
@@ -433,6 +437,31 @@ void fragment() {
 """
 
 
+func _frame_tree() -> void:
+	var fr := String(args.get("frame_tree", "")).split(",")
+	var dist := float(fr[0])
+	var h := float(fr[1]) if fr.size() > 1 else 1.6
+	var cp := cam.global_position
+	var best := {}
+	var bd := INF
+	for e in vegetation.query(cp, 80.0, [VegScatter.Cat.TREE]):
+		var sp := String(lib.info(e["kind"]).get("species", ""))
+		if sp == "snag" or sp == "whitebark":
+			continue
+		var d := Vector2(e["pos"].x - cp.x, e["pos"].z - cp.z).length()
+		if d < bd:
+			bd = d
+			best = e
+	if best.is_empty():
+		return
+	var tp: Vector3 = best["pos"]
+	var away := Vector3(cp.x - tp.x, 0.0, cp.z - tp.z).normalized()
+	var p := tp + away * dist
+	p.y = _ground_at(p.x, p.z) + h
+	cam.global_position = p
+	cam.look_at(tp + Vector3.UP * 1.1, Vector3.UP)
+
+
 func _chop_nearest() -> void:
 	if vegetation == null or vegetation.get("harvest") == null:
 		return
@@ -445,9 +474,9 @@ func _chop_nearest() -> void:
 		if sp == "snag":
 			continue
 		var d := Vector2(e["pos"].x - cp.x, e["pos"].z - cp.z).length()
-		# in front of the camera, 8-30 m away
+		# in front of the camera (1.5-30 m away)
 		var to: Vector3 = (e["pos"] - cp).normalized()
-		if d < 8.0 or d > 30.0 or to.dot(-cam.global_transform.basis.z) < 0.8:
+		if d < 1.5 or d > 30.0 or Vector2(to.x, to.z).normalized().dot(Vector2(-cam.global_transform.basis.z.x, -cam.global_transform.basis.z.z).normalized()) < 0.8:
 			continue
 		if d < bd:
 			bd = d
