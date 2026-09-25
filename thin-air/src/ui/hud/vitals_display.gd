@@ -31,6 +31,7 @@ var _prev := {}
 var _hide_t := {}
 var _time := 0.0
 var _any_visible := false
+var _primed := false
 
 
 func _ready() -> void:
@@ -53,12 +54,13 @@ func sample(v: Object, alt: float, dt: float) -> void:
 	max_health = float(v.get("max_health")) if v.get("max_health") != null else 100.0
 	for m in METERS:
 		var val := float(v.get(m)) if v.get(m) != null else 100.0
-		var prev := float(_prev[m])
+		var prev := float(_prev[m]) if _primed else val
 		if dt > 0.0:
 			var r := (val - prev) / dt
 			_rate[m] = lerpf(float(_rate[m]), r, clampf(dt * 1.5, 0.0, 1.0))
 		_prev[m] = val
 		values[m] = val
+	_primed = true
 	exhausted = v.has_method("has_effect") and bool(v.call("has_effect", &"exhausted"))
 
 

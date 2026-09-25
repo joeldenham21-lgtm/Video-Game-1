@@ -256,17 +256,17 @@ static func build_theme() -> Theme:
 	t.set_stylebox("pressed", "GhostButton", _btn(Color(1, 1, 1, 0.1), Color(0, 0, 0, 0)))
 	t.set_stylebox("disabled", "GhostButton", _btn(Color(0, 0, 0, 0), Color(0, 0, 0, 0)))
 	# menu entries
-	t.set_type_variation("MenuButton", "Button")
+	t.set_type_variation("MenuEntryButton", "Button")
 	for st in ["normal", "hover", "pressed", "disabled", "hover_pressed"]:
-		t.set_stylebox(st, "MenuButton", _menu_btn(st))
-	t.set_stylebox("focus", "MenuButton", _menu_btn("focus"))
-	t.set_font("font", "MenuButton", font("Regular"))
-	t.set_font_size("font_size", "MenuButton", 30)
-	t.set_color("font_color", "MenuButton", Color(TEXT.r, TEXT.g, TEXT.b, 0.82))
-	t.set_color("font_hover_color", "MenuButton", TEXT)
-	t.set_color("font_focus_color", "MenuButton", TEXT)
-	t.set_color("font_pressed_color", "MenuButton", ACCENT)
-	t.set_color("font_disabled_color", "MenuButton", Color(TEXT.r, TEXT.g, TEXT.b, 0.3))
+		t.set_stylebox(st, "MenuEntryButton", _menu_btn(st))
+	t.set_stylebox("focus", "MenuEntryButton", _menu_btn("focus"))
+	t.set_font("font", "MenuEntryButton", font("Regular"))
+	t.set_font_size("font_size", "MenuEntryButton", 30)
+	t.set_color("font_color", "MenuEntryButton", Color(TEXT.r, TEXT.g, TEXT.b, 0.82))
+	t.set_color("font_hover_color", "MenuEntryButton", TEXT)
+	t.set_color("font_focus_color", "MenuEntryButton", TEXT)
+	t.set_color("font_pressed_color", "MenuEntryButton", ACCENT)
+	t.set_color("font_disabled_color", "MenuEntryButton", Color(TEXT.r, TEXT.g, TEXT.b, 0.3))
 	# tabs (text + amber underline drawn by the owner)
 	t.set_type_variation("TabButton", "Button")
 	for st in ["normal", "hover", "pressed", "disabled", "hover_pressed"]:
@@ -487,7 +487,7 @@ static func button(text: String, variation := "", icon_name := "") -> Button:
 
 
 static func menu_button(text: String) -> Button:
-	var b := button(text, "MenuButton")
+	var b := button(text, "MenuEntryButton")
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	return b
 

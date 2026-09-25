@@ -103,7 +103,7 @@ static func glyph(action: StringName, dev: StringName = &"") -> Dictionary:
 			return {"kind": "key", "text": key_name(e as InputEventKey), "icon": "", "color": Color(0, 0, 0, 0), "index": -1}
 		if e is InputEventMouseButton:
 			var mb := (e as InputEventMouseButton).button_index
-			var t := {MOUSE_BUTTON_LEFT: "LMB", MOUSE_BUTTON_RIGHT: "RMB", MOUSE_BUTTON_MIDDLE: "MMB",
+			var t: String = {MOUSE_BUTTON_LEFT: "LMB", MOUSE_BUTTON_RIGHT: "RMB", MOUSE_BUTTON_MIDDLE: "MMB",
 				MOUSE_BUTTON_WHEEL_UP: "Wheel", MOUSE_BUTTON_WHEEL_DOWN: "Wheel"}.get(mb, "Mouse")
 			return {"kind": "mouse", "text": t, "icon": "", "color": Color(0, 0, 0, 0), "index": mb}
 	return {"kind": "none", "text": "—", "icon": "", "color": UITheme.TEXT, "index": -1}
