@@ -46,7 +46,8 @@ func _refresh_door_visual() -> void:
 	var done := is_complete()
 	for i in _leaf_mesh.mesh.get_surface_count():
 		if done:
-			_leaf_mesh.set_surface_override_material(i, null)
+			if _leaf_mesh.get_surface_override_material(i) != null:
+				_leaf_mesh.set_surface_override_material(i, null)
 		else:
 			var role := BuildObject._role_of(_leaf_mesh.mesh.surface_get_material(i))
 			_leaf_mesh.set_surface_override_material(i, BuildMaterials.frame_material(role, build.fraction()))

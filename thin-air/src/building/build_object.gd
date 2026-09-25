@@ -112,7 +112,8 @@ static func _apply_frame(n: Node, f: float, done: bool) -> void:
 		if mi.mesh:
 			for i in mi.mesh.get_surface_count():
 				if done:
-					mi.set_surface_override_material(i, null)
+					if mi.get_surface_override_material(i) != null:
+						mi.set_surface_override_material(i, null)
 				else:
 					var role := _role_of(mi.mesh.surface_get_material(i))
 					mi.set_surface_override_material(i, BuildMaterials.frame_material(role, f))

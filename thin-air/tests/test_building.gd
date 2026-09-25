@@ -16,7 +16,44 @@ func run() -> void:
 	await _setup()
 	await _cabin()
 	await _save_load()
+	await _build_mode()
+	await _camp_pieces()
+	await _sleep()
+	await _log_carry()
+	await _batching()
 	await _teardown()
+
+
+## Minimal stand-in for the Player (CONTRACT §4 subset the building code uses).
+class StubPlayer extends CharacterBody3D:
+	var inventory := Inventory.new(24, 200.0)
+	var vitals: Vitals
+	var active := &""
+	var speed_cap := INF
+	var ground_speed := 0.0
+	var cam: Camera3D
+
+	func _init() -> void:
+		collision_layer = 1 << 1
+		vitals = Vitals.new()
+		vitals.name = "Vitals"
+		vitals.auto_simulate = false
+		add_child(vitals)
+		cam = Camera3D.new()
+		cam.position = Vector3(0, 1.7, 0)
+		add_child(cam)
+
+	func get_active_item() -> StringName:
+		return active
+
+	func get_camera() -> Camera3D:
+		return cam
+
+	func is_input_enabled() -> bool:
+		return false
+
+	func is_dead() -> bool:
+		return false
 
 
 # =============================================================================================== pure maths
@@ -222,7 +259,268 @@ func _save_load() -> void:
 	check(s2.rooms.size() >= 1, "rooms rebuilt after load")
 
 
+func _stub_player(at: Vector3) -> StubPlayer:
+	if player and is_instance_valid(player):
+		player.queue_free()
+	var p := StubPlayer.new()
+	add_child(p)
+	p.global_position = at
+	player = p
+	return p
+
+
+# =============================================================================================== build mode
+
+func _build_mode() -> void:
+	var p := _stub_player(Vector3(30.0, GROUND_Y, 30.0))
+	Game.player = p
+	var bm := BuildMode.new()
+	bm.player = p
+	add_child(bm)
+	await get_tree().physics_frame
+	var eye := Vector3(30.0, GROUND_Y + 1.7, 30.0)
+	var hit := {"position": Vector3(30.0, GROUND_Y, 25.0), "normal": Vector3.UP, "collider": ground, "eye": eye, "yaw": 0.0}
+	var r := bm.compute(&"log_foundation", hit)
+	check(not bool(r["valid"]) and String(r["reason"]) == "Needs a hammer", "log pieces need a hammer (%s)" % r["reason"])
+	p.inventory.add(&"hammer", 1)
+	r = bm.compute(&"log_foundation", hit)
+	check(bool(r["valid"]), "foundation on flat ground valid (%s)" % r["reason"])
+	check(absf((r["xform"] as Transform3D).origin.y - (GROUND_Y + BuildGrid.MIN_CLEARANCE)) < 0.01, "new foundation levelled 0.5 m above the ground")
+	check(r.has("new_xf"), "starts a new structure")
+	var far := hit.duplicate()
+	far["position"] = Vector3(30.0, GROUND_Y, 12.0)
+	check(String(bm.compute(&"log_foundation", far)["reason"]) == "Too far", "max build distance")
+	var piece := bm.place_from(r) as BuildPiece
+	check(piece != null and not piece.is_complete(), "placing creates a blueprint frame")
+	var s := piece.structure
+	await get_tree().physics_frame
+	# snapping to the neighbour cell when aiming at the existing deck's edge
+	var h2 := {"position": s.world_of(Vector3(0.9, 0.0, 0.1)), "normal": Vector3.UP, "collider": piece, "eye": eye, "yaw": 0.0}
+	var r2 := bm.compute(&"log_foundation", h2)
+	check(bool(r2["valid"]) and r2["slot"] == Vector3i(2, 0, 0), "second foundation snaps to the next cell (%s %s)" % [r2.get("slot"), r2["reason"]])
+	var r3 := bm.compute(&"log_wall", h2)
+	check(r3["slot"] == Vector3i(1, 0, 0) and bool(r3["valid"]), "wall snaps to the nearest cell edge (%s %s)" % [r3.get("slot"), r3["reason"]])
+	var r4 := bm.compute(&"log_roof", {"position": s.world_of(Vector3(0.1, 2.5, 0.9)), "normal": Vector3.UP, "collider": piece, "eye": eye, "yaw": 0.0})
+	check(not bool(r4["valid"]) and String(r4["reason"]) == "Needs support", "roof with no walls refused")
+	# free placement: slope + overlap
+	var r5 := bm.compute(&"campfire", {"position": Vector3(33.0, GROUND_Y, 27.0), "normal": Vector3.UP, "collider": ground, "eye": eye, "yaw": 0.0})
+	check(bool(r5["valid"]), "campfire on flat ground (%s)" % r5["reason"])
+	var steep := Vector3(0.0, cos(deg_to_rad(38.0)), sin(deg_to_rad(38.0)))
+	var r6 := bm.compute(&"campfire", {"position": Vector3(33.0, GROUND_Y, 27.0), "normal": steep, "collider": ground, "eye": eye, "yaw": 0.0})
+	check(String(r6["reason"]) == "Too steep", "free piece refused on a 38° slope")
+	piece.build.finish(true)
+	s.flush_now()
+	await get_tree().physics_frame
+	var r7 := bm.compute(&"stone_windbreak", {"position": s.world_of(Vector3(0.0, -0.4, 0.0)), "normal": Vector3.UP, "collider": ground, "eye": eye, "yaw": 0.0})
+	check(not bool(r7["valid"]), "free piece overlapping a foundation refused (%s)" % r7["reason"])
+	# explorer difficulty builds at once when you carry the materials
+	var prev_diff := Game.difficulty
+	Game.difficulty = &"explorer"
+	p.inventory.add(&"log", 4)
+	p.inventory.add(&"stone", 4)
+	var inst := bm.place_from(bm.compute(&"log_foundation", h2)) as BuildPiece
+	check(inst != null and inst.is_complete() and p.inventory.count(&"log") == 0, "explorer: built instantly, cost deducted")
+	Game.difficulty = prev_diff
+	# dismantle: 50% refund of a built piece, full refund of a frame
+	var inv := p.inventory
+	var logs0 := inv.count(&"log")
+	p.active = &"hammer"
+	check(inst.get_interact_hold_time() > 0.5 and inst.get_interact_prompt(p).begins_with("Dismantle"), "hammer + hold interact dismantles")
+	BuildingRoot.dismantle(inst, p)
+	check(inv.count(&"log") == logs0 + 2 and inv.count(&"stone") == 2, "dismantling refunds half (%d logs, %d stones)" % [inv.count(&"log") - logs0, inv.count(&"stone")])
+	var fr := bm.place_from(bm.compute(&"log_wall", h2)) as BuildPiece
+	p.active = &""
+	inv.add(&"log", 3)
+	fr.interact(p)
+	fr.interact(p)
+	check(fr.build.added_units() == 2 and not fr.is_complete(), "interact adds materials to a frame one by one")
+	p.active = &"hammer"
+	var before := inv.count(&"log")
+	BuildingRoot.dismantle(fr, p)
+	check(inv.count(&"log") == before + 2, "cancelling a frame returns everything added")
+	p.active = &""
+	bm.queue_free()
+	await get_tree().process_frame
+
+
+# =============================================================================================== camp pieces
+
+func _camp_pieces() -> void:
+	var p := _stub_player(Vector3(-30.0, GROUND_Y, -30.0))
+	Game.player = p
+	var at := Vector3(-30.0, GROUND_Y, -33.0)
+	Climate.set_weather(&"clear", 0.0)
+	Climate.locked = true
+	# drying rack: meat -> jerky, hide -> cured hide, over game time
+	var rack := root.place_free(&"drying_rack", Transform3D(Basis.IDENTITY, at), true) as BuildDryingRack
+	check(rack != null and rack.is_complete(), "drying rack placed")
+	p.inventory.add(&"meat_raw", 2)
+	p.inventory.add(&"hide_raw", 1)
+	rack.advance()
+	check(rack.own_prompt(p).begins_with("Hang"), "prompt to hang raw meat")
+	rack.own_interact(p)
+	rack.own_interact(p)
+	rack.own_interact(p)
+	check(rack.meat.size() == 2 and not rack.hide.is_empty() and p.inventory.count(&"meat_raw") == 0, "two strips and a hide hung")
+	Climate.advance_time(6.0)
+	rack.advance()
+	check(rack.ready_count() == 0, "not dry after 6 h")
+	Climate.advance_time(6.0)
+	rack.advance()
+	check(rack.ready_count() == 2, "jerky ready after 12 h (%d)" % rack.ready_count())
+	rack.own_interact(p)
+	check(p.inventory.count(&"meat_dried") == 2 and rack.meat.is_empty(), "jerky collected")
+	Climate.advance_time(22.0)
+	rack.advance()
+	rack.collect(p.inventory)
+	check(p.inventory.count(&"hide_cured") == 1, "hide cured after ~30 h")
+	# snow melter beside a lit fire
+	var melter := root.place_free(&"snow_melter", Transform3D(Basis.IDENTITY, at + Vector3(4.0, 0.0, 0.0)), true) as BuildSnowMelter
+	p.inventory.add(&"snow", 7)
+	p.inventory.add(&"bottle_empty", 3)
+	melter.add_snow(p.inventory)
+	check(melter.snow == 7, "snow packed in (%d)" % melter.snow)
+	Climate.advance_time(1.0)
+	melter.advance()
+	check(melter.water == 0, "no fire: nothing melts")
+	var fire := root.place_free(&"campfire", Transform3D(Basis.IDENTITY, at + Vector3(5.3, 0.0, 0.0)), true) as Node3D
+	fire.set(&"always_simulate", true)
+	fire.set(&"fuel_minutes", 240.0)
+	fire.call(&"_set_state", 1)
+	check(fire.call(&"is_heat_active"), "fire lit beside the melter")
+	melter.advance()
+	Climate.advance_time(1.0)
+	melter.advance()
+	check(melter.water == 2 and melter.snow == 1, "an hour by the fire: 2 bottles' worth (%d water, %d snow)" % [melter.water, melter.snow])
+	melter.own_interact(p)
+	check(p.inventory.count(&"water_boiled") == 2 and p.inventory.count(&"bottle_empty") == 1, "bottles filled with boiled water")
+	# torch stand: light, burn down
+	var torch := root.place_free(&"torch_stand", Transform3D(Basis.IDENTITY, at + Vector3(-3.0, 0.0, 0.0)), true) as BuildTorchStand
+	torch.set_lit(true, true)
+	check(torch.is_heat_active() and torch.is_in_group(&"heat_source"), "torch stand lit = heat source")
+	torch.always_simulate = true
+	torch._process(0.0)
+	Climate.advance_time(5.0)
+	torch._process(0.016)
+	check(not torch.lit and torch.minutes_left <= 0.0, "torch stand burns out after its fuel (%.0f min left)" % torch.minutes_left)
+	# lean-to: a ~0.5 shelter; stone windbreak ~0.3
+	var lean := root.place_free(&"lean_to", Transform3D(Basis.IDENTITY, at + Vector3(0.0, 0.0, -8.0)), true) as BuildLeanTo
+	await get_tree().process_frame
+	Climate.refresh_sources()
+	var sh := Climate.get_shelter_at(lean.global_position + Vector3(0.0, 1.0, -0.2))
+	check(sh > 0.4 and sh < 0.6, "lean-to shelter ≈ 0.5 (%.2f)" % sh)
+	# a frame isn't functional
+	var frame := root.place_free(&"bough_bed", Transform3D(Basis.IDENTITY, at + Vector3(0.0, 0.0, 4.0)), false) as BuildBed
+	check(frame.get_interact_prompt(p).begins_with("Bough Bed needs") or frame.get_interact_prompt(p).begins_with("Add"), "a bed frame asks for materials (%s)" % frame.get_interact_prompt(p))
+	p.inventory.add(&"stick", 14)
+	p.inventory.add(&"rope", 1)
+	frame.build.add_all(p.inventory)
+	check(frame.is_complete() and frame.get_interact_prompt(p) == "Sleep", "finished bed offers sleep (%s)" % frame.get_interact_prompt(p))
+
+
+# =============================================================================================== sleep
+
+func _sleep() -> void:
+	var p := _stub_player(Vector3(-30.0, GROUND_Y, -29.0))
+	var v := p.vitals
+	v.food = 80.0
+	v.water = 80.0
+	v.warmth = 90.0
+	v.env_felt_temp = 12.0
+	check(BuildSleep.sleep_problem(p, p.global_position) == "", "may sleep when warm and safe")
+	var wolf := Node3D.new()
+	wolf.add_to_group(&"creature")
+	wolf.set_meta(&"x", 1)
+	wolf.set(&"name", "Wolf")
+	var ws := GDScript.new()
+	ws.source_code = "extends Node3D\nvar species := &\"wolf\"\n"
+	ws.reload()
+	wolf.set_script(ws)
+	add_child(wolf)
+	wolf.global_position = p.global_position + Vector3(12.0, 0.0, 0.0)
+	check(BuildSleep.sleep_problem(p, p.global_position).contains("danger"), "no sleep with a wolf 12 m away")
+	wolf.global_position = p.global_position + Vector3(120.0, 0.0, 0.0)
+	check(BuildSleep.sleep_problem(p, p.global_position) == "", "wolf far away: fine")
+	v.warmth = 12.0
+	check(BuildSleep.sleep_problem(p, p.global_position).begins_with("Too cold"), "no sleep while freezing")
+	v.warmth = 90.0
+	var started := [0.0]
+	var ended := [false]
+	var on_start := func(h: float) -> void: started[0] = h
+	var on_end := func() -> void: ended[0] = true
+	Events.sleep_started.connect(on_start)
+	Events.sleep_ended.connect(on_end)
+	var t0 := float(Climate.day) * 24.0 + Climate.hours
+	var res := BuildSleep.sleep_now(p, 8.0, 1.0, false)
+	var t1 := float(Climate.day) * 24.0 + Climate.hours
+	check(is_equal_approx(started[0], 8.0) and ended[0], "sleep_started(8) / sleep_ended emitted")
+	check(absf(t1 - t0 - 8.0) < 0.01, "the clock advanced 8 h (%.2f)" % (t1 - t0))
+	check(float(res["food"]) < -3.0 and float(res["water"]) < -5.0, "food and water drain while asleep (%.1f / %.1f)" % [res["food"], res["water"]])
+	check(float(res["food"]) > -20.0, "sleeping burns less than being awake")
+	check(not v.env_sleeping, "woke up")
+	Events.sleep_started.disconnect(on_start)
+	Events.sleep_ended.disconnect(on_end)
+	wolf.queue_free()
+
+
+# =============================================================================================== log carrying
+
+func _log_carry() -> void:
+	var p := _stub_player(Vector3(40.0, GROUND_Y, -40.0))
+	var lc := LogCarry.new()
+	lc.player = p
+	p.add_child(lc)
+	p.inventory.add(&"log", 1)
+	await get_tree().process_frame
+	check(lc.count == 1 and is_equal_approx(p.speed_cap, LogCarry.CAP_ONE), "one log: capped at a jog (%.1f)" % p.speed_cap)
+	p.inventory.add(&"log", 2)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(p.inventory.count(&"log") == 2, "a third log doesn't fit on the shoulder (%d)" % p.inventory.count(&"log"))
+	check(is_equal_approx(p.speed_cap, LogCarry.CAP_TWO), "two logs: slowed further (%.1f)" % p.speed_cap)
+	var pickup := ItemPickup.new()
+	pickup.item_id = &"log"
+	check(lc.filter_prompt(pickup, "Pick up Spruce Log").begins_with("Your shoulder is full") and lc.blocks(pickup), "prompt refuses a third log")
+	pickup.free()
+	p.inventory.remove(&"log", 2)
+	await get_tree().process_frame
+	check(is_inf(p.speed_cap), "no logs: no cap")
+
+
+# =============================================================================================== batching
+
+func _batching() -> void:
+	# 4 two-storey cabins ≈ 240 pieces: a few dozen MultiMeshes in total
+	var total := 0
+	var mms := 0
+	for c in 4:
+		var s := root.new_structure(Transform3D(Basis.IDENTITY, Vector3(100.0 + c * 14.0, GROUND_Y + 0.5, 100.0)))
+		for i in [-2, 0, 2]:
+			for k in [-2, 0, 2]:
+				s.add_piece(&"log_foundation", Vector3i(i, 0, k), {}, true)
+				s.add_piece(&"log_floor", Vector3i(i, 1, k), {}, true)
+		for lvl in 2:
+			for i in [-2, 0, 2]:
+				s.add_piece(&"log_wall", Vector3i(i, lvl, 3), {}, true)
+				s.add_piece(&"log_wall", Vector3i(i, lvl, -3), {}, true)
+				s.add_piece(&"log_window_wall", Vector3i(3, lvl, i), {}, true)
+				s.add_piece(&"log_wall", Vector3i(-3, lvl, i), {}, true)
+		for i in [-2, 0, 2]:
+			s.add_piece(&"log_roof", Vector3i(i, 1, -2), {"dir": 1, "tier": 0, "shape": "slope"}, true)
+			s.add_piece(&"log_roof", Vector3i(i, 1, 2), {"dir": 3, "tier": 0, "shape": "slope"}, true)
+			s.add_piece(&"log_roof", Vector3i(i, 1, 0), {"dir": 1, "tier": 1, "shape": "peak"}, true)
+		s.flush_now()
+		total += s.piece_count()
+		mms += s.multimesh_count()
+	check(total >= 200, "%d pieces placed" % total)
+	check(mms <= 4 * 26, "%d pieces drawn by %d MultiMeshes (≤ 26 per cabin)" % [total, mms])
+
+
 func _teardown() -> void:
+	Climate.locked = false
+	Game.player = null
+	if player and is_instance_valid(player):
+		player.queue_free()
 	root.queue_free()
 	ground.queue_free()
 	await get_tree().process_frame

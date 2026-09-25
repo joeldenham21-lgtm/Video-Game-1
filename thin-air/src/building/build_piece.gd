@@ -189,7 +189,6 @@ func refresh_visual() -> void:
 				if src:
 					role = "planks" if src.resource_name == "building_planks" else ("log" if src.resource_name == "building_log" else src.resource_name)
 				mi.set_surface_override_material(i, BuildMaterials.frame_material(role, build.fraction()))
-			mi.set_instance_shader_parameter(&"exposure", 0.0)
 			add_child(mi)
 			_frame_meshes.append(mi)
 	var f := build.fraction()

@@ -52,7 +52,7 @@ func _process(_delta: float) -> void:
 		return
 	if _ui.picker_open:
 		return
-	var can := player.has_method(&"is_input_enabled") and player.call(&"is_input_enabled")
+	var can: bool = player.has_method(&"is_input_enabled") and bool(player.call(&"is_input_enabled"))
 	if not can:
 		if active and Game.state == Game.State.DEAD:
 			exit()
@@ -266,7 +266,7 @@ func _compute_deck(id: StringName, hit: Dictionary, out: Dictionary) -> void:
 func _ground_samples(xf: Transform3D, cell: Vector3i) -> PackedFloat32Array:
 	var out := PackedFloat32Array()
 	var c := BuildGrid.slot_position(Vector3i(cell.x, 0, cell.z))
-	for o in [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(-1, 0, 1), Vector3(1, 0, 1), Vector3.ZERO]:
+	for o: Vector3 in [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(-1, 0, 1), Vector3(1, 0, 1), Vector3.ZERO]:
 		var w := xf * (c + o * 0.95)
 		out.append(BuildingRoot.ground_height(w.x, w.z, xf.origin.y + 2.0))
 	return out
@@ -429,7 +429,7 @@ func _compute_free(id: StringName, hit: Dictionary, out: Dictionary) -> void:
 		# sit on the lowest ground under the footprint so nothing floats
 		var b := Basis(Vector3.UP, yaw)
 		var lo := INF
-		for o in [Vector3(-0.5, 0, -0.5), Vector3(0.5, 0, -0.5), Vector3(-0.5, 0, 0.5), Vector3(0.5, 0, 0.5)]:
+		for o: Vector3 in [Vector3(-0.5, 0, -0.5), Vector3(0.5, 0, -0.5), Vector3(-0.5, 0, 0.5), Vector3(0.5, 0, 0.5)]:
 			var w := pos + b * (o * Vector3(sz.x, 0.0, sz.z) * 0.9)
 			lo = minf(lo, BuildingRoot.ground_height(w.x, w.z, pos.y + 1.0))
 		if is_finite(lo):
