@@ -7,7 +7,8 @@ extends Node
 ## Options: --pos=x,y,z (y may be "g" = ground+1.7)  --poi=<id>  --look=yaw,pitch (deg, yaw 0 = north/-Z,
 ## 90 = west)  --hours=H  --weather=W  --preset=P  --fov=F  --player  --perf  --perf_at=N  --height=H (above ground)
 ## With --player (the real Player, first-person view; --pos/--look place it):  --campfire=D (a lit campfire D m
-## ahead, a little to the right)  --equip=<item id> (in hand)  --inventory=<frame> (open the inventory screen then)
+## ahead, a little to the right)  --equip=<item id> (in hand, or worn)  --give=id,id,… (into the pack; "id*n" for n)
+## --inventory=<frame>[,inventory|equipment|crafting] (open the inventory screen on that tab at that frame)
 
 var args := {}
 var cam: Camera3D
@@ -84,11 +85,17 @@ func _setup_player() -> void:
 		var parent: Node = ItemsRoot.instance if ItemsRoot.instance else Game.world
 		parent.add_child(fire)
 		fire.global_position = at
+	if args.has("give"):
+		for g in String(args["give"]).split(",", false):
+			var parts := g.split("*")
+			if ItemDB.has_item(StringName(parts[0])):
+				p.inventory.add(StringName(parts[0]), int(parts[1]) if parts.size() > 1 else 1)
 	if args.has("equip"):
-		var id := StringName(args["equip"])
-		if ItemDB.has_item(id):
-			p.inventory.add(id, 1)
-			p.equip(id)
+		for e in String(args["equip"]).split(",", false):
+			var id := StringName(e)
+			if ItemDB.has_item(id):
+				p.inventory.add(id, 1)
+				p.equip(id)
 
 
 func _process(_d: float) -> void:
@@ -98,8 +105,11 @@ func _process(_d: float) -> void:
 		var sky := get_tree().get_first_node_in_group(&"sky")
 		if sky and sky.has_method(&"snap"):
 			sky.call(&"snap")
-	if args.has("inventory") and frame == int(args["inventory"]) and InventoryScreen.get_instance():
-		InventoryScreen.get_instance().open(InventoryScreen.Tab.INVENTORY)
+	if args.has("inventory") and frame == int(String(args["inventory"]).get_slice(",", 0)) and InventoryScreen.get_instance():
+		var tab := String(args["inventory"]).get_slice(",", 1) if String(args["inventory"]).contains(",") else "inventory"
+		var t: int = {"inventory": InventoryScreen.Tab.INVENTORY, "equipment": InventoryScreen.Tab.EQUIPMENT,
+			"crafting": InventoryScreen.Tab.CRAFTING}.get(tab, InventoryScreen.Tab.INVENTORY)
+		InventoryScreen.get_instance().open(t)
 	if cam:
 		RenderingServer.global_shader_parameter_set(&"player_position", cam.global_position)
 	if args.has("perf") and frame == perf_at:
