@@ -8,6 +8,12 @@ render_mode cull_back, depth_draw_opaque, world_vertex_coords;
 uniform sampler2D height_tex : filter_nearest;
 uniform vec4 hparams = vec4(-1536.0, -1536.0, 1.5, 2049.0);   // origin x, origin z, cell (m), size (texels)
 uniform float normal_step = 8.0;                               // finite-difference step for normals (m)
+uniform bool packed_height = false;                            // RG8 16-bit heights (vista stand-in range)
+uniform vec2 hrange = vec2(1200.0, 3600.0);
+uniform bool has_normal_tex = false;                           // per-pixel world normals (RGB = n * 0.5 + 0.5)
+uniform sampler2D normal_tex : filter_linear_mipmap, hint_default_white;
+uniform vec4 nparams = vec4(-1536.0, -1536.0, 3072.0, 0.0);   // normal/mask map origin x, z, size (m)
+uniform int mask_layout = 0;                                   // 0 = TerrainData (snow, rock, grass, forest), 1 = vista (snow, rock, scree, forest)
 uniform vec4 hole = vec4(0.0);                                 // centre x, centre z, half size, sink depth (hide under a finer mesh)
 uniform bool has_masks = false;
 uniform sampler2D mask_tex : filter_linear_mipmap, hint_default_black;    // R snow, G rock, B grass, A forest
@@ -31,15 +37,23 @@ uniform sampler2D ice_albedo : source_color, filter_linear_mipmap_anisotropic, r
 varying vec3 wpos;
 varying vec3 wnrm;
 
+float h_texel(ivec2 i) {
+	vec4 v = texelFetch(height_tex, i, 0);
+	if (packed_height) {
+		return hrange.x + (v.r * 65280.0 + v.g * 255.0) / 65535.0 * (hrange.y - hrange.x);
+	}
+	return v.r;
+}
+
 float h_at(vec2 xz) {
 	vec2 t = (xz - hparams.xy) / hparams.z;
 	t = clamp(t, vec2(0.0), vec2(hparams.w - 1.001));
 	ivec2 i = ivec2(floor(t));
 	vec2 f = t - vec2(i);
-	float a = texelFetch(height_tex, i, 0).r;
-	float b = texelFetch(height_tex, i + ivec2(1, 0), 0).r;
-	float c = texelFetch(height_tex, i + ivec2(0, 1), 0).r;
-	float d = texelFetch(height_tex, i + ivec2(1, 1), 0).r;
+	float a = h_texel(i);
+	float b = h_texel(i + ivec2(1, 0));
+	float c = h_texel(i + ivec2(0, 1));
+	float d = h_texel(i + ivec2(1, 1));
 	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
@@ -89,6 +103,12 @@ vec3 tri(sampler2D tex, vec3 p, vec3 bw, float scale) {
 
 void fragment() {
 	vec3 n = normalize(wnrm);
+	if (has_normal_tex) {
+		vec2 nuv = (wpos.xz - nparams.xy) / nparams.z;
+		if (nuv.x > 0.0 && nuv.x < 1.0 && nuv.y > 0.0 && nuv.y < 1.0) {
+			n = normalize(texture(normal_tex, nuv).rgb * 2.0 - 1.0);
+		}
+	}
 	float slope = 1.0 - n.y;
 	float dist = length(wpos - CAMERA_POSITION_WORLD);
 	float big = fbm(wpos.xz * 0.0011);
@@ -110,6 +130,10 @@ void fragment() {
 		vec4 m = texture(mask_tex, muv);
 		float inside = step(0.0, muv.x) * step(muv.x, 1.0) * step(0.0, muv.y) * step(muv.y, 1.0);
 		snow_w = m.r; rock_w = m.g; grass_w = m.b; forest_w = m.a;
+		if (mask_layout == 1) {
+			grass_w = 1.0;
+			scree_w = m.b;
+		}
 		if (has_mask2) {
 			vec4 m2 = texture(mask2_tex, muv);
 			scree_w = m2.r * inside;
@@ -122,24 +146,33 @@ void fragment() {
 		snow_w = -1.0;
 		rock_w = 0.0; grass_w = 0.0; forest_w = 0.0;
 	}
+	// rules (DESIGN §3: snow on everything above ~1,800 m, a dusting below; steep rock sheds it; forest in the
+	// montane band; cured meadows on the valley floor). Blended with the terrain masks where they exist.
+	float line = snowline + 260.0 * (big - 0.5);
+	// the normal map / mesh normal give the slope
+	slope = 1.0 - n.y;
+	float hold = 1.0 - smoothstep(0.34, 0.52, slope + 0.15 * (mid - 0.5));
+	float r_snow = smoothstep(line - 120.0, line + 140.0, alt) * hold;
+	r_snow = max(r_snow, smoothstep(0.62, 0.9, mid + 0.25) * 0.5 * hold * step(valley_floor + 60.0, alt));
+	float r_rock = smoothstep(0.3, 0.48, slope + 0.12 * (mid - 0.5));
+	float r_forest = (1.0 - smoothstep(treeline - 180.0, treeline + 60.0, alt + 120.0 * (big - 0.5)))
+		* smoothstep(valley_floor - 40.0, valley_floor + 60.0, alt) * (1.0 - r_rock) * smoothstep(0.35, 0.55, big + 0.3 * mid);
 	if (snow_w < 0.0) {
-		// rules: snow above a noisy snowline that steep rock sheds, forest in the montane band, meadow below
-		float line = snowline + 260.0 * (big - 0.5);
-		float hold = 1.0 - smoothstep(0.32, 0.5, slope + 0.15 * (mid - 0.5));
-		snow_w = smoothstep(line - 120.0, line + 140.0, alt) * hold;
-		snow_w = max(snow_w, smoothstep(0.62, 0.9, mid + 0.25) * 0.55 * hold * step(valley_floor + 60.0, alt));   // dusting
-		rock_w = smoothstep(0.28, 0.45, slope + 0.12 * (mid - 0.5));
-		forest_w = (1.0 - smoothstep(treeline - 180.0, treeline + 60.0, alt + 120.0 * (big - 0.5)))
-			* smoothstep(valley_floor - 40.0, valley_floor + 60.0, alt) * (1.0 - rock_w) * smoothstep(0.35, 0.55, big + 0.3 * mid);
+		snow_w = r_snow;
+		rock_w = r_rock;
+		forest_w = r_forest;
 		grass_w = 1.0;
 		ice_w = smoothstep(line + 500.0, line + 700.0, alt) * (1.0 - smoothstep(0.12, 0.3, slope)) * 0.8;
+	} else {
+		snow_w = max(snow_w, r_snow * 0.92);
+		rock_w = max(rock_w, r_rock * 0.8);
 	}
 
 	// ---- albedos
 	float s_rock = 1.0 / 7.0;
 	vec3 rock = tri(rock_albedo, wpos, bw, s_rock);
 	vec3 cliff = tri(cliff_albedo, wpos, bw, 1.0 / 19.0);
-	rock = mix(rock, cliff, smoothstep(0.5, 0.75, slope)) * (0.72 + 0.5 * big) * (0.9 + 0.2 * mid);
+	rock = mix(rock, cliff, smoothstep(0.5, 0.75, slope)) * (0.72 + 0.5 * big) * (0.9 + 0.2 * mid) * vec3(0.78, 0.8, 0.84);
 	vec3 snow = texture(snow_albedo, wpos.xz / 5.0).rgb * vec3(0.97, 0.985, 1.0);
 	vec3 grass = texture(grass_albedo, wpos.xz / 6.0).rgb;
 	// late-October meadows: cured, tawny
@@ -162,6 +195,9 @@ void fragment() {
 	base = mix(base, snow, sw);
 	// distant forest reads as a dark texture of trees, even under a dusting
 	ALBEDO = base;
+	if (has_normal_tex) {
+		NORMAL = normalize((VIEW_MATRIX * vec4(n, 0.0)).xyz);
+	}
 	ROUGHNESS = mix(0.9, 0.55, sw);
 	SPECULAR = 0.35 + 0.15 * sw;
 
