@@ -9,7 +9,9 @@ extends RefCounted
 
 const BASE_SLOTS := 24          ## no backpack (matches the contract's Inventory default)
 const BASE_WEIGHT := 30.0
-const EQUIP_SLOTS: Array[StringName] = [&"head", &"face", &"body", &"legs", &"hands", &"feet", &"back"]
+## Worn slots. feet_addon (crampons over boots) and mask (O2 mask beside goggles) are the Player's extra slots.
+const EQUIP_SLOTS: Array[StringName] = [&"head", &"face", &"body", &"legs", &"hands", &"feet", &"back",
+	&"feet_addon", &"mask"]
 const HOTBAR_SIZE := 6
 
 
@@ -63,16 +65,24 @@ static func consume_slot(player: Node, inv: Inventory, index: int) -> bool:
 	var d := ItemDB.get_item(id)
 	var vitals: Variant = player.get("vitals") if player != null else null
 	if vitals is Object and (vitals as Object).has_method("consume"):
-		(vitals as Object).call("consume", id)
+		(vitals as Object).call("consume", id)     # Vitals.consume() emits Events.item_consumed itself
+	else:
+		Events.item_consumed.emit(id)
 	inv.remove_at(index, 1)
-	var cont := StringName(d.get("container", ""))
-	if cont != &"" and ItemDB.has_item(cont):
-		if inv.add(cont, 1) > 0:
-			drop_stack(player, {"id": cont, "count": 1, "durability": 1.0})
-	Events.item_consumed.emit(id)
+	return_container(player, inv, id)
 	var cat := String(d.get("category", ""))
 	Audio.play_sfx(&"drink" if cat == "drink" or id == &"snow" else (&"eat" if cat == "food" else &"pickup"))
 	return true
+
+
+## Gives back the empty container of a used-up item (tin can, bottle, empty O2 bottle): into the pack, or
+## dropped at the player's feet when the pack is full.
+static func return_container(player: Node, inv: Inventory, id: StringName) -> void:
+	var cont := StringName(ItemDB.get_item(id).get("container", ""))
+	if cont == &"" or not ItemDB.has_item(cont) or inv == null:
+		return
+	if inv.add(cont, 1) > 0:
+		drop_stack(player, {"id": cont, "count": 1, "durability": 1.0})
 
 
 static func read_item(_player: Node, id: StringName) -> void:
@@ -100,7 +110,7 @@ static func equip_slot(player: Node, inv: Inventory, index: int) -> bool:
 	if s.is_empty() or player == null:
 		return false
 	var id: StringName = s["id"]
-	var slot := StringName(ItemDB.get_item(id).get("equip_slot", ""))
+	var slot := wear_slot(player, id)
 	if slot == &"hand":
 		return hold_item(player, id)
 	if slot == &"":
@@ -130,6 +140,13 @@ static func equip_slot(player: Node, inv: Inventory, index: int) -> bool:
 		apply_carry_capacity(player)
 	Audio.play_sfx(&"equip")
 	return true
+
+
+## Slot `id` is worn in on this player (the Player's own rule when it has one, else ItemInfo.wear_slot()).
+static func wear_slot(player: Node, id: StringName) -> StringName:
+	if player != null and player.has_method("get_equip_slot"):
+		return StringName(player.call("get_equip_slot", id))
+	return ItemInfo.wear_slot(id)
 
 
 ## Takes off whatever is worn in `slot` and puts it back in the inventory. False if there's no room.
@@ -222,8 +239,21 @@ static func drop_stack(player: Node, stack: Dictionary) -> ItemPickup:
 	var at := pos + flat * 0.75 - Vector3.UP * 0.45
 	var impulse := (flat * 1.6 + Vector3.UP * 0.8)
 	Audio.play_sfx(&"drop", at)
-	return ItemsRoot.spawn(StringName(stack.get("id", "")), int(stack.get("count", 1)), at, impulse,
+	var p := ItemsRoot.spawn(StringName(stack.get("id", "")), int(stack.get("count", 1)), at, impulse,
 		float(stack.get("durability", 1.0)))
+	if p:
+		p.extra = stack_extra(stack)
+	return p
+
+
+## The per-stack state beyond {id, count, durability} that survives dropping/saving (JSON-safe values only).
+static func stack_extra(stack: Dictionary) -> Dictionary:
+	var out := {}
+	for k in stack:
+		var v: Variant = stack[k]
+		if not (String(k) in ["id", "count", "durability"]) and (v is bool or v is int or v is float or v is String):
+			out[String(k)] = v
+	return out
 
 
 # ------------------------------------------------------------------------------------------------ stats
@@ -241,7 +271,8 @@ static func apply_carry_capacity(player: Node) -> void:
 ## Summed clothing values over an equipment dictionary: {insulation °C, windproof 0..1, waterproof 0..1}.
 ## Wind/waterproofing is weighted towards the body layer (the biggest area of skin).
 static func clothing_totals(equipment: Dictionary) -> Dictionary:
-	const AREA := {&"head": 0.1, &"face": 0.05, &"body": 0.45, &"legs": 0.25, &"hands": 0.07, &"feet": 0.08, &"back": 0.0}
+	const AREA := {&"head": 0.1, &"face": 0.05, &"body": 0.45, &"legs": 0.25, &"hands": 0.07, &"feet": 0.08, &"back": 0.0,
+		&"mask": 0.03, &"feet_addon": 0.0}
 	var ins := 0.0
 	var wind := 0.0
 	var water := 0.0
@@ -282,7 +313,8 @@ static func gear_tags(player: Node) -> Array[StringName]:
 			if s.is_empty():
 				continue
 			var d := ItemDB.get_item(s["id"])
-			if String(d.get("equip_slot", "")) in ["", "hand"]:
+			# Carried gear counts (ice axe, rope); wearable gear (crampons, masks, goggles) only when worn.
+			if ItemInfo.wear_slot_of(d) in [&"", &"hand"]:
 				for g in d.get("gear", []):
 					if not out.has(StringName(g)):
 						out.append(StringName(g))

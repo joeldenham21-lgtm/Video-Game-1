@@ -120,6 +120,9 @@ func _draw() -> void:
 			var f := InvStyle.caps_font("SemiBold", 1)
 			var fs := int(clampf(size.x * 0.13, 10, 15))
 			var w := f.get_string_size(empty_label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			if w > size.x - 8.0 and fs > 8:     # long labels ("CRAMPONS") on small phone slots
+				fs = maxi(8, int(float(fs) * (size.x - 8.0) / w))
+				w = f.get_string_size(empty_label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 			draw_string(f, Vector2((size.x - w) * 0.5, size.y * 0.5 + fs * 0.35), empty_label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, InvStyle.TEXT_FAINT)
 		_draw_hotkey()
 		return
@@ -159,6 +162,11 @@ static func _has_durability(id: StringName) -> bool:
 	var d := ItemDB.get_item(id)
 	var t: Variant = d.get("tool", null)
 	if t is Dictionary and int((t as Dictionary).get("durability", 0)) > 1:
+		return true
+	# Torches/lanterns/flares burn down and O2 bottles empty through the same 0..1 slot value.
+	if d.get("light", null) is Dictionary and float((d["light"] as Dictionary).get("burn_minutes", 0.0)) > 0.0:
+		return true
+	if d.has("o2"):
 		return true
 	return d.has("ignite") and float((d["ignite"] as Dictionary).get("wear", 0.0)) > 0.0
 
@@ -212,7 +220,7 @@ func accepts(id: StringName) -> bool:
 		return false
 	match kind:
 		Kind.EQUIP:
-			return StringName(ItemDB.get_item(id).get("equip_slot", "")) == equip_slot
+			return ItemInfo.wear_slot(id) == equip_slot
 		Kind.HOTBAR:
 			return ItemInfo.is_holdable(id) or ItemInfo.is_consumable(id) or ItemDB.get_item(id).has("light")
 	return true

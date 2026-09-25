@@ -23,6 +23,7 @@ var burn_time := 0.0
 ## Heat source contract (lit flares).
 var heat_radius := 1.2
 var heat_celsius := 4.0
+var _flare_energy := 3.0
 
 var _ray: RayCast3D
 var _life := 90.0
@@ -69,7 +70,13 @@ func _ready() -> void:
 			mi.mesh = FPModels.flare_mesh(true)
 			mi.rotation.x = -PI * 0.5
 			drag = 0.08
-			_make_burning(Color(1.0, 0.18, 0.08), 3.2, 16.0)
+			# Same light as the hand-held flare: items.json "light" {radius, energy, color, heat_celsius}.
+			var ld: Dictionary = ItemDB.get_item(item_id).get("light", {})
+			var col := String(ld.get("color", ""))
+			_flare_energy = float(ld.get("energy", 3.0))
+			heat_celsius = float(ld.get("heat_celsius", heat_celsius))
+			_make_burning(Color.html(col) if col != "" and Color.html_is_valid(col) else Color(1.0, 0.18, 0.08),
+				_flare_energy, float(ld.get("radius", 16.0)))
 		Kind.SHELL:
 			drag = 0.25
 			gravity = 3.0
@@ -146,7 +153,7 @@ func _physics_process(delta: float) -> void:
 		burn_time -= delta
 		if _light:
 			_flicker_t += delta
-			_light.light_energy = (3.0 if kind == Kind.FLARE else 5.5) * (0.85 + 0.15 * sin(_flicker_t * 37.0) * sin(_flicker_t * 23.0))
+			_light.light_energy = (_flare_energy if kind == Kind.FLARE else 5.5) * (0.85 + 0.15 * sin(_flicker_t * 37.0) * sin(_flicker_t * 23.0))
 		if burn_time <= 0.0:
 			_burn_out()
 	if stuck:

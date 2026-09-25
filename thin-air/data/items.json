@@ -863,7 +863,7 @@
 	},
 	"o2_bottle": {
 		"name": "Oxygen Cylinder",
-		"desc": "A 2-litre aluminium cylinder of medical oxygen at 200 bar. About forty-five minutes on a mask.",
+		"desc": "A 4-litre carbon-wrapped climbing cylinder at 300 bar. Regulated to two litres a minute, about nine hours on a mask.",
 		"category": "tool",
 		"stack": 2,
 		"weight": 2.8,
@@ -871,7 +871,7 @@
 		"model": "res://assets/models/items/o2_bottle.glb",
 		"tags": ["o2"],
 		"equip_slot": "",
-		"o2": {"minutes": 45},
+		"o2": {"minutes": 540},
 		"container": "o2_bottle_empty"
 	},
 	"crampons": {

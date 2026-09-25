@@ -332,7 +332,14 @@ func _test_actions() -> void:
 	check(inv.count(&"matches") == 2 and r.has("ok"), "a match is used up per attempt")
 	var gear := ItemActions.gear_tags(p)
 	inv.add(&"crampons", 1)
-	check(not gear.has(&"crampons") and ItemActions.gear_tags(p).has(&"crampons"), "carried crampons count as gear")
+	inv.add(&"ice_axe", 1)
+	# Reconciled with the Player: carried tools (ice axe, rope) count, wearable gear only once it's worn.
+	check(not gear.has(&"crampons") and not ItemActions.gear_tags(p).has(&"crampons") and ItemActions.gear_tags(p).has(&"ice_axe"),
+		"carried ice axe counts as gear, carried crampons don't")
+	check(ItemInfo.is_wearable(&"crampons") and ItemActions.equip_slot(p, inv, inv.find(&"crampons"))
+		and eq.get(&"feet_addon", &"") == &"crampons" and inv.count(&"crampons") == 0 and ItemActions.gear_tags(p).has(&"crampons"),
+		"crampons strap on (feet_addon slot) and then count as gear")
+	check(ItemActions.unequip(p, &"feet_addon") and inv.count(&"crampons") == 1, "crampons come off back into the pack")
 	p.queue_free()
 
 

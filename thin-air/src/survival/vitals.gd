@@ -19,7 +19,7 @@ const TUNING := {
 	&"exertion_water_mult": 1.9,
 	&"cold_food_mult": 0.6,            # shivering burns calories when warmth < 50
 	&"altitude_water_mult": 0.45,      # dry thin air above 2,000 m
-	&"kcal_per_food_point": 20.0,      # 100 food = 2,000 kcal
+	&"kcal_per_food_point": 25.0,      # 100 food = 2,500 kcal (items.json "food" = calories / 25)
 	&"ml_per_water_point": 25.0,       # 100 water = 2.5 L (used when an item gives water in mL)
 	# Warmth: drifts toward a target implied by felt temperature.
 	&"comfort_c": 20.0,                # felt °C at which warmth target = 100
@@ -64,8 +64,10 @@ const TUNING := {
 	&"sick_duration": 720.0,
 	&"warmed_up_duration": 300.0,
 	&"rested_duration": 1500.0,
-	&"unsafe_water_sick_chance": 0.35,
+	&"unsafe_water_sick_chance": 0.35,   # fallbacks when an item has no "raw_risk"
 	&"raw_food_sick_chance": 0.3,
+	&"painkiller_sprain_relief": 0.5,    # fraction of the sprain slow-down painkillers mask
+	&"healing_regen_mult": 2.0,          # "healing" effect (herbal poultice) speeds natural regeneration
 }
 
 ## Difficulty scaling (DESIGN §4: Explorer = no hunger/thirst, gentler cold; Whiteout = harsh).
@@ -249,8 +251,11 @@ func reset() -> void:
 		remove_effect(id)
 
 
-## Applies an item's food/drink/medical values (ItemDB "food" block, optional "medical" block).
-## Returns false if the item has nothing to consume.
+## Applies an item's food/drink/medical values (items.json, CONTRACT §6):
+##   food:    {calories, food (points; else calories / kcal_per_food_point), water, warmth, health, stamina,
+##             raw, raw_risk (chance of getting sick)}
+##   medical: {health, stops: [effect ids], warmth, effect, duration_minutes (game minutes)}
+## Returns false if the item has nothing to consume. Emits Events.item_consumed.
 func consume(item_id: StringName) -> bool:
 	var def: Dictionary = ItemDB.get_item(item_id)
 	var f: Dictionary = def.get("food", {})
@@ -259,53 +264,78 @@ func consume(item_id: StringName) -> bool:
 	var metab := _diff(&"metabolism")
 	if not f.is_empty():
 		any = true
-		var kcal := float(f.get("calories", 0.0))
 		if metab > 0.0:
-			food = clampf(food + kcal / float(TUNING[&"kcal_per_food_point"]), 0.0, 100.0)
+			var pts := float(f["food"]) if f.has("food") else float(f.get("calories", 0.0)) / float(TUNING[&"kcal_per_food_point"])
+			food = clampf(food + pts, 0.0, 100.0)
 			var w := float(f.get("water", 0.0))
 			if absf(w) > 100.0:
 				w /= float(TUNING[&"ml_per_water_point"])
 			water = clampf(water + w, 0.0, 100.0)
-		var hot := float(f.get("warmth", 0.0))
-		if hot > 0.0:
-			warmth = minf(warmth + hot, 100.0)
-			add_effect(&"warmed_up", float(TUNING[&"warmed_up_duration"]) * clampf(hot / 15.0, 0.4, 1.5))
-		elif hot < 0.0:
-			warmth = maxf(warmth + hot, 0.0)
+		_add_warmth(float(f.get("warmth", 0.0)))
 		health = clampf(health + float(f.get("health", 0.0)), 0.0, max_health)
 		stamina = clampf(stamina + float(f.get("stamina", 0.0)), 0.0, 100.0)
 		var sick_chance := 0.0
-		if bool(f.get("raw", false)):
+		if f.has("raw_risk"):
+			sick_chance = float(f["raw_risk"])
+		elif bool(f.get("raw", false)):
 			sick_chance = float(TUNING[&"raw_food_sick_chance"])
-		if item_id == &"water_unsafe" or bool(f.get("unsafe", false)):
-			sick_chance = float(TUNING[&"unsafe_water_sick_chance"])
+		if bool(f.get("unsafe", false)) or (item_id == &"water_unsafe" and not f.has("raw_risk")):
+			sick_chance = maxf(sick_chance, float(TUNING[&"unsafe_water_sick_chance"]))
 		if sick_chance > 0.0 and _rng.randf() < sick_chance:
 			add_effect(&"sick", float(TUNING[&"sick_duration"]))
-	# Medical: explicit "medical" block, or well-known ids.
-	var heal_amt := float(med.get("heal", 0.0))
-	var cures: Array = med.get("cures", [])
-	match item_id:
-		&"bandage":
-			cures = ["bleeding"]; heal_amt = maxf(heal_amt, 5.0)
-		&"first_aid_kit":
-			cures = ["bleeding", "sprain"]; heal_amt = maxf(heal_amt, 40.0)
-		&"splint":
-			cures = ["sprain"]
-		&"painkillers":
-			heal_amt = maxf(heal_amt, 8.0)
-			if has_effect(&"sprain"):
-				var e: Dictionary = effects[&"sprain"]
-				e["time"] = float(e["time"]) * 0.5
-		&"herbal_poultice":
-			cures = ["bleeding", "sick"]; heal_amt = maxf(heal_amt, 12.0)
-	if heal_amt > 0.0 or not cures.is_empty():
+	if not med.is_empty():
 		any = true
-		heal(heal_amt)
-		for c in cures:
+		heal(float(med.get("health", med.get("heal", 0.0))))
+		for c in med.get("stops", med.get("cures", [])):
 			remove_effect(StringName(c))
+		_add_warmth(float(med.get("warmth", 0.0)))
+		var fx := StringName(med.get("effect", ""))
+		if fx != &"":
+			var secs := _game_minutes_to_seconds(float(med.get("duration_minutes", 60.0)))
+			add_effect(fx, secs)
+			if fx == &"painkiller" and has_effect(&"sprain"):
+				var sp: Dictionary = effects[&"sprain"]
+				sp["time"] = float(sp["time"]) * 0.75      # resting the joint without the pain
+	else:
+		# Items without a "medical" block (test stand-ins, older data): the well-known basics.
+		var heal_amt := 0.0
+		var cures: Array = []
+		match item_id:
+			&"bandage":
+				cures = ["bleeding"]; heal_amt = 5.0
+			&"first_aid_kit":
+				cures = ["bleeding", "infection"]; heal_amt = 40.0
+			&"splint":
+				cures = ["sprain"]
+			&"painkillers":
+				heal_amt = 4.0
+				add_effect(&"painkiller", _game_minutes_to_seconds(240.0))
+			&"herbal_poultice":
+				cures = ["infection"]; heal_amt = 12.0
+		if heal_amt > 0.0 or not cures.is_empty():
+			any = true
+			heal(heal_amt)
+			for c in cures:
+				remove_effect(StringName(c))
 	if any:
 		Events.item_consumed.emit(item_id)
 	return any
+
+
+## Hot food/drink or a blanket: warmth now plus a "warmed up" spell; cold food (snow) takes warmth.
+func _add_warmth(hot: float) -> void:
+	if hot > 0.0:
+		warmth = minf(warmth + hot, 100.0)
+		add_effect(&"warmed_up", float(TUNING[&"warmed_up_duration"]) * clampf(hot / 15.0, 0.4, 1.5))
+	elif hot < 0.0:
+		warmth = maxf(warmth + hot, 0.0)
+
+
+## Effect durations run on (time-scaled) seconds; item data gives game minutes.
+func _game_minutes_to_seconds(minutes: float) -> float:
+	if Climate.has_method(&"game_minutes_to_seconds"):
+		return float(Climate.game_minutes_to_seconds(minutes))
+	return (minutes / 60.0) / _hours_per_second()
 
 
 # ------------------------------------------------------------------------------------------------
@@ -568,6 +598,8 @@ func _simulate_health(gdt: float, rdt: float, hours: float) -> void:
 			per_h *= 1.5
 		if has_effect(&"sick"):
 			per_h *= 0.3
+		if has_effect(&"healing"):
+			per_h *= float(TUNING[&"healing_regen_mult"])
 		heal(per_h * hours)
 
 
@@ -601,7 +633,10 @@ func on_slept(hours: float) -> void:
 func movement_multiplier() -> float:
 	var m := 1.0
 	if has_effect(&"sprain"):
-		m *= lerpf(0.85, 0.62, get_effect_strength(&"sprain"))
+		var slow := 1.0 - lerpf(0.85, 0.62, get_effect_strength(&"sprain"))
+		if has_effect(&"painkiller"):
+			slow *= 1.0 - float(TUNING[&"painkiller_sprain_relief"])
+		m *= 1.0 - slow
 	if warmth < float(TUNING[&"hypothermia_threshold"]):
 		m *= lerpf(0.75, 1.0, warmth / float(TUNING[&"hypothermia_threshold"]))
 	if oxygen < 15.0:

@@ -185,6 +185,8 @@ func load_state(d: Dictionary) -> void:
 		if p:
 			p.global_transform = SaveUtil.to_xform(ed.get("xf", []))
 			p.sleeping = true
+			if ed.get("extra", null) is Dictionary:
+				p.extra = (ed["extra"] as Dictionary).duplicate()
 	var refund: Variant = d.get("craft_refund", null)
 	if refund is Dictionary and not (refund as Dictionary).is_empty():
 		_refund_after_load.call_deferred(refund)

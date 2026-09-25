@@ -15,14 +15,19 @@ enum Tab { INVENTORY, EQUIPMENT, CRAFTING }
 const TAB_TITLES := ["Inventory", "Equipment", "Crafting"]
 const CATEGORIES := [["all", "All"], ["tools", "Tools"], ["weapons", "Weapons"], ["survival", "Survival"],
 	["clothing", "Clothing"], ["medical", "Medical"], ["food", "Food & Water"], ["materials", "Materials"]]
+## [slot, empty label, slot position, leader-line anchor on the figure] in 460×590 doll units. feet_addon
+## (crampons strapped over the boots) and mask (O2 mask, worn together with goggles) are the Player's
+## extra slots (Player.EQUIP_SLOTS / ItemInfo.wear_slot()).
 const EQUIP_LAYOUT := [
-	[&"head", "HEAD", Vector2(40, 36), Vector2(230, 78)],
-	[&"face", "FACE", Vector2(332, 36), Vector2(246, 92)],
-	[&"body", "BODY", Vector2(22, 200), Vector2(222, 210)],
-	[&"back", "BACK", Vector2(350, 190), Vector2(250, 190)],
-	[&"hands", "HANDS", Vector2(350, 330), Vector2(318, 330)],
-	[&"legs", "LEGS", Vector2(22, 372), Vector2(214, 400)],
-	[&"feet", "FEET", Vector2(330, 470), Vector2(248, 548)],
+	[&"head", "HEAD", Vector2(28, 14), Vector2(230, 70)],
+	[&"face", "FACE", Vector2(344, 14), Vector2(246, 86)],
+	[&"mask", "MASK", Vector2(344, 122), Vector2(232, 100)],
+	[&"body", "BODY", Vector2(22, 176), Vector2(222, 210)],
+	[&"back", "BACK", Vector2(350, 230), Vector2(252, 196)],
+	[&"hands", "HANDS", Vector2(350, 338), Vector2(318, 346)],
+	[&"legs", "LEGS", Vector2(22, 338), Vector2(214, 400)],
+	[&"feet_addon", "CRAMPONS", Vector2(22, 490), Vector2(212, 556)],
+	[&"feet", "FEET", Vector2(344, 490), Vector2(248, 548)],
 ]
 
 static var _instance: InventoryScreen = null

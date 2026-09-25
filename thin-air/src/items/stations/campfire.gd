@@ -636,8 +636,11 @@ func _apply_visuals(delta: float) -> void:
 		(_embers.process_material as ParticleProcessMaterial).gravity = Vector3(0, 0.3, 0) + wd * wl * 0.12
 		if _mobile and _smoke_mat.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED:
 			var day := float(Climate.get_daylight()) if Climate.has_method("get_daylight") else 1.0
-			var v := 0.16 + 0.6 * day
-			_smoke_mat.albedo_color = Color(v * 1.08, v, v * 0.95)
+			# By day grey in daylight; at night smoke is only seen where the flames light it, so an unshaded
+			# puff drifting off into the dark must be faint and warm, not a flat grey disc over the lit ground.
+			var v := 0.12 + 0.64 * day
+			var tint := Color(1.0, 0.64, 0.4).lerp(Color(1.08, 1.0, 0.95), day)
+			_smoke_mat.albedo_color = Color(tint.r * v, tint.g * v, tint.b * v, lerpf(0.35, 1.0, day))
 
 
 static func _emit(p: GPUParticles3D, on: bool, ratio: float) -> void:
