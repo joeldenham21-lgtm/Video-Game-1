@@ -99,6 +99,10 @@ func _backdrop() -> void:
 		var v: Node = (load("res://scenes/ui/menu_vista.tscn") as PackedScene).instantiate()
 		v.set("drift", false)
 		v.set("shot", String(args.get("shot", "hud")))
+		if args.has("weather"):
+			v.set("weather", String(args["weather"]))
+		if args.has("vhours"):
+			v.set("hours", float(args["vhours"]))
 		add_child(v)
 		cam = v.get_node_or_null("Camera") as Camera3D
 	if cam == null:
