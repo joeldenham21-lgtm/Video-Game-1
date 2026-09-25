@@ -1076,7 +1076,10 @@ func _trial_tools() -> void:
 	await _tap(&"use")
 	await _wait(1.9)
 	var fill := float(player.inventory.get_slot(player.inventory.find(&"canteen")).get("durability", 0.0))
-	_check(player.vitals.water > 60.0 and absf(fill - 0.75) < 0.01, "canteen sip: water %.1f, fill %.2f" % [player.vitals.water, fill])
+	# One sip is a quarter of the canteen: items.json capacity_l at Vitals' 25 mL per water point.
+	var sip_gain: float = 0.25 * float(preload("res://src/player/tools/consumable.gd").full_water_points(ItemDB.get_item(&"canteen")))
+	_check(player.vitals.water > 40.0 + sip_gain * 0.9 and player.vitals.water <= 40.0 + sip_gain + 0.01 and absf(fill - 0.75) < 0.01,
+		"canteen sip: water %.1f (+%.1f per sip), fill %.2f" % [player.vitals.water, sip_gain, fill])
 	# --- Binoculars zoom.
 	await _give_and_equip(&"binoculars")
 	Input.action_press(&"aim")

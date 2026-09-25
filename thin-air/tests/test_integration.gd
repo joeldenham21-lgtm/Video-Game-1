@@ -250,6 +250,11 @@ func _campfire() -> Campfire:
 		torch.call(&"_set_lit", false)
 		var m0 := inv.count(&"matches")
 		check(bool(torch.call(&"relight")) and inv.count(&"matches") == m0, "doused torch relights from the campfire without a match")
+		# items.json tool.durability 1 = doesn't wear: a swing that connects must not burn the torch up.
+		var d0 := float(inv.get_slot(inv.find(&"torch")).get("durability", 1.0))
+		check(not torch.wear(1.0) and inv.count(&"torch") == 1
+			and is_equal_approx(float(inv.get_slot(inv.find(&"torch")).get("durability", 1.0)), d0),
+			"hitting something with a torch doesn't use it up")
 	player.select_hotbar(-1)
 	return fire
 
@@ -357,6 +362,15 @@ func _save_load(fire: Campfire) -> void:
 	v.warmth = 77.0
 	v.health = 88.0
 	inv.add(&"canteen", 1)
+	# Canteen water uses Vitals' unit: capacity_l × 1000 / ml_per_water_point (1 L = 40 points).
+	var cw := float(preload("res://src/player/tools/consumable.gd").full_water_points(ItemDB.get_item(&"canteen")))
+	var cap := float(ItemDB.get_item(&"canteen").get("capacity_l", 1.0))
+	check(is_equal_approx(cw, cap * 1000.0 / float(Vitals.TUNING[&"ml_per_water_point"])),
+		"a full canteen holds %.0f water points (%.1f L)" % [cw, cap])
+	# Crampons strapped on through the save (extra equipment slot round-trip).
+	if inv.count(&"crampons") > 0:
+		player.equip(&"crampons")
+	check(player.equipment[&"feet_addon"] == &"crampons", "crampons worn for the save")
 	var ci := inv.find(&"canteen")
 	var cst := inv.get_slot(ci).duplicate()
 	cst["durability"] = 0.5
@@ -374,6 +388,7 @@ func _save_load(fire: Campfire) -> void:
 	v.health = 20.0
 	inv.clear()
 	player.unequip(&"body")
+	player.unequip(&"feet_addon")
 	inv.clear()
 	fire.extinguish()
 	fire.fuel_minutes = 0.0
@@ -393,6 +408,8 @@ func _save_load(fire: Campfire) -> void:
 		"canteen fill and untreated-water flag survive saving")
 	check(player.hotbar == hot_before, "hotbar restored")
 	check(player.equipment[&"body"] == &"parka" and player.equipment[&"face"] == &"goggles", "worn clothing restored")
+	check(player.equipment[&"feet_addon"] == &"crampons" and player.has_crampons() and player.has_gear(&"crampons"),
+		"crampons (feet_addon) restored and active")
 	check(fire.is_burning() and absf(fire.fuel_minutes - fuel_before) < 2.0, "campfire burning with its fuel (%.1f / %.1f min)" % [fire.fuel_minutes, fuel_before])
 	check(box != null and box.inventory.count(&"rope") == 3, "storage box contents restored")
 	var stones := 0

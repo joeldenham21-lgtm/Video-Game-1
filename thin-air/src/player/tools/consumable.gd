@@ -121,8 +121,7 @@ func _apply() -> void:
 	if is_canteen:
 		var f := _fill()
 		var sip := minf(SIP, f)
-		var wdef: Dictionary = def.get("food", {})
-		var gain := float(wdef.get("water", 25.0)) * (sip / SIP)
+		var gain := sip * full_water_points(def)
 		if Vitals.DIFFICULTY.get(v.difficulty, {}).get(&"metabolism", 1.0) > 0.0:
 			v.water = minf(v.water + gain, 100.0)
 		var idx := inventory_index()
@@ -139,6 +138,16 @@ func _apply() -> void:
 		player.inventory.remove_at(idx2, 1)
 		# The empty tin / bottle comes back (items.json "container").
 		ItemActions.return_container(player, player.inventory, item_id)
+
+
+## Water points (Vitals scale) in a full canteen: items.json "capacity_l" at Vitals' mL per water point
+## (1 L = 40 points; a 0.75 L bottle of boiled water is 30). An explicit food.water wins.
+static func full_water_points(d: Dictionary) -> float:
+	var f: Dictionary = d.get("food", {})
+	if f.has("water"):
+		return float(f["water"]) / SIP
+	var ml := float(d.get("capacity_l", 1.0)) * 1000.0
+	return ml / float(Vitals.TUNING[&"ml_per_water_point"])
 
 
 func _finish() -> void:

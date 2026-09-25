@@ -104,11 +104,16 @@ func inventory_index() -> int:
 
 
 ## Wears the held item by `hits` uses (tool.durability = uses until broken). Returns true if it broke.
+## items.json convention (Crafting._wears, the inventory's durability bar): durability ≤ 1 means the item
+## doesn't wear from use — torches, flares and lanterns keep their slot value for fuel left, so a swing
+## that connects must not "break" (burn up) them.
 func wear(hits := 1.0) -> bool:
 	var idx := inventory_index()
 	if idx < 0:
 		return false
-	var uses := maxf(tool_value("durability", 100.0), 1.0)
+	var uses := tool_value("durability", 100.0)
+	if uses <= 1.0:
+		return false
 	var broke := player.inventory.use_durability(idx, hits / uses)
 	if broke:
 		Game.notify("%s broke" % String(def.get("name", item_id)), &"warning")
