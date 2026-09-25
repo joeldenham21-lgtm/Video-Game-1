@@ -349,15 +349,30 @@ def lean_to():
             dn = (slope * math.cos(twist) - side * math.sin(twist)).normalized()
             cen = base + Vector((x, 0, 0)) + slope * (L * 0.45) + nrm * (0.035 + 0.012 * r + 0.01 * (c % 2))
             _bark_slab(s, cen, sd, dn, nrm, w, L, seed=100 + r * 10 + c, step=0.55 + 0.25 * r / rows)
-    # spruce boughs thatched over the bark, thickest along the ridge and the sides
-    for i in range(46):
-        t = rng.uniform(0.0, 0.92) ** 0.8
-        x = rng.uniform(-W / 2 - 0.05, W / 2 + 0.05)
-        cen = Vector((x, ridge_h + 0.16, 1.07)) + slope * (t * (depth + ridge_h) * 0.74) + nrm * (0.12 + rng.uniform(0, 0.06))
-        up = (-slope + Vector((rng.uniform(-0.45, 0.45), 0, 0))).normalized()
-        r2 = up.cross(nrm).normalized()
-        L = rng.uniform(0.6, 0.95)
-        card(s, cen, r2, up, L * 0.72, L, mat="bough", step=0.9 + 0.1 * t, normal=nrm, bend=0.1, segs=2)
+    # spruce boughs thatched thickly over the bark, butts up and tips down like shingles, in overlapping rows
+    for row in range(9):
+        t = row / 8.0
+        n_row = 13
+        for i in range(n_row):
+            x = -W / 2 + 0.05 + (i + (0.5 if row % 2 else 0.0)) * (W - 0.1) / n_row + rng.uniform(-0.08, 0.08)
+            cen = Vector((x, ridge_h + 0.16, 1.07)) + slope * (t * (depth + ridge_h) * 0.72 + 0.1) \
+                + nrm * (0.1 + 0.015 * row + rng.uniform(0.0, 0.05))
+            up = (-slope + Vector((rng.uniform(-0.35, 0.35), 0, 0))).normalized()
+            r2 = up.cross(nrm).normalized()
+            L = rng.uniform(0.8, 1.15)
+            card(s, cen, r2, up, L * 0.75, L, mat="bough", step=0.8 + 0.2 * t, normal=nrm, bend=0.12, segs=2)
+    # boughs leaned against the two triangular ends
+    for side in (-1, 1):
+        for i in range(9):
+            t = rng.uniform(0.1, 0.9)
+            y = (ridge_h + 0.1) * (1.0 - t) * rng.uniform(0.5, 0.95)
+            z = 1.0 - t * (depth + 0.1)
+            cen = Vector((side * (W / 2 + 0.05), y * 0.6 + 0.2, z))
+            nrm2 = Vector((side, 0.2, 0)).normalized()
+            up = Vector((0, 1, rng.uniform(-0.4, 0.4))).normalized()
+            r2 = up.cross(nrm2).normalized()
+            L = rng.uniform(0.7, 1.0)
+            card(s, cen, r2, up, L * 0.75, L, mat="bough", step=0.95, normal=nrm2, bend=0.08, segs=2)
     return {"Model": s}
 
 

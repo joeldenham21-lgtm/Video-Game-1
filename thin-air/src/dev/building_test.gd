@@ -8,6 +8,7 @@ extends Node
 ##     --quit-after 60 --resolution 1280x720 res://scenes/dev/building_test.tscn -- --shot=exterior
 ## Shots: exterior (golden hour), interior (night, fire lit), stilts, frames, camp, aerial, closeup, perf200
 ## Options: --hours=H --weather=W --preset=P --pos=x,y,z --look=yaw,pitch --fov=F --perf --perf_at=N
+##          --bare (no backdrop / trees / ground mesh: count only what the buildings cost)
 ##          --snow=S (global snow cover) --save=abs.jpg (writes the frame at --perf_at and quits)
 
 const GROUND_Y := 1480.0
@@ -29,15 +30,15 @@ const SHOTS := {
 	# pos, look (yaw, pitch), hours, fov
 	"exterior": [Vector3(-7.8, 1.75, 10.6), Vector2(-36.0, 2.0), 16.55, 62.0],
 	"interior": [Vector3(0.35, 1.55, -2.4), Vector2(186.0, -3.0), 22.4, 76.0],
-	"stilts": [Vector3(-3.5, 1.5, -2.5), Vector2(-28.0, 10.0), 15.2, 60.0],
-	"frames": [Vector3(3.5, 1.7, 15.5), Vector2(8.0, -8.0), 12.5, 66.0],
+	"stilts": [Vector3(-0.8, 1.6, -5.2), Vector2(-24.0, 13.0), 15.2, 58.0],
+	"frames": [Vector3(7.0, 1.7, 13.0), Vector2(-35.5, -9.0), 11.5, 62.0],
 	"camp": [Vector3(13.5, 1.9, 4.5), Vector2(38.0, -9.0), 16.7, 64.0],
 	"aerial": [Vector3(-16.0, 13.0, 18.0), Vector2(-40.0, -30.0), 15.8, 55.0],
 	"closeup": [Vector3(-4.4, 1.5, 5.6), Vector2(-30.0, 4.0), 16.4, 55.0],
 	"perf200": [Vector3(-22.0, 6.0, 24.0), Vector2(-40.0, -10.0), 13.0, 70.0],
 	# first person with the real Player (build mode UI, ghost, shoulder logs)
 	"ui_picker": [Vector3(5.5, 0.0, 12.5), Vector2(20.0, -6.0), 14.5, 75.0],
-	"fp_ghost": [Vector3(6.5, 0.0, 12.0), Vector2(8.0, -14.0), 14.5, 75.0],
+	"fp_ghost": [Vector3(9.0, 0.0, 2.0), Vector2(-131.0, -16.0), 14.5, 75.0],
 }
 
 
@@ -76,7 +77,11 @@ func _ready() -> void:
 	_nb.seed = 11
 	_nb.frequency = 0.004
 	_build_ground()
-	_build_backdrop()
+	if args.has("bare"):
+		# perf measurement: only the sky, a collision ground and the buildings
+		(get_node("Ground") as Node3D).visible = false
+	else:
+		_build_backdrop()
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	if root:
@@ -387,8 +392,22 @@ func _build_camp(shot: String) -> void:
 		fire2.set(&"intensity", 1.0)
 	place.call(&"bough_bed", cabin.world_of(Vector3(9.5, 0.0, -1.5)), -78.0)
 	place.call(&"stone_windbreak", cabin.world_of(Vector3(8.6, 0.0, -4.4)), 12.0)
-	place.call(&"drying_rack", cabin.world_of(Vector3(4.2, 0.0, 5.2)), -35.0)
-	place.call(&"snow_melter", cabin.world_of(Vector3(1.7, 0.0, 6.9)), 20.0)
+	var rack := place.call(&"drying_rack", cabin.world_of(Vector3(4.2, 0.0, 5.2)), -35.0) as Node3D
+	var melter := place.call(&"snow_melter", cabin.world_of(Vector3(1.7, 0.0, 6.9)), 20.0) as Node3D
+	var stock := Inventory.new(20, 999.0)
+	stock.add(&"meat_raw", 5)
+	stock.add(&"hide_raw", 1)
+	stock.add(&"snow", 9)
+	if rack and rack.has_method(&"hang"):
+		for _i in 5:
+			rack.call(&"hang", &"meat_raw", stock)
+		rack.call(&"hang", &"hide_raw", stock)
+		var m: Array = rack.get(&"meat")
+		for k in m.size():
+			m[k]["t"] = 1.5 * k
+		rack.call(&"_update_visuals")
+	if melter and melter.has_method(&"add_snow"):
+		melter.call(&"add_snow", stock)
 	place.call(&"workbench", cabin.world_of(Vector3(-4.6, 0.0, 1.8)), 90.0)
 	# an elevated food cache on stilts up the slope (bears can't reach it): tall posts, braces, a ladder
 	var cpos := Vector3(3.0, 0.0, -11.5)

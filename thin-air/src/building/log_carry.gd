@@ -80,8 +80,9 @@ func _layout() -> void:
 	for i in _logs.size():
 		var mi := _logs[i]
 		# on the right shoulder, just below and beside the eye, running forward past the view edge
-		var off := Vector3(0.36 + 0.2 * i, -0.3 + 0.1 * i, -0.28)
-		var tilt := Basis(Vector3.RIGHT, deg_to_rad(8.0)) * Basis(Vector3.FORWARD, deg_to_rad(6.0 + 10.0 * i))
+		var off := Vector3(0.46 + 0.17 * i, -0.4 + 0.05 * i, -0.16)
+		var tilt := Basis(Vector3.UP, deg_to_rad(-16.0 - 4.0 * i)) * Basis(Vector3.RIGHT, deg_to_rad(6.0)) \
+			* Basis(Vector3.FORWARD, deg_to_rad(8.0 + 10.0 * i))
 		mi.transform = Transform3D(tilt * b, off - (tilt * b) * c)
 
 

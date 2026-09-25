@@ -98,7 +98,7 @@ static func for_role(role: String) -> Material:
 		"cloth":
 			m = _lib("canvas")
 		"metal":
-			m = _lib("metal_aircraft")
+			m = _lib("metal_bare")
 		"metal_dark":
 			m = _lib("metal_rusty")
 		"snow":
