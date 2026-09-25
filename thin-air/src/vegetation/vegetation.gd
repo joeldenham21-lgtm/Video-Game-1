@@ -120,6 +120,7 @@ func _attach_subsystems() -> void:
 		"Grass": "res://src/vegetation/veg_grass.gd",
 		"Colliders": "res://src/vegetation/veg_colliders.gd",
 		"Harvest": "res://src/vegetation/veg_harvest.gd",
+		"Loot": "res://src/vegetation/veg_loot.gd",
 	}
 	for n in scripts:
 		var path: String = scripts[n]

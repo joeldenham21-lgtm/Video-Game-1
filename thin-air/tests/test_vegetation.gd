@@ -189,6 +189,15 @@ func _test_grass_cells() -> void:
 		total += (a[k] as PackedFloat32Array).size() / 16
 	check(total > 50, "grass cell has tufts (%d)" % total)
 	check(a == b, "grass cell generation is deterministic")
+	var L: GDScript = load("res://src/vegetation/veg_loot.gd")
+	var spots := 0
+	var det := true
+	for c in _cells_in_window():
+		var s1: Array = L.cell_spots(ctx, c.x, c.y)
+		spots += s1.size()
+		if c.x == 24 and s1 != L.cell_spots(ctx, c.x, c.y):
+			det = false
+	check(spots > 200 and det, "forest-floor stick/stone spots are deterministic (%d)" % spots)
 	# lake cell and the POI pad: nothing in the water / on the pad
 	var wet := 0
 	var pad := 0
