@@ -35,12 +35,12 @@ Z = np.array([0.0, 0.0, 1.0])
 SPECIES = {
 	"spruce": dict(cards="spruce", bark="bark_spruce", wood_density=620.0,
 		shape="cone", shape_k=0.82, spacing=(0.34, 0.6), per_whorl=(4, 6), inter=(1, 2),
-		elev=(38.0, 4.0, -26.0), droop=38.0, upturn=24.0, card_spacing=0.42, card_scale=(0.8, 1.15),
+		elev=(38.0, 4.0, -26.0), droop=38.0, upturn=24.0, card_spacing=0.17, card_scale=(0.55, 0.86),
 		card_angle=50.0, card_pitch=-24.0, card_roll=32.0, branch_frac=0.62, stubs=True, leader=1.3,
 		trunk_wobble=0.004, taper=0.82),
 	"fir": dict(cards="fir", bark="bark_spruce", wood_density=560.0,
 		shape="spire", shape_k=0.95, spacing=(0.3, 0.5), per_whorl=(4, 5), inter=(1, 2),
-		elev=(30.0, -2.0, -14.0), droop=16.0, upturn=8.0, card_spacing=0.36, card_scale=(0.7, 1.0),
+		elev=(30.0, -2.0, -14.0), droop=16.0, upturn=8.0, card_spacing=0.16, card_scale=(0.5, 0.78),
 		card_angle=54.0, card_pitch=-8.0, card_roll=22.0, branch_frac=0.55, stubs=True, leader=1.6,
 		trunk_wobble=0.003, taper=0.85),
 	"lodgepole": dict(cards="lodgepole", bark="bark_pine", wood_density=560.0,
@@ -55,7 +55,7 @@ SPECIES = {
 		trunk_wobble=0.03, taper=0.75, tip_cluster=True),
 	"larch": dict(cards="larch", bark="bark_pine", wood_density=600.0,
 		shape="cone", shape_k=0.75, spacing=(0.45, 0.85), per_whorl=(3, 5), inter=(0, 2),
-		elev=(28.0, 2.0, -12.0), droop=30.0, upturn=18.0, card_spacing=0.44, card_scale=(0.75, 1.05),
+		elev=(28.0, 2.0, -12.0), droop=30.0, upturn=18.0, card_spacing=0.21, card_scale=(0.55, 0.82),
 		card_angle=50.0, card_pitch=-24.0, card_roll=35.0, branch_frac=0.75, stubs=True, leader=1.0,
 		trunk_wobble=0.006, taper=0.8),
 	"snag": dict(cards=None, bark="bark_dead", wood_density=420.0,
@@ -68,9 +68,9 @@ SPECIES = {
 # In-game look per species (read by VegLibrary from the manifest and by impostors.py for the bake):
 # leaf_tint multiplies the card atlas albedo, bark_tint the shared bark_* albedo, transl = backlight.
 LOOK = {
-	"spruce": {"leaf_tint": [1.75, 1.8, 1.8], "bark_tint": [0.72, 0.7, 0.72], "transl": 0.5},
-	"fir": {"leaf_tint": [1.7, 1.75, 1.7], "bark_tint": [0.92, 0.9, 0.95], "transl": 0.45},
-	"lodgepole": {"leaf_tint": [1.5, 1.5, 1.5], "bark_tint": [0.8, 0.82, 0.9], "transl": 0.55},
+	"spruce": {"leaf_tint": [1.42, 1.55, 1.7], "bark_tint": [0.72, 0.7, 0.72], "transl": 0.5},
+	"fir": {"leaf_tint": [1.38, 1.5, 1.42], "bark_tint": [0.92, 0.9, 0.95], "transl": 0.45},
+	"lodgepole": {"leaf_tint": [1.5, 1.5, 1.5], "bark_tint": [0.62, 0.64, 0.74], "transl": 0.55},
 	"whitebark": {"leaf_tint": [1.5, 1.5, 1.5], "bark_tint": [1.35, 1.75, 2.35], "transl": 0.55},
 	"larch": {"leaf_tint": [1.45, 1.4, 1.1], "bark_tint": [0.85, 0.78, 0.78], "transl": 0.85},
 	"snag": {"leaf_tint": [1.0, 1.0, 1.0], "bark_tint": [1.0, 1.0, 1.0], "transl": 0.3},

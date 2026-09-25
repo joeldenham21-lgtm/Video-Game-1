@@ -129,6 +129,17 @@ func _compute_masks(x: float, z: float) -> Color:
 	return Color(snow, rock, meadow, clampf(forest, 0.0, 1.0))
 
 
+## R scree/talus, G gravel, B ice, A wetness (same layout as the real TerrainData).
+func get_masks2(x: float, z: float) -> Color:
+	if not in_window(x, z):
+		return Color(0.0, 0.0, 0.0, 0.0)
+	var m := get_masks(x, z)
+	var scree := clampf((m.g - 0.35) * 2.0, 0.0, 1.0) * (1.0 - smoothstep(36.0, 42.0, get_slope_deg(x, z)))
+	var ld := Vector2(x - LAKE.x, z - LAKE.y).length()
+	var wet := 1.0 - smoothstep(LAKE.z, LAKE.z * 2.2, ld)
+	return Color(scree, 0.0, 0.0, wet)
+
+
 func get_surface(x: float, z: float) -> StringName:
 	var m := get_masks(x, z)
 	if m.r > 0.6:

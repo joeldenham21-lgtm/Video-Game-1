@@ -381,6 +381,7 @@ uniform sampler2D snow_a : source_color, filter_linear_mipmap_anisotropic;
 uniform sampler2D snow_n : hint_normal, filter_linear_mipmap_anisotropic;
 uniform sampler2D cliff_a : source_color, filter_linear_mipmap_anisotropic;
 uniform sampler2D cliff_n : hint_normal, filter_linear_mipmap_anisotropic;
+global uniform float snow_cover;
 varying vec4 m;
 varying vec3 wp;
 varying vec3 wn;
@@ -398,8 +399,11 @@ void fragment() {
 	float wf = m.a;
 	float wg = m.b * (1.0 - m.a);
 	float wr = m.g * (1.0 - steep);
-	float ws = m.r;
+	float ws = max(m.r, smoothstep(0.1, 0.9, snow_cover) * smoothstep(0.55, 0.85, wn.y));
 	float wc = steep;
+	wf *= 1.0 - ws;
+	wg *= 1.0 - ws;
+	wr *= 1.0 - ws;
 	float wsum = wf + wg + wr + ws + wc + 1e-3;
 	vec3 a = (texture(forest_a, uf).rgb * wf + texture(grass_a, ug).rgb * wg + mix(texture(scree_a, ur).rgb,
 		texture(rock_a, ur).rgb, 0.5) * wr + texture(snow_a, ur).rgb * ws + texture(cliff_a, uc).rgb * wc) / wsum;

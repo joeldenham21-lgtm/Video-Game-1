@@ -30,6 +30,8 @@ const ROCK_SPACING := 8.0
 const SMALL_ROCK_SPACING := 4.0
 const SHRUB_SPACING := 5.5
 const LOG_SPACING := 13.0
+## Largest margin passed to excluded() + slack (m).
+const EXCL_REACH := 6.0
 
 const MAX_SLOPE := {Cat.TREE: 38.0, Cat.SAPLING: 38.0, Cat.SHRUB: 40.0, Cat.DEADWOOD: 30.0, Cat.ROCK_BIG: 48.0,
 	Cat.ROCK_SMALL: 44.0}
@@ -50,8 +52,13 @@ class Context:
 	var stumps: Array = []
 	var pads: Array = []                      # [Vector3(x, z, radius)]
 	var trails: Array = []                    # [PackedVector3Array of (x, z, half_width)] segments polyline
+	## Per scatter cell: pads and trail segments that come within EXCL_REACH of it (excluded() is called for
+	## every candidate, and a real map has ~1,500 trail segments).
+	var cell_pads: Dictionary = {}            # cell index -> Array[Vector3]
+	var cell_segs: Dictionary = {}            # cell index -> PackedFloat32Array (ax, az, bx, bz, ha, hb)
 	var density_mul := 1.0
 	var has_water := true
+	var has_masks2 := false                   # TerrainData.get_masks2(): R scree/talus/moraine, G gravel, B ice, A wetness
 
 
 class CellData:
@@ -97,6 +104,7 @@ static func make_context(lib: VegLibrary, terrain: Object, density_mul := 1.0) -
 	var ctx := Context.new()
 	ctx.terrain = terrain
 	ctx.density_mul = density_mul
+	ctx.has_masks2 = terrain.has_method("get_masks2")
 	for n in lib.kind_names:
 		var inf: Dictionary = lib.info(n)
 		var entry := {"index": int(inf["index"]), "name": n, "height": float(inf.get("height", 1.0)),
@@ -140,13 +148,48 @@ static func make_context(lib: VegLibrary, terrain: Object, density_mul := 1.0) -
 					var a: Array = q
 					var qx := float(a[0])
 					var qz := float(a[2]) if a.size() >= 3 else float(a[1])
-					var qw := float(a[3]) if a.size() >= 4 else width
+					# world_layout.json trail points are [x, y, z, flags]: the 4th value is not a width
+					var qw := float(a[3]) if a.size() >= 4 and float(a[3]) > 0.3 else width
 					pts.append(Vector3(qx, qz, qw * 0.5))
 				elif q is Dictionary:
 					pts.append(Vector3(float(q.get("x", 0.0)), float(q.get("z", 0.0)), float(q.get("width", width)) * 0.5))
 		if pts.size() >= 2:
 			ctx.trails.append(pts)
+	_index_exclusions(ctx)
 	return ctx
+
+
+static func _cells_touching(x0: float, z0: float, x1: float, z1: float) -> Array:
+	var out: Array = []
+	var c0 := cell_of(minf(x0, x1), minf(z0, z1))
+	var c1 := cell_of(maxf(x0, x1), maxf(z0, z1))
+	for cz in range(c0.y, c1.y + 1):
+		for cx in range(c0.x, c1.x + 1):
+			out.append(cell_index(cx, cz))
+	return out
+
+
+static func _index_exclusions(ctx: Context) -> void:
+	for p in ctx.pads:
+		var pad: Vector3 = p
+		var r := pad.z + EXCL_REACH
+		for ci in _cells_touching(pad.x - r, pad.y - r, pad.x + r, pad.y + r):
+			if not ctx.cell_pads.has(ci):
+				ctx.cell_pads[ci] = []
+			(ctx.cell_pads[ci] as Array).append(pad)
+	var acc := {}                              # cell index -> Array of floats
+	for t in ctx.trails:
+		var pts: PackedVector3Array = t
+		for i in pts.size() - 1:
+			var a := pts[i]
+			var b := pts[i + 1]
+			var r := maxf(a.z, b.z) + EXCL_REACH
+			for ci in _cells_touching(minf(a.x, b.x) - r, minf(a.y, b.y) - r, maxf(a.x, b.x) + r, maxf(a.y, b.y) + r):
+				if not acc.has(ci):
+					acc[ci] = []
+				(acc[ci] as Array).append_array([a.x, a.y, b.x, b.y, a.z, b.z])
+	for ci in acc:
+		ctx.cell_segs[ci] = PackedFloat32Array(acc[ci])
 
 
 # ---------------------------------------------------------------------------------------------- queries
@@ -175,32 +218,46 @@ static func noise2(x: float, z: float, scale: float, salt: int) -> float:
 	return lerpf(lerpf(a, b, tx), lerpf(c, d, tx), tz)
 
 
-## True when (x, z) is on a POI flat pad (+margin) or within half-width+margin of a trail.
+## True when (x, z) is on a POI flat pad (+margin) or within half-width+margin of a trail (margin <=
+## EXCL_REACH). Uses the per-cell index built by make_context().
 static func excluded(ctx: Context, x: float, z: float, margin: float) -> bool:
-	for p in ctx.pads:
-		var pad: Vector3 = p
-		var dx := x - pad.x
-		var dz := z - pad.y
-		var r := pad.z + margin
-		if dx * dx + dz * dz < r * r:
-			return true
-	for t in ctx.trails:
-		var pts: PackedVector3Array = t
-		for i in pts.size() - 1:
-			var a := pts[i]
-			var b := pts[i + 1]
-			var abx := b.x - a.x
-			var abz := b.y - a.y
-			var l2 := abx * abx + abz * abz
-			var u := 0.0
-			if l2 > 1e-6:
-				u = clampf(((x - a.x) * abx + (z - a.y) * abz) / l2, 0.0, 1.0)
-			var px := a.x + abx * u - x
-			var pz := a.y + abz * u - z
-			var hw := lerpf(a.z, b.z, u) + margin
-			if px * px + pz * pz < hw * hw:
+	var ci := cell_index(cell_of(x, z).x, cell_of(x, z).y)
+	var pads: Variant = ctx.cell_pads.get(ci)
+	if pads != null:
+		for p in pads:
+			var pad: Vector3 = p
+			var dx := x - pad.x
+			var dz := z - pad.y
+			var r := pad.z + margin
+			if dx * dx + dz * dz < r * r:
 				return true
+	var segs: Variant = ctx.cell_segs.get(ci)
+	if segs == null:
+		return false
+	var f: PackedFloat32Array = segs
+	for k in range(0, f.size(), 6):
+		var ax := f[k]
+		var az := f[k + 1]
+		var abx := f[k + 2] - ax
+		var abz := f[k + 3] - az
+		var l2 := abx * abx + abz * abz
+		var u := 0.0
+		if l2 > 1e-6:
+			u = clampf(((x - ax) * abx + (z - az) * abz) / l2, 0.0, 1.0)
+		var px := ax + abx * u - x
+		var pz := az + abz * u - z
+		var hw := lerpf(f[k + 4], f[k + 5], u) + margin
+		if px * px + pz * pz < hw * hw:
+			return true
 	return false
+
+
+## Secondary masks: R scree/talus/moraine, G gravel bars, B glacier ice, A wetness. Falls back to
+## get_surface() == scree when the terrain has no get_masks2().
+static func masks2(ctx: Context, x: float, z: float) -> Color:
+	if ctx.has_masks2:
+		return ctx.terrain.get_masks2(x, z)
+	return Color(1.0 if StringName(ctx.terrain.get_surface(x, z)) == &"scree" else 0.0, 0.0, 0.0, 0.0)
 
 
 static func in_water(ctx: Context, x: float, z: float, y: float, margin: float) -> bool:
@@ -285,9 +342,11 @@ static func generate_cell(ctx: Context, cx: int, cz: int) -> CellData:
 	if not ctx.rock_big.is_empty():
 		rng.seed = _hash(cx, cz, 11)
 		_grid(ctx, out, rng, placed, o, ROCK_SPACING, Cat.ROCK_BIG, func(x: float, z: float, y: float, m: Color, slope: float) -> float:
-			var scree := 1.0 if StringName(t.get_surface(x, z)) == &"scree" else 0.0
+			var m2 := masks2(ctx, x, z)
+			if m2.b > 0.4:
+				return 0.0
 			var moraine := smoothstep(2250.0, 2450.0, y) * (1.0 - m.r * 0.6)
-			return clampf(m.g * 0.55 + scree * 0.35 + moraine * 0.12 + m.a * 0.03, 0.0, 0.8))
+			return clampf(m.g * 0.55 + m2.r * 0.35 + moraine * 0.12 + m.a * 0.03, 0.0, 0.8))
 	# 2) trees
 	rng.seed = _hash(cx, cz, 23)
 	_grid(ctx, out, rng, placed, o, TREE_SPACING, Cat.TREE, func(x: float, z: float, _y: float, m: Color, _slope: float) -> float:
@@ -311,8 +370,10 @@ static func generate_cell(ctx: Context, cx: int, cz: int) -> CellData:
 	if not ctx.rock_small.is_empty():
 		rng.seed = _hash(cx, cz, 53)
 		_grid(ctx, out, rng, placed, o, SMALL_ROCK_SPACING, Cat.ROCK_SMALL, func(x: float, z: float, _y: float, m: Color, _slope: float) -> float:
-			var scree := 1.0 if StringName(t.get_surface(x, z)) == &"scree" else 0.0
-			return clampf(m.g * 0.3 + scree * 0.45 + 0.03 + m.a * 0.03, 0.0, 0.7))
+			var m2 := masks2(ctx, x, z)
+			if m2.b > 0.4:
+				return 0.0
+			return clampf(m.g * 0.3 + m2.r * 0.45 + m2.g * 0.12 + 0.03 + m.a * 0.03, 0.0, 0.7))
 	_build_transforms(out)
 	return out
 
@@ -421,7 +482,8 @@ static func _pick_tree(ctx: Context, t: Object, x: float, z: float, y: float, r_
 	var nrm: Vector3 = t.get_normal(x, z)
 	var south := clampf(nrm.z * 2.5, 0.0, 1.0)            # +Z = south-facing slope
 	var wl: float = t.get_water_level(x, z)
-	var moist := clampf(0.35 + (0.4 if wl > -1e20 else 0.0) + (1.0 - smoothstep(1350.0, 1700.0, y)) * 0.35 - south * 0.3, 0.0, 1.0)
+	var wetness := masks2(ctx, x, z).a if ctx.has_masks2 else 0.0
+	var moist := clampf(0.35 + (0.4 if wl > -1e20 else 0.0) + wetness * 0.4 + (1.0 - smoothstep(1350.0, 1700.0, y)) * 0.35 - south * 0.3, 0.0, 1.0)
 	var burn := smoothstep(0.72, 0.85, noise2(x, z, 160.0, 9))
 	var w := species_weights(y, south, moist, burn)
 	var keys := w.keys()
@@ -453,7 +515,7 @@ static func _pick_shrub(ctx: Context, t: Object, x: float, z: float, y: float, m
 	var nrm: Vector3 = t.get_normal(x, z)
 	var south := clampf(nrm.z * 2.5, 0.0, 1.0)
 	var wl: float = t.get_water_level(x, z)
-	var wet := 1.0 if wl > -1e20 else m.b * 0.6
+	var wet := 1.0 if wl > -1e20 else maxf(m.b * 0.6, masks2(ctx, x, z).a if ctx.has_masks2 else 0.0)
 	var w := {}
 	w["willow"] = wet * 1.2 * (1.0 - smoothstep(2100.0, 2350.0, y)) + 0.1
 	w["alder"] = (0.3 + wet * 0.6) * (1.0 - smoothstep(1900.0, 2150.0, y))

@@ -247,8 +247,11 @@ static func generate_cell(ctx: VegScatter.Context, c: Vector2i, sp: float, dens:
 				continue
 			var m: Color = t.get_masks(x, z)
 			var open := (1.0 - m.r * 0.9) * (1.0 - m.g)
-			var meadow := clampf(m.b * 1.15 + (1.0 - m.a) * 0.12, 0.0, 1.0) * open
-			var floor_cover := m.a * 0.22 * open
+			# canopy gaps: the same clump field VegScatter thins the trees with -> grassy openings in the forest
+			var tree_clump := VegScatter.noise2(x, z, 38.0, 3) * 0.7 + VegScatter.noise2(x, z, 11.0, 4) * 0.3
+			var gap := 1.0 - smoothstep(0.18, 0.42, tree_clump)
+			var meadow := clampf(m.b * 1.15 + (1.0 - m.a) * 0.12 + m.a * gap * 0.85, 0.0, 1.0) * open
+			var floor_cover := m.a * (1.0 - gap) * 0.22 * open
 			var clump := VegScatter.noise2(x, z, 6.0, 31) * 0.6 + VegScatter.noise2(x, z, 1.7, 32) * 0.4
 			var p := (meadow + floor_cover) * dens * (0.3 + 0.7 * smoothstep(0.25, 0.6, clump)) * 1.25
 			if r_acc >= p:
