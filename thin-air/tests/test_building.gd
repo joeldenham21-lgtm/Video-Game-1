@@ -494,7 +494,7 @@ func _batching() -> void:
 	var total := 0
 	var mms := 0
 	for c in 4:
-		var s := root.new_structure(Transform3D(Basis.IDENTITY, Vector3(100.0 + c * 14.0, GROUND_Y + 0.5, 100.0)))
+		var s := root.new_structure(Transform3D(Basis.IDENTITY, Vector3(134.0 + c * 14.0, GROUND_Y + 0.5, 150.0)))
 		for i in [-2, 0, 2]:
 			for k in [-2, 0, 2]:
 				s.add_piece(&"log_foundation", Vector3i(i, 0, k), {}, true)
@@ -512,8 +512,11 @@ func _batching() -> void:
 		s.flush_now()
 		total += s.piece_count()
 		mms += s.multimesh_count()
+	root.batcher.flush()
 	check(total >= 200, "%d pieces placed" % total)
-	check(mms <= 4 * 26, "%d pieces drawn by %d MultiMeshes (≤ 26 per cabin)" % [total, mms])
+	check(mms <= 4 * 30, "each cabin uses ≤ 30 distinct meshes (%d)" % mms)
+	var shared := root.batcher.multimesh_count_in(BuildBatcher.cluster_of(Vector3(150.0, 0.0, 150.0)))
+	check(shared <= 36, "%d pieces in 4 cabins drawn by %d shared MultiMeshes" % [total, shared])
 
 
 func _teardown() -> void:

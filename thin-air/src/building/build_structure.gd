@@ -405,7 +405,28 @@ func rebuild_visuals() -> void:
 	for e in sill_edges:
 		_push(inst, &"sill", Transform3D(Basis.IDENTITY, BuildGrid.slot_position(e)), 1.0)
 	_build_posts(inst, post_nodes)
-	_apply_multimeshes(inst)
+	instance_counts.clear()
+	for n in inst:
+		instance_counts[n] = (inst[n] as Array).size()
+	var batcher := _batcher()
+	if batcher:
+		for n in _mms.keys():
+			(_mms[n] as Node).queue_free()
+		_mms.clear()
+		batcher.submit(self, inst)
+	else:
+		_apply_multimeshes(inst)
+
+
+func _batcher() -> BuildBatcher:
+	var root := get_parent() as BuildingRoot
+	return root.batcher if root and root.batcher and is_instance_valid(root.batcher) else null
+
+
+func _exit_tree() -> void:
+	var b := _batcher()
+	if b:
+		b.remove(self)
 
 
 func _exposure_of(p: BuildPiece) -> float:
@@ -533,7 +554,6 @@ func clear_ground_cache() -> void:
 
 
 func _apply_multimeshes(inst: Dictionary) -> void:
-	instance_counts.clear()
 	var mobile := Settings.is_mobile()
 	for name in _mms.keys():
 		if not inst.has(name):
@@ -544,7 +564,6 @@ func _apply_multimeshes(inst: Dictionary) -> void:
 		var mesh := BuildCatalog.get_mesh(name)
 		if mesh == null:
 			continue
-		instance_counts[name] = list.size()
 		var mmi: MultiMeshInstance3D = _mms.get(name)
 		if mmi == null:
 			mmi = MultiMeshInstance3D.new()
@@ -569,8 +588,9 @@ func _apply_multimeshes(inst: Dictionary) -> void:
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
+## Distinct meshes this structure draws (each is one MultiMesh in its cluster).
 func multimesh_count() -> int:
-	return _mms.size()
+	return instance_counts.size()
 
 
 # ---------------------------------------------------------------------------------------------- shelter

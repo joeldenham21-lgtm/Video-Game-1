@@ -15,6 +15,7 @@ const LOG_CARRY_SCRIPT := "res://src/building/log_carry.gd"
 static var instance: BuildingRoot = null
 
 var free_root: Node3D
+var batcher: BuildBatcher
 var _next_sid := 1
 var _attached_player: Node = null
 var build_mode: Node = null
@@ -39,6 +40,10 @@ func _ready() -> void:
 
 
 func _ensure_free_root() -> void:
+	if batcher == null:
+		batcher = BuildBatcher.new()
+		batcher.name = "Batcher"
+		add_child(batcher)
 	if free_root == null:
 		free_root = get_node_or_null(^"Free") as Node3D
 	if free_root == null:

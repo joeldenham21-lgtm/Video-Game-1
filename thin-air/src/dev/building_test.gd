@@ -29,7 +29,7 @@ const SHOTS := {
 	# pos, look (yaw, pitch), hours, fov
 	"exterior": [Vector3(-7.8, 1.75, 10.6), Vector2(-36.0, 2.0), 16.55, 62.0],
 	"interior": [Vector3(-1.2, 1.55, -1.7), Vector2(165.0, -8.0), 22.4, 72.0],
-	"stilts": [Vector3(9.5, 1.1, 5.5), Vector2(58.0, 7.0), 15.2, 60.0],
+	"stilts": [Vector3(-3.5, 1.5, -2.5), Vector2(-28.0, 10.0), 15.2, 60.0],
 	"frames": [Vector3(3.5, 1.7, 15.5), Vector2(8.0, -8.0), 12.5, 66.0],
 	"camp": [Vector3(-11.0, 2.6, 17.0), Vector2(-28.0, -8.0), 16.7, 66.0],
 	"aerial": [Vector3(-16.0, 13.0, 18.0), Vector2(-40.0, -30.0), 15.8, 55.0],
@@ -364,7 +364,10 @@ func _build_camp(shot: String) -> void:
 		return root.place_free(id, Transform3D(Basis(Vector3.UP, yaw), wp), true)
 	place.call(&"bed", Vector3(-2.35, 0.0, -1.2), 90.0, true)
 	place.call(&"storage_box", Vector3(1.6, 0.0, -2.35), 0.0, true)
-	place.call(&"torch_stand", Vector3(2.3, 0.0, 2.2), 0.0, true)
+	var torch := place.call(&"torch_stand", Vector3(2.3, 0.0, 2.2), 0.0, true) as Node3D
+	if torch and torch.has_method(&"set_lit"):
+		torch.set(&"always_simulate", true)
+		torch.call(&"set_lit", true, true)
 	var fire := place.call(&"stone_fire_pit", cabin.world_of(Vector3(0.6, 0.0, 6.4)), 0.0) as Node3D
 	if fire and fire.has_method(&"add_fuel"):
 		fire.set(&"always_simulate", true)
@@ -375,12 +378,36 @@ func _build_camp(shot: String) -> void:
 		fire.set(&"intensity", 1.0)
 	# the old camp east of the cabin: lean-to facing its fire, windbreak on the weather side, bough bed inside
 	place.call(&"lean_to", cabin.world_of(Vector3(9.2, 0.0, -1.5)), 90.0 + 12.0)
-	place.call(&"campfire", cabin.world_of(Vector3(6.6, 0.0, -1.2)), 0.0)
+	var fire2 := place.call(&"campfire", cabin.world_of(Vector3(6.6, 0.0, -1.2)), 0.0) as Node3D
+	if fire2:
+		fire2.set(&"always_simulate", true)
+		fire2.set(&"fuel_minutes", 150.0)
+		fire2.set(&"has_kindling", true)
+		fire2.call(&"_set_state", 1)
+		fire2.set(&"intensity", 1.0)
 	place.call(&"bough_bed", cabin.world_of(Vector3(9.4, 0.0, -1.6)), 90.0 + 12.0)
 	place.call(&"stone_windbreak", cabin.world_of(Vector3(8.6, 0.0, -4.4)), 12.0)
 	place.call(&"drying_rack", cabin.world_of(Vector3(4.2, 0.0, 5.2)), -35.0)
 	place.call(&"snow_melter", cabin.world_of(Vector3(1.7, 0.0, 6.9)), 20.0)
 	place.call(&"workbench", cabin.world_of(Vector3(-4.6, 0.0, 1.8)), 90.0)
+	# an elevated food cache on stilts up the slope (bears can't reach it): tall posts, braces, a ladder
+	var cpos := Vector3(3.0, 0.0, -11.5)
+	var cb := Basis(Vector3.UP, deg_to_rad(-8.0))
+	var cg: PackedFloat32Array = []
+	for o: Vector3 in [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(-1, 0, 1), Vector3(1, 0, 1), Vector3.ZERO]:
+		var w := cpos + cb * o
+		cg.append(BuildingRoot.ground_height(w.x, w.z))
+	var cache := root.new_structure(Transform3D(cb, Vector3(cpos.x, BuildGrid.foundation_height(cg) + 1.6, cpos.z)))
+	cache.add_piece(&"log_foundation", Vector3i(0, 0, 0), {}, true)
+	cache.add_piece(&"log_doorway", Vector3i(0, 0, 1), {}, true)
+	cache.add_piece(&"door", Vector3i(0, 0, 1), {"flip": false}, true)
+	cache.add_piece(&"log_wall", Vector3i(0, 0, -1), {}, true)
+	cache.add_piece(&"log_wall", Vector3i(1, 0, 0), {}, true)
+	cache.add_piece(&"log_wall", Vector3i(-1, 0, 0), {}, true)
+	cache.add_piece(&"log_roof", Vector3i(0, 0, 0), {"dir": 0, "tier": 0, "shape": "peak"}, true)
+	cache.flush_now()
+	var lad_at := cache.world_of(Vector3(0.0, 0.0, 1.25))
+	root.place_free(&"rope_ladder", Transform3D(cb * Basis(Vector3.UP, PI), lad_at), true)
 	# a second, unfinished structure: frames at several stages
 	var f := root.new_structure(Transform3D(Basis(Vector3.UP, deg_to_rad(12.0)), cabin.world_of(Vector3(11.0, 0.0, 8.0))))
 	f.global_position.y = BuildGrid.foundation_height(PackedFloat32Array([BuildingRoot.ground_height(f.global_position.x - 1, f.global_position.z - 1),
