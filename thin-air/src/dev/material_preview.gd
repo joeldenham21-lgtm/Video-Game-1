@@ -137,7 +137,7 @@ func _build_environment() -> void:
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.tonemap_exposure = float(args.get("exposure", "1.0"))
-	env.ssao_enabled = true
+	env.ssao_enabled = Settings.is_forward_plus()   # SSAO is Forward+-only (Mobile warns)
 	env.ssao_radius = 0.6
 	env.ssao_intensity = 1.2
 	env.fog_enabled = true
