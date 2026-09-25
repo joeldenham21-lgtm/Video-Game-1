@@ -38,6 +38,7 @@ func run() -> void:
 	_injuries()
 	_difficulty()
 	_consumption()
+	_items_schema()
 	_persistence()
 	ItemDB.items.erase(&"_t_ration")
 	ItemDB.items.erase(&"_t_tea")
@@ -259,7 +260,8 @@ func _consumption() -> void:
 	v.food = 40.0
 	v.water = 40.0
 	check(v.consume(&"_t_ration"), "consume a ration bar")
-	check(absf(v.food - 52.5) < 0.01, "250 kcal = +12.5 food (%.2f)" % v.food)
+	var kcal_pt := float(Vitals.TUNING[&"kcal_per_food_point"])
+	check(absf(v.food - (40.0 + 250.0 / kcal_pt)) < 0.01, "250 kcal = +%.1f food without an explicit food value (%.2f)" % [250.0 / kcal_pt, v.food])
 	check(absf(v.water - 38.0) < 0.01, "dry food costs a little water")
 	v.warmth = 50.0
 	v.consume(&"_t_tea")
@@ -270,6 +272,52 @@ func _consumption() -> void:
 	v.simulate(0.1)
 	check(v.has_effect(&"well_fed"), "well_fed when food ≥ 80")
 	v.queue_free()
+
+
+## Vitals.consume() against the real data/items.json food / drink / medical blocks.
+func _items_schema() -> void:
+	var v := _make()
+	v.food = 30.0
+	v.water = 30.0
+	v.warmth = 50.0
+	var mc: Dictionary = ItemDB.get_item(&"meat_cooked").get("food", {})
+	check(v.consume(&"meat_cooked") and is_equal_approx(v.food, 30.0 + float(mc.get("food", 0.0))),
+		"cooked meat adds its items.json food points (%.1f)" % v.food)
+	check(v.warmth > 50.0 and v.has_effect(&"warmed_up"), "hot food warms you (items.json warmth %s)" % str(mc.get("warmth")))
+	var tea: Dictionary = ItemDB.get_item(&"pine_tea").get("food", {})
+	var w0 := v.water
+	v.consume(&"pine_tea")
+	check(is_equal_approx(v.water, minf(w0 + float(tea.get("water", 0.0)), 100.0)), "pine tea adds its water (%.1f)" % v.water)
+	# raw_risk decides illness: 0 never, 1 always.
+	ItemDB.items[&"_t_safe_raw"] = {"id": &"_t_safe_raw", "category": "food", "food": {"calories": 10, "raw": true, "raw_risk": 0.0}}
+	ItemDB.items[&"_t_bad_raw"] = {"id": &"_t_bad_raw", "category": "food", "food": {"calories": 10, "raw": true, "raw_risk": 1.0}}
+	for _i in 20:
+		v.consume(&"_t_safe_raw")
+	check(not v.has_effect(&"sick"), "raw_risk 0: never sick")
+	v.consume(&"_t_bad_raw")
+	check(v.has_effect(&"sick"), "raw_risk 1: sick")
+	ItemDB.items.erase(&"_t_safe_raw")
+	ItemDB.items.erase(&"_t_bad_raw")
+	# Medical blocks: health, stops, warmth, effect + duration_minutes (game minutes).
+	var m := _make()
+	m.health = 40.0
+	m.add_effect(&"bleeding", 200.0, 1.0)
+	var fa: Dictionary = ItemDB.get_item(&"first_aid_kit").get("medical", {})
+	check(m.consume(&"first_aid_kit") and is_equal_approx(m.health, 40.0 + float(fa.get("health", 0.0))) and not m.has_effect(&"bleeding"),
+		"first aid kit: items.json health + stops bleeding (%.1f)" % m.health)
+	m.add_effect(&"sprain", 300.0, 1.0)
+	var slow := m.movement_multiplier()
+	check(m.consume(&"painkillers") and m.has_effect(&"painkiller") and m.movement_multiplier() > slow,
+		"painkillers: painkiller effect eases a sprain (%.2f → %.2f)" % [slow, m.movement_multiplier()])
+	check(m.consume(&"splint") and not m.has_effect(&"sprain"), "splint stops a sprain")
+	m.warmth = 40.0
+	m.consume(&"emergency_blanket")
+	var eb: Dictionary = ItemDB.get_item(&"emergency_blanket").get("medical", {})
+	var secs := Climate.game_minutes_to_seconds(float(eb.get("duration_minutes", 0.0)))
+	check(m.warmth > 55.0 and m.has_effect(&"warmed_up") and float(m.effects[&"warmed_up"]["time"]) >= secs - 0.01,
+		"emergency blanket: warmth + warmed_up for its duration_minutes (%.0f s)" % secs)
+	for n in [v, m]:
+		n.queue_free()
 
 
 func _persistence() -> void:

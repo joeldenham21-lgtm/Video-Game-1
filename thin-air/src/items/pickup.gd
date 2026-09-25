@@ -23,6 +23,8 @@ extends RigidBody3D
 
 ## Set by ItemsRoot.spawn(): a dropped item (saved as part of ItemsRoot's state, never "collected").
 var dynamic := false
+## Extra per-stack state carried through the world and saves (a canteen's "unsafe" water): JSON-safe values.
+var extra: Dictionary = {}
 var _visual_root: Node3D
 var _shape_node: CollisionShape3D
 var _built_key := ""
@@ -90,7 +92,15 @@ func interact(player: Node) -> void:
 
 ## Moves as much of this stack as fits into `inv`; frees the pickup when empty. Returns how many were taken.
 func take_into(inv: Inventory) -> int:
-	var left := inv.add(item_id, count, durability)
+	var left := count
+	if extra.is_empty():
+		left = inv.add(item_id, count, durability)
+	else:
+		var st := extra.duplicate()
+		st["id"] = item_id
+		st["count"] = count
+		st["durability"] = durability
+		left = inv.add_stack(st)
 	var got := count - left
 	if got <= 0:
 		return 0
@@ -112,7 +122,10 @@ func _collected() -> void:
 
 
 func save_data() -> Dictionary:
-	return {"id": String(item_id), "count": count, "durability": durability, "xf": SaveUtil.xform(global_transform)}
+	var d := {"id": String(item_id), "count": count, "durability": durability, "xf": SaveUtil.xform(global_transform)}
+	if not extra.is_empty():
+		d["extra"] = extra.duplicate()
+	return d
 
 
 # ---------------------------------------------------------------------------------------------- visuals

@@ -125,6 +125,10 @@ static func tool_matches(item_id: StringName, key: StringName) -> bool:
 
 static func _wears(item_id: StringName) -> bool:
 	var t: Variant = ItemDB.get_item(item_id).get("tool", null)
+	# The canteen's slot durability is its fill level (player consumable), not wear: boiling in it must
+	# not "wear" (and at 0 % destroy) it.
+	if t is Dictionary and String((t as Dictionary).get("type", "")) == "canteen":
+		return false
 	return t is Dictionary and int((t as Dictionary).get("durability", 0)) > 1
 
 

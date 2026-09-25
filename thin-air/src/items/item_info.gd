@@ -11,7 +11,7 @@ const CATEGORY_LABELS := {
 
 const SLOT_LABELS := {
 	"head": "Head", "face": "Face", "body": "Body", "legs": "Legs", "hands": "Hands", "feet": "Feet",
-	"back": "Back", "hand": "Hands (tool)",
+	"back": "Back", "hand": "Hands (tool)", "feet_addon": "Crampons", "mask": "Oxygen mask",
 }
 
 const GEAR_LABELS := {
@@ -70,21 +70,44 @@ static func primary_action(id: StringName) -> String:
 		return "Apply" if id != &"painkillers" else "Take"
 	if d.has("read"):
 		return "Read"
-	var slot := String(d.get("equip_slot", ""))
-	if slot == "hand":
+	var slot := wear_slot_of(d)
+	if slot == &"hand":
 		return "Hold"
-	if slot != "":
+	if slot != &"":
 		return "Wear"
 	return ""
 
 
+## Equipment slot an item is worn in (&"" = not wearable, &"hand" = held tool). Besides the data's equip_slot,
+## boot add-ons ("addon_slot": "feet", crampons) strap on in &"feet_addon" and an oxygen mask (gear o2_mask)
+## goes in its own &"mask" slot so it can be worn together with goggles. Tools with a "tool" block but no
+## equip_slot (the canteen) are held in the hands. Player.equip() and the inventory UI both use this.
+static func wear_slot(id: StringName) -> StringName:
+	return wear_slot_of(ItemDB.get_item(id))
+
+
+static func wear_slot_of(d: Dictionary) -> StringName:
+	if d.is_empty():
+		return &""
+	var addon := String(d.get("addon_slot", ""))
+	var g: Variant = d.get("gear", [])
+	if addon != "" or (g is Array and (g as Array).has("crampons")):
+		return StringName((addon if addon != "" else "feet") + "_addon")
+	if g is Array and (g as Array).has("o2_mask"):
+		return &"mask"
+	var slot := String(d.get("equip_slot", ""))
+	if slot == "" and d.get("tool", null) is Dictionary and String((d["tool"] as Dictionary).get("type", "")) != "":
+		return &"hand"
+	return StringName(slot)
+
+
 static func is_wearable(id: StringName) -> bool:
-	var slot := String(ItemDB.get_item(id).get("equip_slot", ""))
-	return slot != "" and slot != "hand"
+	var slot := wear_slot(id)
+	return slot != &"" and slot != &"hand"
 
 
 static func is_holdable(id: StringName) -> bool:
-	return String(ItemDB.get_item(id).get("equip_slot", "")) == "hand"
+	return wear_slot(id) == &"hand"
 
 
 static func is_consumable(id: StringName) -> bool:

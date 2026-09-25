@@ -12,6 +12,12 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	var script: Script = load(path)
+	# `for t in tests/test_*.gd` also globs the harness itself (this runner, the TestCase base): skip them.
+	if script == get_script() or path.get_file() == "test_case.gd" or get_parent() != get_tree().root:
+		if get_parent() == get_tree().root:
+			print("RESULT PASS (skipped: %s is test infrastructure, not a test)" % path)
+			get_tree().quit(0)
+		return
 	var t: Node = script.new()
 	add_child(t)
 	await get_tree().process_frame
