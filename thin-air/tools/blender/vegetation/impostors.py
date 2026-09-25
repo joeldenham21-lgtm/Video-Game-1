@@ -18,6 +18,7 @@ Frame math (Godot object space, Y up; mirrored in assets/shaders/impostor.gdshad
 Out: assets/textures/foliage/impostor_albedo.png (RGBA: albedo incl. AO, coverage) and impostor_normal.png
 (RGB object-space normal * 0.5 + 0.5, A depth 0.5 + offset / max(Sx, Sy)), both stacked vertically (one
 1024 px slice per tree) and imported as Texture2DArray; manifest "impostors" section with the layer map.
+Then run `python3.12 thin-air/tools/vegetation/atlas_webp.py` (lossless WebP re-encode, what ships).
 """
 from __future__ import annotations
 

@@ -144,32 +144,32 @@
   }
  },
  "impostors": {
-  "albedo": "res://assets/textures/foliage/impostor_albedo.png",
+  "albedo": "res://assets/textures/foliage/impostor_albedo.webp",
   "frames": 8,
   "layers": {
    "fir_a": {
-    "center_y": 11.0444,
-    "height": 22.0888,
+    "center_y": 11.0459,
+    "height": 22.0919,
     "layer": 3,
-    "radius": 2.201
+    "radius": 2.1692
    },
    "fir_b": {
-    "center_y": 7.0422,
-    "height": 14.0843,
+    "center_y": 7.0442,
+    "height": 14.0885,
     "layer": 4,
-    "radius": 1.7862
+    "radius": 1.6853
    },
    "larch_a": {
-    "center_y": 9.0289,
-    "height": 18.0578,
+    "center_y": 9.0263,
+    "height": 18.0525,
     "layer": 9,
-    "radius": 3.3526
+    "radius": 3.2905
    },
    "larch_b": {
-    "center_y": 6.0272,
-    "height": 12.0543,
+    "center_y": 6.0287,
+    "height": 12.0574,
     "layer": 10,
-    "radius": 2.6577
+    "radius": 2.6313
    },
    "lodgepole_a": {
     "center_y": 12.3278,
@@ -196,22 +196,22 @@
     "radius": 0.7794
    },
    "spruce_a": {
-    "center_y": 14.0349,
-    "height": 28.0698,
+    "center_y": 14.0342,
+    "height": 28.0684,
     "layer": 0,
-    "radius": 3.0865
+    "radius": 2.8962
    },
    "spruce_b": {
-    "center_y": 10.0335,
-    "height": 20.067,
+    "center_y": 10.0362,
+    "height": 20.0725,
     "layer": 1,
-    "radius": 2.6619
+    "radius": 2.5695
    },
    "spruce_c": {
-    "center_y": 6.5371,
-    "height": 13.0743,
+    "center_y": 6.5363,
+    "height": 13.0726,
     "layer": 2,
-    "radius": 2.5643
+    "radius": 2.3323
    },
    "whitebark_a": {
     "center_y": 6.1414,
@@ -227,7 +227,7 @@
    }
   },
   "margin": 1.06,
-  "normal": "res://assets/textures/foliage/impostor_normal.png",
+  "normal": "res://assets/textures/foliage/impostor_normal.webp",
   "tile": 128
  },
  "plants": {
@@ -501,14 +501,14 @@
  "trees": {
   "fir_a": {
    "aabb_max": [
-    2.122,
-    22.089,
-    1.9
+    2.119,
+    22.092,
+    1.68
    ],
    "aabb_min": [
-    -2.101,
+    -1.982,
     -0.402,
-    -1.812
+    -1.797
    ],
    "bark": "bark_spruce",
    "bark_tint": [
@@ -520,13 +520,13 @@
    "card_spacing_mul": 1.0,
    "cards": "fir",
    "crown_base": 2.64,
-   "crown_radius": 2.122,
+   "crown_radius": 2.119,
    "dbh": 0.36,
-   "height": 22.089,
+   "height": 22.092,
    "leaf_tint": [
-    1.7,
-    1.75,
-    1.7
+    1.38,
+    1.5,
+    1.42
    ],
    "path": "res://assets/models/vegetation/fir_a.glb",
    "sapling": false,
@@ -534,7 +534,7 @@
    "stems": 1,
    "transl": 0.45,
    "tris": [
-    3208,
+    4180,
     635,
     145
    ],
@@ -543,14 +543,14 @@
   },
   "fir_b": {
    "aabb_max": [
-    1.666,
-    14.084,
-    1.664
+    1.542,
+    14.088,
+    1.521
    ],
    "aabb_min": [
-    -1.629,
+    -1.53,
     -0.4,
-    -1.717
+    -1.649
    ],
    "bark": "bark_spruce",
    "bark_tint": [
@@ -562,13 +562,13 @@
    "card_spacing_mul": 1.0,
    "cards": "fir",
    "crown_base": 0.7,
-   "crown_radius": 1.717,
+   "crown_radius": 1.649,
    "dbh": 0.24,
-   "height": 14.084,
+   "height": 14.088,
    "leaf_tint": [
-    1.7,
-    1.75,
-    1.7
+    1.38,
+    1.5,
+    1.42
    ],
    "path": "res://assets/models/vegetation/fir_b.glb",
    "sapling": false,
@@ -576,7 +576,7 @@
    "stems": 1,
    "transl": 0.45,
    "tris": [
-    1914,
+    2584,
     443,
     141
    ],
@@ -585,14 +585,14 @@
   },
   "larch_a": {
    "aabb_max": [
-    3.154,
-    18.058,
-    3.073
+    2.962,
+    18.053,
+    2.967
    ],
    "aabb_min": [
-    -2.951,
+    -2.759,
     -0.401,
-    -2.767
+    -2.823
    ],
    "bark": "bark_pine",
    "bark_tint": [
@@ -604,9 +604,9 @@
    "card_spacing_mul": 1.0,
    "cards": "larch",
    "crown_base": 3.6,
-   "crown_radius": 3.154,
+   "crown_radius": 2.967,
    "dbh": 0.4,
-   "height": 18.058,
+   "height": 18.053,
    "leaf_tint": [
     1.45,
     1.4,
@@ -618,7 +618,7 @@
    "stems": 1,
    "transl": 0.85,
    "tris": [
-    2912,
+    3800,
     989,
     147
    ],
@@ -627,14 +627,14 @@
   },
   "larch_b": {
    "aabb_max": [
-    2.352,
-    12.054,
-    2.528
+    2.213,
+    12.057,
+    2.24
    ],
    "aabb_min": [
-    -2.282,
+    -2.221,
     -0.403,
-    -2.218
+    -2.068
    ],
    "bark": "bark_pine",
    "bark_tint": [
@@ -646,9 +646,9 @@
    "card_spacing_mul": 1.0,
    "cards": "larch",
    "crown_base": 1.2,
-   "crown_radius": 2.528,
+   "crown_radius": 2.24,
    "dbh": 0.28,
-   "height": 12.054,
+   "height": 12.057,
    "leaf_tint": [
     1.45,
     1.4,
@@ -660,7 +660,7 @@
    "stems": 1,
    "transl": 0.85,
    "tris": [
-    1474,
+    1962,
     555,
     151
    ],
@@ -680,9 +680,9 @@
    ],
    "bark": "bark_pine",
    "bark_tint": [
-    0.8,
-    0.82,
-    0.9
+    0.62,
+    0.64,
+    0.74
    ],
    "broken": false,
    "card_spacing_mul": 1.0,
@@ -722,9 +722,9 @@
    ],
    "bark": "bark_pine",
    "bark_tint": [
-    0.8,
-    0.82,
-    0.9
+    0.62,
+    0.64,
+    0.74
    ],
    "broken": false,
    "card_spacing_mul": 1.0,
@@ -837,14 +837,14 @@
   },
   "spruce_a": {
    "aabb_max": [
-    2.835,
-    28.07,
-    2.695
+    2.782,
+    28.068,
+    2.63
    ],
    "aabb_min": [
-    -2.673,
+    -2.728,
     -0.403,
-    -2.873
+    -2.528
    ],
    "bark": "bark_spruce",
    "bark_tint": [
@@ -853,16 +853,16 @@
     0.72
    ],
    "broken": false,
-   "card_spacing_mul": 1.26,
+   "card_spacing_mul": 1.469,
    "cards": "spruce",
    "crown_base": 8.4,
-   "crown_radius": 2.873,
+   "crown_radius": 2.782,
    "dbh": 0.5,
-   "height": 28.07,
+   "height": 28.068,
    "leaf_tint": [
-    1.75,
-    1.8,
-    1.8
+    1.42,
+    1.55,
+    1.7
    ],
    "path": "res://assets/models/vegetation/spruce_a.glb",
    "sapling": false,
@@ -870,7 +870,7 @@
    "stems": 1,
    "transl": 0.5,
    "tris": [
-    5786,
+    5880,
     985,
     135
    ],
@@ -879,14 +879,14 @@
   },
   "spruce_b": {
    "aabb_max": [
-    2.567,
-    20.067,
-    2.267
+    2.392,
+    20.072,
+    2.087
    ],
    "aabb_min": [
-    -2.574,
+    -2.258,
     -0.405,
-    -2.46
+    -2.371
    ],
    "bark": "bark_spruce",
    "bark_tint": [
@@ -898,13 +898,13 @@
    "card_spacing_mul": 1.0,
    "cards": "spruce",
    "crown_base": 3.2,
-   "crown_radius": 2.574,
+   "crown_radius": 2.392,
    "dbh": 0.36,
-   "height": 20.067,
+   "height": 20.072,
    "leaf_tint": [
-    1.75,
-    1.8,
-    1.8
+    1.42,
+    1.55,
+    1.7
    ],
    "path": "res://assets/models/vegetation/spruce_b.glb",
    "sapling": false,
@@ -912,7 +912,7 @@
    "stems": 1,
    "transl": 0.5,
    "tris": [
-    4010,
+    4778,
     689,
     143
    ],
@@ -921,14 +921,14 @@
   },
   "spruce_c": {
    "aabb_max": [
-    2.226,
-    13.074,
-    2.179
+    2.224,
+    13.073,
+    2.077
    ],
    "aabb_min": [
-    -2.122,
-    -1.202,
-    -2.451
+    -1.999,
+    -0.939,
+    -2.21
    ],
    "bark": "bark_spruce",
    "bark_tint": [
@@ -940,13 +940,13 @@
    "card_spacing_mul": 1.0,
    "cards": "spruce",
    "crown_base": 0.39,
-   "crown_radius": 2.451,
+   "crown_radius": 2.224,
    "dbh": 0.27,
-   "height": 13.074,
+   "height": 13.073,
    "leaf_tint": [
-    1.75,
-    1.8,
-    1.8
+    1.42,
+    1.55,
+    1.7
    ],
    "path": "res://assets/models/vegetation/spruce_c.glb",
    "sapling": false,
@@ -954,7 +954,7 @@
    "stems": 1,
    "transl": 0.5,
    "tris": [
-    3022,
+    4198,
     575,
     151
    ],
@@ -963,14 +963,14 @@
   },
   "spruce_sapling_a": {
    "aabb_max": [
-    0.781,
-    2.363,
-    0.697
+    0.726,
+    2.362,
+    0.668
    ],
    "aabb_min": [
-    -0.748,
-    -0.453,
-    -0.748
+    -0.702,
+    -0.44,
+    -0.696
    ],
    "bark": "bark_spruce",
    "bark_tint": [
@@ -982,13 +982,13 @@
    "card_spacing_mul": 1.0,
    "cards": "spruce",
    "crown_base": 0.0,
-   "crown_radius": 0.781,
+   "crown_radius": 0.726,
    "dbh": 0.035,
-   "height": 2.363,
+   "height": 2.362,
    "leaf_tint": [
-    1.75,
-    1.8,
-    1.8
+    1.42,
+    1.55,
+    1.7
    ],
    "path": "res://assets/models/vegetation/spruce_sapling_a.glb",
    "sapling": true,
@@ -996,7 +996,7 @@
    "stems": 1,
    "transl": 0.5,
    "tris": [
-    616,
+    842,
     127,
     80
    ],
@@ -1005,14 +1005,14 @@
   },
   "spruce_sapling_b": {
    "aabb_max": [
-    1.066,
-    4.463,
-    0.947
+    0.979,
+    4.457,
+    0.938
    ],
    "aabb_min": [
-    -0.991,
-    -0.735,
-    -1.025
+    -1.002,
+    -0.487,
+    -1.041
    ],
    "bark": "bark_spruce",
    "bark_tint": [
@@ -1024,13 +1024,13 @@
    "card_spacing_mul": 1.0,
    "cards": "spruce",
    "crown_base": 0.0,
-   "crown_radius": 1.066,
+   "crown_radius": 1.041,
    "dbh": 0.075,
-   "height": 4.463,
+   "height": 4.457,
    "leaf_tint": [
-    1.75,
-    1.8,
-    1.8
+    1.42,
+    1.55,
+    1.7
    ],
    "path": "res://assets/models/vegetation/spruce_sapling_b.glb",
    "sapling": true,
@@ -1038,7 +1038,7 @@
    "stems": 1,
    "transl": 0.5,
    "tris": [
-    1508,
+    2296,
     253,
     128
    ],

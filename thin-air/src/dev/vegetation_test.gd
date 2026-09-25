@@ -5,7 +5,7 @@ extends Node3D
 ##   DISPLAY=:99 godot --path thin-air --rendering-method forward_plus --write-movie /tmp/v.png --fixed-fps 30 \
 ##     --quit-after 60 --resolution 1280x720 res://scenes/dev/vegetation_test.tscn -- --mode=lineup
 ## Modes:
-##   --mode=lineup   [--kinds=spruce_a,fir_a] [--lod=0|1|2|3 (3 = impostor)] [--spacing=m]
+##   --mode=lineup   [--kinds=spruce_a,fir_a] [--lod=0|1|2|3 (3 = impostor)] [--lods=0,1,2,3] [--spacing=m]
 ##   --mode=forest   the real Vegetation system (scenes/world/vegetation.tscn) on VegTestTerrain: a valley with
 ##                   a lake, forested slopes, an escarpment and a treeline bench, rendered as a terrain mesh
 ##                   with collision [--density=1.0] [--flat = the flat TerrainData stub instead]
@@ -203,12 +203,20 @@ func _build_lineup() -> void:
 		names = String(args["kinds"]).split(",")
 	else:
 		names = lib.kind_names.duplicate()
-	var lod := int(args.get("lod", "0"))
+	var lods: Array = [int(args.get("lod", "0"))]
+	if args.has("lods"):
+		# --lods=0,1,2,3: every kind repeated once per LOD (3 = impostor), same orientation
+		lods = Array(String(args["lods"]).split(",")).map(func(v: String) -> int: return int(v))
+	var expanded: Array = []
+	for n in names:
+		for l in lods:
+			expanded.append([n, l])
 	var spacing := float(args.get("spacing", "0"))
 	var x := 0.0
 	var prev_r := 0.0
-	for i in names.size():
-		var kind := StringName(names[i])
+	for i in expanded.size():
+		var kind := StringName(expanded[i][0])
+		var lod: int = expanded[i][1]
 		if not lib.has_kind(kind):
 			continue
 		var inf := lib.info(kind)
@@ -218,6 +226,15 @@ func _build_lineup() -> void:
 		var pos := Vector3(x, GROUND_Y, 0.0)
 		if lod >= 3 and lib.has_impostors() and inf.has("impostor_layer"):
 			_add_impostor(kind, pos)
+			if args.get("labels", "1") == "1":
+				var li := Label3D.new()
+				li.text = "%s impostor" % kind
+				li.pixel_size = 0.01
+				li.font_size = 40
+				li.outline_size = 8
+				li.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+				li.position = pos + Vector3(0.0, -0.2, r + 0.6)
+				add_child(li)
 			continue
 		var ms := lib.meshes(kind)
 		if ms.is_empty():
@@ -225,10 +242,10 @@ func _build_lineup() -> void:
 		var mi := MeshInstance3D.new()
 		mi.mesh = ms[mini(lod, ms.size() - 1)]
 		mi.position = pos
-		mi.rotation.y = float(i) * 1.3
+		mi.rotation.y = float(i) * 1.3 if lods.size() == 1 else 0.0
 		add_child(mi)
 		var l := Label3D.new()
-		l.text = String(kind)
+		l.text = String(kind) if lods.size() == 1 else "%s LOD%d" % [kind, lod]
 		l.pixel_size = 0.01
 		l.font_size = 40
 		l.outline_size = 8
