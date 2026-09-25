@@ -558,24 +558,24 @@ func clear_ground_cache() -> void:
 
 func _apply_multimeshes(inst: Dictionary) -> void:
 	var mobile := Settings.is_mobile()
-	for name in _mms.keys():
-		if not inst.has(name):
-			(_mms[name] as Node).queue_free()
-			_mms.erase(name)
-	for name in inst:
-		var list: Array = inst[name]
-		var mesh := BuildCatalog.get_mesh(name)
+	for mesh_name in _mms.keys():
+		if not inst.has(mesh_name):
+			(_mms[mesh_name] as Node).queue_free()
+			_mms.erase(mesh_name)
+	for mesh_name in inst:
+		var list: Array = inst[mesh_name]
+		var mesh := BuildCatalog.get_mesh(mesh_name)
 		if mesh == null:
 			continue
-		var mmi: MultiMeshInstance3D = _mms.get(name)
+		var mmi: MultiMeshInstance3D = _mms.get(mesh_name)
 		if mmi == null:
 			mmi = MultiMeshInstance3D.new()
-			mmi.name = String(name)
+			mmi.name = String(mesh_name)
 			mmi.visibility_range_end = VIS_RANGE_MOBILE if mobile else VIS_RANGE_DESKTOP
 			mmi.visibility_range_end_margin = 20.0
 			mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
 			_visual.add_child(mmi)
-			_mms[name] = mmi
+			_mms[mesh_name] = mmi
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		mm.use_custom_data = true
@@ -587,7 +587,7 @@ func _apply_multimeshes(inst: Dictionary) -> void:
 			mm.set_instance_custom_data(i, Color(float(e[2]), float(e[1]), 0.0, 1.0))
 		mmi.multimesh = mm
 		# Distant structures: drop fine shadow detail (stubs/strips/footings) on mobile.
-		if mobile and (String(name).begins_with("stub_") or String(name).begins_with("footing") or String(name).ends_with("_pz") or String(name).ends_with("_nz")):
+		if mobile and (String(mesh_name).begins_with("stub_") or String(mesh_name).begins_with("footing") or String(mesh_name).ends_with("_pz") or String(mesh_name).ends_with("_nz")):
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 

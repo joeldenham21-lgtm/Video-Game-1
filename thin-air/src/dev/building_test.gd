@@ -355,6 +355,11 @@ func _build_camp(shot: String) -> void:
 		s.add_piece(&"log_roof", Vector3i(i, 0, 2), {"dir": 3, "tier": 0, "shape": "slope"}, true)
 	for i in [-2, 0, 2]:
 		s.add_piece(&"log_roof", Vector3i(i, 0, 0), s.roof_props_for(Vector3i(i, 0, 0), 1), true)
+	# a porch deck in front of the door with pole railings
+	for i in [-2, 0, 2]:
+		s.add_piece(&"log_foundation", Vector3i(i, 0, 4), {}, true)
+	for e in [Vector3i(-2, 0, 5), Vector3i(2, 0, 5), Vector3i(-3, 0, 4), Vector3i(3, 0, 4)]:
+		s.add_piece(&"log_railing", e, {}, true)
 	if shot == "interior" or shot == "camp":
 		door.set_open(true, true)
 	s.flush_now()
@@ -392,7 +397,7 @@ func _build_camp(shot: String) -> void:
 		fire2.set(&"intensity", 1.0)
 	place.call(&"bough_bed", cabin.world_of(Vector3(9.5, 0.0, -1.5)), -78.0)
 	place.call(&"stone_windbreak", cabin.world_of(Vector3(8.6, 0.0, -4.4)), 12.0)
-	var rack := place.call(&"drying_rack", cabin.world_of(Vector3(4.2, 0.0, 5.2)), -35.0) as Node3D
+	var rack := place.call(&"drying_rack", cabin.world_of(Vector3(5.2, 0.0, 6.2)), -35.0) as Node3D
 	var melter := place.call(&"snow_melter", cabin.world_of(Vector3(1.7, 0.0, 6.9)), 20.0) as Node3D
 	var stock := Inventory.new(20, 999.0)
 	stock.add(&"meat_raw", 5)

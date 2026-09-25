@@ -53,10 +53,8 @@ func _refresh_door_visual() -> void:
 		else:
 			var role := BuildObject._role_of(_leaf_mesh.mesh.surface_get_material(i))
 			_leaf_mesh.set_surface_override_material(i, BuildMaterials.frame_material(role, build.fraction()))
-	# A frame is only an outline: walk through it.
-	for c in _leaf.get_children():
-		if c is CollisionShape3D:
-			(c as CollisionShape3D).disabled = not done
+	# A frame is only an outline: walk through it (it stays interactable to fill it in).
+	_leaf.collision_layer = BuildPiece.LAYER_BUILDING if done else BuildPiece.LAYER_INTERACT
 
 
 func refresh_visual() -> void:

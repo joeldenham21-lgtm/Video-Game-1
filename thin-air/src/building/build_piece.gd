@@ -6,6 +6,8 @@ extends StaticBody3D
 ## MultiMeshes and this node keeps only collision + interaction.
 
 const LAYER_BUILDING := 1 << 6
+## Blueprint frames are interaction-only (layer 5): you walk through them and fill them in.
+const LAYER_INTERACT := 1 << 4
 
 @export var buildable_id: StringName = &""
 
@@ -169,6 +171,7 @@ static func _box(size: Vector3, centre: Vector3) -> Array:
 func refresh_visual() -> void:
 	if build == null:
 		return
+	collision_layer = LAYER_BUILDING if build.complete else LAYER_INTERACT
 	if build.complete:
 		for m in _frame_meshes:
 			if is_instance_valid(m):

@@ -182,14 +182,14 @@ func _make_card(id: StringName, inv: Inventory) -> Button:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(icon)
-	var name := Label.new()
-	name.text = BuildCatalog.display_name(id)
-	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name.add_theme_font_override(&"font", InvStyle.font("Medium"))
-	name.add_theme_font_size_override(&"font_size", 15)
-	name.add_theme_color_override(&"font_color", InvStyle.TEXT)
-	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_child(name)
+	var title := Label.new()
+	title.text = BuildCatalog.display_name(id)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_override(&"font", InvStyle.font("Medium"))
+	title.add_theme_font_size_override(&"font_size", 15)
+	title.add_theme_color_override(&"font_color", InvStyle.TEXT)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(title)
 	var cost := RichTextLabel.new()
 	cost.bbcode_enabled = true
 	cost.fit_content = true
@@ -368,7 +368,7 @@ func _build_touch() -> void:
 	box.offset_bottom = 170
 	box.add_theme_constant_override(&"separation", 10)
 	_touch.add_child(box)
-	var scale := float(Settings.get_value(&"touch_ui_scale", 1.0))
+	var ui_scale := float(Settings.get_value(&"touch_ui_scale", 1.0))
 	for spec in [["Place", "primary", func() -> void: mode.place()],
 			["⟲  Rotate", "secondary", func() -> void: mode.rotate_by(-1)],
 			["Rotate  ⟳", "secondary", func() -> void: mode.rotate_by(1)],
@@ -376,20 +376,20 @@ func _build_touch() -> void:
 			["Exit", "secondary", func() -> void: mode.exit()]]:
 		var b := Button.new()
 		b.text = String(spec[0])
-		InvStyle.style_button(b, String(spec[1]), int(20 * scale))
-		b.custom_minimum_size = Vector2(160, 60) * scale
+		InvStyle.style_button(b, String(spec[1]), int(20 * ui_scale))
+		b.custom_minimum_size = Vector2(160, 60) * ui_scale
 		b.pressed.connect(spec[2])
 		box.add_child(b)
 	# A hammer button while not building, unless the HUD's touch controls provide one.
 	_hammer_btn = Button.new()
 	_hammer_btn.text = "Build"
-	InvStyle.style_button(_hammer_btn, "secondary", int(18 * scale))
+	InvStyle.style_button(_hammer_btn, "secondary", int(18 * ui_scale))
 	_hammer_btn.anchor_left = 1.0
 	_hammer_btn.anchor_right = 1.0
-	_hammer_btn.offset_left = -130 * scale
+	_hammer_btn.offset_left = -130 * ui_scale
 	_hammer_btn.offset_right = -20
 	_hammer_btn.offset_top = 150
-	_hammer_btn.offset_bottom = 150 + 56 * scale
+	_hammer_btn.offset_bottom = 150 + 56 * ui_scale
 	_hammer_btn.pressed.connect(func() -> void: mode.open_picker())
 	_hammer_btn.visible = false
 	add_child(_hammer_btn)

@@ -67,6 +67,15 @@ static func refresh_ghost(n: Node) -> void:
 		return
 	var c := component(n)
 	var ghost := c != null and not c.complete
+	if n is CollisionObject3D:
+		# frames are interaction-only; the built object keeps its scene's layer
+		var co := n as CollisionObject3D
+		if ghost:
+			if not co.has_meta(&"built_layer"):
+				co.set_meta(&"built_layer", co.collision_layer)
+			co.collision_layer = BuildPiece.LAYER_INTERACT
+		elif co.has_meta(&"built_layer"):
+			co.collision_layer = int(co.get_meta(&"built_layer"))
 	var mat: Material = null
 	if ghost:
 		mat = BuildMaterials.ghost_material(BuildMaterials.GHOST_TODO if c.fraction() < 0.999 else BuildMaterials.GHOST_OK)

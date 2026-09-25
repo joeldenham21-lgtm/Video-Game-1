@@ -104,6 +104,7 @@ func _refresh_frame() -> void:
 	if is_equal_approx(f, _frame_state):
 		return
 	_frame_state = f
+	collision_layer = BuildPiece.LAYER_BUILDING if build.complete else BuildPiece.LAYER_INTERACT
 	_apply_frame(model, f, build.complete)
 
 
