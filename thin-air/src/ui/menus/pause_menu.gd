@@ -130,7 +130,8 @@ func close() -> void:
 	if _settings:
 		_close_settings()
 	is_open = false
-	Settings.save()
+	if SettingsPanel.persist:
+		Settings.save()
 	Game.set_paused(false)
 	Events.ui_screen_closed.emit(SCREEN)
 	_animate(false)

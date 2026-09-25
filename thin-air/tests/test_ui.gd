@@ -18,6 +18,9 @@ var _saved_preset: StringName
 func run() -> void:
 	_saved_values = Settings.values.duplicate()
 	_saved_preset = Settings.preset
+	SettingsPanel.persist = false
+	if FileAccess.file_exists(Settings.SAVE_PATH):
+		_settings_mtime = FileAccess.get_modified_time(Settings.SAVE_PATH)
 	_test_scripts_compile()
 	_test_theme()
 	_test_glyphs()
@@ -530,6 +533,13 @@ func _reaches_all(ctls: Array) -> bool:
 
 # ============================================================================================ misc
 
+var _settings_mtime := -1
+
+
+func _settings_file_untouched() -> bool:
+	return FileAccess.get_modified_time(Settings.SAVE_PATH) == _settings_mtime or _settings_mtime == -1
+
+
 func _test_screens_misc() -> void:
 	check(LoadingScreen.TIPS.size() >= 10, "loading screen has survival tips")
 	var rows := CreditsRoll.licence_rows()
@@ -537,6 +547,7 @@ func _test_screens_misc() -> void:
 	check(FieldNotes.entry(&"summit_relay")[0] == "Summit relay", "field note for a known scan")
 	check(String(FieldNotes.entry(&"wolf_tracks")[0]) == "Grey wolf", "field note by keyword")
 	check(PauseMenu.can_save() == false, "no saving without a world")
+	check(not FileAccess.file_exists(Settings.SAVE_PATH) or _settings_file_untouched(), "tests leave user settings alone")
 	var vista := (load("res://scenes/ui/menu_vista.tscn") as PackedScene).instantiate()
 	check(vista is MenuVista, "menu vista scene")
 	vista.free()

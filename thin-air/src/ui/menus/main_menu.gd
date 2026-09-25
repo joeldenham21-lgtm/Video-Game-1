@@ -341,7 +341,8 @@ func _start_new() -> void:
 		return
 	_busy = true
 	Settings.set_value(&"difficulty", DIFFICULTIES[_selected][0], false)
-	Settings.save()
+	if SettingsPanel.persist:
+		Settings.save()
 	_leave(func() -> void: Game.new_game())
 
 
@@ -352,7 +353,8 @@ func _leave(then: Callable) -> void:
 
 
 func _quit() -> void:
-	Settings.save()
+	if SettingsPanel.persist:
+		Settings.save()
 	get_tree().quit()
 
 

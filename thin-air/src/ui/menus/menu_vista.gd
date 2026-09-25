@@ -334,6 +334,9 @@ func _scatter_trees() -> void:
 			if density <= 0.0 or rng.randf() > density:
 				continue
 			var y := height_at(px, pz)
+			# sparse, stunted trees towards the treeline (dark specks on snow alias badly at a distance)
+			if y > 1820.0 and rng.randf() < clampf((y - 1820.0) / 300.0, 0.0, 0.8):
+				continue
 			var s := rng.randf_range(1.7, 2.9) * lerpf(1.0, 0.5, clampf((y - 1900.0) / 350.0, 0.0, 1.0))
 			var b := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.9, 1.15), s))
 			xf.append(Transform3D(b, Vector3(px, y - 0.4, pz)))

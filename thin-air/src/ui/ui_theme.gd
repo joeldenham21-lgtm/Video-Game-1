@@ -309,6 +309,8 @@ static func build_theme() -> Theme:
 		t.set_color("font_hover_color", cls, TEXT)
 		t.set_color("font_pressed_color", cls, TEXT)
 		t.set_color("font_focus_color", cls, TEXT)
+		t.set_constant("icon_max_width", cls, 0)       # the switch art is wider than Button's icon cap
+		t.set_constant("h_separation", cls, 12)
 	# ---- Slider
 	var track := StyleBoxFlat.new()
 	track.bg_color = Color(1, 1, 1, 0.14)

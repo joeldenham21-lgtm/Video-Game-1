@@ -55,7 +55,15 @@ func _arrow(icon_name: String) -> Button:
 	b.expand_icon = true
 	b.custom_minimum_size = Vector2(44, 44)
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_constant_override("icon_max_width", 20)
+	b.add_theme_constant_override("icon_max_width", 22)
+	for st in ["normal", "hover", "pressed", "disabled", "hover_pressed", "focus"]:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(1, 1, 1, 0.08 if st == "hover" else (0.14 if st == "pressed" else 0.0))
+		sb.set_corner_radius_all(4)
+		sb.set_content_margin_all(10)
+		if st == "focus":
+			sb.draw_center = false
+		b.add_theme_stylebox_override(st, sb)
 	return b
 
 

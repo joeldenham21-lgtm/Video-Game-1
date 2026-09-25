@@ -58,6 +58,7 @@ func _ready() -> void:
 		get_tree().quit(0 if err == OK else 1)
 		return
 	save_at = int(args.get("at", "36"))
+	SettingsPanel.persist = false          # QA runs never touch user://settings.cfg
 	if args.has("scale"):
 		Settings.values[&"touch_ui_scale"] = float(args["scale"])
 	if args.has("preset"):

@@ -84,6 +84,9 @@ const BINDINGS := [["Move", [&"move_forward", &"move_left", &"move_back", &"move
 	["Journal", [&"journal"]], ["Map", [&"map"]], ["Torch", [&"torch_toggle"]], ["Drop", [&"drop"]],
 	["Hotbar next / previous", [&"hotbar_next", &"hotbar_prev"]], ["Photo mode", [&"photo_mode"]], ["Pause", [&"pause"]]]
 
+## Tests and the QA harness turn this off so they never write user://settings.cfg.
+static var persist := true
+
 var in_game := false
 var tab := 0
 var controls := {}                # key -> Control (the interactive widget)
@@ -121,7 +124,12 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if _apply_timer >= 0.0:
 		Settings.apply()
-	Settings.save()
+	_save()
+
+
+func _save() -> void:
+	if persist:
+		Settings.save()
 
 
 # ============================================================================================= build
@@ -510,7 +518,7 @@ func restore_defaults() -> void:
 	Settings.values[&"difficulty"] = diff
 	Settings.apply_preset(Settings.auto_detect_preset())
 	apply_window_mode()
-	Settings.save()
+	_save()
 	refresh()
 
 
@@ -518,7 +526,7 @@ func close() -> void:
 	if _apply_timer >= 0.0:
 		Settings.apply()
 		_apply_timer = -1.0
-	Settings.save()
+	_save()
 	closed.emit()
 
 
@@ -617,7 +625,7 @@ func _process(delta: float) -> void:
 	if _save_timer >= 0.0:
 		_save_timer -= delta
 		if _save_timer < 0.0:
-			Settings.save()
+			_save()
 
 
 func _input(event: InputEvent) -> void:
