@@ -289,6 +289,9 @@ func load_state(d: Dictionary) -> void:
 		if not (sd is Dictionary):
 			continue
 		var s := new_structure(Transform3D.IDENTITY)
+		if (sd as Dictionary).has("sid"):
+			s.sid = int(sd["sid"])
+			_next_sid = maxi(_next_sid, s.sid + 1)
 		s.load_state(sd)
 	for od in d.get("free", []):
 		if not (od is Dictionary):

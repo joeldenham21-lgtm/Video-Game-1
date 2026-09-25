@@ -13,6 +13,7 @@ signal changed()
 const LAYERS: Array[StringName] = [&"deck", &"wall", &"roof", &"stairs", &"node", &"door"]
 const VIS_RANGE_DESKTOP := 900.0
 const VIS_RANGE_MOBILE := 420.0
+const BRACE_MIN_POST := 1.25
 
 var sid := 0
 var pieces: Dictionary = {}                  # "layer:x,y,z" -> BuildPiece
@@ -469,6 +470,7 @@ func _roof_extras(inst: Dictionary, p: BuildPiece, gable_edges: Dictionary) -> v
 func _build_posts(inst: Dictionary, nodes: Dictionary) -> void:
 	for c in _posts.get_children():
 		c.free()
+	var lengths := {}
 	for n in nodes:
 		var local := BuildGrid.slot_position(n)
 		var g: float
@@ -479,6 +481,7 @@ func _build_posts(inst: Dictionary, nodes: Dictionary) -> void:
 			g = local_of(Vector3(wp.x, BuildingRoot.ground_height(wp.x, wp.z, wp.y + 1.0), wp.z)).y
 			_ground_cache[n] = g
 		var L := BuildGrid.post_length(0.0, g)
+		lengths[n] = L
 		if L < 0.12:
 			continue
 		var mesh_name := &"post_s"
@@ -501,6 +504,27 @@ func _build_posts(inst: Dictionary, nodes: Dictionary) -> void:
 		cs.shape = cy
 		cs.position = Vector3(local.x, BuildGrid.POST_TOP - cy.height * 0.5, local.z)
 		_posts.add_child(cs)
+	# tall stilts get diagonal braces to their neighbours (along the sills and across)
+	for n in lengths:
+		for step in [Vector3i(2, 0, 0), Vector3i(0, 0, 2)]:
+			var m: Vector3i = n + step
+			if not lengths.has(m):
+				continue
+			var la: float = lengths[n]
+			var lb: float = lengths[m]
+			if minf(la, lb) < BRACE_MIN_POST:
+				continue
+			var flip := posmod((n.x + n.z) / 2, 2) == 1
+			var a := BuildGrid.slot_position(n)
+			var b := BuildGrid.slot_position(m)
+			var top := BuildGrid.POST_TOP - 0.12
+			var pa := Vector3(a.x, top if not flip else top - minf(la, lb) * 0.72, a.z)
+			var pb := Vector3(b.x, top - minf(la, lb) * 0.72 if not flip else top, b.z)
+			var d := pb - pa
+			var xa := d * 0.5
+			var ya := Vector3.UP.cross(d).cross(d).normalized() * -1.0
+			var za := xa.normalized().cross(ya).normalized()
+			_push(inst, &"brace", Transform3D(Basis(xa, ya, za), (pa + pb) * 0.5), 1.0)
 
 
 ## Forgets cached ground heights (terrain changed / tests).
@@ -665,7 +689,7 @@ func save_state() -> Dictionary:
 	var list := []
 	for p in piece_list():
 		list.append(p.save_data())
-	return {"xf": SaveUtil.xform(transform), "pieces": list}
+	return {"sid": sid, "xf": SaveUtil.xform(transform), "pieces": list}
 
 
 func load_state(d: Dictionary) -> void:

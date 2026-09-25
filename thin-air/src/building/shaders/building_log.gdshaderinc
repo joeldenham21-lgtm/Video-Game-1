@@ -54,7 +54,7 @@ void fragment() {
 		// each log a slightly different tree: tone and how far it has silvered in the weather
 		float lh = fract(sin(dot(floor(UV2 * 7.0), vec2(12.9898, 78.233)) + v_seed * 17.0) * 43758.5453);
 		vec3 w_alb = texture(wood_albedo, wuv).rgb * wood_tint * (0.84 + 0.3 * lh);
-		float silver = clamp(0.12 + 0.25 * lh * v_exposed, 0.0, 0.45);
+		float silver = clamp(0.22 + 0.25 * lh * v_exposed, 0.0, 0.5);
 		w_alb = mix(w_alb, vec3(dot(w_alb, vec3(0.3, 0.59, 0.11))) * vec3(0.98, 0.97, 0.96), silver);
 		vec3 w_nrm = texture(wood_normal, wuv).rgb;
 		vec3 w_orm = texture(wood_orm, wuv).rgb;

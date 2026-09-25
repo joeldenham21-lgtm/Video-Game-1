@@ -23,6 +23,7 @@ var cabin: BuildStructure
 var _ground_body: StaticBody3D
 var _n := FastNoiseLite.new()
 var _nb := FastNoiseLite.new()
+var _fp := false
 
 const SHOTS := {
 	# pos, look (yaw, pitch), hours, fov
@@ -34,6 +35,9 @@ const SHOTS := {
 	"aerial": [Vector3(-16.0, 13.0, 18.0), Vector2(-40.0, -30.0), 15.8, 55.0],
 	"closeup": [Vector3(-4.4, 1.5, 5.6), Vector2(-30.0, 4.0), 16.4, 55.0],
 	"perf200": [Vector3(-22.0, 6.0, 24.0), Vector2(-40.0, -10.0), 13.0, 70.0],
+	# first person with the real Player (build mode UI, ghost, shoulder logs)
+	"ui_picker": [Vector3(5.5, 0.0, 12.5), Vector2(20.0, -6.0), 14.5, 75.0],
+	"fp_ghost": [Vector3(6.5, 0.0, 12.0), Vector2(8.0, -14.0), 14.5, 75.0],
 }
 
 
@@ -47,7 +51,8 @@ func _ready() -> void:
 	if args.has("preset"):
 		Settings.apply_preset(StringName(args["preset"]))
 	var W = load("res://src/world/world.gd")
-	W.dev_no_player = true
+	_fp = shot.begins_with("ui_") or shot.begins_with("fp_")
+	W.dev_no_player = not _fp
 	Game.is_new_game = false
 	Game.flags.clear()
 	Climate.day = 3
@@ -79,6 +84,9 @@ func _ready() -> void:
 			_build_perf_village()
 		else:
 			_build_camp(shot)
+	if _fp:
+		_setup_player.call_deferred(shot, spec)
+		return
 	cam = Camera3D.new()
 	cam.fov = float(args.get("fov", str(spec[3])))
 	cam.near = 0.05
@@ -98,6 +106,32 @@ func _ready() -> void:
 	cam.rotation_degrees = Vector3(look.y, look.x, 0.0)
 	cam.make_current()
 	RenderingServer.global_shader_parameter_set(&"player_position", cam.global_position)
+
+
+func _setup_player(shot: String, spec: Array) -> void:
+	var p := Game.player as Player
+	if p == null:
+		return
+	Game.state = Game.State.PLAYING
+	var at: Vector3 = spec[0]
+	var yaw := float((spec[1] as Vector2).x)
+	var pos := Vector3(at.x, _ground(at.x, at.z) + 0.05, at.z)
+	p.teleport(pos, yaw)
+	p.set_look(yaw, float((spec[1] as Vector2).y))
+	p.inventory.add(&"hammer", 1)
+	p.inventory.add(&"log", 2)
+	p.inventory.add(&"stick", 12)
+	p.inventory.add(&"stone", 9)
+	p.inventory.add(&"rope", 3)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var bm := root.build_mode as BuildMode if root else null
+	if bm == null:
+		return
+	if shot == "ui_picker":
+		bm.open_picker()
+	elif shot == "fp_ghost":
+		bm.select(&"log_wall")
 
 
 func _process(_d: float) -> void:
@@ -339,15 +373,16 @@ func _build_camp(shot: String) -> void:
 		if fire.has_method(&"_set_state"):
 			fire.call(&"_set_state", 1)
 		fire.set(&"intensity", 1.0)
-	var lean := place.call(&"lean_to", cabin.world_of(Vector3(-6.8, 0.0, 7.5)), 200.0) as Node3D
-	place.call(&"campfire", cabin.world_of(Vector3(-6.2, 0.0, 9.6)), 0.0)
-	place.call(&"drying_rack", cabin.world_of(Vector3(3.8, 0.0, 6.3)), -20.0)
-	place.call(&"snow_melter", cabin.world_of(Vector3(1.6, 0.0, 7.2)), 15.0)
-	place.call(&"bough_bed", cabin.world_of(Vector3(-7.0, 0.0, 7.2)), 200.0)
-	place.call(&"stone_windbreak", cabin.world_of(Vector3(-9.2, 0.0, 9.0)), 110.0)
-	place.call(&"workbench", cabin.world_of(Vector3(4.6, 0.0, 2.0)), 90.0)
+	# the old camp east of the cabin: lean-to facing its fire, windbreak on the weather side, bough bed inside
+	place.call(&"lean_to", cabin.world_of(Vector3(9.2, 0.0, -1.5)), 90.0 + 12.0)
+	place.call(&"campfire", cabin.world_of(Vector3(6.6, 0.0, -1.2)), 0.0)
+	place.call(&"bough_bed", cabin.world_of(Vector3(9.4, 0.0, -1.6)), 90.0 + 12.0)
+	place.call(&"stone_windbreak", cabin.world_of(Vector3(8.6, 0.0, -4.4)), 12.0)
+	place.call(&"drying_rack", cabin.world_of(Vector3(4.2, 0.0, 5.2)), -35.0)
+	place.call(&"snow_melter", cabin.world_of(Vector3(1.7, 0.0, 6.9)), 20.0)
+	place.call(&"workbench", cabin.world_of(Vector3(-4.6, 0.0, 1.8)), 90.0)
 	# a second, unfinished structure: frames at several stages
-	var f := root.new_structure(Transform3D(Basis(Vector3.UP, deg_to_rad(12.0)), cabin.world_of(Vector3(10.0, 0.0, 6.0))))
+	var f := root.new_structure(Transform3D(Basis(Vector3.UP, deg_to_rad(12.0)), cabin.world_of(Vector3(11.0, 0.0, 8.0))))
 	f.global_position.y = BuildGrid.foundation_height(PackedFloat32Array([BuildingRoot.ground_height(f.global_position.x - 1, f.global_position.z - 1),
 		BuildingRoot.ground_height(f.global_position.x + 1, f.global_position.z + 1), BuildingRoot.ground_height(f.global_position.x + 1, f.global_position.z - 1),
 		BuildingRoot.ground_height(f.global_position.x - 1, f.global_position.z + 1)]))

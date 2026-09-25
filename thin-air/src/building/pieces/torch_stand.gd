@@ -37,7 +37,7 @@ func _ready() -> void:
 	_light.omni_range = float(ItemDB.get_buildable(&"torch_stand").get("light_radius", 8.0))
 	_light.omni_attenuation = 1.25
 	_light.light_energy = 0.0
-	_light.shadow_enabled = not _mobile
+	_light.shadow_enabled = not _mobile and int(Settings.get_value(&"shadow_quality", 2)) >= 2
 	_light.shadow_bias = 0.08
 	_light.distance_fade_enabled = true
 	_light.distance_fade_begin = 45.0

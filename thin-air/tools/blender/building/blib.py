@@ -255,7 +255,7 @@ def log(soup, p0, p1, r0, r1=None, *, sides=14, seg=0.3, seed=0, mat="log", bark
             if ao_down > 0.0 and ny < 0.0:
                 ao -= ao_down * smoothstep(0.35, 1.0, -ny)
             ao -= 0.12 * smoothstep(0.5, 1.0, -ny)   # undersides slightly darker anyway
-            b = bark * (0.6 + 0.4 * smoothstep(-0.2, -0.9, ny))
+            b = bark if bark >= 0.9 else bark * (0.6 + 0.4 * smoothstep(-0.2, -0.9, ny))
             row.append(Corner(p, nrm, (arc_len * u_scale, s * L + v_off), uv2, (max(ao, 0.25), step, b, FLAG_WOOD)))
         if prev is not None:
             for ai in range(len(angles) - 1):

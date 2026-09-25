@@ -66,6 +66,7 @@ def fam_foundation():
     for name, L, sd in (("post_s", 0.8, 17), ("post_m", 1.6, 19), ("post_l", 3.2, 29)):
         out[name] = ps.post(L, sd)
     out["footing"] = ps.footing(31)
+    out["brace"] = ps.brace(37)
     return out
 
 

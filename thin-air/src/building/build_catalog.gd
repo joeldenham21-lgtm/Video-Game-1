@@ -26,7 +26,7 @@ const PIECES := {
 const FAMILY_PREFIX := [
 	["wall_", "walls"], ["window_", "walls"], ["doorway_", "walls"], ["stub_", "walls"],
 	["gable_", "gables"], ["roof_", "roof"], ["ridge_", "roof"],
-	["deck_", "foundation"], ["sill", "foundation"], ["post_", "foundation"], ["footing", "foundation"],
+	["deck_", "foundation"], ["sill", "foundation"], ["post_", "foundation"], ["footing", "foundation"], ["brace", "foundation"],
 	["floor", "misc"], ["stairs", "misc"], ["pillar", "misc"], ["railing", "misc"], ["door_leaf", "misc"],
 ]
 

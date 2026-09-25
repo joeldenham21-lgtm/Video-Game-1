@@ -266,6 +266,13 @@ def post(length, seed):
     return s
 
 
+def brace(seed):
+    """Diagonal stilt brace: a pole from x = -1 to +1 (stretched between two posts by the structure)."""
+    s = Soup()
+    log(s, (-HALF, 0.0, 0.0), (HALF, 0.0, 0.0), 0.075, 0.068, seed=seed, bark=0.7, sides=10, seg=0.4, wobble=0.015)
+    return s
+
+
 def footing(seed):
     s = Soup()
     stone(s, (0.0, 0.02, 0.0), 0.36, seed=seed, squash=(1.1, 0.42, 0.95), subdiv=2)
