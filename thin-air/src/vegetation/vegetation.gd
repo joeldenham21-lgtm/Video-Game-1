@@ -870,6 +870,23 @@ func load_state(data: Dictionary) -> void:
 	hidden.clear()
 	for id in data.get("removed", []):
 		removed[int(id)] = true
+	# stumps / fallen trunks / notched trees need their scatter cells now, even if they are still streaming
+	var need := {}
+	for id in removed:
+		need[VegScatter.id_cell(int(id))] = true
+	var hs: Dictionary = data.get("harvest", {})
+	for sec in ["trees", "stumps", "fallen", "uses"]:
+		for k in (hs.get(sec, {}) as Dictionary):
+			need[VegScatter.id_cell(int(k))] = true
+	var list := PackedInt32Array()
+	for ci in need:
+		if ci >= 0 and ci < cells.size() and cells[ci] == null:
+			list.append(ci)
+	if not list.is_empty():
+		if _rebin_task >= 0:
+			WorkerThreadPool.wait_for_task_completion(_rebin_task)
+			_rebin_task = -1
+		_gen_list(list)
 	_build_far()
 	_last_rebin_pos = Vector3(INF, INF, INF)
 	if colliders and colliders.has_method("mark_dirty"):

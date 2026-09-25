@@ -535,3 +535,18 @@ func _test_persistence(veg: Node) -> void:
 	check(h.trees.has(a["id"]) and is_equal_approx(h.trees[a["id"]].hp, hp_a), "partially chopped tree keeps its HP")
 	check(veg.hidden.has(a["id"]), "restored chopped tree drawn by its hero mesh")
 	check(h.fallen.has(b["id"]), "fallen trunk restored")
+	# a fresh world whose scatter is still streaming (start far away): loading must still restore everything
+	var cam2 := Camera3D.new()
+	add_child(cam2)
+	cam2.global_position = Vector3(0.0, 3000.0, -1450.0)
+	var veg2: Node = (load("res://scenes/world/vegetation.tscn") as PackedScene).instantiate()
+	veg2.set("terrain_override", terrain)
+	veg2.set("camera_override", cam2)
+	add_child(veg2)
+	var h2: VegHarvest = veg2.harvest
+	check(not veg2.fully_generated, "second world still streaming its scatter")
+	veg2.load_state(back)
+	check(h2.stumps.size() == stumps_before and h2.trees.size() == h.trees.size(), "load before streaming finished restores stumps and notched trees")
+	veg2.queue_free()
+	cam2.queue_free()
+	await get_tree().process_frame

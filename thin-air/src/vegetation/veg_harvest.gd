@@ -304,6 +304,7 @@ func fell(id: int, from: Vector3) -> void:
 	if from.distance_squared_to(xf.origin) > 0.01:
 		away = Vector3(xf.origin.x - from.x, 0.0, xf.origin.z - from.z).normalized()
 	ft.start_fall(away, stump)
+	Audio.play_sfx_attached(&"tree_fall", ft, 0.0)
 
 
 func _make_stump(id: int, e: Dictionary, cut_h: float, hero: MeshInstance3D, decal: Decal) -> StaticBody3D:
