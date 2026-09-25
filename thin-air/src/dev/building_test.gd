@@ -28,7 +28,7 @@ var _fp := false
 const SHOTS := {
 	# pos, look (yaw, pitch), hours, fov
 	"exterior": [Vector3(-7.8, 1.75, 10.6), Vector2(-36.0, 2.0), 16.55, 62.0],
-	"interior": [Vector3(-1.2, 1.55, -1.7), Vector2(165.0, -8.0), 22.4, 72.0],
+	"interior": [Vector3(0.8, 1.55, -2.3), Vector2(175.0, -4.0), 22.4, 76.0],
 	"stilts": [Vector3(-3.5, 1.5, -2.5), Vector2(-28.0, 10.0), 15.2, 60.0],
 	"frames": [Vector3(3.5, 1.7, 15.5), Vector2(8.0, -8.0), 12.5, 66.0],
 	"camp": [Vector3(-11.0, 2.6, 17.0), Vector2(-28.0, -8.0), 16.7, 66.0],

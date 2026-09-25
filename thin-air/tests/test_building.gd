@@ -222,6 +222,20 @@ func _cabin() -> void:
 	var fall3 := s.unsupported_after([s.get_piece(&"wall", Vector3i(-3, 0, -2)), s.get_piece(&"wall", Vector3i(-3, 0, 0)),
 		s.get_piece(&"wall", Vector3i(-3, 0, 2))])
 	check(fall3.is_empty(), "gable-side walls removed: roof held by the eave walls")
+	# a 2 m hut gets a little gable roof over its single cell
+	var hut := root.new_structure(Transform3D(Basis.IDENTITY, Vector3(-60.0, GROUND_Y + 0.5, 0.0)))
+	hut.add_piece(&"log_foundation", Vector3i.ZERO, {}, true)
+	for e in BuildGrid.cell_edges(Vector3i.ZERO):
+		hut.add_piece(&"log_wall", e, {}, true)
+	var hp := hut.roof_props_for(Vector3i.ZERO, hut.auto_roof_dir(Vector3i.ZERO, 0))
+	check(String(hp["shape"]) == "peak" and int(hp["tier"]) == 0, "single-cell hut: gable roof (%s)" % str(hp))
+	hut.add_piece(&"log_roof", Vector3i.ZERO, hp, true)
+	hut.flush_now()
+	var hg := 0
+	for k in hut.instance_counts:
+		if String(k).begins_with("gable_peak_t0"):
+			hg += int(hut.instance_counts[k])
+	check(hg == 2, "hut gables at both ends (%d)" % hg)
 	root.set_meta(&"test_structure", s)
 
 
@@ -243,10 +257,15 @@ func _save_load() -> void:
 	root.load_state(back)
 	await get_tree().process_frame
 	var ss := root.structures()
-	check(ss.size() == 1, "one structure after load (%d)" % ss.size())
+	check(ss.size() == 2, "both structures after load (%d)" % ss.size())
 	if ss.is_empty():
 		return
-	var s2 := ss[0]
+	var s2: BuildStructure = null
+	for x in ss:
+		if x.piece_count() == n_before:
+			s2 = x
+	if s2 == null:
+		s2 = ss[0]
 	check(s2.piece_count() == n_before, "all %d pieces restored (%d)" % [n_before, s2.piece_count()])
 	check(s2.global_position.is_equal_approx(s.global_position) if is_instance_valid(s) else true, "structure transform restored")
 	var d2 := s2.get_piece(&"door", Vector3i(0, 0, 3)) as BuildDoor

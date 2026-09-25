@@ -345,6 +345,9 @@ func roof_props_for(cell: Vector3i, dir: int) -> Dictionary:
 		var s := get_piece(&"roof", BuildGrid.cell_step(cell, sd))
 		if s and posmod(int(s.props.get("dir", 0)), 4) == posmod(dir, 4):
 			return {"dir": posmod(dir, 4), "tier": int(s.props.get("tier", 0)), "shape": String(s.props.get("shape", "slope"))}
+	# A single cell between two walls (a 2 m wide hut or cache): a small gable roof over it.
+	if is_wallish(BuildGrid.cell_side_edge(cell, dir)) and is_wallish(BuildGrid.cell_side_edge(cell, dir + 2)):
+		return {"dir": posmod(dir, 4), "tier": 0, "shape": "peak"}
 	return {"dir": posmod(dir, 4), "tier": 0, "shape": "slope"}
 
 
