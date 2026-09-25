@@ -68,8 +68,9 @@ def bark_material(set_name: str, tint=(1.0, 1.0, 1.0), uv_scale=(2.0, 1.0), with
 	return m
 
 
-def card_material(set_name: str, with_ao: bool = True, normal_map: bool = True) -> bpy.types.Material:
-	name = f"cmat_{set_name}"
+def card_material(set_name: str, with_ao: bool = True, normal_map: bool = True, tint=(1.0, 1.0, 1.0),
+		ao_mix: float = 1.0, normal_strength: float = 1.0) -> bpy.types.Material:
+	name = f"cmat_{set_name}_{tint[0]:.2f}_{ao_mix:.2f}"
 	m = bpy.data.materials.get(name)
 	if m:
 		return m
@@ -86,6 +87,13 @@ def card_material(set_name: str, with_ao: bool = True, normal_map: bool = True) 
 	alb.interpolation = "Linear"
 	nt.links.new(uv.outputs["UV"], alb.inputs["Vector"])
 	col = alb.outputs["Color"]
+	tn = nt.nodes.new("ShaderNodeMix")
+	tn.data_type = "RGBA"
+	tn.blend_type = "MULTIPLY"
+	tn.inputs["Factor"].default_value = 1.0
+	tn.inputs[7].default_value = (tint[0], tint[1], tint[2], 1.0)
+	nt.links.new(col, tn.inputs[6])
+	col = tn.outputs[2]
 	if with_ao:
 		vcn = nt.nodes.new("ShaderNodeVertexColor")
 		vcn.layer_name = "Col"
@@ -94,7 +102,7 @@ def card_material(set_name: str, with_ao: bool = True, normal_map: bool = True) 
 		mul = nt.nodes.new("ShaderNodeMix")
 		mul.data_type = "RGBA"
 		mul.blend_type = "MULTIPLY"
-		mul.inputs["Factor"].default_value = 1.0
+		mul.inputs["Factor"].default_value = ao_mix
 		nt.links.new(col, mul.inputs[6])
 		nt.links.new(sep.outputs["Green"], mul.inputs[7])
 		col = mul.outputs[2]
@@ -104,7 +112,7 @@ def card_material(set_name: str, with_ao: bool = True, normal_map: bool = True) 
 		nimg.image = _img(os.path.join(vc.TEX_FOLIAGE, f"{set_name}_normal.png"), True)
 		nt.links.new(uv.outputs["UV"], nimg.inputs["Vector"])
 		nm = nt.nodes.new("ShaderNodeNormalMap")
-		nm.inputs["Strength"].default_value = 0.6
+		nm.inputs["Strength"].default_value = normal_strength
 		nt.links.new(nimg.outputs["Color"], nm.inputs["Color"])
 		nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
 	bsdf.inputs["Roughness"].default_value = 0.65

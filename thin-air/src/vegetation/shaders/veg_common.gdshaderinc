@@ -43,6 +43,18 @@ float veg_band_fade(float d, float begin, float end, float margin) {
 	return a * b;
 }
 
+// (fade-in at `begin`, fade-out at `end`) weights; bands that meet at the same distance cross-fade with
+// complementary dithers (see veg_faded_out), so exactly one of them covers each pixel.
+vec2 veg_band_fades(float d, float begin, float end, float margin) {
+	float a = begin <= 0.0 ? 1.0 : smoothstep(begin - margin, begin + margin, d);
+	float b = end <= 0.0 ? 1.0 : 1.0 - smoothstep(end - margin, end + margin, d);
+	return vec2(a, b);
+}
+
+bool veg_faded_out(float dith, vec2 fades) {
+	return dith > fades.y || (1.0 - dith) > fades.x;
+}
+
 // Gust envelope travelling across the landscape along the wind (0.35..1.25).
 float veg_gust(vec3 world_origin, float t) {
 	vec2 wd = normalize(wind_direction.xz + vec2(1e-4, 0.0));

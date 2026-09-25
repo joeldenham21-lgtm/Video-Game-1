@@ -38,7 +38,7 @@ instance uniform float lod_margin = 3.0;
 instance uniform float clip_below = -100000.0;   // object-space Y cut (felled crowns / stumps)
 instance uniform float clip_above = 100000.0;
 
-varying flat float v_fade;
+varying flat vec2 v_fade;   // (fade-in, fade-out) of this LOD band
 varying flat float v_inst;
 varying vec3 v_crown_n;     // view space
 varying vec3 v_world;
@@ -49,7 +49,7 @@ void vertex() {
 	vec3 origin = MODEL_MATRIX[3].xyz;
 	v_inst = veg_hash12(origin.xz + origin.y);
 	float d = distance(view_origin, origin);
-	v_fade = veg_band_fade(d, lod_begin, lod_end, lod_margin);
+	v_fade = veg_band_fades(d, lod_begin, lod_end, lod_margin);
 	v_obj_y = VERTEX.y;
 	v_geo_n = NORMAL;
 	veg_face_card(VERTEX, NORMAL, TANGENT, UV, COLOR.a * 4.0, MODEL_MATRIX, INV_VIEW_MATRIX, PROJECTION_MATRIX, facing);
@@ -59,7 +59,7 @@ void vertex() {
 	VERTEX += veg_wind_offset(VERTEX, NORMAL, COLOR, UV2.x, MODEL_MATRIX, TIME, trunk_sway, branch_sway, flutter);
 	v_crown_n = normalize((MODELVIEW_MATRIX * vec4(crown_obj, 0.0)).xyz);
 	v_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	if (v_fade <= 0.001) {
+	if (v_fade.x * v_fade.y <= 0.001) {
 		// culled by LOD band: collapse the vertex so nothing is rasterised
 		VERTEX = vec3(0.0);
 	}
@@ -70,7 +70,7 @@ void fragment() {
 		discard;
 	}
 	float dith = veg_ign(FRAGCOORD.xy, v_inst * 7.0);
-	if (v_fade < 0.999 && dith > v_fade) {
+	if (veg_faded_out(dith, v_fade)) {
 		discard;
 	}
 	float cam_d = length(VERTEX);

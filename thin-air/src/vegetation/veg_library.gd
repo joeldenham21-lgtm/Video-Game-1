@@ -16,16 +16,6 @@ const IMPOSTOR_SHADER := "res://assets/shaders/impostor.gdshader"
 ## Categories (drive scatter rules, LOD bands, collision and harvesting).
 enum Cat { TREE, SAPLING, SHRUB, DEADWOOD, ROCK_BIG, ROCK_SMALL }
 
-## Per species look tweaks (bark tint, foliage tint/translucency). Values tuned against photographs.
-const SPECIES_LOOK := {
-	&"spruce": {"bark_tint": Color(0.72, 0.7, 0.72), "leaf_tint": Color(1.75, 1.8, 1.8), "transl": 0.5},
-	&"fir": {"bark_tint": Color(0.92, 0.9, 0.95), "leaf_tint": Color(1.7, 1.75, 1.7), "transl": 0.45},
-	&"lodgepole": {"bark_tint": Color(0.8, 0.82, 0.9), "leaf_tint": Color(1.5, 1.5, 1.5), "transl": 0.55},
-	&"whitebark": {"bark_tint": Color(1.35, 1.75, 2.35), "leaf_tint": Color(1.5, 1.5, 1.5), "transl": 0.55},
-	&"larch": {"bark_tint": Color(0.85, 0.78, 0.78), "leaf_tint": Color(1.45, 1.4, 1.1), "transl": 0.85},
-	&"snag": {"bark_tint": Color(1.0, 1.0, 1.0), "leaf_tint": Color(1.0, 1.0, 1.0), "transl": 0.3},
-}
-
 static var _shared: VegLibrary = null
 
 ## kind name -> info Dictionary (manifest row + "cat", "index", "meshes": Array[Mesh])
@@ -153,14 +143,12 @@ func _assign_materials(m: Mesh, row: Dictionary) -> void:
 
 ## Material for a glTF material name: "bark_<set>", "cards_<set>", "rock_<set>", "wood_<set>".
 func material_for(mat_name: String, row: Dictionary) -> Material:
-	var species := StringName(row.get("species", ""))
-	var look: Dictionary = SPECIES_LOOK.get(species, {})
 	if mat_name.begins_with("cards_"):
-		return foliage_material(mat_name.trim_prefix("cards_"), look)
+		return foliage_material(mat_name.trim_prefix("cards_"), row)
 	if mat_name.begins_with("bark_") or mat_name.begins_with("wood_"):
-		return bark_material(mat_name, look.get("bark_tint", Color(1, 1, 1)), float(row.get("moss", 0.0)))
+		return bark_material(mat_name, _color(row.get("bark_tint", [1, 1, 1])), float(row.get("moss", 0.0)))
 	if mat_name.begins_with("rock"):
-		return rock_material(mat_name)
+		return rock_material(mat_name, row)
 	return bark_material(String(row.get("bark", "bark_spruce")), Color(1, 1, 1), 0.0)
 
 
@@ -179,14 +167,24 @@ func bark_material(set_name: String, tint: Color, moss := 0.0) -> ShaderMaterial
 	m.set_shader_parameter(&"uv_scale", Vector2(float(uvs[0]), float(uvs[1])))
 	m.set_shader_parameter(&"tint", Vector3(tint.r, tint.g, tint.b))
 	m.set_shader_parameter(&"moss_amount", moss)
+	if set_name == "wood_endgrain":
+		m.set_shader_parameter(&"uv_jitter", 0.0)
+		m.set_shader_parameter(&"trunk_sway", 0.0)
 	m.resource_name = key
 	_materials[key] = m
 	view_materials.append(m)
 	return m
 
 
-func foliage_material(set_name: String, look: Dictionary) -> ShaderMaterial:
-	var key := "cards:%s" % set_name
+static func _color(a: Variant) -> Color:
+	if a is Array and (a as Array).size() >= 3:
+		return Color(float(a[0]), float(a[1]), float(a[2]))
+	return Color(1, 1, 1)
+
+
+func foliage_material(set_name: String, row: Dictionary) -> ShaderMaterial:
+	var tint := _color(row.get("leaf_tint", [1, 1, 1]))
+	var key := "cards:%s:%s" % [set_name, tint.to_html(false)]
 	if _materials.has(key):
 		return _materials[key]
 	var m := ShaderMaterial.new()
@@ -196,16 +194,15 @@ func foliage_material(set_name: String, look: Dictionary) -> ShaderMaterial:
 	m.set_shader_parameter(&"normal_tex", _tex("res://assets/textures/foliage/%s_normal.png" % set_name))
 	if alb:
 		m.set_shader_parameter(&"atlas_size", Vector2(alb.get_width(), alb.get_height()))
-	var tint: Color = look.get("leaf_tint", Color(1, 1, 1))
 	m.set_shader_parameter(&"tint", Vector3(tint.r, tint.g, tint.b))
-	m.set_shader_parameter(&"translucency", float(look.get("transl", 0.55)))
+	m.set_shader_parameter(&"translucency", float(row.get("transl", 0.55)))
 	m.resource_name = key
 	_materials[key] = m
 	view_materials.append(m)
 	return m
 
 
-func rock_material(mat_name: String) -> Material:
+func rock_material(mat_name: String, row: Dictionary = {}) -> Material:
 	var key := "rock:%s" % mat_name
 	if _materials.has(key):
 		return _materials[key]
@@ -217,6 +214,14 @@ func rock_material(mat_name: String) -> Material:
 		sm.set_shader_parameter(&"albedo_tex", _tex(dir + "albedo.png"))
 		sm.set_shader_parameter(&"normal_tex", _tex(dir + "normal.png"))
 		sm.set_shader_parameter(&"orm_tex", _tex(dir + "orm.png"))
+		var mn := String(row.get("normal", ""))
+		if mn != "" and ResourceLoader.exists(mn):
+			sm.set_shader_parameter(&"macro_normal", load(mn))
+		else:
+			sm.set_shader_parameter(&"macro_strength", 0.0)
+		var meta: Dictionary = _mat_meta.get("rock_boulder", {})
+		var tile: Array = meta.get("tile_m", [3.0, 3.0])
+		sm.set_shader_parameter(&"tile_m", float(tile[0]))
 		view_materials.append(sm)
 		m = sm
 	else:
@@ -247,6 +252,8 @@ func _setup_impostors(imp: Dictionary) -> void:
 	m.set_shader_parameter(&"albedo_array", load(alb_path))
 	m.set_shader_parameter(&"normal_array", load(nrm_path))
 	m.set_shader_parameter(&"frames", float(imp.get("frames", 8)))
+	m.set_shader_parameter(&"margin", float(imp.get("margin", 1.06)))
+	m.set_shader_parameter(&"tile_px", float(imp.get("tile", 128)))
 	impostor_material = m
 	view_materials.append(m)
 	var layers: Dictionary = imp.get("layers", {})
@@ -255,7 +262,8 @@ func _setup_impostors(imp: Dictionary) -> void:
 		if kinds.has(kn):
 			var l: Dictionary = layers[k]
 			kinds[kn]["impostor_layer"] = int(l.get("layer", -1))
-			kinds[kn]["impostor_size"] = float(l.get("size", 10.0))
+			kinds[kn]["impostor_radius"] = float(l.get("radius", 2.0))
+			kinds[kn]["impostor_height"] = float(l.get("height", 10.0))
 			kinds[kn]["impostor_center"] = float(l.get("center_y", 5.0))
 	var q := QuadMesh.new()
 	q.size = Vector2(1.0, 1.0)
@@ -265,6 +273,13 @@ func _setup_impostors(imp: Dictionary) -> void:
 
 func has_impostors() -> bool:
 	return impostor_material != null
+
+
+## INSTANCE_CUSTOM for an impostor instance of `kind` (see impostor.gdshader).
+func impostor_custom(kind: StringName) -> Color:
+	var inf: Dictionary = kinds.get(kind, {})
+	return Color(float(inf.get("impostor_layer", 0)), float(inf.get("impostor_radius", 2.0)),
+		float(inf.get("impostor_center", 5.0)), float(inf.get("impostor_height", 10.0)))
 
 
 ## Pushes the main camera position to every vegetation material (LOD fades use it in all passes).

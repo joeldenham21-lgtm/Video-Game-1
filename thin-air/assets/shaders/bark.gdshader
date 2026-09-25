@@ -11,6 +11,7 @@ uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic, r
 uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D orm_tex : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform vec2 uv_scale = vec2(2.0, 1.0);
+uniform float uv_jitter = 1.0;          // per-instance texture offset (0 for non-tiling maps like end grain)
 uniform vec3 tint : source_color = vec3(1.0);
 uniform float normal_strength : hint_range(0.0, 2.0) = 1.0;
 uniform float trunk_sway = 0.010;
@@ -25,7 +26,7 @@ instance uniform float lod_margin = 3.0;
 instance uniform float clip_below = -100000.0;
 instance uniform float clip_above = 100000.0;
 
-varying flat float v_fade;
+varying flat vec2 v_fade;   // (fade-in, fade-out) of this LOD band
 varying flat float v_inst;
 varying vec3 v_world;
 varying float v_obj_y;
@@ -34,12 +35,12 @@ varying vec3 v_obj_n;
 void vertex() {
 	vec3 origin = MODEL_MATRIX[3].xyz;
 	v_inst = veg_hash12(origin.xz + origin.y);
-	v_fade = veg_band_fade(distance(view_origin, origin), lod_begin, lod_end, lod_margin);
+	v_fade = veg_band_fades(distance(view_origin, origin), lod_begin, lod_end, lod_margin);
 	v_obj_y = VERTEX.y;
 	v_obj_n = NORMAL;
 	VERTEX += veg_wind_offset(VERTEX, NORMAL, COLOR, UV2.x, MODEL_MATRIX, TIME, trunk_sway, branch_sway, 0.0);
 	v_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	if (v_fade <= 0.001) {
+	if (v_fade.x * v_fade.y <= 0.001) {
 		VERTEX = vec3(0.0);
 	}
 }
@@ -48,10 +49,10 @@ void fragment() {
 	if (v_obj_y < clip_below || v_obj_y > clip_above) {
 		discard;
 	}
-	if (v_fade < 0.999 && veg_ign(FRAGCOORD.xy, v_inst * 7.0) > v_fade) {
+	if (veg_faded_out(veg_ign(FRAGCOORD.xy, v_inst * 7.0), v_fade)) {
 		discard;
 	}
-	vec2 uv = UV * uv_scale + vec2(v_inst * 3.7, v_inst * 11.3);
+	vec2 uv = UV * uv_scale + vec2(v_inst * 3.7, v_inst * 11.3) * uv_jitter;
 	vec3 alb = texture(albedo_tex, uv).rgb * tint;
 	vec3 orm = texture(orm_tex, uv).rgb;
 	float ao = COLOR.g * orm.r;

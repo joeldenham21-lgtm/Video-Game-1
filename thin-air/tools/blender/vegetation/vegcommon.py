@@ -92,6 +92,7 @@ class MeshData:
 		self.col: list = []
 		self.faces: list = []
 		self.mat: list = []
+		self.partner: dict = {}     # card vertex -> the other vertex of its row (card width axis)
 
 	def add_vert(self, co, nrm, uv0=(0.0, 0.0), uv1=(0.0, 0.0), col=(1.0, 1.0, 0.0, 0.0)) -> int:
 		self.co.append(tuple(float(c) for c in co))
@@ -116,6 +117,8 @@ class MeshData:
 		self.col += other.col
 		self.faces += [tuple(i + off for i in f) for f in other.faces]
 		self.mat += other.mat
+		for k, v in other.partner.items():
+			self.partner[k + off] = v + off
 
 	def tri_count(self) -> int:
 		return sum(len(f) - 2 for f in self.faces)

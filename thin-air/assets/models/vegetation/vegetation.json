@@ -1,0 +1,968 @@
+{
+ "deadwood": {
+  "log_a": {
+   "bark": "bark_spruce",
+   "harvest": "log",
+   "height": 1.097,
+   "length": 8.0,
+   "log_radius": 0.24,
+   "moss": 0.0,
+   "path": "res://assets/models/vegetation/log_a.glb",
+   "radius": 4.116,
+   "tris": [
+    372,
+    98,
+    40
+   ]
+  },
+  "log_b": {
+   "bark": "bark_dead",
+   "harvest": "log",
+   "height": 0.803,
+   "length": 6.4,
+   "log_radius": 0.2,
+   "moss": 0.8,
+   "path": "res://assets/models/vegetation/log_b.glb",
+   "radius": 3.298,
+   "tris": [
+    332,
+    98,
+    40
+   ]
+  },
+  "stump_a": {
+   "bark": "bark_dead",
+   "harvest": "stump",
+   "height": 0.5,
+   "length": 0.0,
+   "log_radius": 0.26,
+   "moss": 0.0,
+   "path": "res://assets/models/vegetation/stump_a.glb",
+   "radius": 0.461,
+   "tris": [
+    180,
+    56,
+    30
+   ]
+  },
+  "stump_b": {
+   "bark": "bark_dead",
+   "harvest": "stump",
+   "height": 1.481,
+   "length": 0.0,
+   "log_radius": 0.3,
+   "moss": 0.5,
+   "path": "res://assets/models/vegetation/stump_b.glb",
+   "radius": 0.535,
+   "tris": [
+    180,
+    56,
+    30
+   ]
+  }
+ },
+ "groundcover": {
+  "fern_clump": {
+   "bark": "",
+   "card": "fern",
+   "harvest": "",
+   "height": 0.278,
+   "leaf_tint": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "moss": 0.0,
+   "path": "res://assets/models/vegetation/fern_clump.glb",
+   "radius": 0.656,
+   "transl": 0.8,
+   "tris": [
+    42,
+    16,
+    16
+   ]
+  },
+  "grass_tuft_a": {
+   "bark": "",
+   "card": "grass",
+   "harvest": "",
+   "height": 0.546,
+   "leaf_tint": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "moss": 0.0,
+   "path": "res://assets/models/vegetation/grass_tuft_a.glb",
+   "radius": 0.235,
+   "transl": 0.8,
+   "tris": [
+    24,
+    12,
+    12
+   ]
+  },
+  "grass_tuft_b": {
+   "bark": "",
+   "card": "grass",
+   "harvest": "",
+   "height": 0.264,
+   "leaf_tint": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "moss": 0.0,
+   "path": "res://assets/models/vegetation/grass_tuft_b.glb",
+   "radius": 0.152,
+   "transl": 0.8,
+   "tris": [
+    16,
+    8,
+    8
+   ]
+  },
+  "sedge_tuft": {
+   "bark": "",
+   "card": "sedge",
+   "harvest": "",
+   "height": 0.45,
+   "leaf_tint": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "moss": 0.0,
+   "path": "res://assets/models/vegetation/sedge_tuft.glb",
+   "radius": 0.177,
+   "transl": 0.8,
+   "tris": [
+    20,
+    8,
+    8
+   ]
+  }
+ },
+ "impostors": {
+  "albedo": "res://assets/textures/foliage/impostor_albedo.png",
+  "frames": 8,
+  "layers": {
+   "fir_a": {
+    "center_y": 11.0444,
+    "height": 22.0888,
+    "layer": 3,
+    "radius": 2.201
+   },
+   "fir_b": {
+    "center_y": 7.0422,
+    "height": 14.0843,
+    "layer": 4,
+    "radius": 1.7862
+   },
+   "larch_a": {
+    "center_y": 9.0289,
+    "height": 18.0578,
+    "layer": 9,
+    "radius": 3.3526
+   },
+   "larch_b": {
+    "center_y": 6.0272,
+    "height": 12.0543,
+    "layer": 10,
+    "radius": 2.6577
+   },
+   "lodgepole_a": {
+    "center_y": 12.3278,
+    "height": 24.6557,
+    "layer": 5,
+    "radius": 3.0902
+   },
+   "lodgepole_b": {
+    "center_y": 8.7035,
+    "height": 17.407,
+    "layer": 6,
+    "radius": 2.6221
+   },
+   "snag_a": {
+    "center_y": 6.8856,
+    "height": 13.7711,
+    "layer": 11,
+    "radius": 0.6636
+   },
+   "snag_b": {
+    "center_y": 4.2384,
+    "height": 8.4768,
+    "layer": 12,
+    "radius": 0.7794
+   },
+   "spruce_a": {
+    "center_y": 14.0349,
+    "height": 28.0698,
+    "layer": 0,
+    "radius": 3.0865
+   },
+   "spruce_b": {
+    "center_y": 10.0335,
+    "height": 20.067,
+    "layer": 1,
+    "radius": 2.6619
+   },
+   "spruce_c": {
+    "center_y": 6.5371,
+    "height": 13.0743,
+    "layer": 2,
+    "radius": 2.5643
+   },
+   "whitebark_a": {
+    "center_y": 6.1414,
+    "height": 12.2827,
+    "layer": 7,
+    "radius": 4.9799
+   },
+   "whitebark_b": {
+    "center_y": 3.9481,
+    "height": 7.8962,
+    "layer": 8,
+    "radius": 4.2064
+   }
+  },
+  "margin": 1.06,
+  "normal": "res://assets/textures/foliage/impostor_normal.png",
+  "tile": 128
+ },
+ "plants": {
+  "alder_a": {
+   "bark": "bark_spruce",
+   "group": "alder",
+   "harvest": "shrub",
+   "height": 2.927,
+   "leaf_tint": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "moss": 0.0,
+   "path": "res://assets/models/vegetation/alder_a.glb",
+   "radius": 2.197,
+   "species": "alder",
+   "transl": 0.7,
+   "tris": [
+    442,
+    104,
+    34
+   ]
+  },
+  "huckleberry_a": {
+   "bark": "bark_pine",
+   "group": "huckleberry",
+   "harvest": "berries",
+   "height": 1.026,
+   "leaf_tint": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "moss": 0.0,
+   "path": "res://assets/models/vegetation/huckleberry_a.glb",
+   "radius": 0.849,
+   "species": "huckleberry",
+   "transl": 0.7,
+   "tris": [
+    524,
+    110,
+    28
+   ]
+  },
+  "juniper_mat": {
+   "bark": "bark_spruce",
+   "group": "juniper",
+   "harvest": "shrub",
+   "height": 0.956,
+   "leaf_tint": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "moss": 0.0,
+   "path": "res://assets/models/vegetation/juniper_mat.glb",
+   "radius": 1.544,
+   "species": "juniper",
+   "transl": 0.7,
+   "tris": [
+    428,
+    64,
+    56
+   ]
+  },
+  "willow_a": {
+   "bark": "bark_pine",
+   "group": "willow",
+   "harvest": "shrub",
+   "height": 2.406,
+   "leaf_tint": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "moss": 0.0,
+   "path": "res://assets/models/vegetation/willow_a.glb",
+   "radius": 1.96,
+   "species": "willow",
+   "transl": 0.7,
+   "tris": [
+    566,
+    130,
+    36
+   ]
+  }
+ },
+ "rocks": {
+  "boulder_a": {
+   "height": 1.427,
+   "normal": "res://assets/models/rocks/boulder_a_normal.png",
+   "path": "res://assets/models/rocks/boulder_a.glb",
+   "radius": 1.3,
+   "size": [
+    2.601,
+    2.067,
+    1.591
+   ],
+   "talus": false,
+   "tris": [
+    2400,
+    700,
+    160
+   ],
+   "yield": "none"
+  },
+  "boulder_b": {
+   "height": 2.028,
+   "normal": "res://assets/models/rocks/boulder_b_normal.png",
+   "path": "res://assets/models/rocks/boulder_b.glb",
+   "radius": 2.105,
+   "size": [
+    4.21,
+    3.174,
+    2.233
+   ],
+   "talus": false,
+   "tris": [
+    3000,
+    850,
+    200
+   ],
+   "yield": "none"
+  },
+  "boulder_c": {
+   "height": 0.959,
+   "normal": "res://assets/models/rocks/boulder_c_normal.png",
+   "path": "res://assets/models/rocks/boulder_c.glb",
+   "radius": 0.73,
+   "size": [
+    1.461,
+    1.344,
+    1.052
+   ],
+   "talus": false,
+   "tris": [
+    1600,
+    480,
+    120
+   ],
+   "yield": "none"
+  },
+  "outcrop_a": {
+   "height": 1.786,
+   "normal": "res://assets/models/rocks/outcrop_a_normal.png",
+   "path": "res://assets/models/rocks/outcrop_a.glb",
+   "radius": 3.711,
+   "size": [
+    7.422,
+    4.566,
+    2.299
+   ],
+   "talus": false,
+   "tris": [
+    3000,
+    900,
+    220
+   ],
+   "yield": "none"
+  },
+  "outcrop_b": {
+   "height": 2.276,
+   "normal": "res://assets/models/rocks/outcrop_b_normal.png",
+   "path": "res://assets/models/rocks/outcrop_b.glb",
+   "radius": 2.7,
+   "size": [
+    5.399,
+    3.294,
+    2.733
+   ],
+   "talus": false,
+   "tris": [
+    2800,
+    850,
+    200
+   ],
+   "yield": "none"
+  },
+  "rock_small_a": {
+   "height": 0.24,
+   "normal": "res://assets/models/rocks/rock_small_a_normal.png",
+   "path": "res://assets/models/rocks/rock_small_a.glb",
+   "radius": 0.254,
+   "size": [
+    0.508,
+    0.418,
+    0.279
+   ],
+   "talus": false,
+   "tris": [
+    420,
+    140,
+    48
+   ],
+   "yield": "stone"
+  },
+  "rock_small_b": {
+   "height": 0.187,
+   "normal": "res://assets/models/rocks/rock_small_b_normal.png",
+   "path": "res://assets/models/rocks/rock_small_b.glb",
+   "radius": 0.189,
+   "size": [
+    0.377,
+    0.339,
+    0.217
+   ],
+   "talus": false,
+   "tris": [
+    360,
+    120,
+    40
+   ],
+   "yield": "stone"
+  },
+  "rock_small_c": {
+   "height": 0.266,
+   "normal": "res://assets/models/rocks/rock_small_c_normal.png",
+   "path": "res://assets/models/rocks/rock_small_c.glb",
+   "radius": 0.393,
+   "size": [
+    0.787,
+    0.52,
+    0.314
+   ],
+   "talus": false,
+   "tris": [
+    480,
+    160,
+    52
+   ],
+   "yield": "stone"
+  },
+  "rock_small_d": {
+   "height": 0.133,
+   "normal": "res://assets/models/rocks/rock_small_d_normal.png",
+   "path": "res://assets/models/rocks/rock_small_d.glb",
+   "radius": 0.117,
+   "size": [
+    0.235,
+    0.203,
+    0.153
+   ],
+   "talus": false,
+   "tris": [
+    300,
+    100,
+    36
+   ],
+   "yield": "stone"
+  },
+  "talus_patch": {
+   "height": 0.285,
+   "normal": "res://assets/models/rocks/talus_patch_normal.png",
+   "path": "res://assets/models/rocks/talus_patch.glb",
+   "radius": 1.859,
+   "size": [
+    3.718,
+    2.469,
+    0.308
+   ],
+   "talus": true,
+   "tris": [
+    2400,
+    800,
+    200
+   ],
+   "yield": "none"
+  }
+ },
+ "trees": {
+  "fir_a": {
+   "aabb_max": [
+    2.122,
+    22.089,
+    1.9
+   ],
+   "aabb_min": [
+    -2.101,
+    -0.402,
+    -1.812
+   ],
+   "bark": "bark_spruce",
+   "broken": false,
+   "card_spacing_mul": 1.0,
+   "cards": "fir",
+   "crown_base": 2.64,
+   "crown_radius": 2.122,
+   "dbh": 0.36,
+   "height": 22.089,
+   "path": "res://assets/models/vegetation/fir_a.glb",
+   "sapling": false,
+   "species": "fir",
+   "stems": 1,
+   "tris": [
+    3208,
+    635,
+    145
+   ],
+   "trunk_radius": 0.1927,
+   "wood_density": 560.0
+  },
+  "fir_b": {
+   "aabb_max": [
+    1.666,
+    14.084,
+    1.664
+   ],
+   "aabb_min": [
+    -1.629,
+    -0.4,
+    -1.717
+   ],
+   "bark": "bark_spruce",
+   "broken": false,
+   "card_spacing_mul": 1.0,
+   "cards": "fir",
+   "crown_base": 0.7,
+   "crown_radius": 1.717,
+   "dbh": 0.24,
+   "height": 14.084,
+   "path": "res://assets/models/vegetation/fir_b.glb",
+   "sapling": false,
+   "species": "fir",
+   "stems": 1,
+   "tris": [
+    1914,
+    443,
+    141
+   ],
+   "trunk_radius": 0.1284,
+   "wood_density": 560.0
+  },
+  "larch_a": {
+   "aabb_max": [
+    3.154,
+    18.058,
+    3.073
+   ],
+   "aabb_min": [
+    -2.951,
+    -0.401,
+    -2.767
+   ],
+   "bark": "bark_pine",
+   "broken": false,
+   "card_spacing_mul": 1.0,
+   "cards": "larch",
+   "crown_base": 3.6,
+   "crown_radius": 3.154,
+   "dbh": 0.4,
+   "height": 18.058,
+   "path": "res://assets/models/vegetation/larch_a.glb",
+   "sapling": false,
+   "species": "larch",
+   "stems": 1,
+   "tris": [
+    2912,
+    989,
+    147
+   ],
+   "trunk_radius": 0.2141,
+   "wood_density": 600.0
+  },
+  "larch_b": {
+   "aabb_max": [
+    2.352,
+    12.054,
+    2.528
+   ],
+   "aabb_min": [
+    -2.282,
+    -0.403,
+    -2.218
+   ],
+   "bark": "bark_pine",
+   "broken": false,
+   "card_spacing_mul": 1.0,
+   "cards": "larch",
+   "crown_base": 1.2,
+   "crown_radius": 2.528,
+   "dbh": 0.28,
+   "height": 12.054,
+   "path": "res://assets/models/vegetation/larch_b.glb",
+   "sapling": false,
+   "species": "larch",
+   "stems": 1,
+   "tris": [
+    1474,
+    555,
+    151
+   ],
+   "trunk_radius": 0.1499,
+   "wood_density": 600.0
+  },
+  "lodgepole_a": {
+   "aabb_max": [
+    3.029,
+    24.656,
+    2.976
+   ],
+   "aabb_min": [
+    -2.746,
+    -0.402,
+    -2.737
+   ],
+   "bark": "bark_pine",
+   "broken": false,
+   "card_spacing_mul": 1.0,
+   "cards": "lodgepole",
+   "crown_base": 13.44,
+   "crown_radius": 3.029,
+   "dbh": 0.34,
+   "height": 24.656,
+   "path": "res://assets/models/vegetation/lodgepole_a.glb",
+   "sapling": false,
+   "species": "lodgepole",
+   "stems": 1,
+   "tris": [
+    4708,
+    1033,
+    109
+   ],
+   "trunk_radius": 0.182,
+   "wood_density": 560.0
+  },
+  "lodgepole_b": {
+   "aabb_max": [
+    2.3,
+    17.407,
+    2.436
+   ],
+   "aabb_min": [
+    -2.209,
+    -0.402,
+    -2.37
+   ],
+   "bark": "bark_pine",
+   "broken": false,
+   "card_spacing_mul": 1.0,
+   "cards": "lodgepole",
+   "crown_base": 7.65,
+   "crown_radius": 2.436,
+   "dbh": 0.25,
+   "height": 17.407,
+   "path": "res://assets/models/vegetation/lodgepole_b.glb",
+   "sapling": false,
+   "species": "lodgepole",
+   "stems": 1,
+   "tris": [
+    3382,
+    737,
+    127
+   ],
+   "trunk_radius": 0.1338,
+   "wood_density": 560.0
+  },
+  "snag_a": {
+   "aabb_max": [
+    0.569,
+    13.771,
+    0.589
+   ],
+   "aabb_min": [
+    -0.56,
+    -0.408,
+    -0.61
+   ],
+   "bark": "bark_dead",
+   "broken": true,
+   "card_spacing_mul": 1.0,
+   "cards": null,
+   "crown_base": 6.65,
+   "crown_radius": 0.61,
+   "dbh": 0.42,
+   "height": 13.771,
+   "path": "res://assets/models/vegetation/snag_a.glb",
+   "sapling": false,
+   "species": "snag",
+   "stems": 1,
+   "tris": [
+    790,
+    281,
+    55
+   ],
+   "trunk_radius": 0.2248,
+   "wood_density": 420.0
+  },
+  "snag_b": {
+   "aabb_max": [
+    0.502,
+    8.477,
+    0.558
+   ],
+   "aabb_min": [
+    -0.571,
+    -0.405,
+    -0.746
+   ],
+   "bark": "bark_dead",
+   "broken": true,
+   "card_spacing_mul": 1.0,
+   "cards": null,
+   "crown_base": 2.1,
+   "crown_radius": 0.746,
+   "dbh": 0.32,
+   "height": 8.477,
+   "path": "res://assets/models/vegetation/snag_b.glb",
+   "sapling": false,
+   "species": "snag",
+   "stems": 1,
+   "tris": [
+    638,
+    223,
+    71
+   ],
+   "trunk_radius": 0.1713,
+   "wood_density": 420.0
+  },
+  "spruce_a": {
+   "aabb_max": [
+    2.835,
+    28.07,
+    2.695
+   ],
+   "aabb_min": [
+    -2.673,
+    -0.403,
+    -2.873
+   ],
+   "bark": "bark_spruce",
+   "broken": false,
+   "card_spacing_mul": 1.26,
+   "cards": "spruce",
+   "crown_base": 8.4,
+   "crown_radius": 2.873,
+   "dbh": 0.5,
+   "height": 28.07,
+   "path": "res://assets/models/vegetation/spruce_a.glb",
+   "sapling": false,
+   "species": "spruce",
+   "stems": 1,
+   "tris": [
+    5786,
+    985,
+    135
+   ],
+   "trunk_radius": 0.2676,
+   "wood_density": 620.0
+  },
+  "spruce_b": {
+   "aabb_max": [
+    2.567,
+    20.067,
+    2.267
+   ],
+   "aabb_min": [
+    -2.574,
+    -0.405,
+    -2.46
+   ],
+   "bark": "bark_spruce",
+   "broken": false,
+   "card_spacing_mul": 1.0,
+   "cards": "spruce",
+   "crown_base": 3.2,
+   "crown_radius": 2.574,
+   "dbh": 0.36,
+   "height": 20.067,
+   "path": "res://assets/models/vegetation/spruce_b.glb",
+   "sapling": false,
+   "species": "spruce",
+   "stems": 1,
+   "tris": [
+    4010,
+    689,
+    143
+   ],
+   "trunk_radius": 0.1927,
+   "wood_density": 620.0
+  },
+  "spruce_c": {
+   "aabb_max": [
+    2.226,
+    13.074,
+    2.179
+   ],
+   "aabb_min": [
+    -2.122,
+    -1.202,
+    -2.451
+   ],
+   "bark": "bark_spruce",
+   "broken": false,
+   "card_spacing_mul": 1.0,
+   "cards": "spruce",
+   "crown_base": 0.39,
+   "crown_radius": 2.451,
+   "dbh": 0.27,
+   "height": 13.074,
+   "path": "res://assets/models/vegetation/spruce_c.glb",
+   "sapling": false,
+   "species": "spruce",
+   "stems": 1,
+   "tris": [
+    3022,
+    575,
+    151
+   ],
+   "trunk_radius": 0.1445,
+   "wood_density": 620.0
+  },
+  "spruce_sapling_a": {
+   "aabb_max": [
+    0.781,
+    2.363,
+    0.697
+   ],
+   "aabb_min": [
+    -0.748,
+    -0.453,
+    -0.748
+   ],
+   "bark": "bark_spruce",
+   "broken": false,
+   "card_spacing_mul": 1.0,
+   "cards": "spruce",
+   "crown_base": 0.0,
+   "crown_radius": 0.781,
+   "dbh": 0.035,
+   "height": 2.363,
+   "path": "res://assets/models/vegetation/spruce_sapling_a.glb",
+   "sapling": true,
+   "species": "spruce",
+   "stems": 1,
+   "tris": [
+    616,
+    127,
+    80
+   ],
+   "trunk_radius": 0.0179,
+   "wood_density": 620.0
+  },
+  "spruce_sapling_b": {
+   "aabb_max": [
+    1.066,
+    4.463,
+    0.947
+   ],
+   "aabb_min": [
+    -0.991,
+    -0.735,
+    -1.025
+   ],
+   "bark": "bark_spruce",
+   "broken": false,
+   "card_spacing_mul": 1.0,
+   "cards": "spruce",
+   "crown_base": 0.0,
+   "crown_radius": 1.066,
+   "dbh": 0.075,
+   "height": 4.463,
+   "path": "res://assets/models/vegetation/spruce_sapling_b.glb",
+   "sapling": true,
+   "species": "spruce",
+   "stems": 1,
+   "tris": [
+    1508,
+    253,
+    128
+   ],
+   "trunk_radius": 0.0384,
+   "wood_density": 620.0
+  },
+  "whitebark_a": {
+   "aabb_max": [
+    4.327,
+    12.283,
+    4.554
+   ],
+   "aabb_min": [
+    -4.295,
+    -0.421,
+    -3.722
+   ],
+   "bark": "bark_pine",
+   "broken": false,
+   "card_spacing_mul": 1.36,
+   "cards": "whitebark",
+   "crown_base": 2.2,
+   "crown_radius": 4.554,
+   "dbh": 0.3,
+   "height": 12.283,
+   "path": "res://assets/models/vegetation/whitebark_a.glb",
+   "sapling": false,
+   "species": "whitebark",
+   "stems": 3,
+   "tris": [
+    5948,
+    1451,
+    279
+   ],
+   "trunk_radius": 0.1606,
+   "wood_density": 520.0
+  },
+  "whitebark_b": {
+   "aabb_max": [
+    4.109,
+    7.896,
+    2.87
+   ],
+   "aabb_min": [
+    -3.636,
+    -0.406,
+    -2.967
+   ],
+   "bark": "bark_pine",
+   "broken": false,
+   "card_spacing_mul": 1.0,
+   "cards": "whitebark",
+   "crown_base": 0.78,
+   "crown_radius": 4.109,
+   "dbh": 0.24,
+   "height": 7.896,
+   "path": "res://assets/models/vegetation/whitebark_b.glb",
+   "sapling": false,
+   "species": "whitebark",
+   "stems": 2,
+   "tris": [
+    3338,
+    830,
+    224
+   ],
+   "trunk_radius": 0.1284,
+   "wood_density": 520.0
+  }
+ }
+}

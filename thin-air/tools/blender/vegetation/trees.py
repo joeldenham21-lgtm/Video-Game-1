@@ -65,6 +65,17 @@ SPECIES = {
 		trunk_wobble=0.006, taper=0.8),
 }
 
+# In-game look per species (read by VegLibrary from the manifest and by impostors.py for the bake):
+# leaf_tint multiplies the card atlas albedo, bark_tint the shared bark_* albedo, transl = backlight.
+LOOK = {
+	"spruce": {"leaf_tint": [1.75, 1.8, 1.8], "bark_tint": [0.72, 0.7, 0.72], "transl": 0.5},
+	"fir": {"leaf_tint": [1.7, 1.75, 1.7], "bark_tint": [0.92, 0.9, 0.95], "transl": 0.45},
+	"lodgepole": {"leaf_tint": [1.5, 1.5, 1.5], "bark_tint": [0.8, 0.82, 0.9], "transl": 0.55},
+	"whitebark": {"leaf_tint": [1.5, 1.5, 1.5], "bark_tint": [1.35, 1.75, 2.35], "transl": 0.55},
+	"larch": {"leaf_tint": [1.45, 1.4, 1.1], "bark_tint": [0.85, 0.78, 0.78], "transl": 0.85},
+	"snag": {"leaf_tint": [1.0, 1.0, 1.0], "bark_tint": [1.0, 1.0, 1.0], "transl": 0.3},
+}
+
 # H = height (m), dbh = diameter at 1.3 m, cb = live crown base as a fraction of H, rmax = max crown radius (m)
 VARIANTS = {
 	"spruce_a": dict(sp="spruce", H=28.0, dbh=0.50, cb=0.30, rmax=2.7, lean=0.8, branch_mul=1.35, card_mul=1.25),
@@ -567,6 +578,8 @@ def mesh_card(md: vc.MeshData, tree: Tree, c: Card, regions: dict, segs: int = 1
 			row.append(md.add_vert(pos, nrm, uv, (pos[2] / tree.H, c.zrel),
 				vcol(min(wind, 1.0), ao, c.phase, min(c.width / 4.0, 1.0))))
 		rows.append(row)
+		md.partner[row[0]] = row[1]
+		md.partner[row[1]] = row[0]
 	for i in range(segs):
 		a, b = rows[i], rows[i + 1]
 		md.add_face((a[0], a[1], b[1], b[0]), 1)
@@ -750,6 +763,7 @@ def build_variant(name: str, cards_meta: dict | None = None, mat_meta: dict | No
 		"aabb_min": [round(float(aabb_min[0]), 3), round(float(aabb_min[2]), 3), round(float(-aabb_max[1]), 3)],
 		"aabb_max": [round(float(aabb_max[0]), 3), round(float(aabb_max[2]), 3), round(float(-aabb_min[1]), 3)],
 		"tris": [lod0.tri_count(), lod1.tri_count(), lod2.tri_count()], "card_spacing_mul": round(mul, 3),
+		**LOOK.get(var["sp"], {}),
 	}
 	return {"tree": tree, "lods": [lod0, lod1, lod2], "meta": meta}
 

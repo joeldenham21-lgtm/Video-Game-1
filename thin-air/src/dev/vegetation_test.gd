@@ -228,12 +228,11 @@ func _add_impostor(kind: StringName, pos: Vector3) -> void:
 	mm.mesh = lib.impostor_quad
 	mm.instance_count = 1
 	mm.set_instance_transform(0, Transform3D(Basis(), pos))
-	var inf := lib.info(kind)
-	mm.set_instance_custom_data(0, Color(float(inf["impostor_layer"]), float(inf["impostor_size"]),
-		float(inf["impostor_center"]), 0.0))
+	mm.set_instance_custom_data(0, lib.impostor_custom(kind))
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
 	mmi.set_instance_shader_parameter(&"lod_begin", 0.0)
+	mmi.custom_aabb = AABB(Vector3(-10, -1, -10), Vector3(20, 40, 20))
 	add_child(mmi)
 
 
