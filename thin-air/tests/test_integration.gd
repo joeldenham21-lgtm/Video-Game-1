@@ -25,6 +25,7 @@ func run() -> void:
 		return
 	await _gather_and_craft()
 	var fire := await _campfire()
+	await _shelter()
 	await _cook_and_eat(fire)
 	await _inventory_screen()
 	await _pickups_and_storage()
@@ -277,6 +278,39 @@ func _campfire() -> Campfire:
 			"hitting something with a torch doesn't use it up")
 	player.select_hotbar(-1)
 	return fire
+
+
+## CONTRACT §3 shelter interface (the building stream's lean-to/cabin interiors): an Area3D in group "shelter"
+## with shelter_factor and a collision shape. Climate sees it, the player caches it, and it warms the felt temperature.
+func _shelter() -> void:
+	var gs := GDScript.new()
+	gs.source_code = "extends Area3D\nvar shelter_factor := 1.0\n"
+	gs.reload()
+	var a := Area3D.new()
+	a.set_script(gs)
+	a.collision_layer = 0
+	a.collision_mask = 0
+	var cs := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(6.0, 3.0, 6.0)
+	cs.shape = box
+	a.add_child(cs)
+	a.add_to_group(&"shelter")
+	world.add_child(a)
+	a.global_position = player.global_position + Vector3(0.0, 1.4, 0.0)
+	var core := player.global_position + Vector3(0.0, Player.CORE_HEIGHT, 0.0)
+	Climate.refresh_sources()
+	await _wait(0.3)
+	var inside := Climate.get_felt_temperature(core, player.get_insulation(), false)
+	check(Climate.get_shelter_at(core) > 0.9 and player.is_sheltered > 0.9,
+		"shelter Area3D (group shelter, shelter_factor) → Climate %.2f, player.is_sheltered %.2f" % [Climate.get_shelter_at(core), player.is_sheltered])
+	a.queue_free()
+	await get_tree().process_frame
+	Climate.refresh_sources()
+	await _wait(0.3)
+	var outside := Climate.get_felt_temperature(core, player.get_insulation(), false)
+	check(player.is_sheltered < 0.1 and inside > outside + 1.0,
+		"sheltered feels warmer (%.1f vs %.1f °C outside)" % [inside, outside])
 
 
 func _cook_and_eat(fire: Campfire) -> void:
