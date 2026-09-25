@@ -225,7 +225,7 @@ func _campfire() -> Campfire:
 	# Warmth: cold body next to the fire warms up; Climate heat reaches the player's core.
 	player.vitals.warmth = 40.0
 	var w0 := player.vitals.warmth
-	await _wait(2.5)
+	await _wait(4.0)      # the fire ramps up from a flicker (intensity 0.12 → ~0.7 over ~2 s)
 	var heat := Climate.get_heat_at(player.global_position + Vector3(0.0, Player.CORE_HEIGHT, 0.0))
 	check(heat > 5.0 and player.vitals.env_heat > 5.0, "fire heat reaches the player (%.1f °C)" % heat)
 	check(player.vitals.warmth > w0 + 0.5, "warmth rises by the fire (%.1f → %.1f)" % [w0, player.vitals.warmth])
@@ -369,6 +369,26 @@ func _pickups_and_storage() -> void:
 	await get_tree().process_frame
 	inv.add(&"rope", 3)
 	check(inv.transfer(inv.find(&"rope"), box.inventory) == 3 and box.inventory.count(&"rope") == 3, "stored rope in a box")
+	# Per-stack state (a canteen of untreated water) survives the box and the ground.
+	inv.add(&"canteen", 1)
+	var ci := inv.find(&"canteen")
+	var cst := inv.get_slot(ci).duplicate()
+	cst["durability"] = 0.75
+	cst["unsafe"] = true
+	inv.set_slot(ci, cst)
+	inv.transfer(ci, box.inventory)
+	box.inventory.transfer(box.inventory.find(&"canteen"), inv)
+	var back := inv.get_slot(inv.find(&"canteen"))
+	check(bool(back.get("unsafe", false)) and is_equal_approx(float(back.get("durability", 0.0)), 0.75),
+		"canteen through the storage box keeps its fill and untreated water")
+	var pk := ItemActions.drop_stack(player, inv.remove_at(inv.find(&"canteen"), 1))
+	check(pk != null and bool(pk.save_data().get("extra", {}).get("unsafe", false)), "dropped canteen pickup carries (and saves) the untreated flag")
+	if pk:
+		pk.take_into(inv)
+	back = inv.get_slot(inv.find(&"canteen"))
+	check(bool(back.get("unsafe", false)) and is_equal_approx(float(back.get("durability", 0.0)), 0.75),
+		"picked back up: still untreated, same fill")
+	inv.remove(&"canteen", 1)
 
 
 func _save_load(fire: Campfire) -> void:

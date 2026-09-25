@@ -104,7 +104,9 @@ func remove_at(index: int, amount := -1) -> Dictionary:
 		return {}
 	var s := slots[index]
 	var n: int = int(s["count"]) if amount < 0 else mini(amount, int(s["count"]))
-	var out := {"id": s["id"], "count": n, "durability": s.get("durability", 1.0)}
+	var out := s.duplicate()      # keeps per-stack extras (a canteen's "unsafe" water) for drop / transfer
+	out["count"] = n
+	out["durability"] = s.get("durability", 1.0)
 	s["count"] = int(s["count"]) - n
 	if int(s["count"]) <= 0:
 		slots[index] = {}
@@ -234,11 +236,31 @@ func slot_weight(i: int) -> float:
 	return float(ItemDB.get_item(s["id"]).get("weight", 0.1)) * int(s["count"])
 
 
-## Adds a whole stack dictionary ({id, count, durability}), keeping its durability. Returns the count NOT added.
+## Adds a whole stack dictionary ({id, count, durability, ...}), keeping its durability. A stack carrying extra
+## per-stack state (a canteen's "unsafe" water) keeps it: it goes into an empty slot of its own instead of
+## merging. Returns the count NOT added.
 func add_stack(stack: Dictionary) -> int:
 	if stack.is_empty():
 		return 0
-	return add(StringName(stack.get("id", "")), int(stack.get("count", 1)), float(stack.get("durability", 1.0)))
+	var id := StringName(stack.get("id", ""))
+	var n := int(stack.get("count", 1))
+	var extra := false
+	for k in stack:
+		if not (String(k) in ["id", "count", "durability"]):
+			extra = true
+			break
+	if extra and ItemDB.has_item(id) and n > 0 and n <= stack_limit(id):
+		for i in slots.size():
+			if slots[i].is_empty():
+				var st := stack.duplicate()
+				st["id"] = id
+				st["count"] = n
+				st["durability"] = float(stack.get("durability", 1.0))
+				slots[i] = st
+				changed.emit()
+				return 0
+		return n
+	return add(id, n, float(stack.get("durability", 1.0)))
 
 
 ## Moves `amount` (-1 = all) from slot `from` to slot `to`: fills an empty slot, merges identical stacks, or swaps
@@ -300,7 +322,9 @@ func transfer(index: int, other: Inventory, amount := -1) -> int:
 	if s.is_empty() or other == null or other == self:
 		return 0
 	var n: int = int(s["count"]) if amount < 0 else mini(amount, int(s["count"]))
-	var left := other.add(s["id"], n, float(s.get("durability", 1.0)))
+	var part := s.duplicate()
+	part["count"] = n
+	var left := other.add_stack(part)
 	var moved := n - left
 	if moved > 0:
 		remove_at(index, moved)

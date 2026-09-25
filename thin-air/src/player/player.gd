@@ -486,7 +486,7 @@ func drop_active_item() -> void:
 	var st := inventory.remove_at(idx, 1)
 	if st.is_empty():
 		return
-	_drop_to_world(id, 1, float(st.get("durability", 1.0)))
+	_drop_to_world(id, 1, float(st.get("durability", 1.0)), ItemActions.stack_extra(st))
 	Events.item_dropped.emit(id, 1)
 	Audio.play_sfx(&"drop", global_position)
 
@@ -1573,10 +1573,11 @@ func _auto_hotbar(id: StringName) -> void:
 
 
 ## Spawns a dropped stack through ItemsRoot (a "dynamic" pickup: saved with the world, keeps durability).
-func _drop_to_world(id: StringName, count: int, durability := 1.0) -> void:
+func _drop_to_world(id: StringName, count: int, durability := 1.0, extra := {}) -> void:
 	var at := get_eye_position() + get_look_direction() * 0.7 + Vector3.DOWN * 0.3
 	var node := ItemsRoot.spawn(id, count, at, Vector3.ZERO, durability)
 	if node:
+		node.extra = extra.duplicate()
 		node.linear_velocity = get_look_direction() * 2.5 + velocity * 0.5
 
 

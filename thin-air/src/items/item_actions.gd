@@ -239,8 +239,21 @@ static func drop_stack(player: Node, stack: Dictionary) -> ItemPickup:
 	var at := pos + flat * 0.75 - Vector3.UP * 0.45
 	var impulse := (flat * 1.6 + Vector3.UP * 0.8)
 	Audio.play_sfx(&"drop", at)
-	return ItemsRoot.spawn(StringName(stack.get("id", "")), int(stack.get("count", 1)), at, impulse,
+	var p := ItemsRoot.spawn(StringName(stack.get("id", "")), int(stack.get("count", 1)), at, impulse,
 		float(stack.get("durability", 1.0)))
+	if p:
+		p.extra = stack_extra(stack)
+	return p
+
+
+## The per-stack state beyond {id, count, durability} that survives dropping/saving (JSON-safe values only).
+static func stack_extra(stack: Dictionary) -> Dictionary:
+	var out := {}
+	for k in stack:
+		var v: Variant = stack[k]
+		if not (String(k) in ["id", "count", "durability"]) and (v is bool or v is int or v is float or v is String):
+			out[String(k)] = v
+	return out
 
 
 # ------------------------------------------------------------------------------------------------ stats
