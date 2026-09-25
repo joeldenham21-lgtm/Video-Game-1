@@ -17,6 +17,8 @@ extends Node3D
 const S0 := 1.5
 const SHADER_HQ := "res://assets/shaders/terrain.gdshader"
 const SHADER_MOBILE := "res://assets/shaders/terrain_mobile.gdshader"
+const SHADER_HQ_HOLES := "res://assets/shaders/terrain_holes.gdshader"
+const SHADER_MOBILE_HOLES := "res://assets/shaders/terrain_mobile_holes.gdshader"
 const SHADER_SHADOW := "res://assets/shaders/terrain_shadowcaster.gdshader"
 const SHADER_SUN := "res://assets/shaders/terrain_sunshadow.gdshader"
 const LAYERS_JSON := "res://assets/textures/terrain/layers.json"
@@ -55,6 +57,8 @@ var _ymin := 0.0
 var _ymax := 4000.0
 var _last_snap: Array = []
 var _shader: Shader
+var _shader_holes: Shader
+var _holes_near := false
 var _shadow_shader: Shader
 var _layer_avg := PackedVector3Array()
 var _layer_rough := PackedFloat32Array()
@@ -161,6 +165,11 @@ func _load_layers() -> void:
 func _make_material(scale: float) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = _shader
+	_apply_params(m, scale)
+	return m
+
+
+func _apply_params(m: ShaderMaterial, scale: float) -> void:
 	m.set_shader_parameter(&"map_height_tex", TerrainData.height_texture)
 	m.set_shader_parameter(&"mid_height_tex", TerrainData.mid_texture)
 	m.set_shader_parameter(&"far_height_tex", TerrainData.far_texture)
@@ -179,7 +188,6 @@ func _make_material(scale: float) -> ShaderMaterial:
 		for arg in OS.get_cmdline_user_args():
 			if String(arg).begins_with("--terrain_debug="):
 				m.set_shader_parameter(&"debug_view", int(String(arg).get_slice("=", 1)))
-	return m
 
 
 # =========================================================================================== meshes
@@ -241,6 +249,8 @@ static func rects_mesh(rects: Array[Rect2i], ymin: float, ymax: float) -> ArrayM
 
 func _build() -> void:
 	_shader = load(SHADER_MOBILE if mobile else SHADER_HQ)
+	_shader_holes = load(SHADER_MOBILE_HOLES if mobile else SHADER_HQ_HOLES)
+	_holes_near = false
 	_shadow_shader = load(SHADER_SHADOW)
 	_root_tiles = Node3D.new()
 	_root_tiles.name = "Clipmap"
@@ -393,10 +403,43 @@ func _process(delta: float) -> void:
 			else:
 				mat.set_shader_parameter(&"lvl_hole", Vector4(-1e9, -1e9, 1e9, 1e9))
 	_update_shadow_casters(snaps, cp)
+	_update_holes(cp)
 	_update_far_culling(cam)
 	_sync_fog()
 	if _sun_vp:
 		_update_sun_shadow(delta)
+
+
+## The innermost two levels switch to the cut-out shader variant (discard inside the hole discs) only while a
+## heightfield hole is within their reach, so the common case stays fully opaque (early-z, cheap prepass).
+func _update_holes(cp: Vector3) -> void:
+	var holes := TerrainData.get_holes()
+	if holes.is_empty() or _shader_holes == null:
+		return
+	var reach := (2 * T + 2) * S0 * 2.0
+	var arr: Array[Vector4] = []
+	for hd in holes:
+		var hx := float(hd.get("x", 0.0))
+		var hz := float(hd.get("z", 0.0))
+		var r := float(hd.get("radius", 0.0))
+		if absf(hx - cp.x) < reach + r and absf(hz - cp.z) < reach + r and arr.size() < 4:
+			arr.append(Vector4(hx, hz, r, 0.0))
+	var near := not arr.is_empty()
+	if near != _holes_near:
+		_holes_near = near
+		for l in mini(2, _levels.size()):
+			var m: ShaderMaterial = _levels[l]["mat"]
+			m.shader = _shader_holes if near else _shader
+			_apply_params(m, _levels[l]["scale"])
+			_last_snap[l] = Vector2(INF, INF)         # re-send per-level uniforms next frame
+	if near:
+		var count := arr.size()
+		while arr.size() < 4:
+			arr.append(Vector4(0, 0, 0, 0))
+		for l in mini(2, _levels.size()):
+			var m2: ShaderMaterial = _levels[l]["mat"]
+			m2.set_shader_parameter(&"holes", arr)
+			m2.set_shader_parameter(&"hole_count", count)
 
 
 func _place(mi: MeshInstance3D, origin: Vector2, sc: float) -> void:
@@ -511,7 +554,27 @@ func _build_collision() -> void:
 	var hs := HeightMapShape3D.new()
 	hs.map_width = TerrainData.SIZE
 	hs.map_depth = TerrainData.SIZE
-	hs.map_data = TerrainData.heights
+	var data := TerrainData.heights
+	var holes := TerrainData.get_holes()
+	if not holes.is_empty():
+		# NaN samples are holes in Jolt's heightfield: the mine adit / ice cave mouths open into the
+		# structures built under the surface there
+		data = TerrainData.heights.duplicate()
+		for hd in holes:
+			var hx := float(hd.get("x", 0.0))
+			var hz := float(hd.get("z", 0.0))
+			var r := float(hd.get("radius", 0.0))
+			var i0 := maxi(int(floorf((hx - r + TerrainData.HALF) / TerrainData.CELL)), 0)
+			var i1 := mini(int(ceilf((hx + r + TerrainData.HALF) / TerrainData.CELL)), TerrainData.SIZE - 1)
+			var j0 := maxi(int(floorf((hz - r + TerrainData.HALF) / TerrainData.CELL)), 0)
+			var j1 := mini(int(ceilf((hz + r + TerrainData.HALF) / TerrainData.CELL)), TerrainData.SIZE - 1)
+			for j in range(j0, j1 + 1):
+				for i in range(i0, i1 + 1):
+					var px := -TerrainData.HALF + i * TerrainData.CELL
+					var pz := -TerrainData.HALF + j * TerrainData.CELL
+					if (px - hx) * (px - hx) + (pz - hz) * (pz - hz) <= r * r:
+						data[j * TerrainData.SIZE + i] = NAN
+	hs.map_data = data
 	cs.shape = hs
 	cs.scale = Vector3(TerrainData.CELL, 1.0, TerrainData.CELL)
 	_body.add_child(cs)

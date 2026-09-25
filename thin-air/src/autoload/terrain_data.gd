@@ -451,6 +451,12 @@ func get_lakes() -> Array:
 	return layout.get("lakes", [])
 
 
+## Cut-outs of the heightfield ({id, x, z, radius, y}) — the collider has no surface inside them and the
+## renderer discards there; the Structures stream builds the portals / tunnels beneath.
+func get_holes() -> Array[Dictionary]:
+	return _holes
+
+
 ## Inside a cut-out (mine adit portal, ice cave mouth) where the heightfield has no surface.
 func is_hole(x: float, z: float) -> bool:
 	for hd in _holes:
@@ -486,11 +492,13 @@ func raycast(from: Vector3, dir: Vector3, max_dist: float) -> Dictionary:
 	if prev_above < 0.0:
 		return {"hit": true, "position": from, "normal": get_normal(from.x, from.z), "distance": 0.0}
 	while t < max_dist:
-		# step by the clearance (can't hit anything closer than the height margin on steep 80° ground)
-		var step := clampf(prev_above * 0.35, CELL * 0.5, 30.0)
+		# step by the clearance: ground rising at up to ~80 deg can't be closer than ~0.18 x the height margin
+		var step := clampf(prev_above * 0.2, CELL * 0.5, 30.0)
 		t = minf(t + step, max_dist)
 		var p := from + d * t
 		var above := p.y - get_height(p.x, p.z)
+		if above <= 0.0 and not _holes.is_empty() and is_hole(p.x, p.z):
+			above = maxf(above, CELL)            # no surface inside a cut-out: keep marching
 		if above <= 0.0:
 			var a := prev_t
 			var b := t
