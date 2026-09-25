@@ -283,7 +283,7 @@ func grass_material(card_set: String) -> ShaderMaterial:
 			m.set_shader_parameter(&"greenness", 0.0)
 			m.set_shader_parameter(&"wind_amp", 0.06)
 		"sedge":
-			m.set_shader_parameter(&"greenness", 0.45)
+			m.set_shader_parameter(&"greenness", 0.35)
 	m.resource_name = key
 	_materials[key] = m
 	grass_materials.append(m)

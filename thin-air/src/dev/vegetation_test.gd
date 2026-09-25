@@ -6,11 +6,15 @@ extends Node3D
 ##     --quit-after 60 --resolution 1280x720 res://scenes/dev/vegetation_test.tscn -- --mode=lineup
 ## Modes:
 ##   --mode=lineup   [--kinds=spruce_a,fir_a] [--lod=0|1|2|3 (3 = impostor)] [--spacing=m]
-##   --mode=forest   dense forest on the stub terrain via scenes/world/vegetation.tscn [--density=1.0]
-##   --mode=fell     chops a tree next to the camera and lets it fall (harvest state machine demo)
+##   --mode=forest   the real Vegetation system (scenes/world/vegetation.tscn) on VegTestTerrain: a valley with
+##                   a lake, forested slopes, an escarpment and a treeline bench, rendered as a terrain mesh
+##                   with collision [--density=1.0] [--flat = the flat TerrainData stub instead]
+##   --mode=fell     forest + chops the tree nearest to the camera (--hits=N, default: fell it) at frame
+##                   --chop_at (default 20); the tree falls to the camera's right (--fall=left|right|away)
 ## Camera: --cam=x,y,z (y may be "g" = ground + --height) --look=yaw,pitch (yaw 0 = north/-Z) --fov=deg
 ## Light/weather: --hours=H (sun from time of day) or --sun=elev,az ; --wind=0..1.5 ; --snow=0..1 ; --wet=0..1
 ## --preset=P (Settings preset) --perf (prints PERF line at --perf_at frame) --fog=density --exposure=f
+## Perf breakdown: --no_near --no_far --no_grass --no_terrain hide those parts.
 
 const GROUND_Y := 1450.0
 
@@ -22,6 +26,7 @@ var frame := 0
 var perf_at := 60
 var lib: VegLibrary
 var vegetation: Node = null
+var terrain: VegTestTerrain = null
 
 
 func _ready() -> void:
@@ -32,6 +37,10 @@ func _ready() -> void:
 	perf_at = int(args.get("perf_at", "60"))
 	if args.has("preset"):
 		Settings.apply_preset(StringName(args["preset"]))
+	if args.has("tile_scale"):
+		Vegetation.tile_scale = float(args["tile_scale"])
+	if args.has("shadow_tile_scale"):
+		Vegetation.shadow_tile_scale = float(args["shadow_tile_scale"])
 	RenderingServer.global_shader_parameter_set(&"wind_strength", float(args.get("wind", "0.35")))
 	RenderingServer.global_shader_parameter_set(&"wind_direction", Vector3(0.8, 0.0, 0.6).normalized())
 	RenderingServer.global_shader_parameter_set(&"snow_cover", float(args.get("snow", "0.0")))
@@ -54,10 +63,14 @@ func _ready() -> void:
 	cam.make_current()
 
 
+func _ground_at(x: float, z: float) -> float:
+	return terrain.get_height(x, z) if terrain else GROUND_Y
+
+
 func _place_camera() -> void:
 	var c := String(args.get("cam", "")).split(",")
 	if c.size() == 3:
-		var y := GROUND_Y + float(args.get("height", "1.7")) if c[1] == "g" else float(c[1])
+		var y := _ground_at(float(c[0]), float(c[2])) + float(args.get("height", "1.7")) if c[1] == "g" else float(c[1])
 		cam.global_position = Vector3(float(c[0]), y, float(c[2]))
 	var look := String(args.get("look", "0,0")).split(",")
 	cam.rotation_degrees = Vector3(float(look[1]) if look.size() > 1 else 0.0, float(look[0]), 0.0)
@@ -68,6 +81,14 @@ func _process(_d: float) -> void:
 	if cam:
 		lib.set_view_origin(cam.global_position)
 		RenderingServer.global_shader_parameter_set(&"player_position", cam.global_position)
+	if args.get("mode", "") == "fell" and frame == int(args.get("chop_at", "20")):
+		_chop_nearest()
+	if vegetation and frame == 2:
+		for part in ["Near", "Far", "Grass", "Terrain"]:
+			if args.has("no_" + part.to_lower()):
+				var n := vegetation.get_node_or_null(part) if part != "Terrain" else get_node_or_null("TestTerrain")
+				if n:
+					n.visible = false
 	if args.has("perf") and frame == perf_at:
 		print("PERF draw_calls=", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
 			" primitives=", Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME),
@@ -240,11 +261,193 @@ func _add_impostor(kind: StringName, pos: Vector3) -> void:
 
 func _build_forest() -> void:
 	var path := "res://scenes/world/vegetation.tscn"
-	_ground(3000.0, String(args.get("ground", "forest")))
+	if args.has("flat"):
+		_ground(3000.0, String(args.get("ground", "forest")))
+		var body := StaticBody3D.new()
+		var cs := CollisionShape3D.new()
+		cs.shape = WorldBoundaryShape3D.new()
+		body.add_child(cs)
+		body.position.y = GROUND_Y
+		add_child(body)
+	else:
+		terrain = VegTestTerrain.new()
+		_build_terrain()
 	if not ResourceLoader.exists(path):
 		return
 	vegetation = (load(path) as PackedScene).instantiate()
 	if args.has("density") and "density_override" in vegetation:
 		vegetation.set("density_override", float(args["density"]))
+	if terrain:
+		vegetation.set("terrain_override", terrain)
 	vegetation.set("camera_override", cam)
+	vegetation.set("sync_all", true)
 	add_child(vegetation)
+
+
+## Terrain mesh (4 m grid, vertex colours = masks) + heightmap collision + lake for VegTestTerrain.
+func _build_terrain() -> void:
+	var step := 4.0
+	var half := VegTestTerrain.WINDOW
+	var n := int(2.0 * half / step) + 1
+	var verts := PackedVector3Array()
+	var norms := PackedVector3Array()
+	var cols := PackedColorArray()
+	verts.resize(n * n)
+	norms.resize(n * n)
+	cols.resize(n * n)
+	var hm := PackedFloat32Array()
+	hm.resize(n * n)
+	for j in n:
+		for i in n:
+			var x := -half + i * step
+			var z := -half + j * step
+			var y := terrain.get_height(x, z)
+			verts[j * n + i] = Vector3(x, y, z)
+			norms[j * n + i] = terrain.get_normal(x, z)
+			cols[j * n + i] = terrain.get_masks(x, z)
+			hm[j * n + i] = y
+	var idx := PackedInt32Array()
+	idx.resize((n - 1) * (n - 1) * 6)
+	var k := 0
+	for j in n - 1:
+		for i in n - 1:
+			var a := j * n + i
+			idx[k] = a
+			idx[k + 1] = a + 1
+			idx[k + 2] = a + n
+			idx[k + 3] = a + 1
+			idx[k + 4] = a + n + 1
+			idx[k + 5] = a + n
+			k += 6
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = verts
+	arr[Mesh.ARRAY_NORMAL] = norms
+	arr[Mesh.ARRAY_COLOR] = cols
+	arr[Mesh.ARRAY_INDEX] = idx
+	var am := ArrayMesh.new()
+	am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	var mi := MeshInstance3D.new()
+	mi.name = "TestTerrain"
+	mi.mesh = am
+	var sh := Shader.new()
+	sh.code = TERRAIN_SHADER
+	var mat := ShaderMaterial.new()
+	mat.shader = sh
+	for layer in ["forest", "grass", "rock", "scree", "snow", "cliff"]:
+		var dir := "res://assets/textures/terrain/%s_" % layer
+		mat.set_shader_parameter(StringName(layer + "_a"), load(dir + "albedo.png"))
+		mat.set_shader_parameter(StringName(layer + "_n"), load(dir + "normal.png"))
+	mi.material_override = mat
+	add_child(mi)
+	# collision
+	var body := StaticBody3D.new()
+	body.name = "TerrainBody"
+	var cs := CollisionShape3D.new()
+	var hs := HeightMapShape3D.new()
+	hs.map_width = n
+	hs.map_depth = n
+	hs.map_data = hm
+	cs.shape = hs
+	cs.scale = Vector3(step, 1.0, step)
+	body.add_child(cs)
+	add_child(body)
+	# lake
+	var lake := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(VegTestTerrain.LAKE.z * 3.0, VegTestTerrain.LAKE.z * 3.0)
+	lake.mesh = pm
+	var wm := StandardMaterial3D.new()
+	wm.albedo_color = Color(0.02, 0.035, 0.04)
+	wm.roughness = 0.04
+	wm.metallic_specular = 0.6
+	lake.material_override = wm
+	lake.position = Vector3(VegTestTerrain.LAKE.x, terrain.lake_level, VegTestTerrain.LAKE.y)
+	add_child(lake)
+
+
+const TERRAIN_SHADER := """
+shader_type spatial;
+render_mode diffuse_burley;
+uniform sampler2D forest_a : source_color, filter_linear_mipmap_anisotropic;
+uniform sampler2D forest_n : hint_normal, filter_linear_mipmap_anisotropic;
+uniform sampler2D grass_a : source_color, filter_linear_mipmap_anisotropic;
+uniform sampler2D grass_n : hint_normal, filter_linear_mipmap_anisotropic;
+uniform sampler2D rock_a : source_color, filter_linear_mipmap_anisotropic;
+uniform sampler2D rock_n : hint_normal, filter_linear_mipmap_anisotropic;
+uniform sampler2D scree_a : source_color, filter_linear_mipmap_anisotropic;
+uniform sampler2D scree_n : hint_normal, filter_linear_mipmap_anisotropic;
+uniform sampler2D snow_a : source_color, filter_linear_mipmap_anisotropic;
+uniform sampler2D snow_n : hint_normal, filter_linear_mipmap_anisotropic;
+uniform sampler2D cliff_a : source_color, filter_linear_mipmap_anisotropic;
+uniform sampler2D cliff_n : hint_normal, filter_linear_mipmap_anisotropic;
+varying vec4 m;
+varying vec3 wp;
+varying vec3 wn;
+void vertex() {
+	m = COLOR;
+	wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	wn = NORMAL;
+}
+void fragment() {
+	float steep = smoothstep(0.82, 0.62, wn.y);
+	vec2 uf = wp.xz / 2.5;
+	vec2 ug = wp.xz / 3.0;
+	vec2 ur = wp.xz / 4.0;
+	vec2 uc = (abs(wn.x) > abs(wn.z) ? wp.zy : wp.xy) / 8.0;
+	float wf = m.a;
+	float wg = m.b * (1.0 - m.a);
+	float wr = m.g * (1.0 - steep);
+	float ws = m.r;
+	float wc = steep;
+	float wsum = wf + wg + wr + ws + wc + 1e-3;
+	vec3 a = (texture(forest_a, uf).rgb * wf + texture(grass_a, ug).rgb * wg + mix(texture(scree_a, ur).rgb,
+		texture(rock_a, ur).rgb, 0.5) * wr + texture(snow_a, ur).rgb * ws + texture(cliff_a, uc).rgb * wc) / wsum;
+	vec3 nt = (texture(forest_n, uf).rgb * wf + texture(grass_n, ug).rgb * wg + texture(rock_n, ur).rgb * wr
+		+ texture(snow_n, ur).rgb * ws + texture(cliff_n, uc).rgb * wc) / wsum;
+	ALBEDO = a;
+	NORMAL_MAP = nt;
+	ROUGHNESS = mix(0.85, 0.7, ws);
+}
+"""
+
+
+func _chop_nearest() -> void:
+	if vegetation == null or vegetation.get("harvest") == null:
+		return
+	var h: Node = vegetation.harvest
+	var cp := cam.global_position
+	var best := {}
+	var bd := INF
+	for e in vegetation.query(cp, 60.0, [VegScatter.Cat.TREE]):
+		var sp := String(lib.info(e["kind"]).get("species", ""))
+		if sp == "snag":
+			continue
+		var d := Vector2(e["pos"].x - cp.x, e["pos"].z - cp.z).length()
+		# in front of the camera, 8-30 m away
+		var to: Vector3 = (e["pos"] - cp).normalized()
+		if d < 8.0 or d > 30.0 or to.dot(-cam.global_transform.basis.z) < 0.8:
+			continue
+		if d < bd:
+			bd = d
+			best = e
+	if best.is_empty():
+		print("VEG fell: no tree in view")
+		return
+	var right := cam.global_transform.basis.x
+	var away := Vector3(best["pos"].x - cp.x, 0.0, best["pos"].z - cp.z).normalized()
+	var fall := right
+	match String(args.get("fall", "right")):
+		"left":
+			fall = -right
+		"away":
+			fall = away
+	var chopper: Vector3 = best["pos"] - fall * 1.5
+	var hits := int(args.get("hits", "0"))
+	var hit_pos: Vector3 = best["pos"] + Vector3.UP * 0.9 - fall * 0.2
+	if hits > 0:
+		for i in hits:
+			h.hit_instance(best["id"], &"felling_axe", 40.0, hit_pos, -fall, null)
+	else:
+		h.fell(best["id"], chopper)
+	print("VEG fell: %s at %.1f m" % [best["kind"], bd])

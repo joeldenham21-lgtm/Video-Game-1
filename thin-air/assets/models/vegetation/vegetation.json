@@ -511,6 +511,11 @@
     -1.812
    ],
    "bark": "bark_spruce",
+   "bark_tint": [
+    0.92,
+    0.9,
+    0.95
+   ],
    "broken": false,
    "card_spacing_mul": 1.0,
    "cards": "fir",
@@ -518,10 +523,16 @@
    "crown_radius": 2.122,
    "dbh": 0.36,
    "height": 22.089,
+   "leaf_tint": [
+    1.7,
+    1.75,
+    1.7
+   ],
    "path": "res://assets/models/vegetation/fir_a.glb",
    "sapling": false,
    "species": "fir",
    "stems": 1,
+   "transl": 0.45,
    "tris": [
     3208,
     635,
@@ -542,6 +553,11 @@
     -1.717
    ],
    "bark": "bark_spruce",
+   "bark_tint": [
+    0.92,
+    0.9,
+    0.95
+   ],
    "broken": false,
    "card_spacing_mul": 1.0,
    "cards": "fir",
@@ -549,10 +565,16 @@
    "crown_radius": 1.717,
    "dbh": 0.24,
    "height": 14.084,
+   "leaf_tint": [
+    1.7,
+    1.75,
+    1.7
+   ],
    "path": "res://assets/models/vegetation/fir_b.glb",
    "sapling": false,
    "species": "fir",
    "stems": 1,
+   "transl": 0.45,
    "tris": [
     1914,
     443,
@@ -573,6 +595,11 @@
     -2.767
    ],
    "bark": "bark_pine",
+   "bark_tint": [
+    0.85,
+    0.78,
+    0.78
+   ],
    "broken": false,
    "card_spacing_mul": 1.0,
    "cards": "larch",
@@ -580,10 +607,16 @@
    "crown_radius": 3.154,
    "dbh": 0.4,
    "height": 18.058,
+   "leaf_tint": [
+    1.45,
+    1.4,
+    1.1
+   ],
    "path": "res://assets/models/vegetation/larch_a.glb",
    "sapling": false,
    "species": "larch",
    "stems": 1,
+   "transl": 0.85,
    "tris": [
     2912,
     989,
@@ -604,6 +637,11 @@
     -2.218
    ],
    "bark": "bark_pine",
+   "bark_tint": [
+    0.85,
+    0.78,
+    0.78
+   ],
    "broken": false,
    "card_spacing_mul": 1.0,
    "cards": "larch",
@@ -611,10 +649,16 @@
    "crown_radius": 2.528,
    "dbh": 0.28,
    "height": 12.054,
+   "leaf_tint": [
+    1.45,
+    1.4,
+    1.1
+   ],
    "path": "res://assets/models/vegetation/larch_b.glb",
    "sapling": false,
    "species": "larch",
    "stems": 1,
+   "transl": 0.85,
    "tris": [
     1474,
     555,
@@ -635,6 +679,11 @@
     -2.737
    ],
    "bark": "bark_pine",
+   "bark_tint": [
+    0.8,
+    0.82,
+    0.9
+   ],
    "broken": false,
    "card_spacing_mul": 1.0,
    "cards": "lodgepole",
@@ -642,10 +691,16 @@
    "crown_radius": 3.029,
    "dbh": 0.34,
    "height": 24.656,
+   "leaf_tint": [
+    1.5,
+    1.5,
+    1.5
+   ],
    "path": "res://assets/models/vegetation/lodgepole_a.glb",
    "sapling": false,
    "species": "lodgepole",
    "stems": 1,
+   "transl": 0.55,
    "tris": [
     4708,
     1033,
@@ -666,6 +721,11 @@
     -2.37
    ],
    "bark": "bark_pine",
+   "bark_tint": [
+    0.8,
+    0.82,
+    0.9
+   ],
    "broken": false,
    "card_spacing_mul": 1.0,
    "cards": "lodgepole",
@@ -673,10 +733,16 @@
    "crown_radius": 2.436,
    "dbh": 0.25,
    "height": 17.407,
+   "leaf_tint": [
+    1.5,
+    1.5,
+    1.5
+   ],
    "path": "res://assets/models/vegetation/lodgepole_b.glb",
    "sapling": false,
    "species": "lodgepole",
    "stems": 1,
+   "transl": 0.55,
    "tris": [
     3382,
     737,
@@ -697,6 +763,11 @@
     -0.61
    ],
    "bark": "bark_dead",
+   "bark_tint": [
+    1.0,
+    1.0,
+    1.0
+   ],
    "broken": true,
    "card_spacing_mul": 1.0,
    "cards": null,
@@ -704,10 +775,16 @@
    "crown_radius": 0.61,
    "dbh": 0.42,
    "height": 13.771,
+   "leaf_tint": [
+    1.0,
+    1.0,
+    1.0
+   ],
    "path": "res://assets/models/vegetation/snag_a.glb",
    "sapling": false,
    "species": "snag",
    "stems": 1,
+   "transl": 0.3,
    "tris": [
     790,
     281,
@@ -728,6 +805,11 @@
     -0.746
    ],
    "bark": "bark_dead",
+   "bark_tint": [
+    1.0,
+    1.0,
+    1.0
+   ],
    "broken": true,
    "card_spacing_mul": 1.0,
    "cards": null,
@@ -735,10 +817,16 @@
    "crown_radius": 0.746,
    "dbh": 0.32,
    "height": 8.477,
+   "leaf_tint": [
+    1.0,
+    1.0,
+    1.0
+   ],
    "path": "res://assets/models/vegetation/snag_b.glb",
    "sapling": false,
    "species": "snag",
    "stems": 1,
+   "transl": 0.3,
    "tris": [
     638,
     223,
@@ -759,6 +847,11 @@
     -2.873
    ],
    "bark": "bark_spruce",
+   "bark_tint": [
+    0.72,
+    0.7,
+    0.72
+   ],
    "broken": false,
    "card_spacing_mul": 1.26,
    "cards": "spruce",
@@ -766,10 +859,16 @@
    "crown_radius": 2.873,
    "dbh": 0.5,
    "height": 28.07,
+   "leaf_tint": [
+    1.75,
+    1.8,
+    1.8
+   ],
    "path": "res://assets/models/vegetation/spruce_a.glb",
    "sapling": false,
    "species": "spruce",
    "stems": 1,
+   "transl": 0.5,
    "tris": [
     5786,
     985,
@@ -790,6 +889,11 @@
     -2.46
    ],
    "bark": "bark_spruce",
+   "bark_tint": [
+    0.72,
+    0.7,
+    0.72
+   ],
    "broken": false,
    "card_spacing_mul": 1.0,
    "cards": "spruce",
@@ -797,10 +901,16 @@
    "crown_radius": 2.574,
    "dbh": 0.36,
    "height": 20.067,
+   "leaf_tint": [
+    1.75,
+    1.8,
+    1.8
+   ],
    "path": "res://assets/models/vegetation/spruce_b.glb",
    "sapling": false,
    "species": "spruce",
    "stems": 1,
+   "transl": 0.5,
    "tris": [
     4010,
     689,
@@ -821,6 +931,11 @@
     -2.451
    ],
    "bark": "bark_spruce",
+   "bark_tint": [
+    0.72,
+    0.7,
+    0.72
+   ],
    "broken": false,
    "card_spacing_mul": 1.0,
    "cards": "spruce",
@@ -828,10 +943,16 @@
    "crown_radius": 2.451,
    "dbh": 0.27,
    "height": 13.074,
+   "leaf_tint": [
+    1.75,
+    1.8,
+    1.8
+   ],
    "path": "res://assets/models/vegetation/spruce_c.glb",
    "sapling": false,
    "species": "spruce",
    "stems": 1,
+   "transl": 0.5,
    "tris": [
     3022,
     575,
@@ -852,6 +973,11 @@
     -0.748
    ],
    "bark": "bark_spruce",
+   "bark_tint": [
+    0.72,
+    0.7,
+    0.72
+   ],
    "broken": false,
    "card_spacing_mul": 1.0,
    "cards": "spruce",
@@ -859,10 +985,16 @@
    "crown_radius": 0.781,
    "dbh": 0.035,
    "height": 2.363,
+   "leaf_tint": [
+    1.75,
+    1.8,
+    1.8
+   ],
    "path": "res://assets/models/vegetation/spruce_sapling_a.glb",
    "sapling": true,
    "species": "spruce",
    "stems": 1,
+   "transl": 0.5,
    "tris": [
     616,
     127,
@@ -883,6 +1015,11 @@
     -1.025
    ],
    "bark": "bark_spruce",
+   "bark_tint": [
+    0.72,
+    0.7,
+    0.72
+   ],
    "broken": false,
    "card_spacing_mul": 1.0,
    "cards": "spruce",
@@ -890,10 +1027,16 @@
    "crown_radius": 1.066,
    "dbh": 0.075,
    "height": 4.463,
+   "leaf_tint": [
+    1.75,
+    1.8,
+    1.8
+   ],
    "path": "res://assets/models/vegetation/spruce_sapling_b.glb",
    "sapling": true,
    "species": "spruce",
    "stems": 1,
+   "transl": 0.5,
    "tris": [
     1508,
     253,
@@ -914,6 +1057,11 @@
     -3.722
    ],
    "bark": "bark_pine",
+   "bark_tint": [
+    1.35,
+    1.75,
+    2.35
+   ],
    "broken": false,
    "card_spacing_mul": 1.36,
    "cards": "whitebark",
@@ -921,10 +1069,16 @@
    "crown_radius": 4.554,
    "dbh": 0.3,
    "height": 12.283,
+   "leaf_tint": [
+    1.5,
+    1.5,
+    1.5
+   ],
    "path": "res://assets/models/vegetation/whitebark_a.glb",
    "sapling": false,
    "species": "whitebark",
    "stems": 3,
+   "transl": 0.55,
    "tris": [
     5948,
     1451,
@@ -945,6 +1099,11 @@
     -2.967
    ],
    "bark": "bark_pine",
+   "bark_tint": [
+    1.35,
+    1.75,
+    2.35
+   ],
    "broken": false,
    "card_spacing_mul": 1.0,
    "cards": "whitebark",
@@ -952,10 +1111,16 @@
    "crown_radius": 4.109,
    "dbh": 0.24,
    "height": 7.896,
+   "leaf_tint": [
+    1.5,
+    1.5,
+    1.5
+   ],
    "path": "res://assets/models/vegetation/whitebark_b.glb",
    "sapling": false,
    "species": "whitebark",
    "stems": 2,
+   "transl": 0.55,
    "tris": [
     3338,
     830,

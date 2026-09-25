@@ -50,16 +50,18 @@ var is_generated := false
 var fully_generated := false
 var gen_msec := 0
 
-var bands: Array = []                 # per Cat: Array of [begin, end, lod] (main pass, no shadows)
+var bands: Array = []                 # per Cat: Array of [begin, end, lod] (main pass, no shadows); lod 3 = impostor
 var shadow_bands: Array = []          # per Cat: Array of [begin, end, lod] (shadow-only proxies)
 var keep_frac: PackedFloat32Array = PackedFloat32Array([1, 1, 1, 1, 1, 1])
+var _imp_custom: Array = []           # per kind index: impostor INSTANCE_CUSTOM Color, or null (no impostor)
 var imp_distance := 160.0
 var view_distance := 4000.0
 var band_margin := 3.0
 
 var _near_root: Node3D
 var _far_root: Node3D
-var _near: Dictionary = {}            # int key (kind << 4 | band, shadow bands 8..15) -> MultiMeshInstance3D
+var _near: Dictionary = {}            # Vector4i(kind, band code, tile x, tile z) -> MultiMeshInstance3D
+                                      # band code: main bands 0..7, shadow proxies 8..15
 var _far: Dictionary = {}             # far cell index -> MultiMeshInstance3D
 var _far_index: Dictionary = {}       # instance id -> Vector2i(far cell index, instance index)
 var _far_centers: Dictionary = {}     # far cell index -> Vector3 centre
@@ -94,6 +96,7 @@ func _ready() -> void:
 	add_child(_far_root)
 	for k in lib.kind_names:
 		lib.meshes(k)
+		_imp_custom.append(lib.impostor_custom(k) if lib.has_impostors() and lib.info(k).has("impostor_layer") else null)
 	_read_settings()
 	generate()
 	_attach_subsystems()
@@ -145,8 +148,9 @@ func _read_settings() -> void:
 	# trees thin out gently (forests must stay forests), ground clutter scales directly
 	keep_frac = PackedFloat32Array([0.55 + 0.45 * dens, 0.3 + 0.7 * dens, dens, 0.4 + 0.6 * dens, 1.0, dens])
 	var mobile: bool = Settings.is_mobile()
-	var a := maxf(18.0, imp_distance * 0.32)
-	var b := maxf(32.0, imp_distance * 0.62)
+	# LOD0 (<= 6k tris) only where its detail is visible; LOD1 (~1k) to ~55 % of the impostor distance
+	var a := clampf(imp_distance * 0.2, 16.0, 36.0)
+	var b := maxf(30.0, imp_distance * 0.55)
 	var imp := imp_distance
 	band_margin = clampf(imp * 0.04, 2.0, 6.0)
 	var sq := int(Settings.get_value(&"shadow_quality", 2))
@@ -160,7 +164,11 @@ func _read_settings() -> void:
 	var sh_dist := float(Settings.get_value(&"shadow_distance", 200.0))
 	var sh_end := minf(imp, sh_dist)
 	bands[Cat.TREE] = [[0.0, a, 0], [a, b, 1], [b, imp, 2]]
-	shadow_bands[Cat.TREE] = [[0.0, a, 1], [a, sh_end, 2]] if not mobile else [[0.0, sh_end, 2]]
+	# shadow casters: LOD1 right around the player (crisp needle-spray shadows), LOD2 tier fans, then impostor
+	# quads (lod 3: 2 triangles, billboarded toward the light) out to the shadow distance — a dense forest has
+	# thousands of casters within 160 m and every directional cascade draws them
+	shadow_bands[Cat.TREE] = [[0.0, a * 0.5, 1], [a * 0.5, a * 1.6, 2], [a * 1.6, sh_end, 3]] if not mobile \
+		else [[0.0, a, 2], [a, sh_end, 3]]
 	bands[Cat.SAPLING] = [[0.0, a * 0.8, 0], [a * 0.8, b * 0.75, 1], [b * 0.75, imp * 0.8, 2]]
 	shadow_bands[Cat.SAPLING] = [[0.0, minf(a, sh_end), 2]]
 	var sh0 := maxf(14.0, imp * 0.22)
@@ -660,10 +668,25 @@ func rebin_now() -> void:
 	_apply_rebin()
 
 
-## Worker: bins instances into per (asset, band) transform buffers — main bands 0..7, shadow proxies 8..15.
-## Returns int key -> {buf, ids, kind, band, cat, shadow}.
+## World-aligned tile size for a band ending at `end` m: every (asset, band) is split into tiles so frustum
+## culling and the shadow cascades only touch the tiles they overlap (a ring-shaped MultiMesh around the camera
+## would be drawn whole in every pass and every cascade).
+## Tile size = band end x scale; 0 = one tile per (asset, band). Measured on a dense-forest view (Forward+
+## high): tiling cut primitives by only ~5 % (directional shadow cascades still see every tile) for +12 % draw
+## calls, so bands are untiled by default.
+static var tile_scale := 0.0
+static var shadow_tile_scale := 0.0
+
+
+static func band_tile(end: float, shadow := false) -> float:
+	var k := shadow_tile_scale if shadow else tile_scale
+	return 1.0e6 if k <= 0.0 else clampf(end * k, 24.0, 1.0e6)
+
+
+## Worker: bins instances into per (asset, band, tile) transform buffers — main bands 0..7, shadow proxies
+## 8..15. Returns Vector4i key -> {buf, ids, kind, band, cat, shadow}.
 func _compute_rebin(cp: Vector3, excl: Dictionary) -> Dictionary:
-	var lists := {}                       # int key -> Array of int refs (cell index << 12 | local index)
+	var lists := {}                       # Vector4i key -> Array of int refs (cell index << 12 | local index)
 	var slack := REBIN_STEP + band_margin + 1.0
 	var reach := 0.0
 	var cat_reach := PackedFloat32Array()
@@ -697,47 +720,52 @@ func _compute_rebin(cp: Vector3, excl: Dictionary) -> Dictionary:
 				if excl.has(cd.ids[i]):
 					continue
 				var ref := (ci << 12) | i
-				var kk: int = cd.kinds[i] << 4
-				var bl: Array = bands[cat]
-				for b in bl.size():
-					var band: Array = bl[b]
-					if d >= float(band[0]) - slack and d <= float(band[1]) + slack:
-						var key: int = kk | b
-						var lst: Array = lists.get(key, [])
-						if lst.is_empty():
-							lists[key] = lst
-						lst.append(ref)
-				var sl: Array = shadow_bands[cat]
-				for b in sl.size():
-					var sband: Array = sl[b]
-					if d >= float(sband[0]) - slack and d <= float(sband[1]) + slack:
-						var skey: int = kk | (8 + b)
-						var slst: Array = lists.get(skey, [])
-						if slst.is_empty():
-							lists[skey] = slst
-						slst.append(ref)
+				var kind: int = cd.kinds[i]
+				for pass_i in 2:
+					var bl: Array = bands[cat] if pass_i == 0 else shadow_bands[cat]
+					for b in bl.size():
+						var band: Array = bl[b]
+						if d >= float(band[0]) - slack and d <= float(band[1]) + slack:
+							if int(band[2]) == 3 and _imp_custom[kind] == null:
+								continue
+							var t := band_tile(float(band[1]), pass_i == 1)
+							var key := Vector4i(kind, b + 8 * pass_i, int(floor(p.x / t)), int(floor(p.z / t)))
+							var lst: Array = lists.get(key, [])
+							if lst.is_empty():
+								lists[key] = lst
+							lst.append(ref)
 	var out := {}
 	for key in lists:
 		var lst: Array = lists[key]
 		var n := lst.size()
-		var buf := PackedFloat32Array()
-		buf.resize(n * 12)
-		var ids := PackedInt32Array()
-		ids.resize(n)
+		var k4: Vector4i = key
 		var first: int = lst[0]
 		var cd0: VegScatter.CellData = cells[first >> 12]
 		var cat := int(cd0.cats[first & 4095])
+		var band: Array = (shadow_bands if k4.y >= 8 else bands)[cat][k4.y & 7]
+		var imp: Variant = _imp_custom[k4.x] if int(band[2]) == 3 else null
+		var stride := 16 if imp != null else 12
+		var buf := PackedFloat32Array()
+		buf.resize(n * stride)
+		var ids := PackedInt32Array()
+		ids.resize(n)
 		for j in n:
 			var ref: int = lst[j]
 			var cd: VegScatter.CellData = cells[ref >> 12]
 			var li := ref & 4095
 			var k := li * 12
-			var o := j * 12
+			var o := j * stride
 			for e in 12:
 				buf[o + e] = cd.xf[k + e]
+			if imp != null:
+				var c: Color = imp
+				buf[o + 12] = c.r
+				buf[o + 13] = c.g
+				buf[o + 14] = c.b
+				buf[o + 15] = c.a
 			ids[j] = cd.ids[li]
-		var bi: int = key & 15
-		out[key] = {"buf": buf, "ids": ids, "kind": key >> 4, "band": bi & 7, "cat": cat, "shadow": bi >= 8}
+		out[key] = {"buf": buf, "ids": ids, "kind": k4.x, "band": k4.y & 7, "cat": cat, "shadow": k4.y >= 8,
+			"stride": stride}
 	return out
 
 
@@ -754,6 +782,7 @@ func _apply_rebin() -> void:
 		var band_i := int(e["band"])
 		var is_shadow := bool(e["shadow"])
 		var band: Array = (shadow_bands if is_shadow else bands)[int(e["cat"])][band_i]
+		var stride := int(e.get("stride", 12))
 		if mmi == null:
 			var ms := lib.meshes(kind)
 			if ms.is_empty():
@@ -761,31 +790,36 @@ func _apply_rebin() -> void:
 			mmi = MultiMeshInstance3D.new()
 			var mm := MultiMesh.new()
 			mm.transform_format = MultiMesh.TRANSFORM_3D
-			mm.mesh = ms[mini(int(band[2]), ms.size() - 1)]
+			if stride == 16:
+				mm.use_custom_data = true
+				mm.mesh = lib.impostor_quad
+			else:
+				mm.mesh = ms[mini(int(band[2]), ms.size() - 1)]
 			mmi.multimesh = mm
-			mmi.name = "N_%d" % key
 			mmi.extra_cull_margin = 4.0
 			mmi.set_instance_shader_parameter(&"lod_begin", float(band[0]))
 			mmi.set_instance_shader_parameter(&"lod_end", float(band[1]))
 			mmi.set_instance_shader_parameter(&"lod_margin", band_margin)
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY if is_shadow \
 				else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			mmi.visibility_range_end = float(band[1]) + band_margin * 2.0 + REBIN_STEP
+			mmi.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+			# coarse cull (Godot measures to the AABB centre, so allow for the tile size)
+			mmi.visibility_range_end = float(band[1]) + band_tile(float(band[1])) * 0.75 + band_margin * 2.0 + REBIN_STEP
 			_near_root.add_child(mmi)
 			_near[key] = mmi
 		var buf: PackedFloat32Array = e["buf"]
-		var n := buf.size() / 12
+		var n := buf.size() / stride
 		mmi.multimesh.instance_count = n
 		if n > 0:
 			mmi.multimesh.buffer = buf
 		mmi.set_meta(&"ids", e["ids"])
 		mmi.visible = n > 0
 		used[key] = true
+	# tiles that fell out of every band: free (tiles are world-aligned, so the set drifts as you travel)
 	for key in _near.keys():
 		if not used.has(key):
-			var m: MultiMeshInstance3D = _near[key]
-			m.multimesh.instance_count = 0
-			m.visible = false
+			(_near[key] as MultiMeshInstance3D).queue_free()
+			_near.erase(key)
 	# instances removed/hidden while the worker was binning
 	for id in _changed_since_rebin:
 		_hide_in_near(id)

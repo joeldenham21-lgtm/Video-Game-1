@@ -51,7 +51,7 @@ func _read_settings() -> void:
 	distance = clampf(float(Settings.get_value(&"grass_distance", 60.0)), 0.0, 150.0)
 	var dens := clampf(float(Settings.get_value(&"vegetation_density", 1.0)), 0.0, 1.0)
 	var mobile: bool = Settings.is_mobile()
-	spacing = 0.62 if mobile else 0.5
+	spacing = 0.5 if mobile else 0.34
 	density = dens * (0.75 if mobile else 1.0)
 	enabled = distance > 1.0 and density > 0.02 and not meshes.is_empty()
 	VegLibrary.get_shared().set_grass_params(distance * 0.55, distance)
@@ -204,6 +204,7 @@ static func generate_cell(ctx: VegScatter.Context, c: Vector2i, sp: float, dens:
 			var r_kind := rng.randf()
 			var r_yaw := rng.randf()
 			var r_sc := rng.randf()
+			var r_h := rng.randf()
 			if not t.in_bounds(x, z, 1.0):
 				continue
 			var m: Color = t.get_masks(x, z)
@@ -211,7 +212,7 @@ static func generate_cell(ctx: VegScatter.Context, c: Vector2i, sp: float, dens:
 			var meadow := clampf(m.b * 1.15 + (1.0 - m.a) * 0.12, 0.0, 1.0) * open
 			var floor_cover := m.a * 0.22 * open
 			var clump := VegScatter.noise2(x, z, 6.0, 31) * 0.6 + VegScatter.noise2(x, z, 1.7, 32) * 0.4
-			var p := (meadow + floor_cover) * dens * smoothstep(0.2, 0.62, clump) * 1.5
+			var p := (meadow + floor_cover) * dens * (0.3 + 0.7 * smoothstep(0.25, 0.6, clump)) * 1.25
 			if r_acc >= p:
 				continue
 			var slope: float = t.get_slope_deg(x, z)
@@ -229,7 +230,8 @@ static func generate_cell(ctx: VegScatter.Context, c: Vector2i, sp: float, dens:
 				kind = 0 if q < 0.5 else (1 if q < 0.8 else 2)
 			if kind >= nk:
 				kind = nk - 1
-			var sc := lerpf(0.75, 1.3, r_sc) * (0.8 if kind == 3 else 1.0)
+			var sc := lerpf(0.6, 1.3, r_sc) * (0.8 if kind == 3 else 1.0)
+			var tall := lerpf(0.75, 1.3, r_h) * lerpf(0.8, 1.15, clump)
 			# lean with the slope a little (tufts grow up, not normal to the ground)
 			var nrm: Vector3 = t.get_normal(x, z)
 			var up := Vector3.UP.lerp(nrm, 0.3).normalized()
@@ -237,7 +239,7 @@ static func generate_cell(ctx: VegScatter.Context, c: Vector2i, sp: float, dens:
 			var axis := Vector3.UP.cross(up)
 			if axis.length_squared() > 1e-6:
 				b = Basis(axis.normalized(), Vector3.UP.angle_to(up)) * b
-			b = b.scaled(Vector3.ONE * sc)
+			b = b * Basis.from_scale(Vector3(sc, sc * tall, sc))
 			(acc[kind] as Array).append_array([b.x.x, b.y.x, b.z.x, x, b.x.y, b.y.y, b.z.y, y - 0.02,
 				b.x.z, b.y.z, b.z.z, z])
 	for k in nk:

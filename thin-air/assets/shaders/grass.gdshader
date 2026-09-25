@@ -12,8 +12,8 @@ uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic, r
 uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform vec3 tint : source_color = vec3(1.0);
 uniform vec3 dry_tint : source_color = vec3(1.06, 0.96, 0.8);
-uniform vec3 green_tint : source_color = vec3(0.72, 0.86, 0.6);
-uniform float greenness : hint_range(0.0, 1.0) = 0.3;   // share of still-green tufts (late October: few)
+uniform vec3 green_tint : source_color = vec3(0.84, 0.93, 0.74);
+uniform float greenness : hint_range(0.0, 1.0) = 0.25;  // share of still-green tufts (late October: few)
 uniform float alpha_cut : hint_range(0.05, 0.95) = 0.42;
 uniform float fade_start = 35.0;
 uniform float fade_end = 60.0;
@@ -79,7 +79,7 @@ void fragment() {
 	float patch = veg_hash12(floor(v_world.xz / 9.0)) * 0.5 + veg_hash12(floor(v_world.xz / 3.0)) * 0.5;
 	vec3 var_tint = mix(dry_tint, green_tint, clamp(v_green * 0.8 + (patch - 0.6) * 0.5, 0.0, 1.0));
 	vec3 alb = tex.rgb * tint * var_tint * (0.88 + 0.24 * v_inst);
-	float ao = COLOR.g * mix(0.55, 1.0, smoothstep(0.0, 0.25, v_world.y - v_base_y));
+	float ao = COLOR.g * mix(0.7, 1.0, smoothstep(0.0, 0.2, v_world.y - v_base_y));
 	// snow caught in the tufts
 	float snow = smoothstep(0.3, 0.8, v_snow + (veg_hash13(floor(v_world * 11.0)) - 0.5) * 0.3) * 0.8;
 	alb = mix(alb, vec3(0.86, 0.89, 0.93), snow);
