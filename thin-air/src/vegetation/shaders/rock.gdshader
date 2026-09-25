@@ -39,6 +39,13 @@ void vertex() {
 	}
 }
 
+// Normal maps are imported RGTC/BC5 (two channels): rebuild Z (sampling .z of such a texture returns 0,
+// which turns every normal inside out).
+vec3 unpack_normal(vec4 t) {
+	vec2 xy = t.xy * 2.0 - 1.0;
+	return vec3(xy, sqrt(max(1.0 - dot(xy, xy), 0.0)));
+}
+
 vec3 whiteout(vec3 base_ts, vec3 detail_ts) {
 	return normalize(vec3(base_ts.xy + detail_ts.xy, base_ts.z * detail_ts.z));
 }
@@ -48,8 +55,9 @@ void fragment() {
 		discard;
 	}
 	// macro normal (baked) in world space
-	vec3 mn = texture(macro_normal, UV).xyz * 2.0 - 1.0;
+	vec3 mn = unpack_normal(texture(macro_normal, UV));
 	mn.xy *= macro_strength;
+	mn = normalize(mn);
 	vec3 t_w = normalize((INV_VIEW_MATRIX * vec4(TANGENT, 0.0)).xyz);
 	vec3 b_w = normalize((INV_VIEW_MATRIX * vec4(BINORMAL, 0.0)).xyz);
 	vec3 n_w = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
@@ -63,9 +71,9 @@ void fragment() {
 	vec2 uvz = p.xy;
 	vec3 alb = texture(albedo_tex, uvx).rgb * w.x + texture(albedo_tex, uvy).rgb * w.y + texture(albedo_tex, uvz).rgb * w.z;
 	vec3 orm = texture(orm_tex, uvx).rgb * w.x + texture(orm_tex, uvy).rgb * w.y + texture(orm_tex, uvz).rgb * w.z;
-	vec3 tx = texture(normal_tex, uvx).xyz * 2.0 - 1.0;
-	vec3 ty = texture(normal_tex, uvy).xyz * 2.0 - 1.0;
-	vec3 tz = texture(normal_tex, uvz).xyz * 2.0 - 1.0;
+	vec3 tx = unpack_normal(texture(normal_tex, uvx));
+	vec3 ty = unpack_normal(texture(normal_tex, uvy));
+	vec3 tz = unpack_normal(texture(normal_tex, uvz));
 	tx.xy *= detail_strength;
 	ty.xy *= detail_strength;
 	tz.xy *= detail_strength;

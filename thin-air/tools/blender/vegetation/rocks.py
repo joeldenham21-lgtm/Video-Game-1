@@ -60,6 +60,8 @@ def sphere_grid(res: int):
 	lin = np.linspace(-1, 1, res + 1)
 	axes = [(0, 1, 2), (0, 2, 1), (1, 2, 0)]
 	for a, b, c in axes:
+		# quad normal = e_a x e_b; for the odd permutation (x, z, y) that is -e_c, so flip it there
+		odd = (a, b, c) == (0, 2, 1)
 		for sgn in (-1, 1):
 			grid = np.zeros((res + 1, res + 1), dtype=np.int64)
 			for i, u in enumerate(lin):
@@ -72,7 +74,7 @@ def sphere_grid(res: int):
 			for i in range(res):
 				for j in range(res):
 					q = (grid[i, j], grid[i + 1, j], grid[i + 1, j + 1], grid[i, j + 1])
-					faces.append(q if sgn > 0 else q[::-1])
+					faces.append(q if (sgn > 0) != odd else q[::-1])
 	V = np.array(verts, dtype=np.float64)
 	V /= np.linalg.norm(V, axis=1, keepdims=True)
 	return V, faces

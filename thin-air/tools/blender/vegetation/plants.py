@@ -252,7 +252,7 @@ def log_mesh(name, lod, rs, length, radius, broken_ends, stubs, sink):
 	for i in range(rings):
 		for j in range(sides):
 			a, b = ring_ids[i], ring_ids[i + 1]
-			md.add_face((a[j], b[j], b[j + 1], a[j + 1]), 0)
+			md.add_face((a[j], a[j + 1], b[j + 1], b[j]), 0)   # outward facing, same winding as trunks
 	# end caps (end grain) as a separate material slot 1
 	for end in (0, rings):
 		ring = ring_ids[end]
