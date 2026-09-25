@@ -78,7 +78,7 @@ var _u := {}                        # last computed uniforms (debug / tests)
 var _particle_amb := Color(0.3, 0.3, 0.3)
 var _particle_sun := Color(0.5, 0.5, 0.5)
 var _particle_dir := Vector3.UP
-var _local_lights: Array[Light3D] = []
+var _local_lights: Array = []        # Light3D; untyped: a held torch's light can be freed between refreshes
 var _local_refresh := 0.0
 var _local_key := 0.0
 
@@ -299,8 +299,11 @@ func _local_light_key(pos: Vector3, delta: float) -> float:
 		_local_refresh = LOCAL_LIGHT_REFRESH
 		_collect_local_lights()
 	var e := 0.0
-	for l in _local_lights:
-		if not is_instance_valid(l) or not l.is_visible_in_tree() or l.light_energy <= 0.0:
+	for o in _local_lights:
+		if not is_instance_valid(o):
+			continue
+		var l := o as Light3D
+		if l == null or not l.is_visible_in_tree() or l.light_energy <= 0.0:
 			continue
 		var r := 0.0
 		var att := 1.0
@@ -329,11 +332,11 @@ func _collect_local_lights() -> void:
 	for group in [&"heat_source", &"local_light"]:
 		for n in tree.get_nodes_in_group(group):
 			if n is OmniLight3D or n is SpotLight3D:
-				_local_lights.append(n as Light3D)
+				_local_lights.append(n)
 				continue
 			for c in n.find_children("*", "Light3D", true, false):
 				if (c is OmniLight3D or c is SpotLight3D) and not _local_lights.has(c):
-					_local_lights.append(c as Light3D)
+					_local_lights.append(c)
 
 
 func get_fog_color() -> Color:
