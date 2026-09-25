@@ -36,9 +36,9 @@ import trees  # noqa: E402
 import bmats  # noqa: E402
 
 MARGIN = 1.06
-CROWN_BEND = 0.4       # foliage.gdshader crown_bend
+CROWN_BEND = 0.55      # foliage.gdshader crown_bend
 CROWN_UP = 0.6         # foliage.gdshader crown_up
-FACING = 0.85          # foliage.gdshader facing
+FACING = 0.75          # foliage.gdshader facing
 AO_MIX = 0.7
 
 

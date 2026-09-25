@@ -186,7 +186,7 @@ func _test_grass_cells() -> void:
 	var b: Array = G.generate_cell(ctx, Vector2i(-2, 2), 0.5, 1.0, 4)
 	var total := 0
 	for k in 4:
-		total += (a[k] as PackedFloat32Array).size() / 12
+		total += (a[k] as PackedFloat32Array).size() / 16
 	check(total > 50, "grass cell has tufts (%d)" % total)
 	check(a == b, "grass cell generation is deterministic")
 	# lake cell and the POI pad: nothing in the water / on the pad
@@ -197,17 +197,28 @@ func _test_grass_cells() -> void:
 		var bufs: Array = G.generate_cell(ctx, cc + dc, 0.5, 1.0, 4)
 		for buf in bufs:
 			var f: PackedFloat32Array = buf
-			for i in f.size() / 12:
-				var x := f[i * 12 + 3]
-				var z := f[i * 12 + 11]
+			for i in f.size() / 16:
+				var x := f[i * 16 + 3]
+				var z := f[i * 16 + 11]
 				if terrain.get_water_level(x, z) > terrain.get_height(x, z) - 0.25:
 					wet += 1
 	var pc := Vector2i(int(floor(VegTestTerrain.PAD.x / 24.0)), int(floor(VegTestTerrain.PAD.y / 24.0)))
 	for buf in G.generate_cell(ctx, pc, 0.5, 1.0, 4):
 		var f2: PackedFloat32Array = buf
-		for i in f2.size() / 12:
-			if Vector2(f2[i * 12 + 3] - VegTestTerrain.PAD.x, f2[i * 12 + 11] - VegTestTerrain.PAD.y).length() < VegTestTerrain.PAD.z:
+		for i in f2.size() / 16:
+			if Vector2(f2[i * 16 + 3] - VegTestTerrain.PAD.x, f2[i * 16 + 11] - VegTestTerrain.PAD.y).length() < VegTestTerrain.PAD.z:
 				pad += 1
+	var sorted_ok := true
+	for k in 4:
+		var f3: PackedFloat32Array = a[k]
+		for i in range(1, f3.size() / 16):
+			if f3[i * 16 + 12] < f3[(i - 1) * 16 + 12]:
+				sorted_ok = false
+	check(sorted_ok, "grass buffers sorted by rank (density LOD)")
+	var k0: float = G.keep_at(5.0, 18.0, 60.0)
+	var k1: float = G.keep_at(35.0, 18.0, 60.0)
+	var k2: float = G.keep_at(59.0, 18.0, 60.0)
+	check(k0 == 1.0 and k1 < k0 and k2 < k1 and G.keep_at(61.0, 18.0, 60.0) == 0.0, "grass density falls off with distance")
 	check(wet == 0, "no grass in the lake (%d)" % wet)
 	check(pad == 0, "no grass on the POI pad (%d)" % pad)
 
@@ -245,6 +256,13 @@ func _test_lod_settings(veg: Node) -> void:
 		if m.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY:
 			shadow_only += 1
 	check(ok_ranges, "near MultiMeshes have visibility_range_end")
+	var g: Node = veg.grass
+	for i in 400:
+		await get_tree().process_frame
+		if g.cell_count() > 8 and g._tasks.is_empty():
+			break
+	check(g.cell_count() > 0, "grass ring streamed in around the camera (%d cells)" % g.cell_count())
+	check(g.visible_count() < g.instance_count(), "grass density LOD draws fewer tufts far away (%d of %d)" % [g.visible_count(), g.instance_count()])
 	check(shadow_only > 0, "shadow proxies are shadow-only MultiMeshes")
 	var imp_ok := true
 	for mmi in veg._far.values():

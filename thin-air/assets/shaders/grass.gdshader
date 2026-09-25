@@ -15,8 +15,8 @@ uniform vec3 dry_tint : source_color = vec3(1.06, 0.96, 0.8);
 uniform vec3 green_tint : source_color = vec3(0.84, 0.93, 0.74);
 uniform float greenness : hint_range(0.0, 1.0) = 0.25;  // share of still-green tufts (late October: few)
 uniform float alpha_cut : hint_range(0.05, 0.95) = 0.42;
-uniform float fade_start = 35.0;
-uniform float fade_end = 60.0;
+uniform float fade_start = 18.0;   // full density inside (VegGrass: 0.3 x grass_distance)
+uniform float fade_end = 60.0;     // grass_distance
 uniform float trample_radius = 1.0;
 uniform float wind_amp = 0.11;
 uniform float translucency : hint_range(0.0, 2.0) = 0.55;
@@ -34,9 +34,10 @@ void vertex() {
 	v_inst = veg_hash12(origin.xz * 1.37);
 	v_base_y = origin.y;
 	float d = distance(CAMERA_POSITION_WORLD.xz, origin.xz);
-	// distance thinning: each tuft has a random rank; it shrinks, then collapses, as the ring edge nears
-	float keep = 1.0 - smoothstep(fade_start, fade_end, d);
-	float grow = clamp((keep - v_inst * 0.999) * 5.0, 0.0, 1.0);
+	// density LOD: same curve as VegGrass.keep_at(); tufts whose rank is above it shrink away
+	float mid = mix(fade_start, fade_end, 0.6);
+	float keep = d <= mid ? mix(1.0, 0.15, smoothstep(fade_start, mid, d)) : mix(0.15, 0.0, smoothstep(mid, fade_end, d));
+	float grow = clamp((keep - INSTANCE_CUSTOM.r) * 10.0, 0.0, 1.0);
 	// burial under snow: altitude snow line + global snow cover
 	float snow_depth = clamp(smoothstep(snow_start, snow_full, origin.y) * 0.9 + snow_cover * 0.8, 0.0, 1.0);
 	v_snow = snow_depth;

@@ -4,7 +4,10 @@ extends Node3D
 ## a worker thread from TerrainData (meadow mask B, forest mask A as sparse forest-floor cover; nothing on
 ## snow-covered, rocky, steep or wet ground, POI pads or trails) and drawn as one MultiMeshInstance3D per
 ## ground-cover kind (no shadows). The grass shader thins/shrinks tufts toward the ring edge, so there is no
-## visible border. Cheap mobile path: shorter distance, sparser grid, fewer kinds (see _read_settings).
+## visible border. Density LOD: every tuft has a random rank (INSTANCE_CUSTOM.r) and each cell's buffers are
+## sorted by rank, so a cell only draws the first visible_instance_count tufts its distance needs (full density
+## near the player, ~15 % toward the ring edge) and the shader shrinks tufts by the same curve — no popping.
+## Cheap mobile path: shorter distance, sparser grid (see _read_settings).
 
 const CELL := 24.0
 const MAX_TASKS := 3
@@ -25,6 +28,7 @@ var _tasks: Dictionary = {}          # Vector2i -> task id
 var _results: Dictionary = {}        # Vector2i -> Array[PackedFloat32Array]
 var _mutex := Mutex.new()
 var _last_center := Vector3(INF, INF, INF)
+var _last_lod_center := Vector3(INF, INF, INF)
 var _gen_ctx: VegScatter.Context = null
 var _terrain: Object = null
 
@@ -54,7 +58,7 @@ func _read_settings() -> void:
 	spacing = 0.5 if mobile else 0.34
 	density = dens * (0.75 if mobile else 1.0)
 	enabled = distance > 1.0 and density > 0.02 and not meshes.is_empty()
-	VegLibrary.get_shared().set_grass_params(distance * 0.55, distance)
+	VegLibrary.get_shared().set_grass_params(distance * 0.3, distance)
 
 
 func _on_settings_changed() -> void:
@@ -86,6 +90,16 @@ func instance_count() -> int:
 	for c in _cells:
 		for m in _cells[c]:
 			n += (m as MultiMeshInstance3D).multimesh.instance_count
+	return n
+
+
+## Tufts actually drawn (after the density LOD).
+func visible_count() -> int:
+	var n := 0
+	for c in _cells:
+		for m in _cells[c]:
+			var mm := (m as MultiMeshInstance3D).multimesh
+			n += mm.visible_instance_count if mm.visible_instance_count >= 0 else mm.instance_count
 	return n
 
 
@@ -121,6 +135,9 @@ func _process(_delta: float) -> void:
 	if not enabled:
 		return
 	var cp := _center()
+	if built > 0 or cp.distance_squared_to(_last_lod_center) > 1.0:
+		_last_lod_center = cp
+		_update_density_lod(cp)
 	if cp.distance_squared_to(_last_center) < 1.0 and _tasks.size() == 0:
 		return
 	_last_center = cp
@@ -173,8 +190,29 @@ func _request(c: Vector2i) -> void:
 		_mutex.unlock(), false, "veg_grass")
 
 
-## Pure: per-kind MultiMesh buffers (12 floats per instance) for grass cell `c`. Kinds: 0/1 grass tufts,
-## 2 sedge, 3 fern.
+## Density kept at distance d (the grass shader uses the same curve, see grass.gdshader grass_keep()).
+static func keep_at(d: float, near_full: float, fade_end: float) -> float:
+	var mid := lerpf(near_full, fade_end, 0.6)
+	if d <= near_full:
+		return 1.0
+	if d <= mid:
+		return lerpf(1.0, 0.15, smoothstep(near_full, mid, d))
+	return lerpf(0.15, 0.0, smoothstep(mid, fade_end, d))
+
+
+func _update_density_lod(cp: Vector3) -> void:
+	for c in _cells:
+		var keep := keep_at(_cell_dist(c, cp), distance * 0.3, distance)
+		for m in _cells[c]:
+			var mmi: MultiMeshInstance3D = m
+			var ranks: PackedFloat32Array = mmi.get_meta(&"ranks")
+			var n := ranks.bsearch(keep)
+			mmi.multimesh.visible_instance_count = n
+			mmi.visible = n > 0
+
+
+## Pure: per-kind MultiMesh buffers (16 floats per instance: transform + rank in custom.r, sorted by rank) for
+## grass cell `c`. Kinds: 0/1 grass tufts, 2 sedge, 3 fern.
 static func generate_cell(ctx: VegScatter.Context, c: Vector2i, sp: float, dens: float, nk: int) -> Array:
 	var t: Object = ctx.terrain
 	var bufs: Array = []
@@ -240,10 +278,19 @@ static func generate_cell(ctx: VegScatter.Context, c: Vector2i, sp: float, dens:
 			if axis.length_squared() > 1e-6:
 				b = Basis(axis.normalized(), Vector3.UP.angle_to(up)) * b
 			b = b * Basis.from_scale(Vector3(sc, sc * tall, sc))
-			(acc[kind] as Array).append_array([b.x.x, b.y.x, b.z.x, x, b.x.y, b.y.y, b.z.y, y - 0.02,
+			(acc[kind] as Array).append([rng.randf(), b.x.x, b.y.x, b.z.x, x, b.x.y, b.y.y, b.z.y, y - 0.02,
 				b.x.z, b.y.z, b.z.z, z])
 	for k in nk:
-		bufs[k] = PackedFloat32Array(acc[k])
+		var list: Array = acc[k]
+		list.sort_custom(func(p: Array, q: Array) -> bool: return p[0] < q[0])
+		var buf := PackedFloat32Array()
+		buf.resize(list.size() * 16)
+		for i in list.size():
+			var e: Array = list[i]
+			for f in 12:
+				buf[i * 16 + f] = e[f + 1]
+			buf[i * 16 + 12] = e[0]
+		bufs[k] = buf
 	return bufs
 
 
@@ -253,15 +300,19 @@ func _build_cell(c: Vector2i, bufs: Array) -> void:
 	var hi := Vector3((c.x + 1) * CELL + 1.0, -INF, (c.y + 1) * CELL + 1.0)
 	for k in mini(bufs.size(), meshes.size()):
 		var buf: PackedFloat32Array = bufs[k]
-		var n := buf.size() / 12
+		var n := buf.size() / 16
 		if n == 0:
 			continue
+		var ranks := PackedFloat32Array()
+		ranks.resize(n)
 		for i in n:
-			var y := buf[i * 12 + 7]
+			var y := buf[i * 16 + 7]
 			lo.y = minf(lo.y, y)
 			hi.y = maxf(hi.y, y)
+			ranks[i] = buf[i * 16 + 12]
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_custom_data = true
 		mm.mesh = meshes[k]
 		mm.instance_count = n
 		mm.buffer = buf
@@ -270,6 +321,7 @@ func _build_cell(c: Vector2i, bufs: Array) -> void:
 		mmi.multimesh = mm
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mmi.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+		mmi.set_meta(&"ranks", ranks)
 		add_child(mmi)
 		list.append(mmi)
 	if lo.y <= hi.y:
