@@ -30,12 +30,17 @@ def lib():
 								C.c_double, C.c_double, C.c_uint32, C.c_int, C.c_void_p, C.c_void_p, C.c_double]
 	_lib.noise_eroded.argtypes = [f32p, C.c_int, C.c_int, C.c_double, C.c_double, C.c_double, C.c_double, C.c_int,
 								  C.c_double, C.c_double, C.c_uint32, C.c_void_p, C.c_void_p]
+	_lib.erosion_noise.argtypes = [f32p, f32p, C.c_int, C.c_int, C.c_double, C.c_double, C.c_double, C.c_double,
+								   C.c_int, C.c_double, C.c_double, C.c_double, C.c_double, C.c_uint32, f32p, C.c_void_p,
+								   C.c_void_p]
 	_lib.pf_order.argtypes = [f32p, C.c_int, C.c_int, C.c_void_p, C.c_int, i32p, i32p, C.c_void_p]
 	_lib.pf_order.restype = C.c_int
 	_lib.spl_incise.argtypes = [f32p, C.c_int, C.c_int, C.c_float, C.c_void_p, C.c_void_p, C.c_float, C.c_float,
 								C.c_float, C.c_int, C.c_void_p, C.c_float, C.c_void_p]
 	_lib.spl_steady.argtypes = [f32p, C.c_int, C.c_int, C.c_float, C.c_void_p, f32p, C.c_float, C.c_float,
 								C.c_void_p, C.c_int, C.c_float, C.c_void_p]
+	_lib.spl_steady_rand.argtypes = [f32p, C.c_int, C.c_int, C.c_float, C.c_void_p, f32p, C.c_float, C.c_float,
+									 C.c_void_p, C.c_int, C.c_float, C.c_float, C.c_uint64, C.c_void_p]
 	_lib.thermal.argtypes = [f32p, C.c_int, C.c_int, C.c_float, C.c_float, C.c_int, C.c_float, C.c_void_p,
 							 C.c_void_p]
 	_lib.droplets.argtypes = [f32p, C.c_int, C.c_int, C.c_float, C.c_int, C.c_uint64, C.c_void_p, C.c_void_p,
@@ -81,6 +86,20 @@ def noise_eroded(ny, nx, x0, z0, dx, freq, octaves=7, gain=0.5, damp=1.0, seed=1
 	return out
 
 
+def erosion_noise(gx, gz, x0, z0, dx, freq, octaves=5, gain=0.5, lacunarity=2.0, bend=0.6, slope_fade=0.05,
+				  seed=1, derivs=False):
+	"""Gully/spur noise aligned with the fall line of the gradient (gx, gz). Returns out (and d/dx, d/dz)."""
+	gx = _f32(gx)
+	gz = _f32(gz)
+	ny, nx = gx.shape
+	out = np.empty_like(gx)
+	ddx = np.empty_like(gx) if derivs else None
+	ddz = np.empty_like(gx) if derivs else None
+	lib().erosion_noise(gx, gz, nx, ny, x0, z0, dx, freq, octaves, gain, lacunarity, bend, slope_fade, seed & 0xFFFFFFFF,
+						out, _ptr(ddx), _ptr(ddz))
+	return (out, ddx, ddz) if derivs else out
+
+
 def spl_incise(h, dx, fixed=None, kmap=None, K=1e-4, m=0.45, dt=1.0, iters=50, uplift=None, talus_tan=0.0):
 	h = _f32(h).copy()
 	ny, nx = h.shape
@@ -100,6 +119,19 @@ def spl_steady(h, dx, ks, fixed=None, m=0.45, tmax_deg=45.0, tmax_map=None, iter
 	area = np.empty_like(h)
 	lib().spl_steady(h, nx, ny, dx, _ptr(fx), _f32(ks), m, float(np.tan(np.radians(tmax_deg))), _ptr(tm), iters,
 					 damping, area.ctypes.data)
+	return h, area
+
+
+def spl_steady_rand(h, dx, ks, fixed=None, m=0.45, tmax_deg=45.0, tmax_map=None, iters=20, damping=0.5, rexp=1.0,
+					seed=1):
+	"""Steady-state stream-power landscape with stochastic (slope-weighted) receivers. Returns (h, area)."""
+	h = _f32(h).copy()
+	ny, nx = h.shape
+	fx = None if fixed is None else np.ascontiguousarray(fixed, np.uint8)
+	tm = None if tmax_map is None else _f32(tmax_map)
+	area = np.empty_like(h)
+	lib().spl_steady_rand(h, nx, ny, dx, _ptr(fx), _f32(ks), m, float(np.tan(np.radians(tmax_deg))), _ptr(tm), iters,
+						  damping, rexp, seed, area.ctypes.data)
 	return h, area
 
 

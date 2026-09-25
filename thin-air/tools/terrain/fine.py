@@ -59,28 +59,59 @@ class Frame:
 		mask[jj[ok], ii[ok]] = False
 		idx[jj[ok], ii[ok]] = ks
 		_, (J, I) = ndimage.distance_transform_edt(mask, return_indices=True)
-		k = idx[J, I]
-		cx = (X0 + (np.arange(i0, i1)) * DX)[None, :]
-		cz = (X0 + (np.arange(j0, j1)) * DX)[:, None]
-		px, pz = P[k, 0], P[k, 1]
-		kn = np.clip(k + 1, 0, len(P) - 1)
-		kp = np.clip(k - 1, 0, len(P) - 1)
-		tx = P[kn, 0] - P[kp, 0]
-		tz = P[kn, 1] - P[kp, 1]
+		k0 = idx[J, I]
+		cx = (X0 + (np.arange(i0, i1)) * DX)[None, :] + np.zeros((H, W))
+		cz = (X0 + (np.arange(j0, j1)) * DX)[:, None] + np.zeros((H, W))
+		seg = np.hypot(np.diff(P[:, 0]), np.diff(P[:, 1]))
+		self.S = np.concatenate([[0.0], np.cumsum(seg)])
+		nP = len(P)
+		# continuous nearest point: search the segments around the EDT's sample (the EDT only finds the nearest
+		# marked cell, whose sample can be a few samples away from the true nearest point)
+		step = max(float(np.median(seg)) if len(seg) else DX, 1e-3)
+		Wn = int(np.ceil(DX * 1.6 / step)) + 2
+		best = np.full((H, W), np.inf)
+		kf = k0.astype(np.float64)
+		for off in range(-Wn, Wn):
+			ka = np.clip(k0 + off, 0, nP - 2)
+			ax, az = P[ka, 0], P[ka, 1]
+			bx, bz = P[ka + 1, 0], P[ka + 1, 1]
+			abx, abz = bx - ax, bz - az
+			l2 = np.maximum(abx * abx + abz * abz, 1e-12)
+			t = np.clip(((cx - ax) * abx + (cz - az) * abz) / l2, 0.0, 1.0)
+			dd = np.hypot(cx - (ax + t * abx), cz - (az + t * abz))
+			m = dd < best
+			best = np.where(m, dd, best)
+			kf = np.where(m, ka + t, kf)
+		self.kf = kf
+		k = np.clip(np.round(kf).astype(np.int64), 0, nP - 1)
+		ka = np.clip(np.floor(kf).astype(np.int64), 0, nP - 2)
+		fr = kf - ka
+		px = P[ka, 0] * (1 - fr) + P[ka + 1, 0] * fr
+		pz = P[ka, 1] * (1 - fr) + P[ka + 1, 1] * fr
+		tx = P[ka + 1, 0] - P[ka, 0]
+		tz = P[ka + 1, 1] - P[ka, 1]
 		tl = np.maximum(np.hypot(tx, tz), 1e-6)
 		tx, tz = tx / tl, tz / tl
 		rx, rz = cx - px, cz - pz
 		self.d = np.hypot(rx, rz)
 		self.side = rx * (-tz) + rz * tx
-		self.along = rx * tx + rz * tz          # > 0 beyond the last sample at the downstream end
+		# beyond the ends: signed distance past the first / last sample along the end tangent
+		along_end = (cx - P[-1, 0]) * (P[-1, 0] - P[-2, 0]) / max(seg[-1], 1e-6) + \
+			(cz - P[-1, 1]) * (P[-1, 1] - P[-2, 1]) / max(seg[-1], 1e-6)
+		along_start = (cx - P[0, 0]) * (P[1, 0] - P[0, 0]) / max(seg[0], 1e-6) + \
+			(cz - P[0, 1]) * (P[1, 1] - P[0, 1]) / max(seg[0], 1e-6)
+		self.along = np.where(k >= nP - 2, along_end, np.where(k <= 1, along_start, 0.0))
 		self.k = k
-		seg = np.hypot(np.diff(P[:, 0]), np.diff(P[:, 1]))
-		self.S = np.concatenate([[0.0], np.cumsum(seg)])
-		self.s = self.S[k]
-		self.last = len(P) - 1
+		self.s = np.interp(kf, np.arange(nP), self.S)
+		self.last = nP - 1
+
+	def interp(self, arr):
+		"""Per-sample array interpolated at every cell's continuous nearest point."""
+		arr = np.asarray(arr, dtype=np.float64)
+		return np.interp(self.kf, np.arange(len(arr)), arr)
 
 	def attr(self, a):
-		return self.P[self.k, a]
+		return self.interp(self.P[:, a])
 
 
 def dense(pts, step=0.75, smooth=True):
@@ -106,6 +137,8 @@ class Fine:
 		self.X, self.Z = coords()
 		self.h = resample(mid["h"], -3072.0, 6.0, X0, DX, N, order=3)
 		self.hv = resample(mid["hv"], -3072.0, 6.0, X0, DX, N, order=1)
+		fl = resample(mid["floor"].astype(np.float32), -3072.0, 6.0, X0, DX, N, order=1)
+		self.floor_w = np.clip(blur(fl, 6.0) * 1.2, 0.0, 1.0).astype(np.float32)
 		self.masks = {}
 		self.rivers_out = []
 		self.lakes_out = []
@@ -144,43 +177,43 @@ class Fine:
 		# normalise where corrections overlap
 		self.h = (self.h + corr / np.maximum(wsum, 1.0)).astype(np.float32)
 
-	# ------------------------------------------------------------------ 2. detail + couloirs + strata
+	# ------------------------------------------------------------------ 2. detail
 	def detail(self):
-		h = self.h
-		rel = np.clip((h - self.hv) / 250.0, 0.0, 1.0)
-		s = slope_deg(blur(h, 2.0), DX)
-		rid = self.noise(1 / 110.0, 5, "ridged", seed=31)
-		fb = self.noise(1 / 22.0, 4, "fbm", seed=32)
-		bumps = self.noise(1 / 7.0, 3, "fbm", seed=33)
-		h = h + (rid - 0.45) * 6.0 * rel + fb * (0.25 + 1.1 * rel) + bumps * 0.18
-		# dendritic gullies at 3 m, then a little fall-line texture
-		from gen_terrain import face_structure, flow_carve
-		h3 = h[::2, ::2]
-		c3, _ = flow_carve(h3, 3.0, self.seed + 35, k=0.05, expo=0.42, cap=9.0, slope_lo=14.0, slope_hi=36.0,
-						   width_cells=1.0, jitter=0.8)
-		cut = resample(h3 - c3, X0, 3.0, X0, DX, N, order=1)
-		h = h - cut
-		h = face_structure(h, DX, self.seed + 34, [(5.0, 70.0, 0.9), (2.0, 30.0, 0.35)], slope_lo=32.0,
-						   slope_hi=52.0, pre_blur=3.0)
+		"""Metre-scale form on top of the 6 m macro terrain: fall-line gullies/couloirs/spurs (erosion noise,
+		strongest on steep ground), rock-face roughness, hummocky ground everywhere."""
+		h = self.h.astype(np.float64)
+		hb = blur(self.h, 5.0)
+		s = slope_deg(hb, DX)
+		gz, gx = np.gradient(hb.astype(np.float64), DX)
+		E = tlib.erosion_noise(gx, gz, X0, X0, DX, 1 / 150.0, 5, 0.5, 2.0, 0.7, 0.08, seed=self.seed + 31)
+		steep = smoothstep(14.0, 42.0, s)
+		fl = self.floor_w
+		h += E * (0.9 + 2.6 * steep) * (1 - fl)
+		rock = smoothstep(36.0, 52.0, s)
+		rid = self.noise(1 / 26.0, 4, "ridged", seed=32)
+		h += (rid - 0.45) * 2.2 * rock
+		h += self.noise(1 / 45.0, 3, seed=33) * (0.35 + 0.9 * steep) + self.noise(1 / 9.0, 3, seed=34) * 0.12
+		# valley floors: terraces, old channels and hummocky ground rather than a flat plate
+		h += fl * (self.noise(1 / 170.0, 3, seed=35) * 1.6 + self.noise(1 / 55.0, 3, seed=36) * 0.5)
 		self.h = h.astype(np.float32)
 
 	def strata(self):
 		"""Tilted sedimentary bands: steep faces become cliff bands with snow-holding ledges (the look of the
 		Canadian Rockies). Records hardness (cliff bands resist erosion)."""
 		X, Z, h = self.X, self.Z, self.h
-		warp = self.noise(1 / 700.0, 3, seed=41) * 22.0 + self.noise(1 / 170.0, 3, seed=42) * 4.0
+		warp = self.noise(1 / 700.0, 3, seed=41) * 30.0 + self.noise(1 / 170.0, 3, seed=42) * 6.0
 		sc = (h + 0.105 * X - 0.07 * Z + warp).astype(np.float64)   # bands dip ~7 deg to the SW
 		rng = np.random.default_rng(self.seed + 44)
 		lo, hi = float(sc.min()) - 200.0, float(sc.max()) + 200.0
 		thick = []
 		edges = [lo]
 		while edges[-1] < hi:
-			t = rng.uniform(26.0, 88.0)
+			t = rng.uniform(14.0, 46.0)
 			thick.append(t)
 			edges.append(edges[-1] + t)
 		thick = np.array(thick)
 		edges = np.array(edges)
-		hardband = rng.random(len(thick)) < 0.5
+		hardband = rng.random(len(thick)) < 0.55
 		cfrac = rng.uniform(0.25, 0.45, len(thick))
 		band = np.clip(np.searchsorted(edges, sc) - 1, 0, len(thick) - 1)
 		T = thick[band]
@@ -195,7 +228,8 @@ class Fine:
 		g = np.where(hardband[band], g, fr)
 		delta = (g - fr) * T
 		s = slope_deg(blur(h, 2.5), DX)
-		w = smoothstep(30.0, 46.0, s) * (0.6 + 0.3 * smoothstep(2000.0, 2600.0, h))
+		w = smoothstep(33.0, 50.0, s) * (0.4 + 0.4 * smoothstep(1900.0, 2600.0, h))
+		w = w * (1 - self.floor_w)
 		self.h = (h + delta * w).astype(np.float32)
 		cliff = hardband[band] & (fr > 1 - cf)
 		self.hard = np.where(cliff, 0.12, np.where(hardband[band], 0.6, 1.0)).astype(np.float32)
@@ -204,41 +238,44 @@ class Fine:
 
 	# ------------------------------------------------------------------ 3. glacier
 	def glacier(self):
+		"""Corrigan Glacier: a smooth ice surface along the designed glacier line (concave neve under the col,
+		convex tongue), chaotic seracs in the icefall, shallow crevasse troughs (the crevasse pattern itself is
+		drawn by the terrain shader from the detail map), lateral moraines on the tongue and a steep snout.
+		The ice blends into the valley walls over the outer 15 % of its width; the neve fades into the snowfields
+		under the col instead of ending in a cap."""
 		P = dense(D.MAP_VALLEYS["glacier"], 0.75)
-		F = Frame(P, 180.0)
+		F = Frame(P, 200.0)
 		sl = F.sl
-		X, Z = self.X[sl], self.Z[sl]
 		h = self.h[sl].astype(np.float64)
-		ys = F.attr(2)
+		# smooth longitudinal profile (no kinks at the design control points)
+		prof = ndimage.gaussian_filter1d(P[:, 2], 40.0 / 0.75, mode="nearest")
+		ys = F.interp(prof)
 		w0 = F.attr(3)
 		Ltot = F.S[-1]
 		sn = F.s / Ltot                                           # 0 at the neve head, 1 at the snout
 		wob = self.noise(1 / 220.0, 3, seed=51)[sl]
-		w = w0 * (1.0 + 0.10 * wob)
-		beyond = (F.k >= F.last - 1) & (F.along > 0)
-		head = (F.k <= 1) & (F.along < 0)
-		w = np.where(beyond, w0 * 0.55, np.where(head, w0 * 0.5, w))
+		w = w0 * (1.0 + 0.12 * wob)
 		u = F.d / w
-		inside = u < 1.0
+		head_d = np.where(F.k <= 1, np.maximum(-F.along, 0.0), 0.0)
+		snout_d = np.where(F.k >= F.last - 1, np.maximum(F.along, 0.0), 0.0)
 		# cross profile: concave neve, convex tongue
-		convex = np.interp(sn, [0.0, 0.3, 0.55, 1.0], [-5.0, -1.0, 4.0, 8.0])
+		convex = np.interp(sn, [0.0, 0.3, 0.55, 1.0], [-4.0, -1.0, 4.0, 7.0])
 		yi = ys + convex * (1.0 - np.clip(u, 0, 1) ** 2)
-		# icefall: along-flow steps (serac tiers) between the icefall top and base control points
+		# icefall between its top and base control points: chaotic serac blocks and towers
 		S_top = _arc_at(P, F.S, -128, -878)
 		S_base = _arc_at(P, F.S, 35, -625)
 		inf = smoothstep(S_top - 25, S_top + 15, F.s) * (1 - smoothstep(S_base - 15, S_base + 30, F.s))
-		tier = 7.0
-		yt = np.floor(yi / tier) * tier + tier * smoothstep(0.55, 1.0, (yi / tier) % 1.0)
-		sera = self.noise(1 / 9.0, 3, "ridged", seed=52)[sl]
-		yi = yi + inf * ((yt - yi) * 0.75 + (sera - 0.4) * 3.2)
-		# undulations on the tongue and neve
-		yi = yi + self.noise(1 / 60.0, 3, seed=53)[sl] * 0.9 * (1 - inf)
-		# crevasses: arcuate transverse (bowed up-glacier), chevron marginal
+		sera = self.noise(1 / 14.0, 3, "ridged", seed=52)[sl]
+		blk = self.noise(1 / 38.0, 3, seed=57)[sl]
+		yi = yi + inf * ((sera - 0.45) * 3.5 + blk * 2.5)
+		# gentle undulations elsewhere
+		yi = yi + self.noise(1 / 70.0, 3, seed=53)[sl] * 0.8 * (1 - inf)
+		# crevasses: arcuate transverse (bowed down-glacier on the tongue), chevron marginal
 		wv = self.noise(1 / 80.0, 3, seed=54)[sl] * 6.0
 		sa = F.s + 14.0 * np.clip(u, 0, 1) ** 2 + wv
-		lam = np.where(inf > 0.3, 12.0, 38.0)
+		lam = np.where(inf > 0.3, 13.0, 34.0)
 		ph = (sa / lam) % 1.0
-		cw = np.where(inf > 0.3, 0.18, 0.06)
+		cw = np.where(inf > 0.3, 0.2, 0.07)
 		trans = np.clip(1 - np.abs(ph - 0.5) / (cw * 0.5), 0, 1)
 		patches = smoothstep(0.1, 0.45, self.noise(1 / 140.0, 3, seed=56)[sl])
 		ext = np.clip(inf * 1.2 + smoothstep(0.62, 0.72, sn) * (1 - smoothstep(0.82, 0.9, sn)) * patches, 0, 1)
@@ -246,33 +283,28 @@ class Fine:
 		mph = (mq / 17.0) % 1.0
 		marg = np.clip(1 - np.abs(mph - 0.5) / 0.05, 0, 1) * smoothstep(0.6, 0.85, u) * patches
 		bridge = smoothstep(-0.15, 0.25, self.noise(1 / 35.0, 3, seed=55)[sl])
-		crev = np.maximum(trans * ext, marg * 0.8 * (1 - inf)) * bridge * smoothstep(0.98, 0.9, u)
-		depth = np.where(inf > 0.3, 7.0, 4.5)
-		yi = yi - crev * depth
-		# lateral moraines (big on the tongue, none against the neve rock walls) and the ice margin
-		mh = np.interp(sn, [0.0, 0.45, 0.6, 1.0], [0.0, 2.0, 14.0, 20.0])
+		crev = np.maximum(trans * ext, marg * 0.8 * (1 - inf)) * bridge * (1 - smoothstep(0.85, 0.97, u))
+		yi = yi - crev * np.where(inf > 0.3, 1.2, 0.6)
+		# weight of the ice surface: soft margins, faded head, steep snout front
+		wi = (1 - smoothstep(0.82, 1.0, u)) * (1 - smoothstep(0.0, 45.0, head_d))
+		front = smoothstep(0.0, 1.0, 1 - snout_d / np.maximum(w * 0.35, 6.0))
+		wi = wi * front
+		new = h * (1 - wi) + yi * wi
+		# lateral moraines on the tongue (sharp-crested ridges just outside the ice), none on the neve
+		mh = np.interp(sn, [0.0, 0.45, 0.6, 1.0], [0.0, 2.0, 11.0, 16.0])
 		dout = F.d - w
-		mor = mh * np.exp(-((dout - 11.0) / 9.0) ** 2) + mh * 0.6 * np.exp(-((dout - 26.0) / 14.0) ** 2)
-		# snout: the ice ends in a steep front above the forefield (the ice cave opens in it)
-		front = beyond & inside
-		yi = np.where(front, h + (yi - h) * smoothstep(1.0, 0.78, u), yi)
-		y_edge = ys + convex * 0.0
-		out_side = y_edge + mor
-		lateral = (dout > 0) & (dout < 60) & ~beyond
-		new = np.where(inside, yi, np.maximum(h, np.where(lateral, out_side, -1e9)))
-		# inner moraine face: ice meets moraine steeply within the last 8 % of the width
-		edge_blend = smoothstep(0.9, 1.0, u) * inside
-		new = new + edge_blend * (mh * 0.35)
-		# above the glacier (neve): walls stay; ensure ice never floats above bedrock edges weirdly
+		mor = (mh * np.exp(-((dout - 10.0) / 8.0) ** 2) + mh * 0.5 * np.exp(-((dout - 24.0) / 12.0) ** 2))
+		mor = mor * (1 - smoothstep(0.0, 30.0, snout_d)) * (dout > -4.0)
+		new = np.maximum(new, np.minimum(h, ys + 2.0) + mor * (dout > 0)) * (dout > 0) + new * (dout <= 0)
 		self.h[sl] = new.astype(np.float32)
 		ice = np.zeros((N, N), np.float32)
-		ice[sl] = np.where(inside, 1.0, 0.0) * smoothstep(1.0, 0.9, u)
+		ice[sl] = np.clip(wi * 1.15, 0, 1)
 		self.masks["ice"] = ice
 		mor_m = np.zeros((N, N), np.float32)
-		mor_m[sl] = np.clip(mor / 8.0, 0, 1) * (~inside)
+		mor_m[sl] = np.clip(mor / 6.0, 0, 1) * (1 - np.clip(wi * 1.5, 0, 1))
 		self.masks["moraine"] = mor_m
 		crev_m = np.zeros((N, N), np.float32)
-		crev_m[sl] = crev * inside
+		crev_m[sl] = crev * wi
 		self.masks["crevasse"] = crev_m
 		self.glacier_frame = F
 		self.glacier_icefall = (S_top, S_base)
@@ -373,23 +405,24 @@ class Fine:
 		F = Frame(P, 90.0 if kind == "braided" else 30.0)
 		sl = F.sl
 		hs = self.h
-		# centreline profile
-		cy = self.sample(P[:, 0], P[:, 1], blur(hs, 1.0))
-		prof = np.minimum.accumulate(cy)
+		# centreline profile: best downstream-monotone fit of the terrain (cuts bumps AND fills dips, so the
+		# channel never becomes a trench through a spur nor a dam across a hollow)
+		cy = self.sample(P[:, 0], P[:, 1], blur(hs, 2.0))
+		prof = pava_decreasing(cy)
 		# lake connections: ends at / starts from lake level
 		lvl = D.LOON_LAKE["level"]
-		if R["id"] in ("hollow_river", "ashford_creek"):
-			prof = np.maximum(prof, lvl + 0.05 * (np.arange(len(prof))[::-1] > 0))
+		if R["id"] in ("hollow_river", "ashford_creek", "east_creek"):
+			prof = np.maximum(prof, lvl)
 			prof[-1] = lvl
 		if R["id"] == "hollow_river_lower":
 			prof = np.minimum(prof, lvl - 0.25)
 		# smooth, keep monotone
-		k = int(24 / 0.75) | 1
+		k = int(30 / 0.75) | 1
 		prof = ndimage.uniform_filter1d(prof, k, mode="nearest")
 		prof = np.minimum.accumulate(prof)
 		# surface
-		ys = prof[F.k]
-		wv = P[F.k, 2]
+		ys = F.interp(prof)
+		wv = F.interp(P[:, 2])
 		half = wv * 0.5
 		d = F.d
 		h = self.h[sl].astype(np.float64)
@@ -402,20 +435,22 @@ class Fine:
 				  np.sin(sa / 41.0 - sd / 6.5) * 0.35 + bn * 0.35)
 			bed = ys + np.clip(br * 0.55 + 0.05, -0.9, 0.55)
 			u = d / np.maximum(half, 1.0)
-			bank = ys + 0.5 + np.maximum(d - half, 0) * 0.12
-			target = np.where(u < 1, bed, bank)
-			wgt = 1 - smoothstep(half + 8.0, half + 40.0, d)
-			h = np.where(u < 1, target, h + (np.minimum(h, target) - h) * wgt)
+			ex = np.maximum(d - half, 0)
+			target = np.clip(h, ys + 0.35 + ex * 0.01, ys + 0.5 + ex * 0.12)
+			wgt = 1 - smoothstep(half + 8.0, half + 45.0, d)
+			h = np.where(u < 1, bed, h + (target - h) * wgt)
 			wetm = np.clip(1.3 - u, 0, 1)
 		else:
 			depth = 0.45 if kind == "creek" else 1.3
 			depth = depth + np.minimum(half * 0.04, 0.8)
 			u = d / np.maximum(half, 0.8)
 			bed = ys - depth * np.clip(1 - u ** 2, 0, 1) - 0.12
-			bank = ys + 0.25 + np.maximum(d - half, 0) * (0.55 if kind == "creek" else 0.35)
-			target = np.where(u < 1, bed, bank)
-			wgt = 1 - smoothstep(half + 3.0, half + (10.0 if kind == "creek" else 18.0), d)
-			h = np.where(u < 1, np.minimum(h, bed + 0.0), h + (np.minimum(h, target) - h) * wgt)
+			ex = np.maximum(d - half, 0)
+			bank_tan = 0.62 if kind == "creek" else 0.38
+			target = np.clip(h, ys + 0.2 + ex * 0.02, ys + 0.3 + ex * bank_tan)
+			margin = 14.0 if kind == "creek" else 26.0
+			wgt = 1 - smoothstep(half + 2.0, half + margin, d)
+			h = np.where(u < 1, bed, h + (target - h) * wgt)
 			wetm = np.clip(1.5 - u * 0.8, 0, 1) * (d < half + 4)
 		self.h[sl] = h.astype(np.float32)
 		wet = self.masks["wet"]
@@ -578,26 +613,39 @@ class Fine:
 			self.h = np.where(m, h + (y - h) * w, h).astype(np.float32)
 			pm = self.masks.setdefault("pad", np.zeros((N, N), np.float32))
 			pm[:] = np.maximum(pm, (1 - smoothstep(r * 0.7, r + 2.0, rrw)).astype(np.float32))
+		self._summit_cap()
 		self._mine_face()
 		self._station_shelf()
 
+	def _summit_cap(self):
+		"""Mount Corrigan is the highest point: nothing within 450 m rises above a gentle cone from the summit."""
+		p = D.POI["summit"]
+		rr = np.hypot(self.X - p["x"], self.Z - p["z"])
+		m = rr < 450.0
+		cap = p["y"] - 0.05 - 0.06 * np.maximum(rr - p["flat_radius"], 0.0)
+		h = self.h
+		h[m] = np.minimum(h[m], cap[m])
+		self.h = h
+
 	def _mine_face(self):
-		"""Rock face behind the Ashford Mine bench: the adit portal sits at its foot."""
+		"""Rock face behind the Ashford Mine bench: the natural slope west of the bench is steepened into a
+		~65 deg face (never more than 14 m proud of the natural ground); the adit portal sits at its foot."""
 		p = D.POI["ashford_mine"]
 		a = p["adit"]
 		dx_, dz_ = a["dir"]
 		rx, rz = self.X - a["x"], self.Z - a["z"]
 		fwd = rx * dx_ + rz * dz_             # metres into the face
 		lat = rx * (-dz_) + rz * dx_
-		wlat = 1 - smoothstep(26.0, 55.0, np.abs(lat))
-		face = p["y"] + np.where(fwd > 0, np.minimum(fwd * 3.2, 38.0 + fwd * 0.9), -1e9)
-		face = face + self.noise(1 / 6.0, 3, "ridged", seed=121) * 1.6 * (fwd > 0)
+		wlat = 1 - smoothstep(18.0, 42.0, np.abs(lat))
+		wf = smoothstep(-2.0, 1.0, fwd) * (1 - smoothstep(26.0, 40.0, fwd))
+		face = p["y"] + 0.4 + np.maximum(fwd, 0.0) * 2.2
+		face = face + (self.noise(1 / 7.0, 3, "ridged", seed=121) - 0.45) * 1.8 + self.noise(1 / 20.0, 2, seed=122) * 1.2
 		h = self.h.astype(np.float64)
-		zone = (fwd > -1) & (fwd < 60) & (np.abs(lat) < 55)
-		hn = np.where(zone, np.maximum(h, face * wlat + h * (1 - wlat)), h)
-		self.h = hn.astype(np.float32)
+		w = wlat * wf
+		target = np.minimum(np.maximum(h, face), h + 14.0)
+		self.h = (h + (target - h) * w).astype(np.float32)
 		rk = self.masks.setdefault("rockface", np.zeros((N, N), np.float32))
-		rk[:] = np.maximum(rk, (zone & (fwd > 0.5)).astype(np.float32) * wlat)
+		rk[:] = np.maximum(rk, (w * smoothstep(0.5, 2.0, fwd)).astype(np.float32))
 
 	def _station_shelf(self):
 		pass
@@ -615,6 +663,27 @@ class Fine:
 		near = (~inside) & (d < 25) & (d > 0) & ~river
 		h = np.where(near, np.maximum(h, lvl + 0.12 + 0.02 * d), h)
 		self.h = h.astype(np.float32)
+
+
+def pava_decreasing(y):
+	"""Least-squares non-increasing fit (pool-adjacent-violators)."""
+	y = np.asarray(y, dtype=np.float64)
+	vals = []
+	wts = []
+	lens = []
+	for v in y:
+		vals.append(v)
+		wts.append(1.0)
+		lens.append(1)
+		while len(vals) > 1 and vals[-2] < vals[-1]:
+			w = wts[-2] + wts[-1]
+			v2 = (vals[-2] * wts[-2] + vals[-1] * wts[-1]) / w
+			l2 = lens[-2] + lens[-1]
+			vals.pop(); wts.pop(); lens.pop()
+			vals[-1] = v2
+			wts[-1] = w
+			lens[-1] = l2
+	return np.repeat(vals, lens)
 
 
 def _arc_at(P, S, x, z):

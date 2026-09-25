@@ -101,21 +101,29 @@ class SkeletonField:
 	"""Nearest-point field to a set of polylines via one Euclidean distance transform.
 	Build once per grid; query at (possibly warped) positions with .query(xw, zw)."""
 
-	def __init__(self, n, x0, dx, polylines, pad=0.35, smooth=True):
+	def __init__(self, n, x0, dx, polylines, pad=0.35, smooth=True, step=None):
 		self.dx = dx
 		self.padn = int(n * pad)
 		self.N = n + 2 * self.padn
 		self.ox = x0 - self.padn * dx
 		pts = []
+		st = dx * 0.5 if step is None else step
+		self.step = st
 		for pl in polylines:
-			P = open_spline(pl, dx * 0.5) if smooth and len(pl) > 2 else _dense_linear(pl, dx * 0.5)
+			P = open_spline(pl, st) if smooth and len(pl) > 2 else _dense_linear(pl, st)
 			pts.append(P)
 		P = np.vstack(pts)
+		pid = np.concatenate([np.full(len(p), k) for k, p in enumerate(pts)])
+		self.P = P
+		self.pid = pid
 		ii = np.round((P[:, 0] - self.ox) / dx).astype(np.int64)
 		jj = np.round((P[:, 1] - self.ox) / dx).astype(np.int64)
 		ok = (ii >= 0) & (jj >= 0) & (ii < self.N) & (jj < self.N)
+		sidx = np.arange(len(P))[ok]
 		P, ii, jj = P[ok], ii[ok], jj[ok]
 		self.na = P.shape[1] - 2
+		self.sidx = np.full((self.N, self.N), -1, np.int64)
+		self.sidx[jj, ii] = sidx
 		mask = np.ones((self.N, self.N), bool)
 		mask[jj, ii] = False
 		self.px = np.zeros((self.N, self.N), np.float32)
@@ -129,13 +137,42 @@ class SkeletonField:
 		self.J = idx[0].astype(np.int32)
 		self.I = idx[1].astype(np.int32)
 
-	def query(self, x, z):
+	def query(self, x, z, exact=True):
+		"""Distance to the skeleton and its attributes at the nearest point. exact: project onto the two
+		polyline segments around the nearest sample (continuous distance + attributes, no Voronoi staircase)."""
 		i = np.clip(np.round((x - self.ox) / self.dx).astype(np.int64), 0, self.N - 1)
 		j = np.clip(np.round((z - self.ox) / self.dx).astype(np.int64), 0, self.N - 1)
 		J = self.J[j, i]
 		I = self.I[j, i]
-		d = np.hypot(x - self.px[J, I], z - self.pz[J, I])
-		return d, self.attr[:, J, I]
+		if not exact:
+			d = np.hypot(x - self.px[J, I], z - self.pz[J, I])
+			return d, self.attr[:, J, I]
+		k = self.sidx[J, I]
+		P, pid = self.P, self.pid
+		nP = len(P)
+		best_d = np.full(np.shape(x), np.inf)
+		best_a = np.zeros((self.na,) + np.shape(x))
+		W = int(np.ceil(self.dx * 1.6 / max(self.step, 1e-6))) + 2
+		for off in range(-W, W):
+			ka, kb = k + off, k + off + 1
+			ka_c = np.clip(ka, 0, nP - 1)
+			kb_c = np.clip(kb, 0, nP - 1)
+			valid = (ka >= 0) & (kb < nP) & (pid[ka_c] == pid[kb_c])
+			ax, az = P[ka_c, 0], P[ka_c, 1]
+			bx, bz = P[kb_c, 0], P[kb_c, 1]
+			abx, abz = bx - ax, bz - az
+			l2 = np.maximum(abx * abx + abz * abz, 1e-12)
+			t = np.clip(((x - ax) * abx + (z - az) * abz) / l2, 0.0, 1.0)
+			t = np.where(valid, t, 0.0)
+			qx = np.where(valid, ax + t * abx, P[k, 0])
+			qz = np.where(valid, az + t * abz, P[k, 1])
+			d = np.hypot(x - qx, z - qz)
+			m = d < best_d
+			best_d = np.where(m, d, best_d)
+			for a in range(self.na):
+				va = np.where(valid, P[ka_c, 2 + a] + t * (P[kb_c, 2 + a] - P[ka_c, 2 + a]), P[k, 2 + a])
+				best_a[a] = np.where(m, va, best_a[a])
+		return best_d, best_a
 
 
 def _dense_linear(pts, step):

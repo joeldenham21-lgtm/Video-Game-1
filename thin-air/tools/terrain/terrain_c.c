@@ -168,6 +168,77 @@ void noise_grid(float *out, int nx, int ny, double x0, double z0, double dx, dou
 	}
 }
 
+/* "Erosion noise" (after Clay John's eroded-terrain shader / R. S. Johansen's erosion filter): per octave, a
+ * Gaussian-weighted sum of cosine stripes centred on jittered lattice points, oriented so the stripes run down
+ * the local fall line. Each octave bends its stripes along the gradient accumulated so far, so small gullies
+ * branch off larger ones (dendritic look) without any flow simulation or grid bias.
+ *   gx, gz: base terrain gradient (dh/dx, dh/dz, m/m); slope_fade: gradients below this get no gullies.
+ *   freq: 1/metres of the first octave; out: height offset in [-~1, ~1] (sum of octaves, amplitudes gain^o);
+ *   dout_x/z (optional): its derivative (per metre) for chaining. */
+static inline void hash2(int32_t x, int32_t y, uint32_t seed, float *hx, float *hy) {
+	uint32_t a = hash3(x, y, seed), b = hash3(x, y, seed ^ 0x9e3779b9u);
+	*hx = (a & 0xFFFFFF) / 16777216.0f;
+	*hy = (b & 0xFFFFFF) / 16777216.0f;
+}
+
+void erosion_noise(const float *gx, const float *gz, int nx, int ny, double x0, double z0, double dx, double freq,
+				   int octaves, double gain, double lacunarity, double bend, double slope_fade, uint32_t seed,
+				   float *out, float *dout_x, float *dout_z) {
+	const float TAU = 6.2831853f;
+	for (int j = 0; j < ny; j++) {
+		for (int i = 0; i < nx; i++) {
+			size_t k = (size_t)j * nx + i;
+			double X = x0 + i * dx, Z = z0 + j * dx;
+			float ggx = gx[k], ggz = gz[k];
+			float gl = sqrtf(ggx * ggx + ggz * ggz);
+			float fade = gl / (gl + (float)slope_fade);
+			/* stripes run along the gradient: their phase varies across it (perpendicular direction) */
+			float dirx = 0, dirz = 0;
+			if (gl > 1e-6f) { dirx = -ggz / gl; dirz = ggx / gl; }
+			float hsum = 0, dsx = 0, dsz = 0;   /* accumulated value + derivative (per lattice unit of octave 0) */
+			double f = freq;
+			float a = 1.0f;
+			for (int o = 0; o < octaves; o++) {
+				/* bend: add the accumulated slope of the gullies so far (rotated 90 deg like dir) */
+				float bx = dirx + (float)bend * (-dsz), bz = dirz + (float)bend * dsx;
+				float bl = sqrtf(bx * bx + bz * bz);
+				if (bl > 1e-6f) { bx /= bl; bz /= bl; }
+				double px = X * f + o * 31.7, pz = Z * f - o * 17.3;
+				double fpx = floor(px), fpz = floor(pz);
+				int32_t ipx = (int32_t)fpx, ipz = (int32_t)fpz;
+				float fx = (float)(px - fpx), fz = (float)(pz - fpz);
+				float va = 0, vdx = 0, vdz = 0, wt = 0;
+				for (int b2 = -2; b2 <= 1; b2++) {
+					for (int a2 = -2; a2 <= 1; a2++) {
+						float hx, hy;
+						hash2(ipx - a2, ipz - b2, seed + (uint32_t)o * 7717u, &hx, &hy);
+						float ppx = fx + a2 - hx * 0.5f, ppz = fz + b2 - hy * 0.5f;
+						float d = ppx * ppx + ppz * ppz;
+						float w = expf(-d * 2.0f);
+						float mag = ppx * bx + ppz * bz;
+						float c = cosf(mag * TAU), sn = sinf(mag * TAU);
+						va += c * w;
+						vdx += -sn * bx * w;
+						vdz += -sn * bz * w;
+						wt += w;
+					}
+				}
+				va /= wt; vdx /= wt; vdz /= wt;
+				hsum += va * a;
+				/* derivative in octave-0 lattice units: chain rule factor f/freq */
+				float sc = (float)(f / freq);
+				dsx += vdx * a * sc;
+				dsz += vdz * a * sc;
+				a *= (float)gain;
+				f *= lacunarity;
+			}
+			out[k] = hsum * fade;
+			if (dout_x) dout_x[k] = dsx * fade * (float)freq * TAU;
+			if (dout_z) dout_z[k] = dsz * fade * (float)freq * TAU;
+		}
+	}
+}
+
 /* ------------------------------------------------------------------ binary heap */
 typedef struct { float k; int32_t i; } HItem;
 typedef struct { HItem *a; int n, cap; } Heap;
@@ -323,6 +394,66 @@ void spl_steady(float *h, int nx, int ny, float dx, const uint8_t *fixed, const 
 	}
 	if (area_out) memcpy(area_out, A, sizeof(float) * N);
 	free(rcv); free(order); free(A); free(hn);
+}
+
+/* Steady-state stream power with stochastic receivers: each iteration re-derives the drainage tree on the
+ * depression-filled surface, picking every cell's receiver at random among its lower neighbours with probability
+ * ~ slope^rexp (instead of the flooding neighbour / steepest D8 neighbour, which aligns channels with the grid).
+ * The damped iteration averages many such trees, so valleys meander naturally and branch dendritically. */
+void spl_steady_rand(float *h, int nx, int ny, float dx, const uint8_t *fixed, const float *ks, float m,
+					 float tmax_default, const float *tmax_map, int iters, float damping, float rexp, uint64_t seed,
+					 float *area_out) {
+	int N = nx * ny;
+	int32_t *rcv = (int32_t *)malloc(sizeof(int32_t) * N);
+	int32_t *order = (int32_t *)malloc(sizeof(int32_t) * N);
+	float *A = (float *)malloc(sizeof(float) * N);
+	float *hn = (float *)malloc(sizeof(float) * N);
+	float *f = (float *)malloc(sizeof(float) * N);
+	uint64_t s = seed;
+	for (int it = 0; it < iters; it++) {
+		int cnt = pf_order(h, nx, ny, fixed, 1, rcv, order, f);
+		for (int k = 0; k < cnt; k++) {
+			int c = order[k];
+			if (rcv[c] == c) continue;
+			int ci = c % nx, cj = c / nx;
+			float w[8], ws = 0;
+			for (int d = 0; d < 8; d++) {
+				int ni = ci + DI[d], nj = cj + DJ[d];
+				w[d] = 0;
+				if (ni < 0 || nj < 0 || ni >= nx || nj >= ny) continue;
+				float dz = f[c] - f[nj * nx + ni];
+				if (dz <= 0) continue;
+				w[d] = powf(dz / (dx * DL[d]), rexp);
+				ws += w[d];
+			}
+			if (ws <= 0) continue;
+			float r = (float)rnd01(&s) * ws;
+			for (int d = 0; d < 8; d++) {
+				if (w[d] <= 0) continue;
+				r -= w[d];
+				if (r <= 0) { rcv[c] = (cj + DJ[d]) * nx + ci + DI[d]; break; }
+			}
+		}
+		for (int k = 0; k < N; k++) A[k] = dx * dx;
+		for (int k = cnt - 1; k >= 0; k--) {
+			int c = order[k], r = rcv[c];
+			if (r != c) A[r] += A[c];
+		}
+		for (int k = 0; k < cnt; k++) {
+			int c = order[k], r = rcv[c];
+			if (r == c || (fixed && fixed[c])) { hn[c] = h[c]; continue; }
+			int di = abs(c % nx - r % nx), dj = abs(c / nx - r / nx);
+			float dist = dx * ((di && dj) ? 1.41421356f : 1.0f);
+			float sl = ks[c] * powf(A[c], -m);
+			float tm = tmax_map ? tmax_map[c] : tmax_default;
+			if (sl > tm) sl = tm;
+			hn[c] = hn[r] + sl * dist;
+		}
+		for (int k = 0; k < N; k++)
+			if (!(fixed && fixed[k])) h[k] = damping * h[k] + (1.0f - damping) * hn[k];
+	}
+	if (area_out) memcpy(area_out, A, sizeof(float) * N);
+	free(rcv); free(order); free(A); free(hn); free(f);
 }
 
 /* Thermal erosion: material above the talus slope slides to the steepest lower neighbour.
