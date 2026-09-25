@@ -133,8 +133,24 @@ func build_visual() -> void:
 		_embers.position = _head
 		_embers.spread = 35.0
 		if not mobile:
-			_smoke = _make_particles(&"smoke", 10, 2.6, 0.09, 0.2, 0.3, 0.7, Vector3(0, 0.45, 0))
+			# Dense, small, rotated puffs with varied rise speeds: a wisp, not a column of evenly spaced discs.
+			_smoke = _make_particles(&"smoke", 28, 2.2, 0.16, 0.3, 0.12, 0.45, Vector3(0, 0.35, 0))
+			# Faint and overlapping: individual soft puffs merge into a haze instead of reading as discs.
+			var sg := Gradient.new()
+			sg.offsets = PackedFloat32Array([0.0, 0.15, 0.6, 1.0])
+			sg.colors = PackedColorArray([Color(0.32, 0.3, 0.28, 0.0), Color(0.32, 0.3, 0.28, 0.13), Color(0.36, 0.35, 0.34, 0.07), Color(0.4, 0.4, 0.4, 0.0)])
+			_smoke.color_ramp = sg
 			_smoke.position = _head + Vector3(0.0, 0.1, 0.0)
+			_smoke.spread = 22.0
+			_smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+			_smoke.emission_sphere_radius = 0.035
+			_smoke.angle_min = 0.0
+			_smoke.angle_max = 360.0
+			_smoke.angular_velocity_min = -40.0
+			_smoke.angular_velocity_max = 40.0
+			_smoke.linear_accel_min = -0.1
+			_smoke.linear_accel_max = 0.15
+			_smoke.randomness = 0.6
 	_set_lit(lit, true)
 
 

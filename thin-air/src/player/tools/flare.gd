@@ -98,6 +98,12 @@ func _particles(kind: StringName, amount: int, life: float, s_min: float, s_max:
 			c.add_point(Vector2(0.0, 0.3))
 			c.add_point(Vector2(1.0, 1.0))
 			p.scale_amount_curve = c
+			# Rotated, varied puffs (viewmodel_fx_mix honours the particle angle).
+			p.angle_min = 0.0
+			p.angle_max = 360.0
+			p.angular_velocity_min = -35.0
+			p.angular_velocity_max = 35.0
+			p.randomness = 0.5
 		&"flame":
 			# Strontium red: a hot pink-white core fading through deep red.
 			g.offsets = PackedFloat32Array([0.0, 0.2, 0.55, 1.0])

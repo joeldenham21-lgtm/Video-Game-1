@@ -232,6 +232,26 @@ func _campfire() -> Campfire:
 	# Away from the fire it's cold.
 	var far := Climate.get_heat_at(Vector3(30.0, 1451.0, 30.0))
 	check(far == 0.0, "no fire heat 30 m away")
+	# Eye adaptation: beside the fire the eye adapts to its light (the sky's night gain would otherwise
+	# multiply the fire ~2.5× past how the items stream tuned it); away from it, full night adaptation.
+	var sky := get_tree().get_first_node_in_group(&"sky")
+	if sky and sky.has_method(&"get_local_light_key"):
+		sky.call(&"snap")
+		var near_eye := float(sky.call(&"get_eye_adaptation"))
+		var near_exp := float(sky.call(&"get_exposure"))
+		var near_key := float(sky.call(&"get_local_light_key"))
+		var p0 := player.global_position
+		player.teleport(Vector3(60.0, TerrainData.get_height(60.0, 60.0) + 0.05, 60.0), 0.0)
+		await get_tree().process_frame
+		sky.call(&"snap")
+		var far_eye := float(sky.call(&"get_eye_adaptation"))
+		var far_exp := float(sky.call(&"get_exposure"))
+		player.teleport(p0, 0.0)
+		await get_tree().process_frame
+		sky.call(&"snap")
+		check(near_key > 0.5 and near_eye < far_eye * 0.5 and near_exp < far_exp,
+			"eye adapts to the firelight (key %.2f: eye %.2f / exposure %.2f by the fire, %.2f / %.2f 60 m away)"
+			% [near_key, near_eye, near_exp, far_eye, far_exp])
 	# A held torch is a heat source too and lights from the campfire without an igniter.
 	inv.add(&"torch", 1)
 	player.equip(&"torch")

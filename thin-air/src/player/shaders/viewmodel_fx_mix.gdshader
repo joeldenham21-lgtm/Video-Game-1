@@ -10,7 +10,10 @@ uniform vec4 tint : source_color = vec4(0.55, 0.55, 0.55, 1.0);
 void vertex() {
 	mat4 mv = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
 	float sc = length(MODEL_MATRIX[0].xyz);
-	POSITION = vm_project(PROJECTION_MATRIX, mv * vec4(VERTEX * sc, 1.0));
+	// Particle angle (CPUParticles3D angle_min/max, angular_velocity): puffs don't all share one silhouette.
+	float a = INSTANCE_CUSTOM.x;
+	vec3 v = vec3(VERTEX.x * cos(a) - VERTEX.y * sin(a), VERTEX.x * sin(a) + VERTEX.y * cos(a), VERTEX.z);
+	POSITION = vm_project(PROJECTION_MATRIX, mv * vec4(v * sc, 1.0));
 }
 
 void fragment() {

@@ -9,7 +9,10 @@ extends Node3D
 ##  * exposure that adapts like an eye (daylight → moonlit night ≈ 8.5× gain; moonless nights stay dark). The
 ##    camera exposure itself is capped at EXPOSURE_MAX; adaptation beyond that is applied to the sky's own
 ##    light sources instead (sun/moon/sky radiance × get_light_boost()), so night radiance stays in a range
-##    the Mobile colour buffer can hold (no banding) and torches/fires are not multiplied by the night gain,
+##    the Mobile colour buffer can hold (no banding) and torches/fires are not multiplied by the night gain.
+##    Firelight near the eye (campfires, torches, flares, lanterns: group "heat_source"; other lamps: group
+##    "local_light") counts towards the adaptation like daylight does, so by a fire or with a torch in hand
+##    the eye does not gain the full night boost (the dark beyond the firelight stays dark),
 ##  * depth + height fog whose colour is the horizon sky (aerial perspective), valley fog banks, whiteouts,
 ##  * volumetric fog / SSAO / SSIL / SSR / glow / shadow cascades from Settings (on settings_changed).
 ## Other systems must not replace WorldEnvironment.environment; read get_exposure()/get_fog_color() instead.
@@ -25,6 +28,11 @@ const EXPOSURE_MIN := 1.0
 const EYE_ADAPT_MAX := 8.5         # total adaptation daylight → night (camera exposure × light boost)
 const EXPOSURE_MAX := 2.5          # camera (tonemap) exposure cap; the rest is boost on the sky's own lights
 const ADAPT_SECONDS := 3.0
+## Share of a local light's irradiance at the eye (facing it) that counts as scene key: the eye sees the lit
+## ground and the flame, not only the flame's full face. A campfire 2.4 m away then adapts to exposure ≈ 1.4,
+## a torch in hand to ≈ 1 — the exposures the items/player streams tuned those lights at.
+const LOCAL_KEY_WEIGHT := 0.6
+const LOCAL_LIGHT_REFRESH := 0.5
 const CLOUD_SCALE := 0.00005       # uv per metre on the cloud deck (one noise tile = 20 km)
 const LUT_ALTS: Array[float] = [1300.0, 2000.0, 2700.0, 3450.0]
 const T_ALTS: Array[float] = [1300.0, 2000.0, 2700.0, 3450.0, 4500.0, 6000.0, 9000.0]
@@ -70,6 +78,9 @@ var _u := {}                        # last computed uniforms (debug / tests)
 var _particle_amb := Color(0.3, 0.3, 0.3)
 var _particle_sun := Color(0.5, 0.5, 0.5)
 var _particle_dir := Vector3.UP
+var _local_lights: Array[Light3D] = []
+var _local_refresh := 0.0
+var _local_key := 0.0
 
 
 func _ready() -> void:
@@ -275,6 +286,56 @@ func get_light_boost() -> float:
 	return _boost
 
 
+## Scene key (irradiance units, KEY_REF = exposure 1) the eye currently gets from nearby firelight/lamps.
+func get_local_light_key() -> float:
+	return _local_key
+
+
+## Irradiance at `pos` from the local lights (Godot omni/spot falloff: π·energy·window(d/range)·d^-attenuation,
+## the same units as the sun's π·light_energy), × LOCAL_KEY_WEIGHT. Light list refreshed twice a second.
+func _local_light_key(pos: Vector3, delta: float) -> float:
+	_local_refresh -= delta
+	if _local_refresh <= 0.0 or _first:
+		_local_refresh = LOCAL_LIGHT_REFRESH
+		_collect_local_lights()
+	var e := 0.0
+	for l in _local_lights:
+		if not is_instance_valid(l) or not l.is_visible_in_tree() or l.light_energy <= 0.0:
+			continue
+		var r := 0.0
+		var att := 1.0
+		if l is OmniLight3D:
+			r = (l as OmniLight3D).omni_range
+			att = (l as OmniLight3D).omni_attenuation
+		elif l is SpotLight3D:
+			r = (l as SpotLight3D).spot_range
+			att = (l as SpotLight3D).spot_attenuation
+		var d := l.global_position.distance_to(pos)
+		if r <= 0.0 or d >= r:
+			continue
+		var nd := d / r
+		nd *= nd
+		nd *= nd
+		var win := maxf(1.0 - nd, 0.0)
+		e += PI * l.light_energy * win * win * pow(maxf(d, 0.1), -att)
+	return e * LOCAL_KEY_WEIGHT
+
+
+func _collect_local_lights() -> void:
+	_local_lights.clear()
+	var tree := get_tree()
+	if tree == null:
+		return
+	for group in [&"heat_source", &"local_light"]:
+		for n in tree.get_nodes_in_group(group):
+			if n is OmniLight3D or n is SpotLight3D:
+				_local_lights.append(n as Light3D)
+				continue
+			for c in n.find_children("*", "Light3D", true, false):
+				if (c is OmniLight3D or c is SpotLight3D) and not _local_lights.has(c):
+					_local_lights.append(c as Light3D)
+
+
 func get_fog_color() -> Color:
 	return _fog_color
 
@@ -397,6 +458,9 @@ func _update(delta: float) -> void:
 		key = lerpf(key, under, overcast)
 	# Everything above is in boosted units: back to physical for the adaptation target.
 	key = maxf(key, 1.0e-6) / _boost + 2.0e-5
+	# Firelight at the eye: physical already (never boosted).
+	_local_key = _local_light_key(cam_pos, delta)
+	key += _local_key
 	var target := clampf(pow(KEY_REF / key, 0.6), EXPOSURE_MIN, EYE_ADAPT_MAX)
 	# This frame renders with last frame's exposure/boost pair (consistent: radiance × exposure = eye gain).
 	var frame_exposure := _exposure
