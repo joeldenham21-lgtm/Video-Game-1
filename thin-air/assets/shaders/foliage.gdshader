@@ -37,6 +37,7 @@ instance uniform float lod_end = 0.0;
 instance uniform float lod_margin = 3.0;
 instance uniform float clip_below = -100000.0;   // object-space Y cut (felled crowns / stumps)
 instance uniform float clip_above = 100000.0;
+instance uniform float wind_scale = 1.0;       // 0 on felled trees
 
 varying flat vec2 v_fade;   // (fade-in, fade-out) of this LOD band
 varying flat float v_inst;
@@ -56,7 +57,7 @@ void vertex() {
 	BINORMAL = normalize(cross(NORMAL, TANGENT));
 	vec3 radial = vec3(VERTEX.x, 0.0, VERTEX.z);
 	vec3 crown_obj = normalize(radial + vec3(0.0, crown_up * max(length(radial), 0.35), 0.0));
-	VERTEX += veg_wind_offset(VERTEX, NORMAL, COLOR, UV2.x, MODEL_MATRIX, TIME, trunk_sway, branch_sway, flutter);
+	VERTEX += wind_scale * veg_wind_offset(VERTEX, NORMAL, COLOR, UV2.x, MODEL_MATRIX, TIME, trunk_sway, branch_sway, flutter);
 	v_crown_n = normalize((MODELVIEW_MATRIX * vec4(crown_obj, 0.0)).xyz);
 	v_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	if (v_fade.x * v_fade.y <= 0.001) {

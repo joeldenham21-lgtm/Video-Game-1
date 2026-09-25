@@ -12,6 +12,7 @@ const BARK_SHADER := "res://assets/shaders/bark.gdshader"
 const FOLIAGE_SHADER := "res://assets/shaders/foliage.gdshader"
 const ROCK_SHADER := "res://src/vegetation/shaders/rock.gdshader"
 const IMPOSTOR_SHADER := "res://assets/shaders/impostor.gdshader"
+const GRASS_SHADER := "res://assets/shaders/grass.gdshader"
 
 ## Categories (drive scatter rules, LOD bands, collision and harvesting).
 enum Cat { TREE, SAPLING, SHRUB, DEADWOOD, ROCK_BIG, ROCK_SMALL }
@@ -22,6 +23,10 @@ static var _shared: VegLibrary = null
 var kinds: Dictionary = {}
 ## index -> kind name
 var kind_names: Array[StringName] = []
+## ground cover (GPU grass ring, VegGrass): kind name -> manifest row
+var groundcover: Dictionary = {}
+var grass_materials: Array[ShaderMaterial] = []
+var _grass_meshes: Dictionary = {}
 var impostor_material: ShaderMaterial = null
 var impostor_quad: Mesh = null
 ## all ShaderMaterials that read the view_origin uniform
@@ -71,6 +76,10 @@ func load_all() -> void:
 			row["meshes"] = []
 			kinds[StringName(n)] = row
 			kind_names.append(StringName(n))
+	var gc: Variant = (data as Dictionary).get("groundcover", {})
+	if gc is Dictionary:
+		for n in (gc as Dictionary).keys():
+			groundcover[StringName(n)] = (gc[n] as Dictionary).duplicate(true)
 	var imp: Variant = (data as Dictionary).get("impostors", {})
 	if imp is Dictionary and not (imp as Dictionary).is_empty():
 		_setup_impostors(imp)
@@ -236,6 +245,56 @@ func _tex(path: String) -> Texture2D:
 		return load(path) as Texture2D
 	push_warning("VegLibrary: missing texture %s" % path)
 	return null
+
+
+# ---------------------------------------------------------------------------------------------- ground cover
+
+## LOD0 mesh of a ground-cover kind with the grass shader (shared, loaded once).
+func grass_mesh(kind: StringName) -> Mesh:
+	if _grass_meshes.has(kind):
+		return _grass_meshes[kind]
+	var row: Dictionary = groundcover.get(kind, {})
+	var path := String(row.get("path", ""))
+	if path == "" or not ResourceLoader.exists(path):
+		_grass_meshes[kind] = null
+		return null
+	var root := (load(path) as PackedScene).instantiate()
+	var mi := root.find_child("LOD0", true, false) as MeshInstance3D
+	var m: Mesh = null
+	if mi and mi.mesh:
+		m = mi.mesh.duplicate() as Mesh
+		for si in m.get_surface_count():
+			m.surface_set_material(si, grass_material(String(row.get("card", "grass"))))
+	root.free()
+	_grass_meshes[kind] = m
+	return m
+
+
+func grass_material(card_set: String) -> ShaderMaterial:
+	var key := "grass:%s" % card_set
+	if _materials.has(key):
+		return _materials[key]
+	var m := ShaderMaterial.new()
+	m.shader = load(GRASS_SHADER)
+	m.set_shader_parameter(&"albedo_tex", _tex("res://assets/textures/foliage/%s_albedo.png" % card_set))
+	m.set_shader_parameter(&"normal_tex", _tex("res://assets/textures/foliage/%s_normal.png" % card_set))
+	match card_set:
+		"fern":
+			m.set_shader_parameter(&"greenness", 0.0)
+			m.set_shader_parameter(&"wind_amp", 0.06)
+		"sedge":
+			m.set_shader_parameter(&"greenness", 0.45)
+	m.resource_name = key
+	_materials[key] = m
+	grass_materials.append(m)
+	return m
+
+
+## Updates distance fade / trample settings on every grass material.
+func set_grass_params(fade_start: float, fade_end: float) -> void:
+	for m in grass_materials:
+		m.set_shader_parameter(&"fade_start", fade_start)
+		m.set_shader_parameter(&"fade_end", fade_end)
 
 
 # ---------------------------------------------------------------------------------------------- impostors
