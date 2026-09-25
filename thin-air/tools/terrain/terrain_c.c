@@ -739,6 +739,74 @@ int route(const float *h, int nx, int ny, float cell, int si, int sj, int ti, in
 	return len;
 }
 
+/* Least-cost path with a turning penalty (state = cell x incoming direction), so grade-limited paths make
+ * proper switchbacks with long legs and few hairpins instead of metre-scale zig-zags. Same cost model as route()
+ * plus L * turn_w * (1 - cos(turn angle)). */
+int route_turn(const float *h, int nx, int ny, float cell, int si, int sj, int ti, int tj, float gmax, float wg,
+			   float over, float turn_w, const float *penalty, int i0, int j0, int i1, int j1, int32_t *path_i,
+			   int32_t *path_j, int maxlen) {
+	int W = i1 - i0 + 1, Hh = j1 - j0 + 1, M = W * Hh, S = M * 17;   /* dir 16 = start (no heading) */
+	float *dist = (float *)malloc(sizeof(float) * S);
+	int32_t *prev = (int32_t *)malloc(sizeof(int32_t) * S);
+	uint8_t *done = (uint8_t *)calloc(S, 1);
+	float dcx[16], dcy[16];
+	for (int d = 0; d < 16; d++) {
+		float l = sqrtf((float)(RI[d] * RI[d] + RJ[d] * RJ[d]));
+		dcx[d] = RI[d] / l; dcy[d] = RJ[d] / l;
+	}
+	for (int k = 0; k < S; k++) { dist[k] = 3.0e38f; prev[k] = -1; }
+	Heap hp = {0};
+	int s = ((sj - j0) * W + (si - i0)) * 17 + 16, tcell = (tj - j0) * W + (ti - i0);
+	dist[s] = 0;
+	hpush(&hp, 0, s);
+	int goal = -1;
+	while (hp.n > 0) {
+		HItem it = hpop(&hp);
+		int st = it.i;
+		if (done[st]) continue;
+		done[st] = 1;
+		int c = st / 17, din = st % 17;
+		if (c == tcell) { goal = st; break; }
+		int ci = c % W + i0, cj = c / W + j0;
+		float hc = h[(size_t)cj * nx + ci];
+		for (int d = 0; d < 16; d++) {
+			int ni = ci + RI[d], nj = cj + RJ[d];
+			if (ni < i0 || nj < j0 || ni > i1 || nj > j1) continue;
+			int n = (nj - j0) * W + (ni - i0);
+			int ns = n * 17 + d;
+			if (done[ns]) continue;
+			float L = cell * sqrtf((float)(RI[d] * RI[d] + RJ[d] * RJ[d]));
+			float hn = h[(size_t)nj * nx + ni];
+			float g = fabsf(hn - hc) / L;
+			float q = g / gmax;
+			float cst = L * (1.0f + wg * q * q + (penalty ? penalty[(size_t)nj * nx + ni] : 0.0f));
+			if (g > gmax) cst += L * over * (g - gmax) / gmax;
+			if (din < 16) {
+				float cosang = dcx[din] * dcx[d] + dcy[din] * dcy[d];
+				cst += L * turn_w * (1.0f - cosang);
+			}
+			float nd = dist[st] + cst;
+			if (nd < dist[ns]) { dist[ns] = nd; prev[ns] = st; hpush(&hp, nd, ns); }
+		}
+	}
+	int len = 0;
+	if (goal >= 0) {
+		int st = goal;
+		while (st >= 0 && len < maxlen) {
+			int c = st / 17;
+			path_i[len] = c % W + i0; path_j[len] = c / W + j0; len++;
+			if (st == s) break;
+			st = prev[st];
+		}
+		for (int a = 0, b = len - 1; a < b; a++, b--) {
+			int32_t t1 = path_i[a]; path_i[a] = path_i[b]; path_i[b] = t1;
+			int32_t t2 = path_j[a]; path_j[a] = path_j[b]; path_j[b] = t2;
+		}
+	}
+	free(hp.a); free(dist); free(prev); free(done);
+	return len;
+}
+
 /* ------------------------------------------------------------------ preview ray tracer */
 /* Perspective render of a heightfield (world x = x0 + i*dx, z = x0 + j*dx) for generator QA.
  * cam: x,y,z,yaw,pitch(deg; yaw 0 looks -z/north, 90 looks -x/west), fov_deg (vertical). sun: unit vec to sun.

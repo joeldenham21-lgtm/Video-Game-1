@@ -139,6 +139,15 @@ class Fine:
 		self.hv = resample(mid["hv"], -3072.0, 6.0, X0, DX, N, order=1)
 		fl = resample(mid["floor"].astype(np.float32), -3072.0, 6.0, X0, DX, N, order=1)
 		self.floor_w = np.clip(blur(fl, 6.0) * 1.2, 0.0, 1.0).astype(np.float32)
+		# POI pads: keep metre-scale detail, strata and erosion away so pads stay at their design height
+		pz = np.zeros((N, N), np.float32)
+		for p in D.POIS:
+			if p["flat_radius"] > 0 and p["id"] != "summit":
+				rr = np.hypot(self.X - p["x"], self.Z - p["z"])
+				pz = np.maximum(pz, 1 - smoothstep(p["flat_radius"] + 5.0, p["flat_radius"] + 40.0, rr))
+		self.pad_zone = pz.astype(np.float32)
+		rw = mid["ramp"] if "ramp" in mid.files else np.zeros_like(mid["h"])
+		self.ramp_w = np.clip(resample(rw, -3072.0, 6.0, X0, DX, N, order=1), 0.0, 1.0).astype(np.float32)
 		self.masks = {}
 		self.rivers_out = []
 		self.lakes_out = []
@@ -186,12 +195,14 @@ class Fine:
 		s = slope_deg(hb, DX)
 		gz, gx = np.gradient(hb.astype(np.float64), DX)
 		E = tlib.erosion_noise(gx, gz, X0, X0, DX, 1 / 150.0, 5, 0.5, 2.0, 0.7, 0.08, seed=self.seed + 31)
-		steep = smoothstep(14.0, 42.0, s)
-		fl = self.floor_w
-		h += E * (0.9 + 2.6 * steep) * (1 - fl)
-		rock = smoothstep(36.0, 52.0, s)
+		steep = smoothstep(14.0, 42.0, s) * (1 - 0.6 * self.ramp_w)
+		fl = np.maximum(self.floor_w, self.pad_zone)
+		rock = smoothstep(38.0, 55.0, s) * (1 - fl) * (1 - self.ramp_w)
+		h += E * (0.9 + 2.6 * steep + 2.5 * rock) * (1 - fl)
+		# rock faces: ribs, buttresses and chimneys at 10-80 m (cliffs are rough at every scale)
 		rid = self.noise(1 / 26.0, 4, "ridged", seed=32)
-		h += (rid - 0.45) * 2.2 * rock
+		rid2 = self.noise(1 / 75.0, 3, "ridged", seed=37)
+		h += ((rid - 0.45) * 3.0 + (rid2 - 0.45) * 6.0) * rock
 		h += self.noise(1 / 45.0, 3, seed=33) * (0.35 + 0.9 * steep) + self.noise(1 / 9.0, 3, seed=34) * 0.12
 		# valley floors: terraces, old channels and hummocky ground rather than a flat plate
 		h += fl * (self.noise(1 / 170.0, 3, seed=35) * 1.6 + self.noise(1 / 55.0, 3, seed=36) * 0.5)
@@ -229,7 +240,7 @@ class Fine:
 		delta = (g - fr) * T
 		s = slope_deg(blur(h, 2.5), DX)
 		w = smoothstep(33.0, 50.0, s) * (0.4 + 0.4 * smoothstep(1900.0, 2600.0, h))
-		w = w * (1 - self.floor_w)
+		w = w * (1 - self.floor_w) * (1 - self.ramp_w) * (1 - self.pad_zone)
 		self.h = (h + delta * w).astype(np.float32)
 		cliff = hardband[band] & (fr > 1 - cf)
 		self.hard = np.where(cliff, 0.12, np.where(hardband[band], 0.6, 1.0)).astype(np.float32)
@@ -325,9 +336,10 @@ class Fine:
 		# keep ice untouched
 		ice = self.masks["ice"] > 0.2
 		h = np.where(ice, h0, h)
+		h = h0 + (h - h0) * (1 - self.pad_zone)
 		self.log("   droplet net change: min %.1f max %.1f" % (float((h - h0).min()), float((h - h0).max())))
 		self.log("   thermal (talus)")
-		erod = np.clip(hard, 0.05, 1.0) * (1 - ice)
+		erod = np.clip(hard, 0.05, 1.0) * (1 - ice) * (1 - self.pad_zone)
 		h = tlib.thermal(h, DX, 36.0, 24, 0.35, erod=erod, fixed=ice.astype(np.uint8))
 		self.masks["deposit"] = np.clip(blur(np.maximum(h - h0, 0.0), 1.5) / 1.5, 0, 1).astype(np.float32)
 		self.masks["dep_drop"] = blur(dep, 1.0)
@@ -457,6 +469,12 @@ class Fine:
 		wet[sl] = np.maximum(wet[sl], wetm.astype(np.float32))
 		riv = self.masks.setdefault("river", np.zeros((N, N), np.float32))
 		riv[sl] = np.maximum(riv[sl], (d < half + 1.0).astype(np.float32))
+		# water surface around the channel (trail fords grade down to it)
+		if not hasattr(self, "river_level"):
+			self.river_level = np.full((N, N), np.nan, np.float32)
+		rl = self.river_level[sl]
+		near = d < half + 1.5
+		self.river_level[sl] = np.where(near & (np.isnan(rl) | (ys > rl)), ys, rl).astype(np.float32)
 		gravel = self.masks.setdefault("gravel", np.zeros((N, N), np.float32))
 		gw = (half + (35.0 if kind == "braided" else 4.0 if kind == "creek" else 8.0))
 		gravel[sl] = np.maximum(gravel[sl], (1 - smoothstep(gw * 0.7, gw, d)).astype(np.float32))
@@ -520,8 +538,8 @@ class Fine:
 						I = np.linspace(ia, ib, max(2, int(np.hypot(ib - ia, jb - ja)) + 1)).round().astype(int)
 						J = np.linspace(ja, jb, len(I)).round().astype(int)
 					else:
-						I, J = tlib.route(h3, 3.0, (ia, ja), (ib, jb), gmax * 0.92, wg=1.5, over=90.0,
-										  penalty=pen + p_ice.astype(np.float32), margin=110)
+						I, J = tlib.route_turn(h3, 3.0, (ia, ja), (ib, jb), gmax * 0.9, wg=1.5, over=600.0, turn_w=2.5,
+											   penalty=pen + p_ice.astype(np.float32), margin=110)
 					seg = np.stack([X0 + I * 3.0, X0 + J * 3.0], axis=1).astype(np.float64)
 					if len(leg_pts):
 						seg = seg[1:]
@@ -557,6 +575,21 @@ class Fine:
 			for i in range(len(ys) - 2, -1, -1):
 				g = gm[i] * ds[i]
 				ys[i] = min(max(ys[i], ys[i + 1] - g), ys[i + 1] + g)
+		# fords: where the path crosses a stream the tread comes down to just above the water, approached at the
+		# walking grade from both sides (banks are cut into a ramp instead of leaving a 5 m step)
+		rlm = getattr(self, "river_level", None)
+		if rlm is not None:
+			ii = np.clip(np.round((P[:, 0] - X0) / DX).astype(int), 0, N - 1)
+			jj = np.clip(np.round((P[:, 1] - X0) / DX).astype(int), 0, N - 1)
+			f = rlm[jj, ii].astype(np.float64) + 0.3
+			f = np.where(np.isnan(f), np.inf, f)
+			if np.isfinite(f).any():
+				cap = f.copy()
+				for i in range(1, len(cap)):
+					cap[i] = min(cap[i], cap[i - 1] + gm[i] * 0.8 * ds[i - 1])
+				for i in range(len(cap) - 2, -1, -1):
+					cap[i] = min(cap[i], cap[i + 1] + gm[i] * 0.8 * ds[i])
+				ys = np.minimum(ys, cap)
 		Q = np.column_stack([P, ys])
 		F = Frame(Q, 12.0)
 		sl = F.sl
@@ -569,7 +602,11 @@ class Fine:
 		shoulder = 5.0 if not T.get("climb") else 3.0
 		w = 1 - smoothstep(half, half + shoulder, d)
 		w = np.where(river | water, 0.0, w)
-		# cut/fill slopes: pull the terrain toward the tread level with a cross-slope limit
+		# cut/fill slopes: pull the terrain toward the tread level with a cross-slope limit. The tread never
+		# cuts more than max_cut into the ground nor fills more than max_fill (a trail is a bench, not a trench):
+		# where the graded profile would need more, the tread follows the ground (the router avoids those).
+		max_cut, max_fill = (1.5, 1.0) if T.get("climb") else (8.0, 5.0)
+		yt = np.clip(yt, h - max_cut, h + max_fill)
 		cut = yt + np.maximum(d - half, 0) * 1.1
 		fill = yt - np.maximum(d - half, 0) * 0.9
 		target = np.clip(h, fill, cut)
@@ -584,7 +621,7 @@ class Fine:
 		acc = 0.0
 		for i in range(1, len(Q)):
 			acc += ds[i - 1]
-			if acc >= 8.0 or i == len(Q) - 1:
+			if acc >= 3.0 or i == len(Q) - 1:
 				keep.append(i)
 				acc = 0.0
 		self.trails_out.append(dict(id=T["id"], name=T["name"], golden=T.get("golden", False),
@@ -596,19 +633,27 @@ class Fine:
 	# ------------------------------------------------------------------ 8. pads
 	def pads(self):
 		X, Z = self.X, self.Z
+		# pads never fill a stream channel: their weight fades out over the 8 m next to any channel
+		riv = self.masks.get("river", np.zeros((N, N), np.float32)) > 0.5
+		dch = ndimage.distance_transform_edt(~riv) * DX
+		self._river_clear = smoothstep(1.0, 8.0, dch).astype(np.float32)
 		for p in D.POIS:
 			r = p["flat_radius"]
 			if r <= 0 or p["y"] is None:
 				continue
 			y = p["y"]
-			R = max(12.0, r * 1.1)
-			wob = self.noise(1 / 30.0, 2, seed=111 + len(p["id"]))
 			rr = np.hypot(X - p["x"], Z - p["z"])
-			rrw = rr * (1 + 0.1 * wob)
-			m = rrw < r + R
+			# blend ring wide enough that it stays walkable (smoothstep's steepest part <= ~26 deg)
+			ring = (rr > r + 10.0) & (rr < r + 14.0)
+			dh = float(np.max(np.abs(self.h[ring] - y))) if ring.any() else 0.0
+			R = float(np.clip(max(12.0, r * 1.1, dh * 3.0), 12.0, 90.0))
 			if p["id"] == "summit":
 				R = 10.0
+			wob = self.noise(1 / 30.0, 2, seed=111 + len(p["id"]))
+			rrw = rr * (1 + 0.1 * wob)
+			m = rrw < r + R
 			w = np.clip(1 - smoothstep(r, r + R, rrw), 0, 1)
+			w = w * self._river_clear
 			h = self.h.astype(np.float64)
 			self.h = np.where(m, h + (y - h) * w, h).astype(np.float32)
 			pm = self.masks.setdefault("pad", np.zeros((N, N), np.float32))

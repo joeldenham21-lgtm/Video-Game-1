@@ -46,6 +46,8 @@ def _import_file(png, lossless=False):
 		"detect_3d/compress_to": 0,
 	}
 	imp = png + ".import"
+	if os.path.exists(imp) and "compress/mode" in open(imp).read():
+		return                                  # keep Godot's own (complete) import file
 	uid = None
 	if os.path.exists(imp):
 		import re
@@ -117,7 +119,7 @@ def compute_masks(F, log):
 	F.masks["chute"] = chute
 	patch = smoothstep(-0.35, 0.25, nz1 * 0.7 + nz2 * 0.3 + 0.12)
 	clear = np.zeros_like(h)
-	for cx, cz, r in ((-520, 820, 120), (-900, 260, 45), (420, 520, 45), (820, -80, 70), (-760, -260, 32)):
+	for cx, cz, r in ((-520, 820, 120), (-900, 260, 45), (420, 520, 45), (820, -80, 70), (-743, -287, 32)):
 		wob = 1 + 0.25 * nz1
 		clear = np.maximum(clear, 1 - smoothstep(r * 0.7, r * 1.25, np.hypot(X - cx, Z - cz) / wob))
 	near_water = np.clip(1 - F.masks.get("lake_shore_d", np.full_like(h, 99.0)) / 14.0, 0, 1) * (water < 0.5)
@@ -142,6 +144,9 @@ def compute_masks(F, log):
 	wind_scour = np.clip(windward, 0, 1) * smoothstep(2500.0, 3000.0, h) * 0.45
 	lee = np.clip(-windward, 0, 1) * smoothstep(2300.0, 2800.0, h) * 0.25
 	snow = s_alt * s_slope * s_curv * (1 - wind_scour) + lee * s_slope
+	# snow-filled gullies and couloirs on steep faces (concave, shaded), the look of the range in late October
+	gully = smoothstep(38.0, 55.0, slope) * (1 - smoothstep(62.0, 72.0, slope)) * np.clip(curv * 2.5 - 0.15, 0, 1)
+	snow = np.maximum(snow, gully * s_alt * (0.75 + 0.25 * np.clip(aspect_n, 0, 1)))
 	dust = smoothstep(1550.0, 1800.0, h) * np.clip(aspect_n, 0, 1) * 0.35 * s_slope     # shaded dusting below
 	snow = np.maximum(snow, dust)
 	snow = snow * (1 - 0.45 * forest * (h < 2150))
@@ -162,6 +167,7 @@ def compute_masks(F, log):
 	scree = cliffs_near * smoothstep(24.0, 31.0, slope) * (1 - smoothstep(42.0, 50.0, slope)) * 1.6
 	scree = scree + deposit * 0.8 + moraine * 0.9 + smoothstep(2300.0, 2600.0, h) * (1 - forest) * 0.35 * (1 - rock)
 	scree = np.clip(scree * (1 - ice) * (1 - water) * (1 - forest * 0.9), 0, 1)
+	scree = scree * (1 - smoothstep(44.0, 56.0, slope))          # talus lies below its angle of repose
 
 	# ---- gravel (G), wetness (A)
 	gravel = np.clip(gravel0 + moraine * 0.35 * (h < 2500), 0, 1) * (1 - ice)
@@ -232,7 +238,7 @@ def write_all(F, mid, far, root, layout_path, log, seed, preview_dir=None):
 	log("OUT: layout")
 	layout = build_layout(F, h, masks, masks2, seed)
 	with open(layout_path, "w") as f:
-		json.dump(layout, f, indent=1)
+		f.write(compact_json(layout))
 	if preview_dir:
 		import preview
 		preview.render(h, DX, os.path.join(preview_dir, "out_map.png"), 1024, water=F.masks["water"],
@@ -243,6 +249,14 @@ def write_all(F, mid, far, root, layout_path, log, seed, preview_dir=None):
 	log("OUT: sizes MB " + ", ".join("%s %.1f" % (k, v / 1e6) for k, v in sorted(sizes.items())) +
 		"  total %.1f" % (sum(sizes.values()) / 1e6))
 	return layout
+
+
+def compact_json(obj):
+	"""Indented JSON with numeric arrays ([x, y, z, w] points) kept on one line (small, diff-friendly)."""
+	import re
+	text = json.dumps(obj, indent=1)
+	return re.sub(r"\[\s+([-0-9.eE,\s]+?)\s+\]",
+				  lambda m: "[" + ", ".join(x.strip() for x in m.group(1).split(",")) + "]", text) + "\n"
 
 
 def build_layout(F, h, masks, masks2, seed):
@@ -284,7 +298,8 @@ def build_layout(F, h, masks, masks2, seed):
 		pois=pois,
 		lakes=F.lakes_out,
 		rivers=F.rivers_out,
-		trails=F.trails_out,
+		trails=[dict(t, points=[[p[0], round(H(p[0], p[2]), 2), p[2]] + list(p[3:]) for p in t["points"]])
+				for t in F.trails_out],
 		golden_path=["crash_site", "ranger_cabin", "ashford_mine", "owens_bivouac", "glacier_camp", "icefall",
 					 "kestrel_station", "summit"],
 		spawn=spawn,

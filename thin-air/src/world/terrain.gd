@@ -23,15 +23,19 @@ const LAYERS_JSON := "res://assets/textures/terrain/layers.json"
 const TEX_AH := "res://assets/textures/terrain/terrain_albedo_height.png"
 const TEX_NR := "res://assets/textures/terrain/terrain_normal_rough.png"
 const TEX_MACRO := "res://assets/textures/terrain/terrain_macro_noise.png"
-const RANGE_M := 49000.0            # outermost level must reach this far
+const RANGE_M := 24000.0            # outermost level must reach this far (FAR data ends at 24.6 km)
 const BOUNDARY_INSET := 4.0         # invisible walls this far inside the map edge
 
 @export var tiles_desktop := 64
 @export var tiles_mobile := 32
+## Shadow casters use their own, coarser ring size (they only need to cover the shadow distance).
+@export var shadow_tiles_desktop := 32
+@export var shadow_tiles_mobile := 16
 @export var build_collision := true
 @export var sun_shadow_enabled := true
 
 var T := 64
+var Ts := 32
 var mobile := false
 var level_count := 0
 var detail_far := 360.0
@@ -39,6 +43,7 @@ var detail_far := 360.0
 var _levels: Array[Dictionary] = []   # per level: {scale, mat, tiles:[MeshInstance3D], offs:[Vector2i], trim_x, trim_z, filler, manual}
 var _shadow_levels: Array[Dictionary] = []
 var _tile_mesh: ArrayMesh
+var _quad_mesh: ArrayMesh
 var _strip_h: ArrayMesh               # far-level strips
 var _strip_v: ArrayMesh
 var _filler0: ArrayMesh
@@ -94,6 +99,7 @@ func _ready() -> void:
 func _configure() -> void:
 	mobile = Settings.is_mobile() or String(Settings.preset).begins_with("mobile") or not Settings.is_forward_plus()
 	T = tiles_mobile if mobile else tiles_desktop
+	Ts = shadow_tiles_mobile if mobile else shadow_tiles_desktop
 	if String(Settings.preset) == "low":
 		T = 48
 	detail_far = 220.0 if mobile else 360.0
@@ -241,6 +247,7 @@ func _build() -> void:
 	add_child(_root_tiles)
 	var n4 := 4 * T + 1
 	_tile_mesh = grid_mesh(T, T, Rect2i(), _ymin, _ymax)
+	_quad_mesh = grid_mesh(2 * T, 2 * T, Rect2i(), _ymin, _ymax)
 	_strip_h = grid_mesh(n4, T, Rect2i(), _ymin, _ymax)
 	_strip_v = grid_mesh(T, 2 * T + 1, Rect2i(), _ymin, _ymax)
 	_trim_x = grid_mesh(4 * T + 2, 1, Rect2i(), _ymin, _ymax)
@@ -250,7 +257,7 @@ func _build() -> void:
 	_filler = rects_mesh(arms, _ymin, _ymax)
 	var cross: Array[Rect2i] = [Rect2i(2 * T, 0, 1, n4), Rect2i(0, 2 * T, 2 * T, 1), Rect2i(2 * T + 1, 2 * T, 2 * T, 1)]
 	_filler0 = rects_mesh(cross, _ymin, _ymax)
-	var far_strips_from := 4
+	var far_strips_from := 3
 	for l in level_count:
 		var sc := S0 * pow(2.0, l)
 		var mat := _make_material(sc)
@@ -268,14 +275,22 @@ func _build() -> void:
 			lv["offs"].append(Vector2i(0, T))
 			lv["tiles"].append(_mk(parent, _strip_v, mat, "right"))
 			lv["offs"].append(Vector2i(3 * T + 1, T))
+		elif l == 0:
+			# the innermost level: 4 quadrant meshes (2T x 2T each) around the filler cross
+			for q in 4:
+				var qx := q & 1
+				var qy := q >> 1
+				lv["tiles"].append(_mk(parent, _quad_mesh, mat, "q%d" % q))
+				lv["offs"].append(Vector2i(qx * (2 * T + 1), qy * (2 * T + 1)))
+			lv["filler"] = _mk(parent, _filler0, mat, "filler")
 		else:
 			for ty in 4:
 				for tx in 4:
-					if l > 0 and (tx == 1 or tx == 2) and (ty == 1 or ty == 2):
+					if (tx == 1 or tx == 2) and (ty == 1 or ty == 2):
 						continue
 					lv["tiles"].append(_mk(parent, _tile_mesh, mat, "t%d%d" % [tx, ty]))
 					lv["offs"].append(Vector2i(tx * T + (1 if tx >= 2 else 0), ty * T + (1 if ty >= 2 else 0)))
-			lv["filler"] = _mk(parent, _filler0 if l == 0 else _filler, mat, "filler")
+			lv["filler"] = _mk(parent, _filler, mat, "filler")
 		if l < level_count - 1:
 			lv["trim_x"] = _mk(parent, _trim_x, mat, "trim_x")
 			lv["trim_z"] = _mk(parent, _trim_z, mat, "trim_z")
@@ -296,10 +311,12 @@ func _mk(parent: Node3D, mesh: Mesh, mat: Material, nm: String) -> MeshInstance3
 
 
 func _build_shadow_casters() -> void:
-	# level 0 + its trims: one (4T+2)² grid placed on the hole of level 1; rings for levels 1.. (4 variants)
-	var n := 4 * T + 2
+	# level 0 + its trims: one (4Ts+2)^2 grid placed on the hole of level 1; rings for levels 1.. (4 variants).
+	# The casters use their own ring size Ts (coarser than the visible clipmap's T) and only reach the shadow
+	# distance, so the terrain costs few shadow triangles per cascade.
+	var n := 4 * Ts + 2
 	var need := 0
-	var half := (2.0 * T + 1.0) * S0
+	var half := (2.0 * Ts + 1.0) * S0
 	while half < _shadow_distance * 1.15 and need < level_count - 1:
 		need += 1
 		half *= 2.0
@@ -308,7 +325,7 @@ func _build_shadow_casters() -> void:
 	for v in 4:
 		var ox := v & 1
 		var oz := (v >> 1) & 1
-		_shadow_meshes["ring%d" % v] = grid_mesh(n, n, Rect2i(T + ox, T + oz, 2 * T + 1, 2 * T + 1), _ymin, _ymax)
+		_shadow_meshes["ring%d" % v] = grid_mesh(n, n, Rect2i(Ts + ox, Ts + oz, 2 * Ts + 1, 2 * Ts + 1), _ymin, _ymax)
 	var holder := Node3D.new()
 	holder.name = "ShadowCasters"
 	_root_tiles.add_child(holder)
@@ -319,7 +336,7 @@ func _build_shadow_casters() -> void:
 		m.set_shader_parameter(&"mid_height_tex", TerrainData.mid_texture)
 		m.set_shader_parameter(&"far_height_tex", TerrainData.far_texture)
 		m.set_shader_parameter(&"lvl_scale", S0 * pow(2.0, l))
-		m.set_shader_parameter(&"lvl_morph", S0 * pow(2.0, l) * T * 0.35)
+		m.set_shader_parameter(&"lvl_morph", S0 * pow(2.0, l) * Ts * 0.35)
 		var mi := MeshInstance3D.new()
 		mi.name = "ShadowL%d" % l
 		mi.mesh = _shadow_meshes["l0"] if l == 0 else _shadow_meshes["ring0"]
@@ -395,8 +412,8 @@ func _update_shadow_casters(snaps: Array[Vector2], cp: Vector3) -> void:
 		if l + 1 >= level_count:
 			continue
 		var sn: Vector2 = snaps[l + 1]
-		var hole0 := sn - Vector2(2 * T * sc, 2 * T * sc)
-		var hole1 := sn + Vector2((2 * T + 2) * sc, (2 * T + 2) * sc)
+		var hole0 := sn - Vector2(2 * Ts * sc, 2 * Ts * sc)
+		var hole1 := sn + Vector2((2 * Ts + 2) * sc, (2 * Ts + 2) * sc)
 		mat.set_shader_parameter(&"lvl_hole", Vector4(hole0.x, hole0.y, hole1.x, hole1.y))
 		var mi: MeshInstance3D = e["mi"]
 		if l > 0:

@@ -51,6 +51,10 @@ def lib():
 	_lib.route.argtypes = [f32p, C.c_int, C.c_int, C.c_float, C.c_int, C.c_int, C.c_int, C.c_int, C.c_float, C.c_float,
 						   C.c_float, C.c_void_p, C.c_int, C.c_int, C.c_int, C.c_int, i32p, i32p, C.c_int]
 	_lib.route.restype = C.c_int
+	_lib.route_turn.argtypes = [f32p, C.c_int, C.c_int, C.c_float, C.c_int, C.c_int, C.c_int, C.c_int, C.c_float,
+								C.c_float, C.c_float, C.c_float, C.c_void_p, C.c_int, C.c_int, C.c_int, C.c_int, i32p, i32p,
+								C.c_int]
+	_lib.route_turn.restype = C.c_int
 	_lib.lic_fall.argtypes = [f32p, f32p, C.c_int, C.c_int, C.c_int, f32p]
 	_lib.horizon_ao.argtypes = [f32p, C.c_int, C.c_int, C.c_float, C.c_int, C.c_float, C.c_float, f32p]
 	_lib.horizon_dir.argtypes = [f32p, C.c_int, C.c_int, C.c_float, C.c_float, C.c_float, C.c_float, C.c_float,
@@ -204,6 +208,23 @@ def route(h, cell, start, goal, gmax_deg, wg=2.0, over=60.0, penalty=None, margi
 	pen = None if penalty is None else _f32(penalty)
 	n = lib().route(h, nx, ny, cell, int(start[0]), int(start[1]), int(goal[0]), int(goal[1]),
 					float(np.tan(np.radians(gmax_deg))), wg, over, _ptr(pen), i0, j0, i1, j1, pi, pj, maxlen)
+	return pi[:n].copy(), pj[:n].copy()
+
+
+def route_turn(h, cell, start, goal, gmax_deg, wg=2.0, over=60.0, turn_w=2.0, penalty=None, margin=120):
+	"""Like route() but with a turning penalty (long switchback legs). Returns (I, J) int arrays."""
+	h = _f32(h)
+	ny, nx = h.shape
+	i0 = max(0, min(start[0], goal[0]) - margin)
+	j0 = max(0, min(start[1], goal[1]) - margin)
+	i1 = min(nx - 1, max(start[0], goal[0]) + margin)
+	j1 = min(ny - 1, max(start[1], goal[1]) + margin)
+	maxlen = (i1 - i0 + 1) * (j1 - j0 + 1)
+	pi = np.zeros(maxlen, np.int32)
+	pj = np.zeros(maxlen, np.int32)
+	pen = None if penalty is None else _f32(penalty)
+	n = lib().route_turn(h, nx, ny, cell, int(start[0]), int(start[1]), int(goal[0]), int(goal[1]),
+						 float(np.tan(np.radians(gmax_deg))), wg, over, turn_w, _ptr(pen), i0, j0, i1, j1, pi, pj, maxlen)
 	return pi[:n].copy(), pj[:n].copy()
 
 

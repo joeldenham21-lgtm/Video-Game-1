@@ -85,6 +85,30 @@ def make_cone(n, x0, dx):
 	return fn
 
 
+def grade_ramps(h, n, x0, dx, max_cross_deg=24.0):
+	"""Grade the golden-path corridors (design.RAMPS): inside each corridor the surface follows the corridor's
+	smooth longitudinal profile, keeping the natural cross shape but limited to max_cross_deg either side, so
+	switchbacking trails fit without cliffs. Returns (h, corridor weight 0..1)."""
+	from fields import SkeletonField
+	X, Z = grid(n, x0, dx)
+	h = h.astype(np.float64)
+	wsum = np.zeros_like(h)
+	kx = np.tan(np.radians(max_cross_deg))
+	hs = blur(h.astype(np.float32), 20.0 / dx).astype(np.float64)
+	for r in D.RAMPS:
+		F = SkeletonField(n, x0, dx, [r["points"]], pad=0.05, step=dx * 0.25)
+		d, a = F.query(X, Z)
+		W = r["width"]
+		w = 1 - smoothstep(W * 0.45, W, d)
+		if not (w > 0).any():
+			continue
+		ys = a[0]
+		target = ys + np.clip(hs - ys, -d * kx, d * kx) + (h - hs) * 0.35
+		h = h + (target - h) * w
+		wsum = np.maximum(wsum, w)
+	return h.astype(np.float32), wsum.astype(np.float32)
+
+
 def make_profile(n, x0, dx):
 	"""profile_fn for macro.design_surface on this grid: cliff-base altitude with noise, raised along the ramps."""
 	from fields import SkeletonField
@@ -95,7 +119,7 @@ def make_profile(n, x0, dx):
 		H1 = D.CLIFF_BASE + D.CLIFF_BASE_VAR * noise_on(m, x0, d, 1 / 900.0, 3, 300)
 		X, Z = grid(m, x0, d)
 		for r in D.RAMPS:
-			F = SkeletonField(m, x0, d, [r["points"]], pad=0.05, step=d * 0.25)
+			F = SkeletonField(m, x0, d, [[p[:2] for p in r["points"]]], pad=0.05, step=d * 0.25)
 			dd, _ = F.query(X, Z)
 			H1 = H1 + 1500.0 * (1 - smoothstep(r["width"] * 0.6, r["width"] + 60.0, dd))
 		return macro.cliff_profile(s, Hv, Hc, H1)
@@ -221,6 +245,7 @@ def stage_mid(args):
 	t = np.clip(dv / np.maximum(Wf, 20.0), 0.0, 1.0)
 	q = t * t * (2.0 - t)
 	h = np.where(floor, h, Hv + (h - Hv) * q).astype(np.float32)
+	h, ramp_w = grade_ramps(h, MID_N, MID_X0, MID_DX)
 	# keep the outer ring equal to FAR
 	X, Z = grid(MID_N, MID_X0, MID_DX)
 	edge = np.minimum(np.minimum(X - MID_X0, -MID_X0 - X), np.minimum(Z - MID_X0, -MID_X0 - Z))
@@ -228,7 +253,7 @@ def stage_mid(args):
 	wb = 1.0 - smoothstep(60.0, 300.0, edge)
 	h = (h * (1 - wb) + hf6 * wb).astype(np.float32)
 	h = tlib.thermal(h, MID_DX, 55.0, 3, 0.5, fixed=floor.astype(np.uint8))
-	np.savez_compressed(cache_path("mid"), h=h, hv=Hv, dv=dv, s=s, rel=rel, floor=floor)
+	np.savez_compressed(cache_path("mid"), h=h, hv=Hv, dv=dv, s=s, rel=rel, floor=floor, ramp=ramp_w)
 	log("MID: done  min %.0f max %.0f" % (h.min(), h.max()))
 	if args.preview:
 		import preview
@@ -270,12 +295,13 @@ def stage_fine2(args):
 	log("FINE2: lake, tarns, rivers")
 	F.lake()
 	F.tarns()
+	F.forefield()
 	for R in D.RIVERS:
 		F.river(R)
-	F.forefield()
+	log("FINE2: pads")
+	F.pads()
 	log("FINE2: trails")
 	F.trails()
-	log("FINE2: pads")
 	F.pads()
 	F.water_recheck()
 	F.log = None

@@ -234,9 +234,25 @@ void terrain_fragment(in vec3 vtx_view, in mat4 view_matrix, in vec3 world, in v
 		base_r = mix(far_r, tr, tex_w);
 	}
 	// rock colour: strata bands and a little warmth/greyness variation (lichen, oxidation)
-	float rockness = clamp(w[1] + w[2], 0.0, 1.0) / max(wsum, 1e-4);
+	float rockness = clamp((w[1] + w[2]) / max(wsum, 1e-4), 0.0, 1.0);
 	vec3 band = mix(vec3(0.86, 0.86, 0.87), vec3(1.12, 1.05, 0.95), det.g);
 	base_alb *= mix(vec3(1.0), band, rockness * in_map);
+	// rock faces: dark water / lichen streaks running down the fall line, weathering patches (warm iron
+	// stains, grey-green lichen), so walls read as rock at any distance instead of plaster
+	if (rockness > 0.01) {
+		vec2 hz = N.xz;
+		float hl = length(hz);
+		vec2 along = hl > 1e-3 ? vec2(-hz.y, hz.x) / hl : vec2(1.0, 0.0);
+		float u_face = dot(wp.xz, along);
+		vec3 sn1 = texture(macro_noise, vec2(u_face / 23.0, wp.y / 260.0)).rgb;
+		vec3 sn2 = texture(macro_noise, vec2(u_face / 7.0 + 0.31, wp.y / 90.0)).rgb;
+		float streak = smoothstep(0.45, 0.8, sn1.r) * 0.55 + smoothstep(0.5, 0.85, sn2.g) * 0.3;
+		float face = smoothstep(0.35, 0.6, steep);
+		vec3 stain = mix(vec3(1.0), vec3(1.08, 0.97, 0.86), smoothstep(0.55, 0.8, mnf.g));
+		vec3 lichen = mix(vec3(1.0), vec3(0.9, 0.95, 0.88), smoothstep(0.5, 0.75, mn.r));
+		vec3 rock_mod = (1.0 - streak * face * 0.55) * stain * lichen * mix(1.0, 0.82, face);
+		base_alb *= mix(vec3(1.0), rock_mod, rockness);
+	}
 	// macro variation: breaks up any remaining repetition near and far
 	float v_near = dot(mn - 0.5, vec3(0.5, 0.3, 0.2)) * 2.0;
 	float v_far = dot(mnf - 0.5, vec3(0.6, 0.3, 0.1)) * 2.0;

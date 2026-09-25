@@ -28,7 +28,7 @@ POIS = [
 		 zone="valley"),
 	dict(id="ashford_mine", name="Ashford Mine", x=820.0, z=-80.0, y=1950.0, radius=90.0, flat_radius=30.0,
 		 zone="forest", adit=dict(x=784.0, z=-86.0, dir=[-1.0, 0.0])),
-	dict(id="trapper_cabin", name="Trapper's Cabin", x=-760.0, z=-260.0, y=1748.0, radius=45.0,
+	dict(id="trapper_cabin", name="Trapper's Cabin", x=-743.0, z=-287.0, y=1737.0, radius=45.0,
 		 flat_radius=12.0, zone="forest"),
 	dict(id="owens_bivouac", name="Owen's Bivouac", x=380.0, z=-520.0, y=2300.0, radius=40.0, flat_radius=8.0,
 		 zone="subalpine"),
@@ -36,7 +36,7 @@ POIS = [
 		 zone="glacier"),
 	dict(id="icefall", name="Corrigan Icefall", x=-60.0, z=-770.0, y=None, radius=120.0, flat_radius=0.0,
 		 zone="glacier"),
-	dict(id="ice_cave", name="Ice Cave", x=178.0, z=-452.0, y=2404.0, radius=40.0, flat_radius=7.0,
+	dict(id="ice_cave", name="Ice Cave", x=168.0, z=-442.0, y=2400.0, radius=40.0, flat_radius=6.0,
 		 zone="glacier", entrance=dict(x=172.0, z=-470.0, dir=[0.0, -1.0])),
 	dict(id="kestrel_station", name="Kestrel Station", x=-360.0, z=-980.0, y=2950.0, radius=110.0,
 		 flat_radius=46.0, zone="col"),
@@ -160,11 +160,16 @@ GORGES = [dict(points=[(84, 1250), (82, 1400), (82, 1536), (92, 1700)], radius=1
 		  # directly above the head of the valley floor (no forested apron there)
 		  dict(points=[(-180, -120), (0, -200), (140, -260), (300, -330), (470, -420)], radius=420.0, deg=55.0)]
 RAMPS = [
-	dict(id="burke_ramp", width=150.0, points=[(840, -60), (760, -250), (640, -380), (520, -470), (380, -520)]),
-	dict(id="bivouac_ramp", width=110.0, points=[(380, -520), (300, -575), (230, -630), (168, -668), (90, -660)]),
-	dict(id="snout_ramp", width=80.0, points=[(380, -520), (280, -470), (178, -452)]),
-	dict(id="col_ramp", width=120.0, points=[(-128, -878), (-200, -960), (-290, -1000), (-360, -980)]),
-	dict(id="lookout_ramp", width=90.0, points=[(-620, 600), (-760, 420), (-900, 260)]),
+	# walkable corridors of the golden path above the forest: (x, z, surface y) along the corridor centre.
+	# The terrain inside is graded to this profile with gentle cross slopes; cliffs / benches are suppressed.
+	dict(id="mine_road_ramp", width=90.0, points=[(690, 270, 1555), (755, 150, 1660), (795, 40, 1790), (812, -30, 1905),
+												  (832, -76, 1950)]),
+	dict(id="burke_ramp", width=120.0, points=[(832, -76, 1950), (760, -250, 2040), (640, -380, 2130), (520, -470, 2220),
+											   (380, -520, 2300)]),
+	dict(id="bivouac_ramp", width=100.0, points=[(380, -520, 2300), (300, -575, 2370), (230, -630, 2440), (168, -668, 2500),
+												 (95, -655, 2502)]),
+	dict(id="snout_ramp", width=70.0, points=[(380, -520, 2300), (280, -470, 2350), (190, -452, 2402)]),
+	dict(id="lookout_ramp", width=80.0, points=[(-620, 600, 1492), (-760, 420, 1600), (-900, 260, 1716)]),
 ]
 
 # --------------------------------------------------------------------------------------------- water
@@ -178,7 +183,7 @@ TARNS = [dict(id="bivouac_tarn", name="Bivouac Tarn", x=318.0, z=-596.0, radius=
 # Rivers: polylines (x, z, width) — the water surface height is derived from the carved terrain.
 RIVERS = [
 	dict(id="corrigan_creek", name="Corrigan Creek", kind="creek",
-		 points=[(174, -462, 4), (180, -425, 4.5), (168, -370, 5), (152, -320, 5), (142, -265, 5), (133, -215, 4),
+		 points=[(192, -462, 4), (197, -440, 4.2), (186, -412, 4.5), (168, -370, 5), (152, -320, 5), (142, -265, 5), (133, -215, 4),
 				 (126, -175, 4), (114, -120, 5), (102, -65, 5.5), (88, -20, 6), (72, 25, 7), (58, 65, 8),
 				 (45, 100, 9)]),
 	dict(id="hollow_river", name="Hollow River", kind="braided",
@@ -216,7 +221,7 @@ TRAILS = [
 			   dict(to=(420, 520), via=[(385, 780), (428, 650)])]),
 	dict(id="ashford_road", name="Ashford Mine Road", width=2.6, max_grade_deg=17.0, golden=True,
 		 legs=[dict(to=(420, 520), via=[]),
-			   dict(to=(820, -80), via=[(590, 430), (720, 240)])]),
+			   dict(to=(820, -80), via=[(590, 430), (690, 270), (760, 140), (800, 20)])]),
 	dict(id="burke_route", name="Burke's Route", width=1.3, max_grade_deg=24.0, golden=True,
 		 legs=[dict(to=(820, -80), via=[]),
 			   dict(to=(380, -520), via=[(720, -300), (560, -420)])]),
@@ -233,7 +238,7 @@ TRAILS = [
 			   dict(to=(-900, 260), via=[(-620, 600), (-760, 420)])]),
 	dict(id="trapline", name="Trapline", width=1.0, max_grade_deg=22.0, golden=False,
 		 legs=[dict(to=(-900, 260), via=[]),
-			   dict(to=(-760, -260), via=[(-760, 100), (-700, -80)])]),
+			   dict(to=(-743, -287), via=[(-760, 100), (-700, -80)])]),
 	dict(id="ice_cave_spur", name="Snout Path", width=1.0, max_grade_deg=26.0, golden=False,
 		 legs=[dict(to=(380, -520), via=[]),
 			   dict(to=(178, -452), via=[(280, -470)])]),
