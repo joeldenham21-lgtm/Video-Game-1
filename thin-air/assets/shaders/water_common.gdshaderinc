@@ -22,7 +22,7 @@ uniform sampler2D foam_tex : hint_default_black, filter_linear_mipmap, repeat_en
 
 // water optics (per metre): milky glacial "rock flour" water — red dies in a metre, green/blue carry a few
 uniform vec3 extinction = vec3(0.6, 0.24, 0.23);
-uniform vec3 body_albedo : source_color = vec3(0.045, 0.24, 0.235);  // diffuse reflectance of deep water
+uniform vec3 body_albedo : source_color = vec3(0.05, 0.31, 0.29);  // diffuse reflectance of deep water
 // light for the heightfield "reflection" of the surrounding range (set every frame by water.gd)
 uniform vec3 refl_sun = vec3(1.0);            // sun/moon colour × energy
 uniform vec3 refl_amb = vec3(0.3, 0.35, 0.4); // sky ambient
@@ -94,7 +94,7 @@ vec4 heightfield_reflection(vec3 p, vec3 r, float max_dist) {
 			vec4 nt = texture(terrain_normal_tex, tuv);
 			vec3 n = nt.xyz * 2.0 - 1.0;
 			// rough albedo of the hit: forest dark green-grey, rock grey, snow white, meadow straw
-			vec3 alb = mix(vec3(0.11, 0.105, 0.095), vec3(0.035, 0.05, 0.035), m.a);
+			vec3 alb = mix(vec3(0.12, 0.115, 0.1), vec3(0.05, 0.07, 0.045), m.a);
 			alb = mix(alb, vec3(0.22, 0.2, 0.14), m.b * (1.0 - m.a) * 0.7);
 			alb = mix(alb, vec3(0.2, 0.2, 0.2), m.g * 0.6);
 			alb = mix(alb, vec3(0.75, 0.78, 0.82), smoothstep(0.35, 0.8, m.r));

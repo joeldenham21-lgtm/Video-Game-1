@@ -254,7 +254,6 @@ static func _add_quad(bk: Dictionary, a: Dictionary, b: Dictionary) -> void:
 			uv2.append(Vector2(float(sec["speed"]), float(sec["slope"])))
 			cc.append(col)
 	# vertices: 0 = a left, 1 = a right, 2 = b left, 3 = b right; winding so Plane() normal points up
-	var t0 := [base, base + 1, base + 2]
 	var p0 := v[base]
 	var p1 := v[base + 1]
 	var p2 := v[base + 2]
@@ -269,7 +268,6 @@ static func _add_quad(bk: Dictionary, a: Dictionary, b: Dictionary) -> void:
 	bk["uv2"] = uv2
 	bk["c"] = cc
 	bk["i"] = ii
-	t0.clear()
 
 
 ## Steep reaches: waterfalls (≥ FALL_SLOPE) and cascades. Returns Array of {river, kind (&"fall"/&"cascade"),

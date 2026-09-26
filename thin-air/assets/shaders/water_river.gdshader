@@ -104,15 +104,25 @@ void fragment() {
 	body = mix(body, 1.0, foam);
 	alpha = mix(alpha, 1.0, foam);
 	rough = mix(rough, 0.55, foam);
-	// falling sheet: streaked, bright aerated water with dark glassy gaps
-	float streak = smoothstep(0.25, 0.8, mix(f1.g, f0.g, wA));
-	vec3 fall_col = mix(vec3(0.3, 0.42, 0.43), vec3(0.88, 0.9, 0.9), streak);
-	albedo = mix(albedo, fall_col, fall * (1.0 - foam));
-	alpha = mix(alpha, mix(0.72, 0.97, streak), fall);
+	// falling sheet: braided white threads of aerated water racing down the rock, dark wet rock between them
+	float fall_speed = 2.5 + speed;
+	vec2 fu = vec2(UV.x * 0.3, UV.y * 0.035);
+	float th0 = texture(foam_tex, fu - vec2(0.0, fall_speed * ph.x * 0.035)).g;
+	float th1 = texture(foam_tex, fu - vec2(0.0, fall_speed * ph.y * 0.035) + vec2(0.31, 0.0)).g;
+	float threads = mix(th1, th0, wA);
+	float wide = texture(foam_tex, vec2(UV.x * 0.7, UV.y * 0.012) + vec2(0.5, 0.0)).b;
+	float streak = smoothstep(0.35, 0.75, threads * 0.8 + wide * 0.45);
+	vec3 fall_col = mix(vec3(0.16, 0.2, 0.2), vec3(0.8, 0.83, 0.84), streak);
+	albedo = mix(albedo, fall_col, fall * (1.0 - foam * 0.5));
+	alpha = mix(alpha, mix(0.1, 0.94, streak), fall);
 	body = mix(body, alpha, fall);
+	rough = mix(rough, 0.45, fall * streak);
+	// ragged edges instead of two parallel lines down the mountain
+	float rag = texture(foam_tex, vec2(UV.y * 0.05, 0.3)).b;
+	float fall_edge = smoothstep(1.0, 0.35 + 0.4 * rag, abs(UV.x));
 
 	// ---- soft edges: banks, ends, very shallow water
-	float edge = smoothstep(1.0, 0.82, edge_u) * smoothstep(0.0, 0.08, depth + fall) * v_col.b;
+	float edge = mix(smoothstep(1.0, 0.82, edge_u), fall_edge, fall) * smoothstep(0.0, 0.08, depth + fall) * v_col.b;
 	alpha *= edge;
 	body *= edge;
 	spec *= edge;

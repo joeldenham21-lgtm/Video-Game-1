@@ -33,8 +33,8 @@ float linear_depth(vec2 uv, mat4 inv_proj) {
 }
 
 // March the reflected ray in view space against the depth buffer. rgb + a = confidence.
-vec4 ssr(vec3 vpos, vec3 vref, mat4 proj, mat4 inv_proj) {
-	float t = 1.5;
+vec4 ssr(vec3 vpos, vec3 vref, mat4 proj, mat4 inv_proj, float jitter) {
+	float t = 1.5 * (0.6 + 0.8 * jitter);   // per-pixel jitter: step banding becomes fine noise (TAA/FSR2 resolve it)
 	float prev_t = 0.0;
 	for (int k = 0; k < ssr_steps; k++) {
 		vec3 p = vpos + vref * t;
@@ -66,7 +66,7 @@ vec4 ssr(vec3 vpos, vec3 vref, mat4 proj, mat4 inv_proj) {
 			vec3 ph = vpos + vref * b;
 			vec4 ch = proj * vec4(ph, 1.0);
 			vec2 uh = ch.xy / ch.w * 0.5 + 0.5;
-			vec2 edge = smoothstep(vec2(0.0), vec2(0.08), uh) * smoothstep(vec2(1.0), vec2(0.92), uh);
+			vec2 edge = smoothstep(vec2(0.0), vec2(0.18), uh) * smoothstep(vec2(1.0), vec2(0.82), uh);
 			return vec4(textureLod(screen_tex, uh, 0.0).rgb, edge.x * edge.y);
 		}
 		prev_t = t;
@@ -95,7 +95,10 @@ void fragment() {
 	// metres of water depth the rim ice reaches: a few cm in the valley, decimetres at the tarns / in shade
 	float ice_reach = cold * cold * (0.06 + 0.3 * shade + 0.35 * v_cold) * (0.6 + 0.8 * fz.b);
 	float ice = smoothstep(ice_reach, ice_reach * 0.6, depth) * step(0.02, cold);
-	float frost = smoothstep(ice_reach * 0.35, ice_reach * 0.05, depth);    // white rime at the very edge
+	// white rime only in the last centimetres at the waterline (a hand's width on a gentle shore)
+	float frost = smoothstep(min(0.02, ice_reach * 0.5), 0.0, depth) * step(0.02, cold);
+	// far away the thin ice reads like the water it floats on (no grey band along distant shores)
+	float ice_far = 1.0 - smoothstep(60.0, 220.0, dist);
 
 	// ---- surface normal: wind ripples, flattened under ice and in sheltered shallows
 	float calm = clamp(ice * 1.2, 0.0, 1.0) * 0.97;
@@ -129,7 +132,7 @@ void fragment() {
 #ifdef WATER_SSR
 	if (above) {
 		vec3 vref = normalize((VIEW_MATRIX * vec4(R, 0.0)).xyz);
-		vec4 s = ssr(VERTEX, vref, PROJECTION_MATRIX, INV_PROJECTION_MATRIX);
+		vec4 s = ssr(VERTEX, vref, PROJECTION_MATRIX, INV_PROJECTION_MATRIX, w_hash(FRAGCOORD.xy + fract(TIME) * 61.0));
 		occl_col = mix(occl_col, s.rgb, s.a);
 		occl = max(occl, s.a);
 	}
@@ -160,10 +163,11 @@ void fragment() {
 	vec3 ice_col = mix(vec3(0.04, 0.06, 0.065), vec3(0.58, 0.62, 0.64), frost * (0.5 + 0.5 * fz.r));
 	float crack = smoothstep(0.55, 0.9, texture(foam_tex, v_world.xz / 1.7).r) * (1.0 - frost);
 	ice_col = mix(ice_col, vec3(0.3, 0.33, 0.34), crack * 0.6);
-	float ice_alpha = mix(0.3, 0.9, frost);   // black ice is clear: mostly reflection + a grey film
-	albedo = mix(albedo, ice_col, ice);
-	body = mix(body, ice_alpha, ice);
-	alpha = mix(alpha, ice_alpha, ice);
+	float ice_alpha = mix(0.22, 0.85, frost);   // black ice is clear: mostly reflection + a grey film
+	float ice_v = ice * mix(0.25, 1.0, ice_far);
+	albedo = mix(albedo, ice_col, ice_v);
+	body = mix(body, ice_alpha, ice_v);
+	alpha = mix(alpha, ice_alpha, ice_v);
 	rough = mix(rough, mix(0.07, 0.45, frost), ice);
 	spec = mix(spec, WATER_SPEC * 1.05 * sqrt(k_sky), ice);
 	emis *= 1.0 - ice * 0.6;
