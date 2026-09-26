@@ -32,6 +32,7 @@ const BUILD: Array[StringName] = [&"campfire", &"stone_fire_pit", &"lean_to", &"
 const POSE_OVERRIDES := {
 	&"canned_beans": {"view": "upright", "yaw": 20.0, "elev": 16.0},
 	&"lean_to": {"view": "upright", "yaw": 30.0, "elev": 18.0},
+	&"o2_mask": {"view": "flat", "yaw": 150.0, "elev": 42.0},
 }
 
 static var _cache: Dictionary = {}
