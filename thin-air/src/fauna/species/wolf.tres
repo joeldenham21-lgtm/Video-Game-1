@@ -1,0 +1,57 @@
+[gd_resource type="Resource" script_class="SpeciesDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/fauna/species_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"wolf"
+display_name = "Grey wolf"
+model_path = "res://assets/models/fauna/wolf.glb"
+coat_path = "res://assets/textures/fauna/wolf_albedo.png"
+ai_script = "res://src/fauna/wolf.gd"
+scale_range = Vector2(0.92, 1.06)
+mass = 42.0
+health = 55.0
+body_radius = 0.19
+body_length = 1.05
+body_height = 0.58
+eye_height = 0.8
+fur_length = 0.034
+fur_sheen = 0.5
+eye_color = Color(0.5, 0.34, 0.07, 1)
+walk_speed = 1.15
+trot_speed = 2.6
+run_speed = 8.5
+accel = 7.0
+turn_rate = 240.0
+max_slope = 40.0
+wade_depth = 0.5
+sight_range = 110.0
+fov_deg = 250.0
+hearing = 1.4
+smell_range = 260.0
+fire_fear = 1.2
+skittish = 0.4
+aggression = 0.8
+flee_distance = 60.0
+damage = 13.0
+damage_type = &"bite"
+attack_range = 1.5
+attack_cooldown = 1.4
+loot = {"meat_raw": 3, "hide_raw": 1, "bone": 2}
+harvest_hits = 6
+sfx_call = &"wolf_howl"
+sfx_alarm = &"wolf_bark"
+sfx_hurt = &"wolf_yelp"
+sfx_attack = &"wolf_attack"
+sfx_threat = &"wolf_growl"
+sfx_death = &"wolf_yelp"
+biomes = PackedStringArray("valley", "forest", "subalpine")
+min_alt = 1300.0
+max_alt = 2450.0
+group_min = 2
+group_max = 4
+night_weight = 1.6
+day_weight = 0.2
+spawn_weight = 1.0
+slope_pref = Vector2(0, 30)
