@@ -86,6 +86,11 @@ _subresources={
 "use_external/fallback_path": "res://assets/models/poi/materials/rock.tres",
 "use_external/path": "res://assets/models/poi/materials/rock.tres"
 },
+"rock_cliff": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/rock_cliff.tres",
+"use_external/path": "res://assets/models/poi/materials/rock_cliff.tres"
+},
 "rock_t": {
 "use_external/enabled": true,
 "use_external/fallback_path": "res://assets/models/poi/materials/rock_t.tres",

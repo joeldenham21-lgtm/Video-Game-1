@@ -196,6 +196,12 @@ def build_exterior():
         c = Vector((PX + 0.2 + P.rnd(-0.4, 0.3), PY + math.cos(a) * 2.9, pz + 1.3 + math.sin(a) * 2.4 + 1.2))
         s.add(P.blob((0, 0, 0), (P.rnd(0.8, 1.4), P.rnd(0.9, 1.5), P.rnd(0.7, 1.2)), "rock", 9, 0.35, k * 1.3, rings=5),
               T(c) @ RZ(P.rnd(0, 360)), "main")
+    # the terrain has a cut-out disc (layout "holes": ashford_adit, r 2.2 at x -39) through the whole slope: restore
+    # the hillside surface inside the disc above the portal (rock), leaving only the mouth open
+    hx, hy, hr = -39.0, 6.0, 2.6
+    cap = P.heightpatch(hr * 2, hr * 2, 0.25, lambda u, v: G.h(hx + u, hy + v) + 0.03, "rock_cliff", smooth_=True)
+    P.remove_faces(cap, lambda c, i: (c.x ** 2 + c.y ** 2) > hr * hr or (c.z < pz + 2.95 and abs(c.y) < 1.45))
+    s.add(cap, T(hx, hy, 0), "main")
     # ice at the portal mouth: icicles from the lagging, floor glaze
     for k in range(16):
         x = PX + 1.4 - P.rnd(0, 2.5)

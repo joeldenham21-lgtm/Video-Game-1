@@ -1,23 +1,23 @@
 {
  "ashford_mine": {
   "cols": 32,
-  "glb_kb": 1166,
+  "glb_kb": 1189,
   "id": "ashford_mine",
   "lights": 0,
   "markers": 11,
-  "secs": 2.0,
+  "secs": 3.1,
   "surfaces": {
    "detail": 6,
    "ground": 2,
    "interior": 4,
-   "main": 13
+   "main": 14
   },
-  "total": 13252,
+  "total": 13870,
   "tris": {
    "detail": 3824,
    "ground": 652,
    "interior": 1168,
-   "main": 7608
+   "main": 8226
   }
  },
  "ashford_mine_interior": {
@@ -26,7 +26,7 @@
   "id": "ashford_mine_interior",
   "lights": 2,
   "markers": 17,
-  "secs": 1.9,
+  "secs": 2.1,
   "surfaces": {
    "detail": 2,
    "main": 16
@@ -43,7 +43,7 @@
   "id": "ashford_tunnel_kit",
   "lights": 0,
   "markers": 1,
-  "secs": 0.5,
+  "secs": 0.6,
   "surfaces": {
    "kit_bend": 3,
    "kit_dead_end": 1,
@@ -91,7 +91,7 @@
   "id": "fire_lookout",
   "lights": 1,
   "markers": 8,
-  "secs": 4.1,
+  "secs": 2.5,
   "surfaces": {
    "detail": 1,
    "interior": 10,
@@ -127,7 +127,7 @@
   "id": "ice_cave",
   "lights": 2,
   "markers": 6,
-  "secs": 0.7,
+  "secs": 0.8,
   "surfaces": {
    "detail": 3,
    "main": 8
@@ -140,19 +140,19 @@
  },
  "ice_cave_entrance": {
   "cols": 29,
-  "glb_kb": 349,
+  "glb_kb": 412,
   "id": "ice_cave_entrance",
   "lights": 0,
   "markers": 4,
-  "secs": 0.6,
+  "secs": 0.7,
   "surfaces": {
    "detail": 2,
    "main": 4
   },
-  "total": 4444,
+  "total": 5318,
   "tris": {
    "detail": 48,
-   "main": 4396
+   "main": 5270
   }
  },
  "kestrel_station": {
@@ -239,7 +239,7 @@
   "id": "trapper_cabin",
   "lights": 0,
   "markers": 8,
-  "secs": 1.5,
+  "secs": 1.7,
   "surfaces": {
    "detail": 4,
    "interior": 5,

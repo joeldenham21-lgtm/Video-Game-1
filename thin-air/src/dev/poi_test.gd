@@ -56,11 +56,12 @@ const SHOTS := {
 		"hero": [Vector3(6.0, 1.7, 8.0), Vector2(37.0, -6.0), 16.4, 60.0, false],
 	},
 	&"fire_lookout": {
-		"hero": [Vector3(-12.0, 1.7, -4.0), Vector2(-108.0, 16.0), 16.6, 62.0, false],
+		"hero": [Vector3(-17.0, 1.7, 7.0), Vector2(-69.0, 14.0), 16.2, 60.0, false],
+		"base": [Vector3(-12.0, 1.7, -4.0), Vector2(-108.0, 16.0), 16.6, 62.0, false],
 		"cab": [Vector3(1.5, 13.7, 1.5), Vector2(45.0, -16.0), 16.6, 78.0, false],
 	},
 	&"trapper_cabin": {
-		"hero": [Vector3(4.0, 1.7, 5.0), Vector2(39.0, -6.0), 16.2, 60.0, false],
+		"hero": [Vector3(5.5, 1.7, 4.0), Vector2(55.0, -4.0), 14.6, 58.0, false],
 	},
 	&"ice_cave": {
 		"passage": [Vector3(0.0, 1.6, -2.0), Vector2(0.0, 0.0), 13.0, 75.0, false],

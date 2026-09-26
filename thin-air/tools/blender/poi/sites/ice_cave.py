@@ -195,6 +195,19 @@ def build_entrance():
     path = [Vector((0, -3.8, z0)), Vector((0, 0.0, z0 + 0.1)), Vector((0.3, 6.0, z0 + 0.3))]
     me, dense, wd, hd = ice_passage(path, [4.4, 3.8, 3.4], [3.6, 3.2, 3.0], 12.0, 0.5)
     s.add(me, None, "main")
+    # the arch's outside: the same vault pushed out 0.45 m and turned outward (the passage faces point inwards)
+    shell = P.Mesh().extend(me)
+    P.remove_faces(shell, lambda c, i: shell.m[i] != "ice_cave")
+    axis = [d + Vector((0, 0, 0)) for d in dense]
+    def push(p):
+        k = min(range(len(axis)), key=lambda j: (Vector((axis[j].x, axis[j].y, 0)) - Vector((p.x, p.y, 0))).length)
+        a = axis[k]
+        v = Vector((p.x - a.x, p.y - a.y, max(0.0, p.z - a.z)))
+        return v.normalized() * 0.45 if v.length > 1e-4 else Vector((0, 0, 0.45))
+    shell.displace(push)
+    P.flip(shell)
+    shell.set_tint((0.75, 0.75, 0.75))
+    s.add(shell, None, "main")
     # glacier front around the mouth: big scalloped ice slabs rising into the slope
     for k in range(9):
         a = math.radians(-80 + k * 20)

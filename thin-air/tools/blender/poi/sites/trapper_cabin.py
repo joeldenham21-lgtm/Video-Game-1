@@ -52,7 +52,7 @@ def build():
             t0 = i / 7
             y = sy * (Y1 + 0.4) * (1 - t0)
             z = PL - 0.2 + (rise + 0.2) * t0
-            bd = box(X1 - X0 + 0.7, 0.26, 0.03, "wood_planks", 'x', seg=0.5, tint=(0.6, 0.58, 0.55))
+            bd = box(X1 - X0 + 0.7, 0.37, 0.03, "wood_planks", 'x', seg=0.5, tint=(0.6, 0.58, 0.55))
             bd.displace(lambda p, i=i: Vector((0, 0, -0.35 * math.sin(math.pi * (p.x - X0 + 0.35) / (X1 - X0 + 0.7)) * (1 - i / 9))))
             if sy > 0 and 1 <= i <= 4:
                 P.remove_faces(bd, lambda c, _i, i=i: abs(c.x) < 0.9 - 0.15 * i)
