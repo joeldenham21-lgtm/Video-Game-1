@@ -56,11 +56,6 @@ _subresources={
 "use_external/fallback_path": "res://assets/models/poi/materials/decal.tres",
 "use_external/path": "res://assets/models/poi/materials/decal.tres"
 },
-"gravel": {
-"use_external/enabled": true,
-"use_external/fallback_path": "res://assets/models/poi/materials/gravel.tres",
-"use_external/path": "res://assets/models/poi/materials/gravel.tres"
-},
 "ice_floor": {
 "use_external/enabled": true,
 "use_external/fallback_path": "res://assets/models/poi/materials/ice_floor.tres",
@@ -100,6 +95,16 @@ _subresources={
 "use_external/enabled": true,
 "use_external/fallback_path": "res://assets/models/poi/materials/rope.tres",
 "use_external/path": "res://assets/models/poi/materials/rope.tres"
+},
+"tailings": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/tailings.tres",
+"use_external/path": "res://assets/models/poi/materials/tailings.tres"
+},
+"waste_rock": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/waste_rock.tres",
+"use_external/path": "res://assets/models/poi/materials/waste_rock.tres"
 },
 "wood_endgrain": {
 "use_external/enabled": true,

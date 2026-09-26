@@ -215,6 +215,7 @@ def build():
     s.bucket("interior", vis_end=45.0)
     s.bucket("ground", vis_end=400.0, shadow=False)
     s.meta["lights_on"] = False
+    G = P.Ground("kestrel_station")
 
     # ---------------------------------------------------------------- modules
     win = lambda u0: (u0, u0 + 0.7, 1.0, 1.6, "window")
@@ -236,6 +237,12 @@ def build():
         "W": [win(1.3), (midw[0], midw[1], 0.0, 2.05, "door"), win(7.6)],
         "E": [win(2.0), win(5.0), win(8.2)],
         "N": [door(1.65)], "S": [win(1.75)]})
+    # heater flues through each roof (stainless, rain cap), lamp fixtures over the doors
+    for key in MODS:
+        fx = MODS[key] + 1.1
+        s.add(cyl(0.07, 1.4, "metal_bare", 10), T(fx, -2.5, F + WH), "main")
+        s.add(lathe([(0.0, 0.0), (0.16, 0.0), (0.0, 0.1)], "metal_bare", 10), T(fx, -2.5, F + WH + 1.45), "main")
+        s.add(box(0.3, 0.2, 0.25, "metal_bare"), T(MODS[key] - 1.9, 3.8, F + WH - 0.4), "detail")
     walkway(s, MODS["A"] + MW / 2, MODS["B"] - MW / 2)
     walkway(s, MODS["B"] + MW / 2, MODS["C"] - MW / 2)
     # exterior doors (insulated, closed) + stairs
@@ -246,6 +253,8 @@ def build():
         leaf = AR.door_leaf(0.9, 2.05, 0.07, "paint_metal", (0.85, 0.85, 0.82), window_=True)
         s.add(leaf, T(dx, y + sy * 0.0, F) @ RZ(yaw), "main")
         ext_stair(s, (dx, y + sy * 0.05, F), yaw, F, landing=(1.5, 1.4))
+        s.add(box(0.22, 0.14, 0.12, "paint_metal", tint=(0.2, 0.2, 0.2)), T(dx, y + sy * 0.15, F + 2.35), "detail")
+        s.add(box(0.18, 0.02, 0.08, "lamp", flags=P.F_NOAO), T(dx, y + sy * 0.22, F + 2.3), "detail")
     s.add(PR.decal("sign_kestrel", 2.4, 0.6).transformed(T(0, -ML / 2 - WT / 2 - 0.012, F + WH + 0.1) @ RZ(0)), None, "main")
     for key, dname in (("A", "plate_lab"), ("B", "plate_main"), ("C", "plate_bunk")):
         cx = MODS[key]
@@ -548,6 +557,7 @@ def build():
     # ---------------------------------------------------------------- route wands, crates, drifts
     for k in range(9):
         p = Vector((-6.0 - k * 4.5, 14.0 + k * 3.2, 0))
+        p.z = G.h(p.x, p.y) - 0.2
         s.add(rod(p, p + Vector((0.05, 0.02, 1.9)), 0.012, "wood_log", 5), None, "detail")
         fl = P.quad(p + Vector((0.05, 0.02, 1.9)), p + Vector((0.4, 0.1, 1.85)), p + Vector((0.4, 0.1, 1.62)),
                     p + Vector((0.05, 0.02, 1.66)), "nylon_paint_2s", tint=(0.9, 0.3, 0.04), two_sided=False)

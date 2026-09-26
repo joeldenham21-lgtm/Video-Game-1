@@ -3,6 +3,7 @@
 [ext_resource type="PackedScene" path="res://assets/models/poi/ashford_mine_interior.glb" id="1"]
 [ext_resource type="Script" path="res://scenes/poi/poi_site.gd" id="2"]
 [ext_resource type="Script" path="res://scenes/poi/poi_shelter.gd" id="3"]
+[ext_resource type="Script" path="res://scenes/poi/poi_door.gd" id="4"]
 
 [sub_resource type="BoxShape3D" id="Box_0"]
 size = Vector3(1.5, 1, 1)
@@ -123,6 +124,9 @@ size = Vector3(0.2, 2.2, 2.2)
 
 [sub_resource type="BoxShape3D" id="Box_39"]
 size = Vector3(110, 6, 44)
+
+[sub_resource type="BoxShape3D" id="Box_40"]
+size = Vector3(1.8, 2.1, 0.3)
 
 [node name="ashford_mine_interior" instance=ExtResource("1")]
 script = ExtResource("2")
@@ -531,3 +535,15 @@ shelter_factor = 1
 [node name="Shape" type="CollisionShape3D" parent="Shelter_Mine"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
 shape = SubResource("Box_39")
+
+[node name="Door_Exit" type="StaticBody3D" parent="." groups=["interactable"]]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 0.45, 1.1, 0)
+collision_layer = 16
+collision_mask = 0
+script = ExtResource("4")
+target_site = &"ashford_mine"
+target_socket = &"Arrive_FromMine"
+prompt = "Leave the mine"
+
+[node name="Shape" type="CollisionShape3D" parent="Door_Exit"]
+shape = SubResource("Box_40")

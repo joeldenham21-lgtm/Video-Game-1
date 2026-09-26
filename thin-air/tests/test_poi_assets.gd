@@ -57,6 +57,7 @@ func run() -> void:
 		_check_sockets(site, id, logs)
 		_check_meshes(site, id)
 		_check_lights(site, id)
+		_check_doors(site, id)
 		# lights switch without errors (emissive materials duplicated per site)
 		add_child(site)
 		site.set_interior_lights(true)
@@ -79,7 +80,8 @@ func run() -> void:
 
 
 func _check_collision(site: Node3D, id: StringName) -> void:
-	var bodies := site.find_children("*", "StaticBody3D", true, false)
+	var col := site.get_node_or_null(^"Collision")
+	var bodies: Array[Node] = col.find_children("*", "StaticBody3D", true, false) if col else []
 	var shapes := 0
 	var ok_surface := true
 	var ok_layer := true
@@ -152,3 +154,19 @@ func _check_lights(site: Node3D, id: StringName) -> void:
 				n += 1
 		worst = maxi(worst, n)
 	check(worst <= 4, "%s <= 4 real-time lights per interior (worst cluster %d)" % [id, worst])
+
+
+## Transition doors point at a real socket of a real location scene, on the interact layer.
+func _check_doors(site: Node3D, id: StringName) -> void:
+	for d in site.find_children("*", "StaticBody3D", true, false):
+		if not (d is PoiDoor):
+			continue
+		var door := d as PoiDoor
+		var ps := load("res://scenes/poi/%s.tscn" % door.target_site) as PackedScene
+		var ok := false
+		if ps:
+			var t := ps.instantiate()
+			ok = t.get_node_or_null(NodePath("Sockets/" + String(door.target_socket))) != null
+			t.free()
+		check(ok and door.collision_layer == 16 and door.is_in_group(&"interactable"),
+			"%s door %s -> %s/%s" % [id, door.name, door.target_site, door.target_socket])

@@ -219,7 +219,7 @@ def build_exterior():
             zz = g + (v / 1.0) * (hh if v > 0 else 0.3) + 0.08 * P.nz((x, u, 3), 1.2)
             rr.append(Vector((x, yy, zz)))
         rings.append(rr)
-    dump = P.loft(rings, "gravel", closed=False, smooth_=True, tint=(0.9, 0.78, 0.66))
+    dump = P.loft(rings, "waste_rock", closed=False, smooth_=True)
     if P.face_normal(dump, len(dump.f) // 2).z < 0:
         P.flip(dump)
     s.add(dump, None, "ground")
@@ -259,6 +259,11 @@ def build_exterior():
     for k in range(10):
         s.add(P.blob((0, 0, 0), (0.3, 0.25, 0.2), "rock", 7, 0.3, k * 3.1, rings=4),
               T(BX + 4.8 + P.rnd(-1, 1.5), CY + P.rnd(-1.4, 1.4), G.h(BX + 4.8, CY)), "detail")
+    # iron-stained tailings fan below the chute, a heap of spilt ore
+    tf = P.heightpatch(7.0, 5.0, 0.4, lambda u, v: 0.35 * max(0.0, 1 - (u / 3.5) ** 2 - (v / 2.5) ** 2) + 0.04 * P.nz((u, v, 0), 1.4),
+                       "tailings", smooth_=True)
+    s.add(tf, T(BX + 4.5, CY, G.h(BX + 4.5, CY)), "ground")
+    s.add(P.blob((0, 0, 0), (1.2, 1.0, 0.6), "waste_rock", 10, 0.3, 7.0, rings=5), T(BX + 3.6, CY, G.h(BX + 3.6, CY)), "main")
 
     # ---- headframe over the shaft (2-post with backlegs), shaft collar cribbing, sheave
     HX, HY = 4.0, -12.0
@@ -404,6 +409,7 @@ def build_exterior():
     s.marker("Arrive_Default", (26.0, -18.0, G.h(26.0, -18.0)), 90)
     s.marker("Arrive_FromMine", (PX + 3.0, PY, pz), -90)
     s.marker("Use_Door_Mine", (DX + 0.25, PY, pz + 1.1), 90)
+    s.door("Door_Mine", (DX + 0.2, PY, pz + 1.1), 90, (1.8, 0.3, 2.1), "ashford_mine_interior", "Arrive_FromPortal", "Enter the adit")
     s.marker("Log_miner_diary_1", (BHX + 2.9 * math.cos(math.radians(8)) - 1.3 * math.sin(math.radians(8)),
                                    BHY + 2.9 * math.sin(math.radians(8)) + 1.3 * math.cos(math.radians(8)), bz + 0.1), 0)
     s.marker("Loot_Bunkhouse", (BHX - 3.0, BHY + 1.5, bz + 0.5), 0)
@@ -670,6 +676,7 @@ def build_interior():
     # sockets
     s.marker("Arrive_FromPortal", (-1.2, 0.0, 0.05), 90)
     s.marker("Use_Door_Exit", (0.35, 0.0, 1.1), -90)
+    s.door("Door_Exit", (0.45, 0.0, 1.1), -90, (1.8, 0.3, 2.1), "ashford_mine", "Arrive_FromMine", "Leave the mine")
     s.marker("Log_burke_01", (-30.8, -2.5, 1.4), 0)
     s.marker("Log_miner_diary_2", (pa.x, pa.y - 0.2, 1.2), 0)
     s.marker("Log_miner_diary_3", (end2.x + 2.2, end2.y, 0.1), 90)

@@ -92,6 +92,8 @@ MATS = {
     "rime": two(lib("snow_packed", snow_accept=0.0, tint=(0.93, 0.96, 1.0), rough_mul=0.9)),
     "rock": lib("rock_boulder"),
     "gravel": ter("gravel"),
+    "waste_rock": ter("scree", tint=(1.25, 1.1, 0.95), snow_accept=0.45),      # mine dump: wind-scoured, warm
+    "tailings": ter("dirt", tint=(1.9, 1.15, 0.6), snow_accept=0.3),           # iron-stained fines below the bin
     "dirt": ter("dirt"),
     "rock_t": ter("rock"),
     "scree": ter("scree"),
@@ -100,7 +102,7 @@ MATS = {
     "forest_t": ter("forest"),
     # special
     "glass": dict(kind="glass"),
-    "glass_lit": dict(kind="glass", glow=2.6),
+    "glass_lit": dict(kind="glass", glow=2.6, frost=0.3),
     "lamp": dict(kind="surface", albedo=None, color=(0.9, 0.88, 0.8), emission=(1.0, 0.78, 0.5), emission_energy=5.0,
                  lit_param=True, snow_accept=0.0),
     "screen": dict(kind="surface", albedo=None, color=(0.02, 0.025, 0.03), rough=0.12,
@@ -178,6 +180,8 @@ def write_material(name):
         params.append(("grime_tex", res("res://assets/textures/glass_grime/glass_grime_albedo.png")))
         if spec.get("glow"):
             params.append(("glow_energy", _f(spec["glow"])))
+        if spec.get("frost"):
+            params.append(("frost", _f(spec["frost"])))
     elif kind == "ice":
         sh = res(RES_SH % "poi_ice", "Shader")
         params.append(("noise_tex", res(NOISE)))
@@ -399,6 +403,18 @@ def write_scene(site, glb_res, mats_by_bucket):
                    [("transform", "Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, %s)" % _vec(p)), ("script", hs),
                     ("heat_radius", _f(H["radius"])), ("heat_celsius", _f(H["celsius"])),
                     ("active", "true" if H["active"] else "false")])
+    if site.doors:
+        ds = t.ext_res("Script", "res://scenes/poi/poi_door.gd")
+        for D in site.doors:
+            props = [("transform", gd_transform(D["M"])), ("collision_layer", "16"), ("collision_mask", "0"), ("script", ds),
+                     ("target_site", '&"%s"' % D["site"]), ("target_socket", '&"%s"' % D["socket"]),
+                     ("prompt", '"%s"' % D["prompt"])]
+            if D["flag"]:
+                props.append(("locked_flag", '&"%s"' % D["flag"]))
+            t.node('[node name="%s" type="StaticBody3D" parent="." groups=["interactable"]]' % D["name"], props)
+            sz = D["size"]
+            t.node('[node name="Shape" type="CollisionShape3D" parent="%s"]' % D["name"],
+                   [("shape", t.box_shape((sz[0], sz[2], sz[1])))])
     for header, props in site.extra:
         t.node(header, props)
     os.makedirs(OUT_SCENES, exist_ok=True)

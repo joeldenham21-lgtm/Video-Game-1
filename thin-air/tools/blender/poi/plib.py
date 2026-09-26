@@ -661,6 +661,7 @@ class Site:
         self.probes = []
         self.shelters = []
         self.heat = []
+        self.doors = []
         self.extra = []
         self.ground = ground
         self.interior = interior
@@ -721,6 +722,11 @@ class Site:
 
     def shelter(self, name, center, size, factor=1.0, yaw=0.0):
         self.shelters.append(dict(name=name, M=T(center) @ RZ(yaw), size=Vector(size), factor=factor))
+
+    def door(self, name, loc, yaw, size, target_site, target_socket, prompt="Enter", locked_flag=""):
+        """Interactable transition (scenes/poi/poi_door.gd) on layer 5 at loc; box size (w, d, h) in the door's frame."""
+        self.doors.append(dict(name=name, M=T(loc) @ RZ(yaw), size=Vector(size), site=target_site, socket=target_socket,
+                               prompt=prompt, flag=locked_flag))
 
     def heat_source(self, name, loc, radius=4.0, celsius=18.0, active=False):
         self.heat.append(dict(name=name, loc=Vector(loc), radius=radius, celsius=celsius, active=active))

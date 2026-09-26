@@ -3,6 +3,7 @@
 [ext_resource type="PackedScene" path="res://assets/models/poi/ice_cave.glb" id="1"]
 [ext_resource type="Script" path="res://scenes/poi/poi_site.gd" id="2"]
 [ext_resource type="Script" path="res://scenes/poi/poi_shelter.gd" id="3"]
+[ext_resource type="Script" path="res://scenes/poi/poi_door.gd" id="4"]
 
 [sub_resource type="BoxShape3D" id="Box_0"]
 size = Vector3(0.6, 3.6, 0.6)
@@ -156,6 +157,9 @@ size = Vector3(3.8, 3.4, 0.3)
 
 [sub_resource type="BoxShape3D" id="Box_50"]
 size = Vector3(14, 6, 54)
+
+[sub_resource type="BoxShape3D" id="Box_51"]
+size = Vector3(3, 2.6, 0.4)
 
 [node name="ice_cave" instance=ExtResource("1")]
 script = ExtResource("2")
@@ -639,3 +643,15 @@ shelter_factor = 0.9
 [node name="Shape" type="CollisionShape3D" parent="Shelter_Cave"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
 shape = SubResource("Box_50")
+
+[node name="Door_Exit" type="StaticBody3D" parent="." groups=["interactable"]]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 1.2, 0.3)
+collision_layer = 16
+collision_mask = 0
+script = ExtResource("4")
+target_site = &"ice_cave_entrance"
+target_socket = &"Arrive_FromIceCave"
+prompt = "Leave the cave"
+
+[node name="Shape" type="CollisionShape3D" parent="Door_Exit"]
+shape = SubResource("Box_51")

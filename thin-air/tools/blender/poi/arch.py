@@ -172,15 +172,25 @@ def gable_roof(L, W, pitch_deg, over=0.4, t=0.12, mat="metal_corrugated", fascia
     return me, rise
 
 
-def log_course(L, r, mat="wood_log", ext=0.25, seed_=0, taper=0.0):
-    """One horizontal log along +X from -ext to L + ext, axis at z = 0 (UV U around, V along)."""
+def log_course(L, r, mat="wood_log", ext=0.25, seed_=0, taper=0.0, tint=(1, 1, 1)):
+    """One horizontal log along +X from -ext to L + ext, axis at z = 0 (UV U around, V along). Each log gets its
+    own radius, butt-to-top taper (alternating direction course to course), sweep and weathering tint."""
     P.seed(seed_)
-    me = cyl(r, L + 2 * ext, mat, 10, r2=r * (1 - taper), cap_mat="wood_endgrain", a0=P.rnd(0, 36))
-    me.displace(lambda p: Vector((P.nz(p, 1.3, seed_) * 0.01, P.nz(p, 1.1, seed_ + 3) * 0.01, 0)))
+    r = r * P.rnd(0.9, 1.08)
+    tp = taper if taper else P.rnd(0.06, 0.14)
+    flipd = P.rnd() < 0.5
+    k = P.rnd(0.82, 1.0)
+    t_ = (tint[0] * k, tint[1] * k * P.rnd(0.97, 1.02), tint[2] * k * P.rnd(0.95, 1.02))
+    me = cyl(r * (1 - tp / 2) if flipd else r, L + 2 * ext, mat, 10, r2=r if flipd else r * (1 - tp), cap_mat="wood_endgrain",
+             a0=P.rnd(0, 36), tint=t_, vseg=max(1, int((L + 2 * ext) / 1.2)), jitter=0.0)
+    sw = P.rnd(-0.03, 0.03)
+    Ln = L + 2 * ext
+    me.displace(lambda p: Vector((P.nz(p, 1.3, seed_) * 0.01 + sw * math.sin(math.pi * p.z / Ln),
+                                  P.nz(p, 1.1, seed_ + 3) * 0.01, 0)))
     return me.transformed(T(-ext, 0, 0) @ RY(90))
 
 
-def log_wall(L, H, r=0.14, openings=(), seed_=0, ext=0.25, mat="wood_log", chink=True, z_start=None):
+def log_wall(L, H, r=0.14, openings=(), seed_=0, ext=0.25, mat="wood_log", chink=True, z_start=None, tint=(0.8, 0.74, 0.66)):
     """Stacked logs along +X (0..L), courses every ~1.75 r from z = r. Logs are split around openings
     (x0, x1, z0, z1). Returns (mesh, cols)."""
     me = P.Mesh()
@@ -206,7 +216,7 @@ def log_wall(L, H, r=0.14, openings=(), seed_=0, ext=0.25, mat="wood_log", chink
             if ln < 0.15:
                 continue
             # logs run past the corners (ea / eb) where they notch over the crossing wall
-            lg = log_course(ln + ea + eb, r, mat, 0.0, seed_ * 97 + k * 3 + int(a * 10))
+            lg = log_course(ln + ea + eb, r, mat, 0.0, seed_ * 97 + k * 3 + int(a * 10), tint=tint)
             me.extend(lg.transformed(T(a - ea, 0, z)))
         if chink:
             for a, b, ea, eb in segs:

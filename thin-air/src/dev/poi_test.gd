@@ -23,7 +23,8 @@ const SHOTS := {
 		"aerial": [Vector3(-20.0, 16.0, 18.0), Vector2(-45.0, -32.0), 15.5, 55.0, false],
 	},
 	&"kestrel_station": {
-		"hero": [Vector3(-24.0, 2.2, 27.0), Vector2(-38.0, -2.0), 17.1, 60.0, false],
+		"hero": [Vector3(14.0, 2.0, 30.0), Vector2(25.0, -1.0), 16.9, 58.0, false],
+		"pad": [Vector3(-24.0, 2.2, 27.0), Vector2(-38.0, -2.0), 17.1, 60.0, false],
 		"night": [Vector3(-14.0, 2.0, 20.0), Vector2(-30.0, 0.0), 21.5, 60.0, true],
 		"galley": [Vector3(0.6, 3.45, 3.9), Vector2(8.0, -10.0), 13.0, 78.0, true],
 		"comms": [Vector3(-1.2, 3.45, -1.5), Vector2(-25.0, -12.0), 13.0, 78.0, true],
@@ -38,7 +39,8 @@ const SHOTS := {
 		"lake": [Vector3(-3.0, 1.7, 38.0), Vector2(-4.5, 1.0), 16.8, 55.0, false],
 	},
 	&"ashford_mine": {
-		"hero": [Vector3(22.0, 1.8, 2.0), Vector2(84.0, 4.0), 15.8, 62.0, false],
+		"hero": [Vector3(-18.0, 1.8, 6.0), Vector2(57.0, 5.0), 15.4, 62.0, false],
+		"camp": [Vector3(22.0, 1.8, 2.0), Vector2(84.0, 4.0), 15.8, 62.0, false],
 		"portal": [Vector3(-28.0, 1.7, -3.0), Vector2(71.0, 4.0), 15.0, 62.0, false],
 		"bunkhouse": [Vector3(-4.0, 1.8, 22.0), Vector2(45.0, -8.0), 15.5, 62.0, false],
 	},

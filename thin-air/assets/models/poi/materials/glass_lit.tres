@@ -9,3 +9,4 @@ render_priority = 0
 shader = ExtResource("1")
 shader_parameter/grime_tex = ExtResource("2")
 shader_parameter/glow_energy = 2.6
+shader_parameter/frost = 0.3

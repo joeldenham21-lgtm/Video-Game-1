@@ -173,6 +173,7 @@ def build_interior():
     s.col_box("ice", Vector((0, -0.6, 1.6)), (3.8, 0.3, 3.4))
     s.marker("Arrive_FromEntrance", (0.0, 1.2, 0.05), 0)
     s.marker("Use_Door_Exit", (0.0, 0.2, 1.1), 180)
+    s.door("Door_Exit", (0.0, -0.3, 1.2), 180, (3.0, 0.4, 2.6), "ice_cave_entrance", "Arrive_FromIceCave", "Leave the cave")
     s.marker("Log_park_02", J + Vector((0.4, -0.9, 0.05)), 18)
     s.marker("Loot_Camp", J + Vector((-0.7, 0.8, 0.3)), 0)
     s.marker("Loot_Stove", J + Vector((0.8, 0.9, 0.2)), 0)
@@ -234,6 +235,7 @@ def build_entrance():
     s.marker("Arrive_Default", (0.5, -9.0, G.h(0.5, -9.0)), 0)
     s.marker("Arrive_FromIceCave", (0.0, -2.5, z0 + 0.05), 180)
     s.marker("Use_Door_IceCave", (0.2, 5.4, z0 + 1.2), 0)
+    s.door("Door_IceCave", (0.3, 5.9, z0 + 1.3), 0, (3.0, 0.4, 2.6), "ice_cave", "Arrive_FromEntrance", "Go deeper")
     s.marker("Log_park_03", (-1.2, -4.2, G.h(-1.2, -4.2) + 0.05), 20)
     s.shelter("Shelter_Mouth", Vector((0.1, 1.5, z0)), (3.4, 7.0, 3.0), 0.6)
     return s

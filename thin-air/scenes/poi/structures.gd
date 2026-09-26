@@ -30,6 +30,7 @@ static var only_ids: Array[StringName] = []
 
 
 func _ready() -> void:
+	add_to_group(&"poi_structures")
 	for id: StringName in SITES:
 		if not only_ids.is_empty() and not only_ids.has(id):
 			continue
@@ -52,6 +53,14 @@ func _ready() -> void:
 
 func get_site(id: StringName) -> Node3D:
 	return sites.get(id)
+
+
+## A socket (Marker3D) of a placed location, e.g. get_socket(&"ashford_mine_interior", &"Arrive_FromPortal").
+func get_socket(id: StringName, socket: StringName) -> Marker3D:
+	var s := sites.get(id) as Node3D
+	if s == null:
+		return null
+	return s.get_node_or_null(NodePath("Sockets/" + String(socket))) as Marker3D
 
 
 ## World transform of a location scene's root (its local origin = the POI anchor on the ground).
