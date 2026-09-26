@@ -182,7 +182,7 @@ func _river_volume(rv: Dictionary) -> WaterVolume:
 	var v := WaterVolume.new()
 	v.name = "River_" + String(rv.get("id", "river"))
 	v.setup_river(StringName(str(rv.get("id", ""))))
-	var step := 3
+	var step := 6                     # ~230 boxes for all rivers; the level inside comes from WaterQuery anyway
 	var i := 0
 	while i < pts.size() - 1:
 		var j := mini(i + step, pts.size() - 1)
