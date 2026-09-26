@@ -826,8 +826,9 @@ def gait_feet(spec, g, t, T, pose, stride_scale=1.0):
             s = (p - duty) / (1.0 - duty)
             fwd = E * (-0.5 + sstep(s))
             pbo_eff = phi0 + (pbo - phi0) * g.get("breakover", 1.0)
-            phi = keys([(0.0, pbo_eff), (0.35, L.get("phi_swing", 75.0)), (0.8, phi0 + 10.0), (1.0, phi0)], s)
-            theta = keys(th_sw, s)
+            phi = keys([(0.0, pbo_eff), (0.35, g.get("phi_swing", L.get("phi_swing", 75.0))), (0.8, phi0 + 10.0),
+                        (1.0, phi0)], s)
+            theta = L["theta0"] + (keys(th_sw, s) - L["theta0"]) * g.get("swing_scale", 1.0)
             lf = lift * math.sin(math.pi * s) ** 0.85
         pose.feet[leg] = dict(fwd=fwd + g.get("reach_f" if front else "reach_h", 0.0), lift=lf, theta=theta, phi=phi,
                               side=g.get("splay", 0.0))
@@ -1223,6 +1224,9 @@ def build_creature(spec):
     Ng = b_arr_to_g(nb.reshape(-1, 3))
     img, uv_m = bake_texture(me, Vg, Ng, Rg, spec["tex"], spec["pattern"], regions)
     save_png(img, os.path.join(TEX_DIR, name + "_albedo.png"))
+    for tex_name, pat in spec.get("extra_coats", {}).items():
+        img2, _ = bake_texture(me, Vg, Ng, Rg, spec["tex"], pat, regions)
+        save_png(img2, os.path.join(TEX_DIR, tex_name + "_albedo.png"))
     # armature + weights
     arm = build_armature(name, spec["skeleton"])
     for i, bn in enumerate(bone_names):

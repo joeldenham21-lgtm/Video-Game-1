@@ -31,6 +31,9 @@ func _ready() -> void:
 		var kv := String(a).trim_prefix("--").split("=", true, 1)
 		args[kv[0]] = kv[1] if kv.size() > 1 else "1"
 	perf_at = int(args.get("perf_at", "20"))
+	if args.has("res"):
+		var r := String(args["res"]).split("x")
+		get_window().size = Vector2i(int(r[0]), int(r[1]))
 	_mode = String(args.get("mode", "single"))
 	if args.has("preset"):
 		Settings.apply_preset(StringName(args["preset"]))

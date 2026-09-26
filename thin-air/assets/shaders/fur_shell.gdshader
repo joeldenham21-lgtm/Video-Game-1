@@ -14,9 +14,9 @@ uniform vec3 comb = vec3(0.0, -0.3, 0.95);
 uniform float comb_amount = 0.55;
 uniform float gravity = 0.3;
 uniform vec3 tint : source_color = vec3(1.0);
-uniform float root_dark = 0.42;
-uniform float tip_shift = 0.08;
-uniform float sheen = 0.55;
+uniform float root_dark = 0.5;
+uniform float tip_shift = 0.0;
+uniform float sheen = 0.2;
 uniform float wet_response = 1.0;
 global uniform vec3 wind_direction;
 global uniform float wind_strength;
@@ -53,5 +53,5 @@ void fragment() {
 	SPECULAR = 0.3;
 	RIM = sheen;
 	RIM_TINT = 0.8;
-	BACKLIGHT = col * 0.45;
+	BACKLIGHT = col * 0.15;
 }

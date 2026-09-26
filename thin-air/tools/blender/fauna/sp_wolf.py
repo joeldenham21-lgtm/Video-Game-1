@@ -40,14 +40,14 @@ EYE = (0.0385, 0.827, -0.635)
 
 def body():
     P = [
-        Prim("ell", "spine2", "body", k=0.0, c=(0, 0.585, -0.15), r=(0.104, 0.162, 0.235), rot=(-4, 0, 0)),
-        Prim("ell", "chest", "body", k=0.05, c=(0, 0.655, -0.27), r=(0.094, 0.118, 0.13)),
-        Prim("ell", "chest", "chest", k=0.04, c=(0, 0.528, -0.345), r=(0.068, 0.085, 0.07)),
-        Prim("ell", "spine1", "belly", k=0.06, c=(0, 0.628, 0.10), r=(0.088, 0.094, 0.19), rot=(9, 0, 0)),
+        Prim("ell", "spine2", "body", k=0.0, c=(0, 0.583, -0.15), r=(0.114, 0.174, 0.24), rot=(-4, 0, 0)),
+        Prim("ell", "chest", "body", k=0.05, c=(0, 0.655, -0.27), r=(0.102, 0.124, 0.13)),
+        Prim("ell", "chest", "chest", k=0.04, c=(0, 0.525, -0.345), r=(0.076, 0.09, 0.075)),
+        Prim("ell", "spine1", "belly", k=0.06, c=(0, 0.625, 0.10), r=(0.095, 0.1, 0.19), rot=(9, 0, 0)),
         Prim("ell", "pelvis", "body", k=0.05, c=(0, 0.685, 0.20), r=(0.08, 0.062, 0.13)),
         Prim("ell", "pelvis", "body", k=0.06, c=(0, 0.66, 0.345), r=(0.078, 0.08, 0.10)),
-        Prim("cone", "neck1", "neck", k=0.06, a=(0, 0.665, -0.30), b=(0, 0.79, -0.52), ra=0.105, rb=0.072),
-        Prim("ell", "neck2", "neck", k=0.05, c=(0, 0.705, -0.425), r=(0.086, 0.1, 0.1)),
+        Prim("cone", "neck1", "neck", k=0.06, a=(0, 0.665, -0.30), b=(0, 0.79, -0.52), ra=0.114, rb=0.08),
+        Prim("ell", "neck2", "neck", k=0.05, c=(0, 0.705, -0.425), r=(0.096, 0.108, 0.1)),
         Prim("ell", "neck2", "chest", k=0.03, c=(0, 0.752, -0.555), r=(0.04, 0.032, 0.05)),
         # head
         Prim("ell", "head", "head", k=0.026, c=(0, 0.822, -0.57), r=(0.068, 0.066, 0.086)),
@@ -71,13 +71,13 @@ def body():
             Prim("ell", "thigh" + s, "body", k=0.035, c=(0.064 * x, 0.54, 0.405), r=(0.038, 0.085, 0.042)),
             Prim("ell", "scapula" + s, "body", k=0.04, c=(0.066 * x, 0.662, -0.27), r=(0.044, 0.10, 0.07)),
             Prim("ell", "upperarm" + s, "leg", k=0.04, c=(0.08 * x, 0.50, -0.302), r=(0.044, 0.10, 0.064), rot=(10, 0, 0)),
-            Prim("cone", "upperarm" + s, "leg", k=0.03, a=(0.09 * x, 0.54, -0.35), b=(0.092 * x, 0.39, -0.278), ra=0.044, rb=0.035),
-            Prim("cone", "forearm" + s, "leg", k=0.015, a=(0.092 * x, 0.385, -0.272), b=(0.08 * x, 0.14, -0.288), ra=0.033, rb=0.02),
+            Prim("cone", "upperarm" + s, "leg", k=0.03, a=(0.09 * x, 0.54, -0.35), b=(0.092 * x, 0.39, -0.278), ra=0.05, rb=0.039),
+            Prim("cone", "forearm" + s, "leg", k=0.015, a=(0.092 * x, 0.385, -0.272), b=(0.08 * x, 0.14, -0.288), ra=0.037, rb=0.022),
             Prim("ell", "forearm" + s, "leg", k=0.02, c=(0.089 * x, 0.32, -0.284), r=(0.029, 0.07, 0.031)),
             Prim("ell", "hand" + s, "leg", k=0.01, c=(0.08 * x, 0.125, -0.29), r=(0.021, 0.024, 0.023)),
             Prim("cone", "hand" + s, "leg", k=0.008, a=(0.08 * x, 0.12, -0.29), b=(0.078 * x, 0.042, -0.31), ra=0.019, rb=0.018),
             Prim("ell", "fpaw" + s, "paw", k=0.012, c=(0.078 * x, 0.026, -0.33), r=(0.029, 0.022, 0.043)),
-            Prim("cone", "shin" + s, "leg", k=0.025, a=(0.095 * x, 0.41, 0.29), b=(0.082 * x, 0.185, 0.435), ra=0.042, rb=0.021),
+            Prim("cone", "shin" + s, "leg", k=0.025, a=(0.095 * x, 0.41, 0.29), b=(0.082 * x, 0.185, 0.435), ra=0.048, rb=0.023),
             Prim("ell", "shin" + s, "leg", k=0.02, c=(0.087 * x, 0.34, 0.35), r=(0.031, 0.075, 0.04), rot=(-30, 0, 0)),
             Prim("ell", "foot" + s, "leg", k=0.01, c=(0.082 * x, 0.176, 0.449), r=(0.02, 0.025, 0.022)),
             Prim("cone", "foot" + s, "leg", k=0.008, a=(0.082 * x, 0.17, 0.44), b=(0.078 * x, 0.042, 0.418), ra=0.019, rb=0.018),
@@ -156,22 +156,22 @@ def pattern(P, N, R):
     fine2 = vnoise(Pn, 300.0, 2)
     med = fbm(P, 16.0, 3, 3)
     big = fbm(P, 4.5, 2, 4)
-    tawny = np.array([0.55, 0.46, 0.35])
-    grey = np.array([0.52, 0.51, 0.48])
-    dark = np.array([0.12, 0.11, 0.10])
-    cream = np.array([0.80, 0.75, 0.66])
-    white = np.array([0.87, 0.85, 0.81])
+    tawny = np.array([0.47, 0.385, 0.29])
+    grey = np.array([0.43, 0.42, 0.395])
+    dark = np.array([0.085, 0.078, 0.07])
+    cream = np.array([0.72, 0.66, 0.57])
+    white = np.array([0.82, 0.8, 0.76])
     black = np.array([0.045, 0.04, 0.038])
-    buff = np.array([0.70, 0.60, 0.46])
+    buff = np.array([0.6, 0.5, 0.37])
     # agouti base: grey/tawny patches, banded guard hairs (pale band + black tip)
     base = _mix(tawny, grey, _ss(0.35, 0.7, big))
     base = base * (0.7 + 0.55 * fine)[:, None]
-    base = _mix(base, dark, _ss(0.6, 0.85, fine2) * 0.45)
+    base = _mix(base, dark, _ss(0.5, 0.8, fine2) * 0.6)
     # dark saddle / cape: dorsal surfaces from the withers to the tail base
     dorsal = _ss(0.15, 0.8, ny) * _ss(0.58, 0.72, y) * _ss(-0.42, -0.22, z) * (1 - _ss(0.5, 0.58, z))
     cape = _ss(-0.45, -0.3, z) * (1 - _ss(-0.1, 0.05, z)) * _ss(0.0, 0.6, ny) * _ss(0.55, 0.7, y)
     sad = np.clip(dorsal * (0.55 + 0.45 * med) + cape * 0.35, 0, 1) * (1 - head) * (1 - leg * 0.6)
-    col = _mix(base, _mix(dark, base, 0.35 * fine), sad * 0.8)
+    col = _mix(base, _mix(dark, base, 0.3 * fine), np.clip(sad * 1.15, 0, 1))
     # pale ventral: belly, inner legs, throat, chest
     ventral = _ss(-0.15, -0.65, ny) * _ss(0.72, 0.55, y)
     throat = (R["chest"] + R["neck"] * _ss(-0.1, -0.7, ny)) * _ss(-0.2, -0.6, ny + nz * 0.5)
@@ -215,7 +215,7 @@ def pattern(P, N, R):
     fl = 0.72 + 0.12 * (med - 0.5)
     fl = fl + 0.25 * np.clip(R["neck"] + cape, 0, 1) + 0.12 * dorsal
     fl = np.where(pale > 0.5, fl * 0.75, fl)
-    fl = fl * (1 - leg) + leg * (0.45 * _ss(0.2, 0.45, y) + 0.12)
+    fl = fl * (1 - leg) + leg * (0.5 * _ss(0.2, 0.45, y) + 0.22)
     fl = fl * (1 - head) + head * (0.25 + 0.3 * R["cheek"] - 0.15 * R["muzzle"])
     fl = fl * (1 - tail) + tail * 1.0
     fl = fl * (1 - ear) + ear * 0.12
@@ -264,6 +264,6 @@ SPEC = dict(
                jaw="jaw", ears=["ear.L", "ear.R"], tail=["tail1", "tail2", "tail3", "tail4"]),
     chest_bone="chest", pelvis_bone="pelvis",
     disp=lambda P: 0.0012 * (fbm(P, 45.0, 2, 9) - 0.5),
-    meta=dict(fur_length=0.034, mass=42.0),
+    meta=dict(fur_length=0.042, mass=42.0),
     preview=[("idle", 0), ("trot", 4), ("gallop", 3), ("snarl", 10)],
 )

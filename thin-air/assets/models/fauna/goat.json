@@ -13,8 +13,6 @@
   "ear.R",
   "tail1",
   "tail2",
-  "tail3",
-  "tail4",
   "scapula.L",
   "upperarm.L",
   "forearm.L",
@@ -35,29 +33,17 @@
   "hpaw.R"
  ],
  "clips": {
-  "attack": {
-   "events": {
-    "bite": 0.52
-   },
-   "length": 1.0,
-   "loop": false,
-   "move": 0.9
-  },
   "death": {
-   "length": 1.7,
+   "length": 1.8,
    "loop": false
   },
   "gallop": {
-   "length": 0.42,
+   "length": 0.5,
    "loop": true,
-   "speed": 8.5
+   "speed": 8.25
   },
   "hit": {
    "length": 0.5,
-   "loop": false
-  },
-  "howl": {
-   "length": 4.0,
    "loop": false
   },
   "idle": {
@@ -68,37 +54,28 @@
    "length": 3.2,
    "loop": true
   },
-  "snarl": {
-   "length": 2.0,
-   "loop": true
-  },
   "sniff": {
    "length": 3.0,
    "loop": true
   },
-  "stalk": {
-   "length": 1.5,
-   "loop": true,
-   "speed": 0.5
-  },
   "trot": {
-   "length": 0.6,
+   "length": 0.667,
    "loop": true,
-   "speed": 2.6
+   "speed": 2.25
   },
   "walk": {
-   "length": 0.9,
+   "length": 1.0,
    "loop": true,
-   "speed": 1.15
+   "speed": 0.8999999999999999
   }
  },
- "fur_length": 0.042,
- "height": 0.9322848320007324,
- "length": 1.6504778861999512,
- "mass": 42.0,
- "species": "wolf",
- "tris": 12652,
- "uv_meters": 1.6736758179992666,
- "verts": 6377,
- "width": 0.28574299812316895
+ "fur_length": 0.05,
+ "height": 1.308727741241455,
+ "length": 1.3652437925338745,
+ "mass": 75.0,
+ "species": "goat",
+ "tris": 12452,
+ "uv_meters": 2.030376401342147,
+ "verts": 6275,
+ "width": 0.3578106760978699
 }

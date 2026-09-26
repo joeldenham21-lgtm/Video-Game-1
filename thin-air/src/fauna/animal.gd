@@ -180,8 +180,19 @@ func activate(pos: Vector3, yaw_rad: float, seed_value: int) -> void:
 	health = def.health
 	awareness = 0.0
 	fear = 0.0
+	fire_threat = 0.0
+	sees_player = false
+	smells_player = false
+	dist_to_player = 1e9
+	last_known = pos
 	grudge = 0.0
 	speed = 0.0
+	ai_enabled = true
+	tick_acc = 0.0
+	anim_acc = 0.0
+	state_time = 0.0
+	_anim_speed = 1.0
+	_stuck_t = 0.0
 	harvest_progress = 0.0
 	harvest_index = 0
 	corpse_age = 0.0
@@ -728,8 +739,12 @@ func _select_anim() -> void:
 		return
 	var want := C_IDLE
 	var spd := 1.0
+	var go := gait_override()
 	if speed < 0.12:
 		want = idle_clip()
+	elif go != &"" and anim.has_animation(go):
+		want = go
+		spd = speed / def.clip_speed(go, speed)
 	elif stalk_gait and anim.has_animation(C_STALK):
 		want = C_STALK
 		spd = speed / def.clip_speed(C_STALK, 0.5)
@@ -754,6 +769,11 @@ func _select_anim() -> void:
 
 func current_clip() -> StringName:
 	return _clip
+
+
+## Hook: a special locomotion clip for the current state (deer stot, hare hop), or &"".
+func gait_override() -> StringName:
+	return &""
 
 
 ## Dev/QA: freeze the AI and hold a clip (locomotion clips play in place). t0 = start time in the clip.

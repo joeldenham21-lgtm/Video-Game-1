@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="SpeciesDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/fauna/species_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"deer"
+display_name = "Mule deer"
+model_path = "res://assets/models/fauna/deer.glb"
+coat_path = "res://assets/textures/fauna/deer_albedo.png"
+ai_script = "res://src/fauna/deer.gd"
+scale_range = Vector2(0.94, 1.06)
+mass = 65.0
+health = 45.0
+body_radius = 0.2
+body_length = 1.2
+body_height = 0.8
+eye_height = 1.3
+fur_length = 0.02
+fur_sheen = 0.18
+eye_color = Color(0.08, 0.05, 0.03, 1)
+walk_speed = 1.2
+trot_speed = 3.0
+run_speed = 11.0
+accel = 9.0
+turn_rate = 260.0
+max_slope = 42.0
+wade_depth = 0.5
+gait_clips = PackedStringArray("walk", "trot", "gallop")
+sight_range = 130.0
+fov_deg = 310.0
+hearing = 1.6
+smell_range = 200.0
+fire_fear = 1.4
+skittish = 0.85
+aggression = 0.0
+flee_distance = 90.0
+damage = 0.0
+damage_type = &"bite"
+attack_range = 1.5
+attack_cooldown = 2.0
+loot = {"meat_raw": 5, "hide_raw": 2, "bone": 2}
+harvest_hits = 8
+sfx_alarm = &"deer_bark"
+sfx_hurt = &"deer_bark"
+sfx_death = &"deer_bark"
+biomes = PackedStringArray("valley", "forest", "subalpine")
+min_alt = 1300.0
+max_alt = 2400.0
+group_min = 1
+group_max = 4
+night_weight = 0.5
+day_weight = 1.3
+spawn_weight = 1.3
+slope_pref = Vector2(0, 22)

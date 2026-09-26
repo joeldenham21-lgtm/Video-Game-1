@@ -11,7 +11,7 @@ uniform float strand_scale = 8.0;
 uniform vec3 tint : source_color = vec3(1.0);
 uniform float roughness = 0.84;
 uniform float under_shadow = 0.3;
-uniform float sheen = 0.5;
+uniform float sheen = 0.18;
 uniform float grain = 0.6;
 uniform float wet_response = 1.0;
 uniform float snow_catch = 0.0;      // snow dusting on the back (animals out in snowfall)
@@ -39,7 +39,7 @@ void fragment() {
 	SPECULAR = 0.32;
 	RIM = sheen * (0.35 + 0.65 * fl);
 	RIM_TINT = 0.7;
-	BACKLIGHT = col * 0.3 * fl;
+	BACKLIGHT = col * 0.12 * fl;
 	// strand grain: finite-difference bump of the strand map (tangent space)
 	float e = 1.0 / 512.0;
 	float h0 = texture(strand_tex, suv).g;

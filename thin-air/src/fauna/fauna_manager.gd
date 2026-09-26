@@ -20,8 +20,8 @@ const DESPAWN := 250.0
 const SPAWN_MIN := 110.0
 const SPAWN_MAX := 190.0
 const SPECIES_DIR := "res://src/fauna/species/"
-const SPECIES := ["wolf", "deer", "bear", "goat", "hare"]
-const POOL := {"wolf": 5, "deer": 5, "bear": 2, "goat": 4, "hare": 3}
+const SPECIES := ["wolf", "deer", "bear", "old_grey", "goat", "hare"]
+const POOL := {"wolf": 5, "deer": 5, "bear": 1, "old_grey": 1, "goat": 4, "hare": 3}
 const BLOOD_POOL := 16
 
 ## Dev/test switch: no automatic population (QA scenes place animals themselves).
@@ -415,7 +415,7 @@ func _population() -> void:
 			if Vector2(mp.x - player_pos.x, mp.z - player_pos.z).length() < 420.0:
 				var at := _saved_old_grey_pos(mp)
 				if at == Vector3.INF:
-					at = _find_spawn(defs.get(&"bear"), mp, 40.0, 170.0)
+					at = _find_spawn(defs.get(&"old_grey"), mp, 40.0, 170.0)
 				if at != Vector3.INF and at.distance_to(player_pos) > 90.0:
 					_spawn_old_grey(at)
 					return
@@ -537,7 +537,7 @@ func _saved_old_grey_pos(mine: Vector3) -> Vector3:
 
 
 func _spawn_old_grey(at: Vector3) -> Animal:
-	var a := spawn_animal(&"bear", at, _rng.randf() * TAU, 4242)
+	var a := spawn_animal(&"old_grey", at, _rng.randf() * TAU, 4242)
 	if a and a.has_method(&"make_old_grey"):
 		a.call(&"make_old_grey", float(old_grey.get("health", -1.0)))
 	return a
