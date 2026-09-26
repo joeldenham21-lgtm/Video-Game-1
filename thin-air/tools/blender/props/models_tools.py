@@ -127,11 +127,11 @@ def build_stone_axe():
         yy = hy - 0.036 + k * 0.0135
         tilt = 0.3 if k % 2 == 0 else -0.3
         ring = []
-        for i in range(20):
-            a = i / 20 * math.tau
+        for i in range(14):
+            a = i / 14 * math.tau
             ring.append(Vector((math.cos(a) * 0.0195, yy + math.sin(a) * tilt * 0.022, math.sin(a) * 0.0215)))
-        mb.tube(ring, 0.0028, seg=6, mat="sinew", closed=True)
-    return [R.obj(mb, "stone_axe", bevel=0.0006)]
+        mb.tube(ring, 0.0028, seg=5, mat="sinew", closed=True)
+    return [R.obj(mb, "stone_axe", smooth_angle=50)]
 
 
 # ============================================================================================ knives
@@ -175,11 +175,11 @@ def build_knife(stone=False):
     mb.tube(path, rad, seg=16, mat=hm, up=(0, 1, 0))
     if stone:
         # the flake is set into a split stick and wrapped with sinew
-        for k in range(9):
-            zz = 0.012 + k * 0.0065
-            ring = [Vector((math.cos(i / 16 * math.tau) * 0.0094, math.sin(i / 16 * math.tau) * 0.0124 - 0.001,
-                            zz + math.sin(i / 16 * math.tau) * 0.002)) for i in range(16)]
-            mb.tube(ring, 0.0016, seg=5, mat="sinew", closed=True)
+        for k in range(8):
+            zz = 0.012 + k * 0.0075
+            ring = [Vector((math.cos(i / 12 * math.tau) * 0.0094, math.sin(i / 12 * math.tau) * 0.0124 - 0.001,
+                            zz + math.sin(i / 12 * math.tau) * 0.002)) for i in range(12)]
+            mb.tube(ring, 0.0017, seg=4, mat="sinew", closed=True)
     else:
         for zz in (0.036, 0.086):                  # brass rivets through the scales
             mb.tube([Vector((-0.0094, -0.0012, zz)), Vector((0.0094, -0.0012, zz))], 0.0022, seg=10, mat="brass")
@@ -355,7 +355,7 @@ def build_scanner(with_screen=True):
             Vector((0, 0.164, -0.002)), Vector((0, 0.168, -0.003))]
     rad = [(0.038, 0.014), (0.043, 0.0165), (0.046, 0.019), (0.046, 0.019), (0.044, 0.0195), (0.041, 0.018)]
     mb.tube(body, rad, section=sec, mat="plastic_yellow", up=(0, 0, 1))
-    for (y0, y1) in ((0.006, 0.056), (0.134, 0.161)):
+    for (y0, y1) in ((0.006, 0.052), (0.1435, 0.161)):
         mb.tube([Vector((0, y0, 0)), Vector((0, y0 + 0.004, 0)), Vector((0, y1 - 0.004, 0)), Vector((0, y1, 0))],
                 [(0.046, 0.0192), (0.0488, 0.0208), (0.0488, 0.0208), (0.046, 0.0192)], section=sec, mat="rubber",
                 up=(0, 0, 1))
