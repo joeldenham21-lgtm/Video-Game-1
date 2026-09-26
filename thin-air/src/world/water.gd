@@ -278,6 +278,7 @@ func _make_mist(tex: Texture2D, drop: float, width: float) -> GPUParticles3D:
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
 	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.billboard_keep_scale = true            # particle scale (2.5–9 m puffs) survives billboarding
 	mat.vertex_color_use_as_albedo = true
 	mat.albedo_texture = tex
 	mat.albedo_color = Color(0.92, 0.95, 0.97)

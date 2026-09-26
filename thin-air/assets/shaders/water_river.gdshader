@@ -112,9 +112,10 @@ void fragment() {
 	float threads = mix(th1, th0, wA);
 	float wide = texture(foam_tex, vec2(UV.x * 0.7, UV.y * 0.012) + vec2(0.5, 0.0)).b;
 	float streak = smoothstep(0.35, 0.75, threads * 0.8 + wide * 0.45);
-	vec3 fall_col = mix(vec3(0.16, 0.2, 0.2), vec3(0.8, 0.83, 0.84), streak);
+	// between the threads: a dark film of water over wet rock (what makes a fall read against snow/scree)
+	vec3 fall_col = mix(vec3(0.025, 0.035, 0.035), vec3(0.8, 0.83, 0.84), streak);
 	albedo = mix(albedo, fall_col, fall * (1.0 - foam * 0.5));
-	alpha = mix(alpha, mix(0.1, 0.94, streak), fall);
+	alpha = mix(alpha, mix(0.6, 0.95, streak), fall);
 	body = mix(body, alpha, fall);
 	rough = mix(rough, 0.45, fall * streak);
 	// ragged edges instead of two parallel lines down the mountain

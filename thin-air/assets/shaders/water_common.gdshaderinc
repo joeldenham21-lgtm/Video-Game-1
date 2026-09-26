@@ -83,22 +83,42 @@ vec4 heightfield_reflection(vec3 p, vec3 r, float max_dist) {
 	}
 	vec2 dir = normalize(r.xz + vec2(1e-5));
 	float rise = r.y / max(length(r.xz), 1e-4);
-	float t = 6.0;
-	for (int k = 0; k < 9; k++) {
+	float t = 4.0;
+	float prev_t = 0.0;
+	for (int k = 0; k < 11; k++) {
 		vec2 q = p.xz + dir * t;
 		float ray_y = p.y + rise * t;
-		float th = bed_height_fast(q);
+		// conifer canopy stands ~22 m above the ground: forested shores reflect as a dark tree line
+		float canopy = texture(terrain_mask_tex, terrain_uv(q)).a;
+		float th = bed_height_fast(q) + 22.0 * smoothstep(0.25, 0.7, canopy);
 		if (th > ray_y) {
+			// refine the silhouette (3 bisection steps) so reflected skylines do not stair-step
+			float a = prev_t;
+			float b = t;
+			for (int j = 0; j < 3; j++) {
+				float m = (a + b) * 0.5;
+				vec2 qm = p.xz + dir * m;
+				float cm = texture(terrain_mask_tex, terrain_uv(qm)).a;
+				if (bed_height_fast(qm) + 22.0 * smoothstep(0.25, 0.7, cm) > p.y + rise * m) {
+					b = m;
+				} else {
+					a = m;
+				}
+			}
+			t = b;
+			q = p.xz + dir * t;
 			vec2 tuv = terrain_uv(q);
 			vec4 m = texture(terrain_mask_tex, tuv);
 			vec4 nt = texture(terrain_normal_tex, tuv);
 			vec3 n = nt.xyz * 2.0 - 1.0;
-			// rough albedo of the hit: forest dark green-grey, rock grey, snow white, meadow straw
-			vec3 alb = mix(vec3(0.12, 0.115, 0.1), vec3(0.05, 0.07, 0.045), m.a);
-			alb = mix(alb, vec3(0.22, 0.2, 0.14), m.b * (1.0 - m.a) * 0.7);
+			float forest = smoothstep(0.25, 0.7, m.a);
+			// rough albedo of the hit: dark spruce canopy, rock grey, snow white, meadow straw
+			vec3 alb = vec3(0.12, 0.115, 0.1);
+			alb = mix(alb, vec3(0.22, 0.2, 0.14), m.b * 0.7);
 			alb = mix(alb, vec3(0.2, 0.2, 0.2), m.g * 0.6);
 			alb = mix(alb, vec3(0.75, 0.78, 0.82), smoothstep(0.35, 0.8, m.r));
-			float ndl = max(dot(n, sun_direction), 0.0);
+			alb = mix(alb, vec3(0.03, 0.045, 0.03), forest);
+			float ndl = max(dot(n, sun_direction), 0.0) * (1.0 - 0.5 * forest);
 			vec3 lit = alb * (refl_sun * ndl * 0.8 + refl_amb * (0.35 + 0.65 * nt.a));
 			// aerial perspective toward the fog colour with distance
 			float fogk = 1.0 - exp(-t / 2600.0);
@@ -106,7 +126,8 @@ vec4 heightfield_reflection(vec3 p, vec3 r, float max_dist) {
 			float cov = smoothstep(max_dist, max_dist * 0.7, t);
 			return vec4(lit, cov);
 		}
-		t *= 1.9;
+		prev_t = t;
+		t *= 1.75;
 		if (t > max_dist) {
 			break;
 		}
