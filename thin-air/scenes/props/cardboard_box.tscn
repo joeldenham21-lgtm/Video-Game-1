@@ -1,0 +1,19 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/props/cardboard_box.glb" id="1_model"]
+
+[sub_resource type="BoxShape3D" id="shape_0"]
+size = Vector3(0.476, 0.3, 0.336)
+
+[node name="CardboardBox" type="RigidBody3D"]
+collision_layer = 8
+collision_mask = 585
+mass = 3
+can_sleep = true
+sleeping = true
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+
+[node name="Shape0" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+shape = SubResource("shape_0")

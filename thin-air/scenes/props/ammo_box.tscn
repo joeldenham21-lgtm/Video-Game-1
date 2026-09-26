@@ -1,0 +1,19 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/props/ammo_box.glb" id="1_model"]
+
+[sub_resource type="BoxShape3D" id="shape_0"]
+size = Vector3(0.331, 0.2249, 0.165)
+
+[node name="AmmoBox" type="RigidBody3D"]
+collision_layer = 8
+collision_mask = 585
+mass = 7
+can_sleep = true
+sleeping = true
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+
+[node name="Shape0" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.11245, 0)
+shape = SubResource("shape_0")
