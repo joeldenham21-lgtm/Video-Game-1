@@ -682,7 +682,7 @@ func _build_stats() -> Control:
 	var dist := float(Game.get_flag(&"stat_distance_m", 0.0))
 	var bps := Blueprints.all_unlocked().size()
 	var tiles := [
-		["Days survived", str(maxi(Climate.day - 1, 0)) if Climate.hours < 12.0 else str(Climate.day), "calendar"],
+		["Nights survived", str(maxi(Climate.day - 1, 0)), "calendar"],
 		["Time on the mountain", UITheme.duration(Game.playtime), "clock"],
 		["Distance walked", ("%.1f km" % (dist / 1000.0)) if dist >= 1000.0 else "%d m" % roundi(dist), "route"],
 		["Highest point", UITheme.metres(float(Game.get_flag(&"stat_max_altitude", 0.0))), "altitude"],

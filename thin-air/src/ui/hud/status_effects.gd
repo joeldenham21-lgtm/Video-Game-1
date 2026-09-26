@@ -9,7 +9,7 @@ const INFO := {
 	&"bleeding": ["Bleeding", "bleeding", 2, "Losing health. Apply a bandage."],
 	&"sprain": ["Sprain", "sprain", 1, "Moving slower. A splint or rest helps."],
 	&"frostbite": ["Frostbite", "frostbite", 2, "Maximum health reduced. Get warm and stay warm."],
-	&"hypoxic": ["Hypoxic", "hypoxic", 2, "Not enough oxygen. Descend or use an O₂ bottle."],
+	&"hypoxic": ["Hypoxic", "hypoxic", 2, "Not enough oxygen. Descend, rest, or breathe bottled oxygen."],
 	&"hypothermia": ["Hypothermia", "hypothermia", 2, "Body temperature falling. Find heat now."],
 	&"sick": ["Sick", "sick", 1, "Food poisoning or bad water. Rest and drink boiled water."],
 	&"exhausted": ["Exhausted", "exhausted", 1, "Out of breath. Stop and recover."],

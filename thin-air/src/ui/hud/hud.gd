@@ -62,6 +62,7 @@ var death_screen: Node = null
 var touch_controls: Node = null
 
 var _screens := {}                   # open full-screen UIs (ui_screen_opened)
+var _overlays := {}                  # open overlays that keep the HUD (build mode): Esc belongs to them
 var _screen_closed_frame := -10
 var _cinematic := false
 var _dead := false
@@ -291,11 +292,14 @@ func _on_device_changed(d: StringName) -> void:
 
 func _on_screen_opened(sc: StringName) -> void:
 	if OVERLAY_SCREENS.has(sc):
+		_overlays[sc] = true
 		return
 	_screens[sc] = true
 
 
 func _on_screen_closed(sc: StringName) -> void:
+	if _overlays.erase(sc):
+		_screen_closed_frame = Engine.get_process_frames()
 	if _screens.erase(sc):
 		_screen_closed_frame = Engine.get_process_frames()
 
@@ -455,6 +459,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		if photo_mode:
 			set_photo_mode(false)
 			get_viewport().set_input_as_handled()
+		elif _overlays.has(&"build"):
+			pass                             # build mode leaves on Esc / B itself
 		elif can_open_screen():
 			open_pause()
 			get_viewport().set_input_as_handled()
@@ -478,7 +484,7 @@ func _input(event: InputEvent) -> void:
 func _poll_injected() -> void:
 	if touch_controls == null or not touch_mode:
 		return
-	if Input.is_action_just_pressed(&"pause") and can_open_screen():
+	if Input.is_action_just_pressed(&"pause") and can_open_screen() and not _overlays.has(&"build"):
 		open_pause()
 	elif Input.is_action_just_pressed(&"journal") and can_open_screen():
 		open_journal()
@@ -522,16 +528,17 @@ func _process(delta: float) -> void:
 	var p3 := p as Node3D
 	var cam: Camera3D = p.call("get_camera") if p.has_method("get_camera") else get_viewport().get_camera_3d()
 	damage.camera = cam
-	# ---- compass (every frame, cheap: redraws only on change)
+	# ---- compass bearing every frame (redraws only when it moved); markers at 10 Hz below
 	if root.visible and cam:
-		var fwd := -cam.global_transform.basis.z
-		compass.set_state(HUDCompass.bearing_of(fwd), _poi_markers(p3.global_position), _objective_marker(p3.global_position))
+		compass.set_bearing(HUDCompass.bearing_of(-cam.global_transform.basis.z))
 	# ---- slow updates (10 Hz)
 	_slow_t += delta
 	_slow_dt += delta
 	var v: Object = p.get("vitals")
 	if _slow_t >= 0.1:
 		_slow_t = 0.0
+		if root.visible:
+			compass.set_markers(_poi_markers(p3.global_position), _objective_marker(p3.global_position))
 		if v:
 			vitals.sample(v, p3.global_position.y, _slow_dt)
 			var eff: Variant = v.get("effects")

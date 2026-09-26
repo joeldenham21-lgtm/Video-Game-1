@@ -38,12 +38,24 @@ static func delta_deg(a: float, b: float) -> float:
 
 
 func set_state(b: float, mk: Array[Dictionary], obj: Dictionary) -> void:
-	bearing = b
+	set_markers(mk, obj)
+	set_bearing(b)
+
+
+## Every frame: redraw only when the view turned noticeably.
+func set_bearing(b: float) -> void:
+	if absf(HUDCompass.delta_deg(b, bearing)) > 0.05:
+		bearing = b
+		queue_redraw()
+
+
+## ~10 Hz: places and the objective.
+func set_markers(mk: Array[Dictionary], obj: Dictionary) -> void:
+	var h := hash([mk.size(), snappedf(float(obj.get("bearing", -1.0)), 0.2), int(float(obj.get("distance", 0.0)) / 10.0)])
+	for m in mk:
+		h = hash([h, snappedf(float(m["bearing"]), 0.2), int(float(m.get("distance", 0.0)) / 10.0)])
 	markers = mk
 	objective = obj
-	var h := hash([snappedf(b, 0.1), mk.size(), obj.get("bearing", -1.0)])
-	for m in mk:
-		h = hash([h, snappedf(float(m["bearing"]), 0.2), int(float(m.get("distance", 0.0)) / 50.0)])
 	if h != _last_hash:
 		_last_hash = h
 		queue_redraw()
