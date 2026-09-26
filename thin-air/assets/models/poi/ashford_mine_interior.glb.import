@@ -86,10 +86,10 @@ _subresources={
 "use_external/fallback_path": "res://assets/models/poi/materials/plastic.tres",
 "use_external/path": "res://assets/models/poi/materials/plastic.tres"
 },
-"rock_t": {
+"rock_cliff": {
 "use_external/enabled": true,
-"use_external/fallback_path": "res://assets/models/poi/materials/rock_t.tres",
-"use_external/path": "res://assets/models/poi/materials/rock_t.tres"
+"use_external/fallback_path": "res://assets/models/poi/materials/rock_cliff.tres",
+"use_external/path": "res://assets/models/poi/materials/rock_cliff.tres"
 },
 "rope": {
 "use_external/enabled": true,

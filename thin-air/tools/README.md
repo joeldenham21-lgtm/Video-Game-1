@@ -169,3 +169,18 @@ conventions the building shaders read: UV in metres (V along the grain), UV2 = p
 COLOR r = AO, g = build step (the order parts appear while a blueprint frame is filled), b = bark density /
 weathering, a = surface flag (wood / endgrain / chinking). Constants shared with `src/building/build_grid.gd`:
 2 m cells, 0.27 m log courses, wall plate 2.44 m, storey 2.6 m, roof rise 1.35 m per cell (34°).
+## Story locations (`tools/blender/poi/`, poi stream)
+| Tool | Command (from repo root) | Output |
+|---|---|---|
+| POI textures | `python3.12 thin-air/tools/blender/poi/gen_textures.py` | `assets/models/poi/textures/poi_decals_albedo.png` (2048×1024 RGBA decal atlas: C-FKTL registration, Otter panel, radio faces, station/mine/ranger/relay signage, hazard stripes, whiteboard, topo map, calendar, stencils, terminal screen), `poi_noise.png`; region table `tools/blender/poi/decals.json` |
+| POI models + scenes | `blender -b -P thin-air/tools/blender/poi/build.py -- [--only=crash_site,kestrel_station,...] [--nobake]` then `godot --headless --path thin-air --import` | per location (≈40 s for all): `assets/models/poi/<id>.glb` (merged static meshes per visibility bucket, one surface per material) + `.import` (materials remapped to `assets/models/poi/materials/*.tres`), `scenes/poi/<id>.tscn` (inherited scene: PoiSite root, collision boxes per footstep surface, Marker3D sockets, lights, reflection probes, shelter areas, heat slots), `tools/blender/poi/stats.json` |
+| POI QA shots | `DISPLAY=:99 godot --path thin-air --rendering-method forward_plus --fixed-fps 30 --quit-after 45 --resolution 1280x720 res://scenes/dev/poi_test.tscn -- --site=<id> --shot=<name> --save=/abs/x.jpg [--lights=1 --torch=3 --hours=H --perf --all]` | the real world (terrain, vegetation, sky) with the location placed by `scenes/poi/structures.gd`; shots per site in `src/dev/poi_test.gd` SHOTS; `docs/shots/poi_*.jpg` |
+Sites (`sites/*.py`): crash_site (DHC-3 Otter C-FKTL wreck), kestrel_station, ranger_cabin, ashford_mine (+ `ashford_mine_interior`),
+summit_relay, owens_bivouac, glacier_camp, fire_lookout, trapper_cabin, ice_cave (+ `ice_cave_entrance`). Libraries: `plib.py`
+(Mesh soup, primitives - box/cyl/lathe/loft/tube/slab/heightpatch/blob, Site, terrain `Ground` sampler, BVH ray-cast vertex
+bake, glTF export), `arch.py` (walls with openings, windows, doors, stairs, railings, roofs, log walls, lattice masts, guys),
+`props.py` (crates, drums, jerrycans, bunks, stoves, lanterns, tents, rime ice …), `pscene.py` (materials, .import, .tscn).
+**Vertex layout** (read by `assets/models/poi/shaders/poi_common.gdshaderinc`): UV in metres (× 1/tile per material; V
+along the grain), `COLOR.rgb` = paint tint × baked AO (near occlusion + sky openness) × ground grime, `COLOR.a` = sky
+exposure (0 indoors .. 1 open sky) → snow settles on exposed up-facing surfaces (global `snow_cover` + altitude), rain
+wets. Materials reuse the shared texture library (no duplicated textures): repaintable variants desaturate + tint.

@@ -21,7 +21,7 @@ uniform float metal_mul = 1.0;
 uniform float normal_strength = 1.0;
 uniform bool orm_is_rough = false;      // orm_tex is a plain roughness map (terrain layer sets)
 uniform float snow_accept = 1.0;        // 0 for surfaces snow never sticks to (glass, hot metal)
-uniform float snow_line_low = 1750.0;
+uniform float snow_line_low = 1720.0;
 uniform float snow_line_high = 2150.0;
 uniform float wet_accept = 1.0;
 uniform vec3 emission_color : source_color = vec3(0.0);
@@ -34,12 +34,13 @@ varying vec3 v_wn;
 // Varyings can only be written in vertex() itself: every POI shader expands this macro there.
 #define POI_VERTEX v_wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; v_wn = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 
+// Same response as the vegetation / rock shaders (src/vegetation/shaders/veg_common.gdshaderinc veg_snow) so a
+// roof, a boulder and a spruce at the same altitude carry the same snow.
 float poi_snow(float exposure, float n) {
-	float s = clamp(snow_cover * 1.25 + smoothstep(snow_line_low, snow_line_high, v_wpos.y) * 0.75, 0.0, 1.0);
-	s *= exposure * snow_accept;
-	float up = smoothstep(0.35, 0.85, v_wn.y + (n - 0.5) * 0.3);
-	float th = 1.0 - s * 1.6;
-	return up * smoothstep(th - 0.12, th + 0.12, n) * smoothstep(0.0, 0.08, s);
+	float amount = clamp(smoothstep(snow_line_low, snow_line_high, v_wpos.y) * 0.85 + snow_cover * 0.75, 0.0, 1.0);
+	float up = smoothstep(0.15, 0.75, v_wn.y);
+	float s = amount * up * exposure * snow_accept;
+	return smoothstep(0.25, 0.65, s + (n - 0.5) * 0.45) * step(0.001, s);
 }
 
 void poi_surface(vec2 uv_m, vec4 vcol, out vec3 albedo, out float rough, out float metal, out float ao,

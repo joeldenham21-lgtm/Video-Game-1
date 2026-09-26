@@ -11,13 +11,15 @@ extends Node
 ##          --all (instance every location, not only --site)  --list (print the sockets of the site)  --torch=E (a hand torch on the camera, energy E)
 
 const SHOTS := {
-	# site -> shot -> [cam (site-local x, y above ground, z), look (yaw, pitch), hours, fov, lights]
+	# site -> shot -> [cam (site-local x, y above ground, z) | socket name, look (yaw, pitch), hours, fov, lights,
+	#                  (socket shots) offset in the socket's frame (x right, y up, -z forward)]
 	&"crash_site": {
 		"hero": [Vector3(-7.5, 1.6, 7.0), Vector2(-48.0, -5.0), 16.3, 55.0, false],
 		"wide": [Vector3(-12.5, 1.7, 9.0), Vector2(-62.0, -4.0), 16.9, 58.0, false],
 		"trail": [Vector3(22.0, 2.4, 20.0), Vector2(55.0, -6.0), 16.6, 60.0, false],
-		"cabin": [Vector3(0.9, 0.95, -2.1), Vector2(-60.0, -6.0), 16.9, 75.0, false],
-		"cockpit": [Vector3(-0.5, 0.95, -4.2), Vector2(-120.0, -8.0), 16.9, 75.0, false],
+		"cabin": ["Arrive_Wake", Vector2(0.0, -6.0), 16.9, 75.0, false, Vector3(0.1, 1.5, 1.2)],
+		"cockpit": ["Arrive_Wake", Vector2(-4.0, -12.0), 16.9, 70.0, false, Vector3(0.15, 1.45, -0.7)],
+		"nose": [Vector3(-7.0, 1.4, 0.1), Vector2(-83.0, -2.0), 15.6, 55.0, false],
 		"aerial": [Vector3(-20.0, 16.0, 18.0), Vector2(-45.0, -32.0), 15.5, 55.0, false],
 	},
 	&"kestrel_station": {
@@ -116,7 +118,8 @@ func _ready() -> void:
 	if args.has("list") and site.has_method(&"get_sockets"):
 		for m: Marker3D in site.call(&"get_sockets", ""):
 			print("SOCKET ", m.name, " ", m.global_position)
-	var local: Vector3 = spec[0]
+	var socket_shot := spec[0] is String
+	var local: Vector3 = spec[0] if not socket_shot else Vector3.ZERO
 	if args.has("cam"):
 		var c := String(args["cam"]).split(",")
 		local = Vector3(float(c[0]), float(c[1]), float(c[2]))
@@ -130,12 +133,19 @@ func _ready() -> void:
 	cam.far = float(Settings.get_value(&"view_distance", 4000.0))
 	add_child(cam)
 	var xf := site.global_transform
-	var wp := xf * Vector3(local.x, 0.0, local.z)
-	var interior := bool(site.get(&"interior"))
-	var gy := xf.origin.y if interior else TerrainData.get_height(wp.x, wp.z)
-	cam.global_position = Vector3(wp.x, gy + local.y, wp.z)
-	var site_yaw := rad_to_deg(xf.basis.get_euler().y)
-	cam.rotation_degrees = Vector3(look.y, site_yaw + look.x, 0.0)
+	if socket_shot and not args.has("cam"):
+		var m := site.call(&"get_socket", String(spec[0])) as Marker3D
+		var off: Vector3 = spec[5] if spec.size() > 5 else Vector3(0, 1.55, 0)
+		var myaw := m.global_rotation.y
+		cam.global_position = m.global_position + Basis(Vector3.UP, myaw) * off
+		cam.rotation_degrees = Vector3(look.y, rad_to_deg(myaw) + look.x, 0.0)
+	else:
+		var wp := xf * Vector3(local.x, 0.0, local.z)
+		var interior := bool(site.get(&"interior"))
+		var gy := xf.origin.y if interior else TerrainData.get_height(wp.x, wp.z)
+		cam.global_position = Vector3(wp.x, gy + local.y, wp.z)
+		var site_yaw := rad_to_deg(xf.basis.get_euler().y)
+		cam.rotation_degrees = Vector3(look.y, site_yaw + look.x, 0.0)
 	cam.make_current()
 	if args.has("torch"):
 		var sp := SpotLight3D.new()

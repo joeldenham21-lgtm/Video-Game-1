@@ -200,8 +200,8 @@ def build():
     s.add(PR.table(0.5, 0.4, 0.8, "wood_planks"), T(-0.7, Y0 + 0.4, Fz), "interior")
     s.add(lathe([(0.0, 0.0), (0.12, 0.01), (0.16, 0.08), (0.15, 0.09), (0.0, 0.03)], "paint_metal", 12, tint=(0.8, 0.8, 0.75)),
           T(-0.7, Y0 + 0.4, Fz + 0.8), "interior")
-    s.add(PR.decal("topo_map", 0.9, 0.6).transformed(RZ(-90)), T(X0 + 0.16, 1.0, Fz + 1.55), "interior")
-    s.add(PR.decal("calendar", 0.25, 0.37).transformed(RZ(90)), T(X1 - 0.16, -0.3, Fz + 1.5), "interior")
+    s.add(PR.decal("topo_map", 0.9, 0.6).transformed(RZ(90)), T(X0 + 0.16, 1.0, Fz + 1.55), "interior")
+    s.add(PR.decal("calendar", 0.25, 0.37).transformed(RZ(-90)), T(X1 - 0.16, -0.3, Fz + 1.5), "interior")
     # hanging lanterns on the tie beams (hooks)
     for (x, y) in ((-1.0, 0.0), (1.2, 2.0)):
         s.add(rod((x, y, PLATE - 0.25), (x, y, PLATE - 0.55), 0.004, "metal_dark", 4), None, "interior")

@@ -86,6 +86,11 @@ _subresources={
 "use_external/fallback_path": "res://assets/models/poi/materials/leather.tres",
 "use_external/path": "res://assets/models/poi/materials/leather.tres"
 },
+"led_red": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/led_red.tres",
+"use_external/path": "res://assets/models/poi/materials/led_red.tres"
+},
 "metal_aircraft": {
 "use_external/enabled": true,
 "use_external/fallback_path": "res://assets/models/poi/materials/metal_aircraft.tres",

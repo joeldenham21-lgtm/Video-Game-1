@@ -20,7 +20,7 @@ from plib import T, RX, RY, RZ, box, cyl, lathe, rod, tube
 
 TIMBER = (0.78, 0.72, 0.64)
 ORANGE = (0.85, 0.32, 0.05)
-ROCK_T = (0.62, 0.6, 0.57)
+ROCK_T = (1.0, 1.0, 1.0)
 
 
 # ================================================================== tunnel kit
@@ -43,7 +43,7 @@ def tunnel_ring(p, t, w=1.9, h=2.45, noise=0.12, seed_=0.0, floor_noise=0.03):
     return pts
 
 
-def tunnel(path, w=1.9, h=2.45, seed_=0.0, step=0.8, mat="rock_t", tint=ROCK_T, open_ends=True):
+def tunnel(path, w=1.9, h=2.45, seed_=0.0, step=0.8, mat="rock_cliff", tint=ROCK_T, open_ends=True):
     """Rock tunnel along a polyline (floor centre points). Faces point inwards."""
     pts = [Vector(p) for p in path]
     dense = []
@@ -421,7 +421,7 @@ def build_exterior():
 
 def build_interior():
     s = P.Site("ashford_mine_interior", ground=False, interior=True, seed_=59)
-    s.bucket("main", vis_end=0.0)
+    s.bucket("main", vis_end=220.0)     # interiors sit 1 km under the terrain: never drawn from the surface
     s.bucket("detail", vis_end=45.0)
     # Local frame: origin = inside face of the portal door; the adit runs west (-X).
     main = [Vector((0.5, 0, 0)), Vector((-12.0, 0, 0)), Vector((-30.0, 0.0, 0)), Vector((-46.0, 1.5, 0)),
@@ -435,7 +435,7 @@ def build_interior():
     for k, (path, w, h, sd) in enumerate(((main, 2.0, 2.5, 1.0), (drift2, 1.9, 2.45, 2.0), (cross, 1.9, 2.4, 3.0),
                                            (powder, 1.7, 2.2, 4.0))):
         me, dense = P.Mesh(), None
-        me, dense = tunnel(path, w, h, sd, 0.8, "rock_t")
+        me, dense = tunnel(path, w, h, sd, 0.8, "rock_cliff")
         segs.append((me, dense, path, w))
     # cut junction openings: main at the crosscut / powder alcove; main end joins drift2
     def cut(me, center, direction, radius):
@@ -462,7 +462,7 @@ def build_interior():
         wd = 3.0 + 4.0 * math.sin(math.pi * t) ** 0.7
         ht = 2.6 + 3.8 * math.sin(math.pi * t) ** 0.6
         rings.append(tunnel_ring(p, SU, wd, ht, 0.35, 7.0 + k * 0.1, 0.08))
-    stope = P.loft(rings, "rock_t", True, True, ROCK_T)
+    stope = P.loft(rings, "rock_cliff", True, True, ROCK_T)
     fi = len(stope.f) // 2
     c = sum((stope.v[j] for j in stope.f[fi]), Vector()) / len(stope.f[fi])
     if P.face_normal(stope, fi).dot((stope_c + Vector((0, 0, 1.5))) - c) < 0:
@@ -472,13 +472,13 @@ def build_interior():
     end2 = drift2[-1]
     for k in range(18):
         p = end2 + Vector((P.rnd(-2.2, 0.8), P.rnd(-0.9, 0.9), P.rnd(0.0, 1.8)))
-        s.add(P.blob((0, 0, 0), (P.rnd(0.3, 0.8), P.rnd(0.3, 0.7), P.rnd(0.25, 0.6)), "rock_t", 8, 0.35, k * 2.1, tint=ROCK_T, rings=5),
+        s.add(P.blob((0, 0, 0), (P.rnd(0.3, 0.8), P.rnd(0.3, 0.7), P.rnd(0.25, 0.6)), "rock_cliff", 8, 0.35, k * 2.1, tint=ROCK_T, rings=5),
               T(p), "main")
     for k in range(4):
         a = end2 + Vector((P.rnd(-3, -0.5), P.rnd(-0.8, 0.8), 0.2))
         s.add(P.beam(a, a + Vector((P.rnd(0.5, 1.5), P.rnd(-0.6, 0.6), P.rnd(0.8, 1.8))), 0.18, 0.18, "wood_log", tint=TIMBER), None, "main")
-    s.add(P.blob((0, 0, 0), (1.3, 1.2, 1.4), "rock_t", 10, 0.2, 3.0, tint=ROCK_T), T(end2 + Vector((-1.0, 0, 1.0))), "main")
-    s.add(P.blob((0, 0, 0), (0.9, 1.1, 1.3), "rock_t", 10, 0.2, 4.0, tint=ROCK_T), T(powder[-1] + Vector((0, 0.6, 1.0))), "main")
+    s.add(P.blob((0, 0, 0), (1.3, 1.2, 1.4), "rock_cliff", 10, 0.2, 3.0, tint=ROCK_T), T(end2 + Vector((-1.0, 0, 1.0))), "main")
+    s.add(P.blob((0, 0, 0), (0.9, 1.1, 1.3), "rock_cliff", 10, 0.2, 4.0, tint=ROCK_T), T(powder[-1] + Vector((0, 0.6, 1.0))), "main")
     # Owen's depot chamber at the end of the crosscut
     dc = cross[-1] + Vector((0, -2.2, 0))
     rings = []
@@ -487,7 +487,7 @@ def build_interior():
         p = cross[-1] + Vector((0, -4.6 * t, 0))
         wd = 2.0 + 3.0 * math.sin(math.pi * t) ** 0.6
         rings.append(tunnel_ring(p, (0, -1, 0), wd, 2.6 + 0.4 * math.sin(math.pi * t), 0.15, 9.0 + k, 0.03))
-    dch = P.loft(rings, "rock_t", True, True, ROCK_T, cap1=True)
+    dch = P.loft(rings, "rock_cliff", True, True, ROCK_T, cap1=True)
     fi = len(dch.f) // 2
     c = sum((dch.v[j] for j in dch.f[fi]), Vector()) / len(dch.f[fi])
     if P.face_normal(dch, fi).dot(dc + Vector((0, 0, 1.3)) - c) < 0:
@@ -529,7 +529,7 @@ def build_interior():
         s.add(rod(p - side * 3.2, p + side * 3.2, 0.14, "wood_log", 8, cap_mat="wood_endgrain", tint=TIMBER), None, "main")
     for k in range(10):
         p = stope_c + Vector((P.rnd(-5, 5), P.rnd(-2.5, 2.5), 0))
-        s.add(P.blob((0, 0, 0), (P.rnd(0.4, 1.0), P.rnd(0.4, 0.9), P.rnd(0.2, 0.5)), "rock_t", 8, 0.3, k * 1.9, tint=ROCK_T, rings=4),
+        s.add(P.blob((0, 0, 0), (P.rnd(0.4, 1.0), P.rnd(0.4, 0.9), P.rnd(0.2, 0.5)), "rock_cliff", 8, 0.3, k * 1.9, tint=ROCK_T, rings=4),
               T(p), "main")
     # ladder raise above the main drift near its end
     RX_ = Vector((-55.0, 1.2, 2.3))

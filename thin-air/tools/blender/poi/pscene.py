@@ -81,6 +81,8 @@ MATS = {
     "rope": lib("rope"),
     "rubber": lib("rubber"),
     "hide": lib("hide"),
+    "panel": lib("rubber", desat=1.0, lum=4.6, rough_mul=0.75, normal_strength=0.15),   # FRP wall lining
+    "rock_cliff": ter("cliff", tint=(1.25, 1.22, 1.18), rough_mul=0.8),                   # dark wet tunnel rock
     "plastic": lib("rubber", desat=1.0, lum=4.2, rough_mul=0.62, normal_strength=0.3),
     # mineral
     "concrete": lib("concrete"),

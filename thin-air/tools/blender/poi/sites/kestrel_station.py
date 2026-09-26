@@ -28,7 +28,7 @@ WALK_Y = (0.6, 2.4)
 DOOR_Y = (1.05, 1.95)
 
 
-def add_wall(s, M, start, theta, L, H, openings, mat_out="paint_metal", mat_in="paint_metal", tint_out=RED,
+def add_wall(s, M, start, theta, L, H, openings, mat_out="paint_metal", mat_in="panel", tint_out=RED,
              tint_in=INWALL, t=WT, bucket="main", surface="metal", seg=1.2, windows=True):
     me, cols = AR.wall(L, H, t, [(a, b, c, d) for a, b, c, d, *_ in openings], mat_out, mat_in, tint_out, tint_in, seg)
     W = M @ T(start[0], start[1], start[2] if len(start) > 2 else 0.0) @ RZ(theta)
@@ -56,7 +56,7 @@ def module(s, key, cx, openings, roof=True):
     s.add(box(MW - WT, ML - WT, 0.06, "vinyl_floor", 'y', seg=1.5, flags=P.F_NOEXP), M @ T(0, 0, F - 0.03), "main")
     s.add(box(MW + 0.1, ML + 0.1, 0.22, "paint_metal", 'y', tint=(0.25, 0.25, 0.25), seg=2.0), M @ T(0, 0, F - 0.17), "main")
     s.col_box("metal", M @ Vector((0, 0, F - 0.14)), (MW + 0.1, ML + 0.1, 0.28))
-    ceil = box(MW - WT, ML - WT, 0.04, "paint_metal", 'y', tint=(0.9, 0.9, 0.88), seg=1.5, flags=P.F_NOEXP)
+    ceil = box(MW - WT, ML - WT, 0.04, "panel", 'y', tint=(0.9, 0.9, 0.88), seg=1.5, flags=P.F_NOEXP)
     s.add(ceil, M @ T(0, 0, F + WH - 0.02), "main")
     for sx in (-1, 1):
         s.add(box(0.14, ML + 0.3, 0.26, "metal_dark", 'y', tint=(0.6, 0.6, 0.6)), M @ T(sx * 1.55, 0, F - 0.41), "main")
@@ -132,7 +132,7 @@ def walkway(s, x0, x1):
     s.col_box("metal", M @ Vector((L / 2, (ya + yb) / 2, F - 0.08)), (L, w + 0.2, 0.16))
     s.add(box(L, w + 0.3, 0.12, "metal_corrugated", 'x', tint=(0.8, 0.8, 0.8)), M @ T(L / 2, (ya + yb) / 2, F + H + 0.06), "main")
     s.col_box("metal", M @ Vector((L / 2, (ya + yb) / 2, F + H + 0.06)), (L, w + 0.3, 0.12))
-    s.add(box(L, w, 0.03, "paint_metal", 'x', tint=(0.9, 0.9, 0.88), flags=P.F_NOEXP), M @ T(L / 2, (ya + yb) / 2, F + H - 0.02), "main")
+    s.add(box(L, w, 0.03, "panel", 'x', tint=(0.9, 0.9, 0.88), flags=P.F_NOEXP), M @ T(L / 2, (ya + yb) / 2, F + H - 0.02), "main")
     s.add(box(L, w, 0.3, "paint_metal", 'x', tint=(0.25, 0.25, 0.25)), M @ T(L / 2, (ya + yb) / 2, F - 0.2), "main")
     for x in (1.2, L - 1.2):
         for y in (ya + 0.2, yb - 0.2):
@@ -293,7 +293,7 @@ def build():
               B @ T(0.5 + k * 0.2, -1.8 + k * 0.4, 0.76), "interior")
     # whiteboard on the east wall
     s.add(box(0.03, 1.5, 0.9, "paint_gloss", tint=(0.9, 0.9, 0.9)), B @ T(2.0, -0.6, 1.5), "interior")
-    s.add(PR.decal("whiteboard", 1.42, 0.8).transformed(RZ(90)), B @ T(1.982, -0.6, 1.5), "interior")
+    s.add(PR.decal("whiteboard", 1.42, 0.8).transformed(RZ(-90)), B @ T(1.982, -0.6, 1.5), "interior")
     # O2 concentrator + bottle rack (comms corner)
     o2 = box(0.4, 0.35, 0.65, "plastic", tint=(0.85, 0.85, 0.82)).transformed(T(0, 0, 0.325))
     o2.extend(box(0.2, 0.01, 0.1, "screen", flags=P.F_NOAO).transformed(T(0, -0.18, 0.55)))
@@ -359,7 +359,7 @@ def build():
                     T(-0.35 + j * 0.35, 0, 0.1 + lv * 0.47 + 0.12)))
         s.add(sh, A @ T(x, 5.1, 0) @ RZ(180), "interior")
     s.col_box("metal", A @ Vector((0, 5.1, 1.0)), (3.4, 0.4, 2.0))
-    s.add(PR.decal("topo_map", 1.2, 0.8).transformed(RZ(-90)), A @ T(-1.985, -1.3, 1.55), "interior")
+    s.add(PR.decal("topo_map", 1.2, 0.8).transformed(RZ(90)), A @ T(-1.985, -1.3, 1.55), "interior")
     s.add(box(0.8, 0.25, 0.05, "lamp", flags=P.F_NOAO), A @ T(0, 0, 2.42), "interior")
     s.light("Lab", A @ Vector((0.0, 0.0, 2.2)), (0.95, 0.95, 1.0), 1.8, 8.0)
 
@@ -440,7 +440,7 @@ def build():
         tk = fuel_tank()
         s.add(tk, T(GX - 5.2, GY - 1.4 + k * 1.6, 0) @ RZ(90), "main")
         s.col_box("metal", Vector((GX - 5.2, GY - 1.4 + k * 1.6, 1.05)), (1.25, 3.0, 1.25))
-        s.add(PR.decal("sign_diesel", 0.5, 0.25).transformed(RZ(-90)), T(GX - 5.2 + 0.62, GY - 1.4 + k * 1.6, 1.05), "detail")
+        s.add(PR.decal("sign_diesel", 0.5, 0.25).transformed(RZ(90)), T(GX - 5.2 + 0.62, GY - 1.4 + k * 1.6, 1.05), "detail")
     s.add(tube([(GX - 4.6, GY - 0.6, 0.6), (GX - 3.0, GY - 0.6, 0.3), (GX - SW / 2 - 0.05, GY - 0.6, 0.5)], 0.025, "metal_bare", 6), None, "detail")
     pal = box(1.2, 1.2, 0.14, "wood_fresh", 'x')
     for k in range(4):

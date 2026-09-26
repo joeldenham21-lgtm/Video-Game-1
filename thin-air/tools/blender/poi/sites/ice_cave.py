@@ -80,7 +80,7 @@ def ice_passage(path, widths, heights, seed_, step=0.9):
 
 def build_interior():
     s = P.Site("ice_cave", ground=False, interior=True, seed_=89)
-    s.bucket("main", vis_end=0.0)
+    s.bucket("main", vis_end=220.0)     # interiors sit 1 km under the terrain: never drawn from the surface
     s.bucket("detail", vis_end=40.0)
     # Local frame: origin = inside of the mouth transition; the passage winds north (+Y).
     path = [Vector((0, 0, 0)), Vector((0.5, 7, 0.2)), Vector((-2.0, 15, 0.5)), Vector((-1.0, 24, 0.7)), Vector((2.5, 31, 0.9)),

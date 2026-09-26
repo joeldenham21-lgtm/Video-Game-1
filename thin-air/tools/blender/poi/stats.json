@@ -5,7 +5,7 @@
   "id": "ashford_mine",
   "lights": 0,
   "markers": 11,
-  "secs": 2.3,
+  "secs": 2.0,
   "surfaces": {
    "detail": 6,
    "ground": 1,
@@ -26,7 +26,7 @@
   "id": "ashford_mine_interior",
   "lights": 2,
   "markers": 17,
-  "secs": 2.8,
+  "secs": 2.0,
   "surfaces": {
    "detail": 2,
    "main": 15
@@ -38,24 +38,24 @@
   }
  },
  "crash_site": {
-  "cols": 24,
-  "glb_kb": 1657,
+  "cols": 26,
+  "glb_kb": 1745,
   "id": "crash_site",
   "lights": 0,
   "markers": 18,
-  "secs": 4.3,
+  "secs": 4.5,
   "surfaces": {
-   "detail": 9,
+   "detail": 13,
    "ground": 2,
    "interior": 10,
    "main": 12
   },
-  "total": 19666,
+  "total": 20532,
   "tris": {
-   "detail": 1208,
+   "detail": 1564,
    "ground": 2152,
-   "interior": 2590,
-   "main": 13716
+   "interior": 3224,
+   "main": 13592
   }
  },
  "fire_lookout": {
@@ -130,16 +130,16 @@
  },
  "kestrel_station": {
   "cols": 204,
-  "glb_kb": 2510,
+  "glb_kb": 2511,
   "id": "kestrel_station",
   "lights": 6,
   "markers": 31,
-  "secs": 6.4,
+  "secs": 7.2,
   "surfaces": {
    "detail": 10,
    "ground": 1,
    "interior": 20,
-   "main": 19
+   "main": 20
   },
   "total": 28824,
   "tris": {
@@ -172,7 +172,7 @@
   "id": "ranger_cabin",
   "lights": 1,
   "markers": 17,
-  "secs": 4.8,
+  "secs": 5.3,
   "surfaces": {
    "detail": 7,
    "ground": 1,

@@ -124,7 +124,7 @@ def xs_between(a, b, step, extra=()):
     return sorted(xs)
 
 
-def skin(xs, jag_first=None, jag_last=None, seed_=0.0, crumple=None):
+def skin(xs, jag_first=None, jag_last=None, seed_=0.0, crumple=None, holes=()):
     """Outer + inner skin between the given stations, windows cut, torn ends jagged (A frame)."""
     rings_o = []
     rings_i = []
@@ -160,6 +160,9 @@ def skin(xs, jag_first=None, jag_last=None, seed_=0.0, crumple=None):
         P.flip(inner)
     P.remove_faces(outer, lambda c, i: in_window(c, wins))
     P.remove_faces(inner, lambda c, i: in_window(c, wins, True))
+    for x0, x1, f0, f1, side in holes:
+        for m_ in (outer, inner):
+            P.remove_faces(m_, lambda c, i: x0 < c.x < x1 and c.y * side > sec(c.x)[0] - 0.12 and f0 < side_frac(c) < f1)
     # torn edge: connect outer and inner at the jagged ends
     edge = P.Mesh()
     for k, jag in ((0, jag_first), (len(xs) - 1, jag_last)):
@@ -181,6 +184,8 @@ def skin(xs, jag_first=None, jag_last=None, seed_=0.0, crumple=None):
         for side in (1, -1):
             if (a, b) == (0.35, 0.85) and side == -1:
                 continue            # this one shattered on impact
+            if (a, b) == COCKPIT_WINDOW and side == -1:
+                continue            # right pilot door torn off (lies on the trail)
             x0, x1 = min(a, b), max(a, b)
             hw = sec((x0 + x1) / 2)[0]
             _hw, zb, zt, rc = sec((x0 + x1) / 2)
@@ -328,6 +333,59 @@ def spruce_top(length, r, seed_):
     return me
 
 
+def extras(s, Wf, Wa, hinge, Wr, yaw):
+    """Small parts that sell the aircraft: nav lights, pitot, antennas and the snapped HF wire, door outline and
+    steps, exhaust stack, oil-cooler scoop, wing-root fairing; cockpit headsets, belts, extinguisher, papers."""
+    d = P.Mesh()
+    # nav lights (red port = left, green starboard), pitot on the left wing
+    d.extend(lathe([(0.0, 0.0), (0.05, 0.0), (0.04, 0.08), (0.0, 0.1)], "glass", 8, flags=P.F_NOAO).transformed(
+        hinge @ T(3.3 - 0.5, 8.86, 1.02) @ RX(-90)))
+    d.extend(box(0.12, 0.05, 0.05, "led_red", flags=P.F_NOAO).transformed(hinge @ T(3.3 - 0.5, 8.88, 1.02)))
+    d.extend(rod((3.4, 6.2, 0.96), (3.9, 6.2, 0.96), 0.012, "metal_bare", 6).transformed(hinge))
+    d.extend(rod((3.3, 6.2, 0.98), (3.4, 6.2, 0.96), 0.02, "metal_bare", 6).transformed(hinge))
+    s.add(d, None, "detail")
+    g = P.Mesh()
+    g.extend(box(0.12, 0.05, 0.05, "plastic", tint=(0.05, 0.4, 0.1)).transformed(T(-0.5 + 3.3 - 3.3, -8.88, 0.02)))
+    s.add(g, Wr @ T(-0.5, 0, 0), "detail")
+    a = P.Mesh()
+    # VHF whip behind the wing, HF mast on the roof with its wire snapped (the tail is gone)
+    a.extend(rod((0.9, 0.0, 1.0), (0.55, 0.0, 1.62), 0.012, "metal_dark", 6))
+    a.extend(rod((1.1, 0.0, 1.0), (1.0, 0.0, 1.35), 0.03, "metal_dark", 6))
+    a.extend(tube([(1.0, 0.0, 1.35), (0.2, 0.05, 1.2), (-0.1, -0.35, 0.6), (0.05, -0.7, -0.2), (-0.3, -0.9, -0.7)], 0.003, "metal_dark", 4))
+    # door outline + handle (left pilot door), step bars under both doors
+    for (x0, x1) in ((3.64, 4.36),):
+        hw = sec(4.0)[0] + 0.004
+        for zz in (-0.62, 0.84):
+            a.extend(box(x1 - x0, 0.006, 0.012, "paint_metal", tint=(0.05, 0.05, 0.05), flags=P.F_NOAO).transformed(T((x0 + x1) / 2, hw, zz)))
+        for xx in (x0, x1):
+            a.extend(box(0.012, 0.006, 1.46, "paint_metal", tint=(0.05, 0.05, 0.05), flags=P.F_NOAO).transformed(T(xx, hw, 0.11)))
+        a.extend(box(0.12, 0.03, 0.03, "metal_bare").transformed(T(x0 + 0.12, hw + 0.02, 0.1)))
+    for sy in (1, -1):
+        a.extend(tube([(3.8, sy * 0.8, -0.8), (3.8, sy * 1.02, -1.0), (4.1, sy * 1.02, -1.0), (4.1, sy * 0.8, -0.8)], 0.012, "metal_bare", 5))
+    # exhaust stack (right side, crushed), oil-cooler scoop under the cowling, wing-root fairings
+    a.extend(tube([(4.95, -0.62, -0.15), (4.6, -0.8, -0.3), (3.9, -0.84, -0.42)], 0.06, "metal_rusty", 8))
+    a.extend(box(0.5, 0.35, 0.18, "metal_aircraft", tint=RED).transformed(T(5.15, 0.0, -0.62) @ RY(8)))
+    for sy in (1, -1):
+        a.extend(box(1.9, 0.12, 0.16, "metal_aircraft", tint=WHITE).transformed(T(2.3, sy * 0.86, 0.98)))
+    a.displace(lambda p: crumple_nose(p) if p.x > 3.3 else Vector((0, 0, 0)))
+    s.add(a, Wf, "detail")
+    # cockpit: headsets on hooks, belts, extinguisher, papers
+    i = P.Mesh()
+    for sy in (0.38, -0.38):
+        band = [Vector((3.55, sy + 0.09 * math.cos(math.radians(t)), 0.62 + 0.09 * math.sin(math.radians(t)))) for t in range(0, 181, 30)]
+        i.extend(tube(band, 0.008, "plastic", 5, tint=(0.08, 0.08, 0.08)))
+        for e in (band[0], band[-1]):
+            i.extend(cyl(0.045, 0.035, "plastic", 10, tint=(0.08, 0.08, 0.08)).transformed(T(e) @ RX(90) @ T(0, 0, -0.017)))
+        i.extend(tube([(3.55, sy + 0.09, 0.62), (3.6, sy + 0.1, 0.3), (3.9, sy * 0.4, 0.05), (4.3, 0.0, 0.2)], 0.004, "rubber", 4))
+        for sx in (-1, 1):
+            i.extend(P.strip_tube([(3.62, sy + sx * 0.2, 0.25), (3.7, sy + sx * 0.12, -0.45), (3.8, sy + sx * 0.05, -0.52)], 0.045, 0.006,
+                                  "canvas", tint=(0.12, 0.12, 0.14)))
+    i.extend(PR.gas_bottle(0.45, 0.06, (0.6, 0.05, 0.03)).transformed(T(4.25, 0.62, -0.95)))
+    for k in range(5):
+        i.extend(PR.decal("paper", 0.21, 0.3).transformed(T(P.rnd(0.4, 3.2), P.rnd(-0.6, 0.6), -0.9) @ RZ(P.rnd(0, 360)) @ RX(-90)))
+    s.add(i, Wf, "interior")
+
+
 def build():
     s = P.Site("crash_site", seed_=17)
     s.bucket("main", vis_end=900.0)
@@ -342,7 +400,7 @@ def build():
     wins = CABIN_WINDOWS + [COCKPIT_WINDOW]
     edges = [w for ab in wins for w in ab]
     xs = xs_between(0.1, 4.9, 0.3, edges + [3.6, 4.55])
-    fwd = skin(xs, jag_first=0.2, seed_=1.3, crumple=crumple_nose)
+    fwd = skin(xs, jag_first=0.2, seed_=1.3, crumple=crumple_nose, holes=[(3.62, 4.38, -0.05, 0.95, -1)])
     # firewall cap (behind the engine) and buckled floor
     fw = [p for p in ring(4.9, 0.0)]
     cap = P.Mesh()
@@ -474,7 +532,7 @@ def build():
     # instrument panel + glare shield + control column with two wheels
     pnl = box(0.12, 1.3, 0.42, "paint_metal", 'y', tint=(0.12, 0.12, 0.12))
     s.add(pnl, I @ T(4.42, 0, 0.3) @ RY(-12), "interior")
-    s.add(PR.decal("otter_panel", 1.2, 0.5, "decal").transformed(RZ(90)), I @ T(4.355, 0, 0.3) @ RY(-12) @ T(-0.001, 0, 0),
+    s.add(PR.decal("otter_panel", 1.2, 0.5, "decal").transformed(RZ(-90)), I @ T(4.355, 0, 0.3) @ RY(-12) @ T(-0.001, 0, 0),
           "interior")
     s.add(box(0.35, 1.36, 0.04, "leather", 'y', tint=(0.3, 0.3, 0.3)), I @ T(4.36, 0, 0.55) @ RY(10), "interior")
     col = rod((4.3, 0, -0.9), (4.1, 0, 0.0), 0.035, "paint_metal", tint=(0.1, 0.1, 0.1))
@@ -523,7 +581,9 @@ def build():
     # --- fuselage collision (A frame boxes) ---------------------------------------------------------------------
     for c, sz in (((2.4, 0, -0.98), (5.0, 1.64, 0.12)),        # floor
                   ((2.5, 0.81, 0), (4.8, 0.06, 2.0)),           # left wall
-                  ((2.5, -0.81, 0), (4.8, 0.06, 2.0)),          # right wall
+                  ((1.8, -0.81, 0), (3.4, 0.06, 2.0)),          # right wall (aft of the torn-off door)
+                  ((4.6, -0.81, 0), (0.45, 0.06, 2.0)),
+                  ((4.0, -0.81, 0.93), (0.8, 0.06, 0.14)),
                   ((2.4, 0, 1.02), (5.0, 1.64, 0.1)),           # roof
                   ((4.75, 0, -0.1), (0.5, 1.5, 1.8)),           # firewall / panel
                   ((5.45, 0, 0.1), (1.2, 1.35, 1.35))):         # engine
@@ -647,6 +707,8 @@ def build():
         snag.extend(PR.splinter_top(r * 0.7, "wood_fresh", 0.6, seed_=k + 0.3).transformed(T(0, 0, H)))
         s.add(snag, T(q.x, q.y, G.h(q.x, q.y) - 0.3), "main")
         s.col_box("wood", (q.x, q.y, G.h(q.x, q.y) + H / 2), (r * 1.6, r * 1.6, H))
+
+    extras(s, Wf, Wa, hinge, Wr, yaw)
 
     # --- sockets ------------------------------------------------------------------------------------------------
     def A(x, y, z):
