@@ -531,9 +531,10 @@ func _poll_actions() -> void:
 		if Input.is_action_just_pressed(HOTBAR_ACTIONS[i]):
 			select_hotbar(i)
 			return
-	if Input.is_action_just_pressed(&"hotbar_next"):
+	# While build mode owns the wheel / bumpers (rotating the ghost) they don't cycle the hotbar.
+	if Input.is_action_just_pressed(&"hotbar_next") and not tool_blocked:
 		_cycle_hotbar(1)
-	elif Input.is_action_just_pressed(&"hotbar_prev"):
+	elif Input.is_action_just_pressed(&"hotbar_prev") and not tool_blocked:
 		_cycle_hotbar(-1)
 	elif Input.is_action_just_pressed(&"drop"):
 		drop_active_item()

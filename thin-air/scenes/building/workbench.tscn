@@ -1,0 +1,7 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/items/workbench.tscn" id="1"]
+[ext_resource type="Script" path="res://src/building/pieces/built_workbench.gd" id="2"]
+
+[node name="Workbench" instance=ExtResource("1")]
+script = ExtResource("2")

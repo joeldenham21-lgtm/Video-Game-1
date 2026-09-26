@@ -46,6 +46,7 @@ window/handheld/orientation=4
 
 [gui]
 
+theme/custom="res://assets/ui/theme.tres"
 theme/custom_font="res://assets/fonts/IBMPlexSans-Regular.ttf"
 
 [input]
@@ -304,4 +305,32 @@ sun_direction={
 fog_color={
 "type": "color",
 "value": Color(0.7, 0.75, 0.8, 1)
+}
+terrain_height_tex={
+"type": "sampler2D",
+"value": ""
+}
+terrain_normal_tex={
+"type": "sampler2D",
+"value": ""
+}
+terrain_mask_tex={
+"type": "sampler2D",
+"value": ""
+}
+terrain_mask2_tex={
+"type": "sampler2D",
+"value": ""
+}
+terrain_shadow_tex={
+"type": "sampler2D",
+"value": ""
+}
+terrain_params={
+"type": "vec4",
+"value": Vector4(-1536, -1536, 3072, 1.5)
+}
+terrain_shadow_params={
+"type": "vec4",
+"value": Vector4(-3072, -3072, 6144, 0)
 }
