@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://d2a3wp5mv6mo2"
-path="res://.godot/imported/testmodel.glb-fea6ac47730f463f2f576cb1ec8f6878.scn"
+uid="uid://c6nmkyg661g13"
+path="res://.godot/imported/arms.glb-e26c3d049e61d6632f5467975a328128.scn"
 
 [deps]
 
-source_file="res://assets/models/_test/testmodel.glb"
-dest_files=["res://.godot/imported/testmodel.glb-fea6ac47730f463f2f576cb1ec8f6878.scn"]
+source_file="res://assets/models/fp/arms.glb"
+dest_files=["res://.godot/imported/arms.glb-e26c3d049e61d6632f5467975a328128.scn"]
 
 [params]
 
@@ -26,7 +26,7 @@ nodes/use_node_type_suffixes=true
 meshes/ensure_tangents=true
 meshes/generate_lods=true
 meshes/create_shadow_meshes=true
-meshes/light_baking=1
+meshes/light_baking=0
 meshes/lightmap_texel_size=0.2
 meshes/force_disable_compression=false
 skins/use_named_skins=true
@@ -35,11 +35,11 @@ animation/fps=30
 animation/trimming=false
 animation/remove_immutable_tracks=true
 animation/import_rest_as_RESET=false
-import_script/path=""
+import_script/path="res://scenes/props/prop_import.gd"
 materials/extract=0
 materials/extract_format=0
 materials/extract_path=""
 _subresources={}
 gltf/naming_version=2
 gltf/embedded_image_handling=1
-gltf/texture_map_mode=1
+gltf/texture_map_mode=0
