@@ -116,6 +116,11 @@ _subresources={
 "use_external/fallback_path": "res://assets/models/poi/materials/wood_log.tres",
 "use_external/path": "res://assets/models/poi/materials/wood_log.tres"
 },
+"wood_old": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/wood_old.tres",
+"use_external/path": "res://assets/models/poi/materials/wood_old.tres"
+},
 "wood_planks": {
 "use_external/enabled": true,
 "use_external/fallback_path": "res://assets/models/poi/materials/wood_planks.tres",

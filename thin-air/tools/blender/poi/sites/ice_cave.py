@@ -119,7 +119,7 @@ def build_interior():
         chan.append(p + off + Vector((0, 0, 0.01)))
     for a, b in zip(chan, chan[1:]):
         d = b - a
-        side = Vector((-d.y, d.x, 0)).normalized() * 0.35
+        side = Vector((-d.y, d.x, 0)).normalized() * 0.55
         s.add(P.quad(a - side, a + side, b + side, b - side, "water", flags=P.F_NOAO), None, "main")
     for k, (p, r) in enumerate(((cc + Vector((2.2, 2.0, 0.02)), 1.2), (Vector((-1.5, 17.0, 0.55)), 0.7))):
         pool = P.heightpatch(r * 2, r * 1.4, 0.3, lambda x, y: 0.0, "water", flags=P.F_NOAO)

@@ -74,12 +74,22 @@ def build():
     hut = P.Mesh()
     W, D, Hh = 2.2, 1.7, 2.0
     for (sx, sy, w, d) in ((0, -D / 2, W, 0.08), (0, D / 2, W, 0.08), (-W / 2, 0, 0.08, D), (W / 2, 0, 0.08, D)):
-        hut.extend(box(w, d, Hh, "paint_metal", 'z', seg=0.6, tint=(0.8, 0.8, 0.77)).transformed(T(sx, sy, Hh / 2)))
+        hut.extend(box(w, d, Hh, "panel", 'z', seg=0.5, tint=(0.86, 0.86, 0.82)).transformed(T(sx, sy, Hh / 2)))
     hut.extend(box(W + 0.3, D + 0.3, 0.1, "metal_corrugated", 'x', tint=(0.8, 0.8, 0.8)).transformed(T(0, 0, Hh + 0.08) @ RY(-5)))
     hut.extend(AR.door_leaf(0.75, 1.75, 0.05, "paint_metal", (0.7, 0.7, 0.68)).transformed(T(0.3, -D / 2 - 0.05, 0.02)))
     hut.extend(box(W + 0.4, D + 0.4, 0.25, "concrete", seg=0.6).transformed(T(0, 0, 0.0)))
+    for k in range(6):
+        hut.extend(box(0.05, 0.03, Hh - 0.1, "panel", 'z', tint=(0.8, 0.8, 0.76)).transformed(T(-W / 2 + 0.2 + k * 0.36, D / 2 + 0.045, Hh / 2)))
+        hut.extend(box(0.03, 0.05, Hh - 0.1, "panel", 'z', tint=(0.8, 0.8, 0.76)).transformed(T(-W / 2 - 0.045, -D / 2 + 0.15 + k * 0.28, Hh / 2)))
+    hut.extend(box(0.35, 0.06, 0.25, "metal_bare").transformed(T(-0.6, -D / 2 - 0.04, 1.55)))
+    for k in range(5):
+        hut.extend(box(0.3, 0.02, 0.012, "metal_dark").transformed(T(-0.6, -D / 2 - 0.075, 1.46 + k * 0.045)))
+    hut.extend(PR.decal("sign_relay", 0.6, 0.15).transformed(T(0.3, -D / 2 - 0.052, 1.95)))
     hut.extend(tube([(-W / 2 - 0.02, 0.3, 1.8), (-2.0, 0.6, 1.5), (-3.9, 1.3, 1.6), (-0.1, -0.35, 1.5)], 0.02, "rubber", 5).transformed(T(0, 0, 0)))
     s.add(hut, T(HX, HY, hz) @ RZ(8), "main")
+    lee = P.heightpatch(3.2, 3.0, 0.3, lambda u, v: max(0.0, 0.55 * (1 - (u / 1.6) ** 2) * (1 - max(0.0, v / 1.5)) * min(1.0, (v + 1.5) / 0.8)) - 0.03,
+                        "snow", smooth_=True)
+    s.add(lee, T(HX + 2.4, HY + 0.2, G.h(HX + 2.4, HY + 0.2)) @ RZ(8 - 90), "main")
     s.col_box("metal", Vector((HX, HY, hz + Hh / 2)), (W, D, Hh + 0.3), RZ(8))
     bb = box(1.0, 0.6, 0.6, "plastic", tint=(0.15, 0.15, 0.15)).transformed(T(0, 0, 0.3))
     bb.extend(box(0.9, 0.1, 0.05, "plastic", tint=(0.9, 0.7, 0.1)).transformed(T(0, -0.31, 0.45)))
@@ -94,12 +104,18 @@ def build():
     for x in (SPX - 1.0, SPX + 1.0):
         s.add(rod((x, SPY + 0.25, spz - 0.2), (x, SPY + 0.25, spz + 1.8), 0.035, "galvanized", 6), None, "main")
     s.col_box("metal", Vector((SPX, SPY, spz + 1.0)), (2.2, 0.6, 2.0))
-    # cairn with the survey disc
+    # survey cairn: a squat pile of angular frost-shattered blocks with the brass survey disc on a bolt
     cz = G.h(-2.2, 1.6)
-    for k in range(9):
-        r_ = 0.5 - k * 0.045
-        s.add(P.blob((0, 0, 0), (r_, r_ * 0.9, 0.18), "rock", 8, 0.3, k * 1.7, rings=4), T(-2.2 + P.rnd(-0.05, 0.05), 1.6, cz + 0.12 + k * 0.2), "main")
-    s.col_box("rock", Vector((-2.2, 1.6, cz + 0.9)), (0.9, 0.9, 1.8))
+    for k in range(26):
+        hz = P.rnd(0.0, 1.0) ** 1.4 * 1.15
+        rr = (1.0 - hz / 1.3) * 0.65 * P.rnd(0.3, 1.0)
+        a = P.rnd(0, 2 * math.pi)
+        sz = P.rnd(0.14, 0.28)
+        blk = box(sz * P.rnd(1.0, 1.6), sz * P.rnd(0.8, 1.3), sz * P.rnd(0.6, 0.9), "rock", 'x', tint=(0.8, 0.8, 0.78))
+        blk.displace(lambda p, k=k: Vector((0.02 * P.nz(p, 9.0, k), 0.02 * P.nz(p, 9.0, k + 1), 0.015 * P.nz(p, 9.0, k + 2))))
+        s.add(blk, T(-2.2 + math.cos(a) * rr, 1.6 + math.sin(a) * rr, cz + 0.08 + hz) @ RZ(P.rnd(0, 180)) @ RX(P.rnd(-15, 15)) @ RY(P.rnd(-15, 15)), "main")
+    s.add(cyl(0.045, 0.01, "metal_bare", 12, tint=(0.8, 0.6, 0.3)), T(-1.55, 1.6, cz + 0.02), "detail")
+    s.col_box("rock", Vector((-2.2, 1.6, cz + 0.6)), (1.2, 1.2, 1.2))
     # rime on everything exposed, grown into the wind
     rimed = P.Mesh()
     for src, amt, sd in ((mast, 1.0, 1), (ant, 0.9, 2), (guys, 0.5, 3)):

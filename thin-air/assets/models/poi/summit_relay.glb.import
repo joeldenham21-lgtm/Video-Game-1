@@ -66,6 +66,11 @@ _subresources={
 "use_external/fallback_path": "res://assets/models/poi/materials/metal_corrugated.tres",
 "use_external/path": "res://assets/models/poi/materials/metal_corrugated.tres"
 },
+"metal_dark": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/metal_dark.tres",
+"use_external/path": "res://assets/models/poi/materials/metal_dark.tres"
+},
 "metal_rusty": {
 "use_external/enabled": true,
 "use_external/fallback_path": "res://assets/models/poi/materials/metal_rusty.tres",
@@ -80,6 +85,11 @@ _subresources={
 "use_external/enabled": true,
 "use_external/fallback_path": "res://assets/models/poi/materials/paint_metal.tres",
 "use_external/path": "res://assets/models/poi/materials/paint_metal.tres"
+},
+"panel": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/panel.tres",
+"use_external/path": "res://assets/models/poi/materials/panel.tres"
 },
 "plastic": {
 "use_external/enabled": true,
@@ -100,6 +110,11 @@ _subresources={
 "use_external/enabled": true,
 "use_external/fallback_path": "res://assets/models/poi/materials/rubber.tres",
 "use_external/path": "res://assets/models/poi/materials/rubber.tres"
+},
+"snow": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/snow.tres",
+"use_external/path": "res://assets/models/poi/materials/snow.tres"
 },
 "solar_cell": {
 "use_external/enabled": true,

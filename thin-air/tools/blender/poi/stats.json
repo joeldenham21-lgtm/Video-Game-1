@@ -1,16 +1,16 @@
 {
  "ashford_mine": {
   "cols": 32,
-  "glb_kb": 1165,
+  "glb_kb": 1166,
   "id": "ashford_mine",
   "lights": 0,
   "markers": 11,
-  "secs": 5.5,
+  "secs": 2.0,
   "surfaces": {
    "detail": 6,
    "ground": 2,
    "interior": 4,
-   "main": 12
+   "main": 13
   },
   "total": 13252,
   "tris": {
@@ -22,14 +22,14 @@
  },
  "ashford_mine_interior": {
   "cols": 68,
-  "glb_kb": 1442,
+  "glb_kb": 1443,
   "id": "ashford_mine_interior",
   "lights": 2,
   "markers": 17,
-  "secs": 2.8,
+  "secs": 1.9,
   "surfaces": {
    "detail": 2,
-   "main": 15
+   "main": 16
   },
   "total": 16794,
   "tris": {
@@ -39,16 +39,16 @@
  },
  "ashford_tunnel_kit": {
   "cols": 0,
-  "glb_kb": 420,
+  "glb_kb": 421,
   "id": "ashford_tunnel_kit",
   "lights": 0,
   "markers": 1,
-  "secs": 0.6,
+  "secs": 0.5,
   "surfaces": {
    "kit_bend": 3,
    "kit_dead_end": 1,
    "kit_junction": 1,
-   "kit_raise": 5,
+   "kit_raise": 6,
    "kit_stope": 3,
    "kit_straight": 5,
    "kit_straight_rock": 3
@@ -123,11 +123,11 @@
  },
  "ice_cave": {
   "cols": 97,
-  "glb_kb": 632,
+  "glb_kb": 633,
   "id": "ice_cave",
   "lights": 2,
   "markers": 6,
-  "secs": 0.8,
+  "secs": 0.9,
   "surfaces": {
    "detail": 3,
    "main": 8
@@ -144,7 +144,7 @@
   "id": "ice_cave_entrance",
   "lights": 0,
   "markers": 4,
-  "secs": 0.9,
+  "secs": 0.6,
   "surfaces": {
    "detail": 2,
    "main": 4
@@ -216,21 +216,21 @@
  },
  "summit_relay": {
   "cols": 6,
-  "glb_kb": 1046,
+  "glb_kb": 1095,
   "id": "summit_relay",
   "lights": 0,
   "markers": 9,
   "secs": 3.4,
   "surfaces": {
    "detail": 3,
-   "main": 11,
+   "main": 14,
    "rime": 1
   },
-  "total": 8510,
+  "total": 8940,
   "tris": {
-   "detail": 594,
-   "main": 2748,
-   "rime": 5168
+   "detail": 638,
+   "main": 3002,
+   "rime": 5300
   }
  },
  "trapper_cabin": {

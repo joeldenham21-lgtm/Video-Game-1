@@ -18,7 +18,8 @@ import props as PR
 import arch as AR
 from plib import T, RX, RY, RZ, box, cyl, lathe, rod, tube
 
-TIMBER = (0.78, 0.72, 0.64)
+TIMBER = (0.8, 0.78, 0.74)        # weathered, silvered (outside)
+TIMBER_IN = (0.46, 0.42, 0.37)     # damp, dark (underground)
 ORANGE = (0.85, 0.32, 0.05)
 ROCK_T = (1.0, 1.0, 1.0)
 
@@ -67,19 +68,20 @@ def tunnel(path, w=1.9, h=2.45, seed_=0.0, step=0.8, mat="rock_cliff", tint=ROCK
     return me, dense
 
 
-def timber_set(p, t, w=1.75, h=2.25, tint=TIMBER, lag=True, paint=None, seed_=0):
+def timber_set(p, t, w=1.75, h=2.25, tint=None, lag=True, paint=None, seed_=0):
     """Post-and-cap timber set at p facing along t (square-hewn 0.2 m timbers, battered posts) + lagging."""
     t = Vector(t).normalized()
     side = Vector((-t.y, t.x, 0))
     me = P.Mesh()
     P.seed(seed_)
+    tint = tint or TIMBER_IN
     for sx in (-1, 1):
         b = p + side * sx * (w / 2)
         top = p + side * sx * (w / 2 - 0.08) + Vector((0, 0, h))
         tt = tint if not paint or (sx > 0) else paint
-        me.extend(P.beam(b, top, 0.2, 0.2, "wood_log", up=t, tint=tt, end_mat="wood_endgrain"))
+        me.extend(P.beam(b, top, 0.2, 0.2, "wood_old", up=t, tint=tt, end_mat="wood_endgrain"))
     cap = p + Vector((0, 0, h + 0.1))
-    me.extend(P.beam(cap - side * (w / 2 + 0.15), cap + side * (w / 2 + 0.15), 0.22, 0.2, "wood_log", up=(0, 0, 1),
+    me.extend(P.beam(cap - side * (w / 2 + 0.15), cap + side * (w / 2 + 0.15), 0.22, 0.2, "wood_old", up=(0, 0, 1),
                      tint=paint or tint, end_mat="wood_endgrain"))
     if lag:
         for k in range(5):
@@ -109,7 +111,7 @@ def rails(path, gauge=0.61, tie_every=0.65, tint=(1, 1, 1), ties=True):
             while d < L:
                 q = a + t * d
                 me.extend(P.beam(q - side * 0.55 + Vector((0, 0, 0.03)), q + side * 0.55 + Vector((0, 0, 0.03)), 0.14, 0.07,
-                                 "wood_log", tint=(0.55, 0.5, 0.45)))
+                                 "wood_old", tint=(0.55, 0.5, 0.45)))
                 d += tie_every
             acc = (acc + L) % tie_every
     return me
@@ -153,18 +155,18 @@ def build_exterior():
     # heavy portal frame, head block, retaining crib walls either side
     F = P.Mesh()
     for sy in (-1, 1):
-        F.extend(P.beam((PX + 1.3, PY + sy * 1.15, pz - 0.2), (PX + 1.3, PY + sy * 1.1, pz + 2.6), 0.3, 0.3, "wood_log", tint=TIMBER,
+        F.extend(P.beam((PX + 1.3, PY + sy * 1.15, pz - 0.2), (PX + 1.3, PY + sy * 1.1, pz + 2.6), 0.3, 0.3, "wood_old", tint=TIMBER,
                         end_mat="wood_endgrain"))
         for k in range(7):
             z = pz + 0.15 + k * 0.33
-            F.extend(P.beam((PX + 1.5, PY + sy * 1.35, z), (PX + 1.5, PY + sy * (3.2 + 0.25 * k), z), 0.28, 0.28, "wood_log",
+            F.extend(P.beam((PX + 1.5, PY + sy * 1.35, z), (PX + 1.5, PY + sy * (3.2 + 0.25 * k), z), 0.28, 0.28, "wood_old",
                             tint=TIMBER, end_mat="wood_endgrain"))
             F.extend(P.beam((PX + 0.3, PY + sy * (3.0 + 0.25 * k), z + 0.16), (PX + 1.7, PY + sy * (3.0 + 0.25 * k), z + 0.16), 0.24, 0.24,
-                            "wood_log", tint=TIMBER, end_mat="wood_endgrain"))
-    F.extend(P.beam((PX + 1.35, PY - 1.6, pz + 2.72), (PX + 1.35, PY + 1.6, pz + 2.72), 0.34, 0.32, "wood_log", tint=TIMBER,
+                            "wood_old", tint=TIMBER, end_mat="wood_endgrain"))
+    F.extend(P.beam((PX + 1.35, PY - 1.6, pz + 2.72), (PX + 1.35, PY + 1.6, pz + 2.72), 0.34, 0.32, "wood_old", tint=TIMBER,
                     end_mat="wood_endgrain"))
     for k in range(7):
-        F.extend(P.beam((PX + 1.6, PY - 1.5 + k * 0.5, pz + 2.95), (PX - 2.0, PY - 1.5 + k * 0.5, pz + 3.1), 0.2, 0.2, "wood_log",
+        F.extend(P.beam((PX + 1.6, PY - 1.5 + k * 0.5, pz + 2.95), (PX - 2.0, PY - 1.5 + k * 0.5, pz + 3.1), 0.2, 0.2, "wood_old",
                         tint=(0.7, 0.66, 0.6)))
     s.add(F, None, "main")
     s.add(PR.decal("sign_mine", 2.6, 0.5).transformed(RZ(90)), T(PX + 1.53, PY, pz + 3.3), "main")
@@ -240,7 +242,7 @@ def build_exterior():
     for sx in (-1, 1):
         for sy in (-1, 1):
             bin_.extend(P.beam((BX + sx * 1.4, CY + sy * 1.4, G.h(BX + sx * 1.4, CY + sy * 1.4) - 0.2),
-                               (BX + sx * 1.4, CY + sy * 1.4, top_z + 1.6), 0.25, 0.25, "wood_log", tint=TIMBER, end_mat="wood_endgrain"))
+                               (BX + sx * 1.4, CY + sy * 1.4, top_z + 1.6), 0.25, 0.25, "wood_old", tint=TIMBER, end_mat="wood_endgrain"))
     for k in range(9):
         z = top_z - 1.2 + k * 0.32
         for sy in (-1, 1):
@@ -271,18 +273,18 @@ def build_exterior():
     hf = P.Mesh()
     Hh = 11.0
     for sy in (-1, 1):
-        hf.extend(P.beam((HX - 1.2, HY + sy * 1.3, hz), (HX - 1.2, HY + sy * 1.1, hz + Hh), 0.3, 0.3, "wood_log", tint=TIMBER, end_mat="wood_endgrain"))
-        hf.extend(P.beam((HX + 1.2, HY + sy * 1.3, hz), (HX + 1.2, HY + sy * 1.1, hz + Hh), 0.3, 0.3, "wood_log", tint=TIMBER, end_mat="wood_endgrain"))
-        hf.extend(P.beam((HX + 7.5, HY + sy * 1.5, hz), (HX + 0.8, HY + sy * 1.1, hz + Hh - 0.4), 0.3, 0.3, "wood_log", tint=TIMBER, end_mat="wood_endgrain"))
+        hf.extend(P.beam((HX - 1.2, HY + sy * 1.3, hz), (HX - 1.2, HY + sy * 1.1, hz + Hh), 0.3, 0.3, "wood_old", tint=TIMBER, end_mat="wood_endgrain"))
+        hf.extend(P.beam((HX + 1.2, HY + sy * 1.3, hz), (HX + 1.2, HY + sy * 1.1, hz + Hh), 0.3, 0.3, "wood_old", tint=TIMBER, end_mat="wood_endgrain"))
+        hf.extend(P.beam((HX + 7.5, HY + sy * 1.5, hz), (HX + 0.8, HY + sy * 1.1, hz + Hh - 0.4), 0.3, 0.3, "wood_old", tint=TIMBER, end_mat="wood_endgrain"))
         for k in range(4):
             z = hz + 1.5 + k * 2.6
-            hf.extend(P.beam((HX - 1.3, HY + sy * 1.2, z), (HX + 1.3, HY + sy * 1.2, z), 0.2, 0.2, "wood_log", tint=TIMBER))
+            hf.extend(P.beam((HX - 1.3, HY + sy * 1.2, z), (HX + 1.3, HY + sy * 1.2, z), 0.2, 0.2, "wood_old", tint=TIMBER))
             if k < 3:
-                hf.extend(P.beam((HX - 1.2, HY + sy * 1.25, z), (HX + 1.2, HY + sy * 1.2, z + 2.6), 0.14, 0.14, "wood_log", tint=TIMBER))
+                hf.extend(P.beam((HX - 1.2, HY + sy * 1.25, z), (HX + 1.2, HY + sy * 1.2, z + 2.6), 0.14, 0.14, "wood_old", tint=TIMBER))
     for k in range(4):
         z = hz + 1.5 + k * 2.6
         for sx in (-1, 1):
-            hf.extend(P.beam((HX + sx * 1.2, HY - 1.3, z), (HX + sx * 1.2, HY + 1.3, z), 0.2, 0.2, "wood_log", tint=TIMBER))
+            hf.extend(P.beam((HX + sx * 1.2, HY - 1.3, z), (HX + sx * 1.2, HY + 1.3, z), 0.2, 0.2, "wood_old", tint=TIMBER))
     hf.extend(box(3.0, 3.0, 0.12, "wood_planks", 'x', tint=TIMBER).transformed(T(HX, HY, hz + Hh)))
     # sheave wheel
     sh = cyl(0.9, 0.12, "metal_rusty", 24, caps=False).transformed(RX(90) @ T(0, 0, -0.06))
@@ -293,7 +295,7 @@ def build_exterior():
     sh.extend(cyl(0.12, 0.3, "metal_rusty", 10).transformed(RX(90) @ T(0, 0, -0.15)))
     hf.extend(sh.transformed(T(HX + 0.3, HY, hz + Hh + 0.95) @ RZ(90)))
     for sy in (-0.3, 0.3):
-        hf.extend(box(0.6, 0.12, 0.8, "wood_log", tint=TIMBER).transformed(T(HX + 0.3, HY + sy, hz + Hh + 0.4)))
+        hf.extend(box(0.6, 0.12, 0.8, "wood_old", tint=TIMBER).transformed(T(HX + 0.3, HY + sy, hz + Hh + 0.4)))
     s.add(hf, None, "main")
     for sx in (-1.2, 1.2):
         for sy in (-1.2, 1.2):
@@ -303,10 +305,10 @@ def build_exterior():
     for k in range(3):
         z = hz + k * 0.28
         for sy in (-1, 1):
-            col.extend(P.beam((HX - 1.5, HY + sy * 1.0, z + 0.14), (HX + 1.5, HY + sy * 1.0, z + 0.14), 0.28, 0.28, "wood_log", tint=TIMBER,
+            col.extend(P.beam((HX - 1.5, HY + sy * 1.0, z + 0.14), (HX + 1.5, HY + sy * 1.0, z + 0.14), 0.28, 0.28, "wood_old", tint=TIMBER,
                               end_mat="wood_endgrain"))
         for sx in (-1, 1):
-            col.extend(P.beam((HX + sx * 1.2, HY - 1.3, z + 0.28), (HX + sx * 1.2, HY + 1.3, z + 0.28), 0.28, 0.28, "wood_log", tint=TIMBER,
+            col.extend(P.beam((HX + sx * 1.2, HY - 1.3, z + 0.28), (HX + sx * 1.2, HY + 1.3, z + 0.28), 0.28, 0.28, "wood_old", tint=TIMBER,
                               end_mat="wood_endgrain"))
     col.extend(box(2.1, 1.7, 0.05, "metal_dark", tint=(0.01, 0.01, 0.01), flags=P.F_NOAO | P.F_NOEXP).transformed(T(HX, HY, hz - 0.3)))
     for sx in (-1, 1):
@@ -341,7 +343,7 @@ def build_exterior():
     s.col_box("metal", Vector((WX + 1.5, WY + 4.2, wz + 0.9)), (3.8, 1.4, 1.8), RZ(8))
     # hoist house remains: corner posts, collapsed roof slab, a standing wall
     for (dx, dy) in ((-2.2, -2.0), (2.2, -2.0), (2.2, 2.0)):
-        s.add(P.beam((WX + dx, WY + dy, wz), (WX + dx, WY + dy, wz + 3.0), 0.18, 0.18, "wood_log", tint=TIMBER), None, "main")
+        s.add(P.beam((WX + dx, WY + dy, wz), (WX + dx, WY + dy, wz + 3.0), 0.18, 0.18, "wood_old", tint=TIMBER), None, "main")
     wall_, cols_ = AR.wall(4.4, 3.0, 0.05, [(1.6, 2.4, 1.2, 2.0)], "wood_planks", "wood_planks", TIMBER, TIMBER, 1.5)
     s.add(wall_, T(WX - 2.2, WY - 2.0, wz), "main")
     for c, size in cols_:
@@ -375,10 +377,10 @@ def build_exterior():
     r2 = box(3.4, 3.0, 0.05, "wood_planks", 'y', seg=0.8, tint=(0.6, 0.55, 0.5))
     s.add(r2, Mb @ T(2.3, -0.5, 0.7) @ RX(12) @ RY(-20), "main")
     for k in range(5):
-        s.add(P.beam((P.rnd(-3, 3), P.rnd(-2, 2), 0.1), (P.rnd(-3, 3), P.rnd(-2, 2), P.rnd(0.2, 1.4)), 0.12, 0.12, "wood_log", tint=TIMBER),
+        s.add(P.beam((P.rnd(-3, 3), P.rnd(-2, 2), 0.1), (P.rnd(-3, 3), P.rnd(-2, 2), P.rnd(0.2, 1.4)), 0.12, 0.12, "wood_old", tint=TIMBER),
               Mb, "main")
-    s.add(PR.bunk(0.8, 1.9, 0.4, "wood_log", (0.3, 0.26, 0.2), blanket=False), Mb @ T(-3.3, 1.2, 0) @ RZ(90) @ RX(4), "interior")
-    s.add(PR.bunk(0.8, 1.9, 0.4, "wood_log", (0.3, 0.26, 0.2), blanket=False), Mb @ T(2.9, 1.3, 0) @ RZ(90), "interior")
+    s.add(PR.bunk(0.8, 1.9, 0.4, "wood_old", (0.3, 0.26, 0.2), blanket=False), Mb @ T(-3.3, 1.2, 0) @ RZ(90) @ RX(4), "interior")
+    s.add(PR.bunk(0.8, 1.9, 0.4, "wood_old", (0.3, 0.26, 0.2), blanket=False), Mb @ T(2.9, 1.3, 0) @ RZ(90), "interior")
     st = PR.wood_stove((0.25, 0.14, 0.1), 1.2)
     s.add(st, Mb @ T(0.8, 1.8, 0) @ RZ(90) @ RY(8), "interior")
     s.add(PR.barrel(rust=True, lying=True), Mb @ T(4.8, -3.2, 0) @ RZ(30), "detail")
@@ -398,7 +400,7 @@ def build_exterior():
     wb.extend(P.slab([(-0.35, 0.25), (0.35, 0.25), (0.45, 0.6), (-0.5, 0.6)], 0.6, "metal_rusty").transformed(T(0, -0.3, 0)))
     wb.extend(cyl(0.18, 0.06, "metal_rusty", 10).transformed(T(0.55, 0, 0.18) @ RX(90)))
     for sy in (-0.25, 0.25):
-        wb.extend(rod((0.55, sy * 0.6, 0.18), (-1.0, sy, 0.45), 0.02, "wood_log", 5))
+        wb.extend(rod((0.55, sy * 0.6, 0.18), (-1.0, sy, 0.45), 0.02, "wood_old", 5))
     iron.extend(wb.transformed(T(-6.0, -6.0, G.h(-6, -6)) @ RZ(40) @ RX(12)))
     for k in range(3):
         x, y = 12.0 + k * 0.7, -2.0 + k * 0.2
@@ -482,7 +484,7 @@ def build_interior():
               T(p), "main")
     for k in range(4):
         a = end2 + Vector((P.rnd(-3, -0.5), P.rnd(-0.8, 0.8), 0.2))
-        s.add(P.beam(a, a + Vector((P.rnd(0.5, 1.5), P.rnd(-0.6, 0.6), P.rnd(0.8, 1.8))), 0.18, 0.18, "wood_log", tint=TIMBER), None, "main")
+        s.add(P.beam(a, a + Vector((P.rnd(0.5, 1.5), P.rnd(-0.6, 0.6), P.rnd(0.8, 1.8))), 0.18, 0.18, "wood_old", tint=TIMBER_IN), None, "main")
     s.add(P.blob((0, 0, 0), (1.3, 1.2, 1.4), "rock_cliff", 10, 0.2, 3.0, tint=ROCK_T), T(end2 + Vector((-1.0, 0, 1.0))), "main")
     s.add(P.blob((0, 0, 0), (0.9, 1.1, 1.3), "rock_cliff", 10, 0.2, 4.0, tint=ROCK_T), T(powder[-1] + Vector((0, 0.6, 1.0))), "main")
     # Owen's depot chamber at the end of the crosscut
@@ -532,7 +534,7 @@ def build_interior():
     for k in range(6):
         p = stope_c + Vector((-4.0 + k * 1.6, 0.6 * k - 1.5, 2.0 + (k % 2) * 1.4))
         side = Vector((-0.3, 0.8, 0.0)).normalized()
-        s.add(rod(p - side * 3.2, p + side * 3.2, 0.14, "wood_log", 8, cap_mat="wood_endgrain", tint=TIMBER), None, "main")
+        s.add(rod(p - side * 3.2, p + side * 3.2, 0.14, "wood_old", 8, cap_mat="wood_endgrain", tint=TIMBER_IN), None, "main")
     for k in range(10):
         p = stope_c + Vector((P.rnd(-5, 5), P.rnd(-2.5, 2.5), 0))
         s.add(P.blob((0, 0, 0), (P.rnd(0.4, 1.0), P.rnd(0.4, 0.9), P.rnd(0.2, 0.5)), "rock_cliff", 8, 0.3, k * 1.9, tint=ROCK_T, rings=4),
@@ -543,8 +545,8 @@ def build_interior():
     for k in range(10):
         z = k * 0.3
         for sy in (-1, 1):
-            crib.extend(box(1.6, 0.2, 0.2, "wood_log", 'x', tint=TIMBER, end_mat="wood_endgrain").transformed(T(0, sy * 0.7, z)))
-            crib.extend(box(0.2, 1.6, 0.2, "wood_log", 'y', tint=TIMBER, end_mat="wood_endgrain").transformed(T(sy * 0.7, 0, z + 0.15)))
+            crib.extend(box(1.6, 0.2, 0.2, "wood_old", 'x', tint=TIMBER_IN, end_mat="wood_endgrain").transformed(T(0, sy * 0.7, z)))
+            crib.extend(box(0.2, 1.6, 0.2, "wood_old", 'y', tint=TIMBER_IN, end_mat="wood_endgrain").transformed(T(sy * 0.7, 0, z + 0.15)))
     crib.extend(box(1.4, 1.4, 0.05, "metal_dark", tint=(0.01, 0.01, 0.01), flags=P.F_NOAO).transformed(T(0, 0, 3.1)))
     s.add(crib, T(RX_), "main")
     s.add(PR.ladder(4.8, 0.45), T(RX_ + Vector((0.45, 0, -2.3))) @ RZ(90) @ RX(-6), "main")
@@ -571,8 +573,8 @@ def build_interior():
         pdoor.extend(box(0.2, 0.05, 1.9, "wood_planks", 'z', tint=(0.55, 0.5, 0.45)).transformed(T(-0.4 + j * 0.2, 0, 0.95)))
     s.add(pdoor, T(pa + Vector((-0.4, 0, 0))) @ RZ(-65) @ T(0.4, 0, 0), "main")
     for sx in (-0.75, 0.75):
-        s.add(box(0.18, 0.18, 2.1, "wood_log", tint=TIMBER), T(pa + Vector((sx, 0, 1.05))), "main")
-    s.add(box(1.7, 0.2, 0.2, "wood_log", tint=TIMBER), T(pa + Vector((0, 0, 2.15))), "main")
+        s.add(box(0.18, 0.18, 2.1, "wood_old", tint=TIMBER_IN), T(pa + Vector((sx, 0, 1.05))), "main")
+    s.add(box(1.7, 0.2, 0.2, "wood_old", tint=TIMBER_IN), T(pa + Vector((0, 0, 2.15))), "main")
     for k in range(3):
         s.add(PR.crate(0.6, 0.4, 0.35, "wood_planks", tint=(0.8, 0.7, 0.55), stencil="stencil_ashford"),
               T(powder[-1] + Vector((P.rnd(-0.4, 0.4), -0.8 - k * 0.1, 0.35 * (k == 2)))) @ RZ(180 + P.rnd(-10, 10)), "main")
@@ -764,7 +766,7 @@ def build_kit():
         s.add(me, None, name)
         for k in range(5):
             p = off + Vector((-3.2 + k * 1.6, 0.0, 2.0 + (k % 2) * 1.3))
-            s.add(rod(p - Vector((0, 3.0, 0)), p + Vector((0, 3.0, 0)), 0.14, "wood_log", 8, cap_mat="wood_endgrain", tint=TIMBER), None, name)
+            s.add(rod(p - Vector((0, 3.0, 0)), p + Vector((0, 3.0, 0)), 0.14, "wood_old", 8, cap_mat="wood_endgrain", tint=TIMBER_IN), None, name)
     piece("kit_stope", stope, 5)
 
     def raise_(name, off):
@@ -773,8 +775,8 @@ def build_kit():
         for k in range(10):
             z = 2.3 + k * 0.3
             for sy in (-1, 1):
-                crib.extend(box(1.6, 0.2, 0.2, "wood_log", 'x', tint=TIMBER, end_mat="wood_endgrain").transformed(T(off + Vector((0, sy * 0.7, z)))))
-                crib.extend(box(0.2, 1.6, 0.2, "wood_log", 'y', tint=TIMBER, end_mat="wood_endgrain").transformed(T(off + Vector((sy * 0.7, 0, z + 0.15)))))
+                crib.extend(box(1.6, 0.2, 0.2, "wood_old", 'x', tint=TIMBER_IN, end_mat="wood_endgrain").transformed(T(off + Vector((0, sy * 0.7, z)))))
+                crib.extend(box(0.2, 1.6, 0.2, "wood_old", 'y', tint=TIMBER_IN, end_mat="wood_endgrain").transformed(T(off + Vector((sy * 0.7, 0, z + 0.15)))))
         s.add(crib, None, name)
         s.add(PR.ladder(5.2, 0.45), T(off + Vector((0.45, 0, 0))) @ RZ(90) @ RX(-6), name)
     piece("kit_raise", raise_, 6)

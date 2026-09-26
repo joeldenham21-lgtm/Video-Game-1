@@ -56,6 +56,7 @@ MATS = {
     "wood_paint_white": lib("wood_painted", desat=1.0, lum=1.9, tint=(0.93, 0.92, 0.88)),
     "wood_paint": lib("wood_painted", desat=1.0, lum=1.9),                   # colour from vertex tint
     "wood_paint_2s": two(lib("wood_painted", desat=1.0, lum=1.9)),
+    "wood_old": lib("wood_log", desat=0.6, lum=1.05, rough_add=0.05),      # silvered, weathered timber
     "wood_dark": lib("wood_planks", tint=(0.62, 0.55, 0.47)),
     "wood_fresh": lib("wood_log", tint=(1.12, 1.0, 0.86), rough_add=-0.05),  # sawn lumber, plywood
     "bark_dead": lib("bark_dead"),
