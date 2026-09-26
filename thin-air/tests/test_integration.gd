@@ -204,9 +204,14 @@ func _gather_and_craft() -> void:
 
 func _campfire() -> Campfire:
 	var inv := player.inventory
-	player.teleport(Vector3(0.0, TerrainData.get_height(0.0, 0.0) + 0.05, 0.0), 0.0)
+	# Use the crash meadow's flat pad: the map centre may be a slope or a river on the real terrain.
+	var base := Vector3.ZERO
+	var poi: Dictionary = TerrainData.get_poi(&"crash_site")
+	if not poi.is_empty():
+		base = poi["position"]
+	player.teleport(Vector3(base.x, TerrainData.get_height(base.x, base.z) + 0.05, base.z), 0.0)
 	var fire := (load("res://scenes/items/campfire.tscn") as PackedScene).instantiate() as Campfire
-	fire.position = Vector3(0.0, TerrainData.get_height(0.0, -1.6), -1.6)     # in front (north, −Z)
+	fire.position = Vector3(base.x, TerrainData.get_height(base.x, base.z - 1.6), base.z - 1.6)     # in front (north, −Z)
 	ItemsRoot.instance.add_child(fire)
 	await get_tree().process_frame
 	Climate.refresh_sources()
