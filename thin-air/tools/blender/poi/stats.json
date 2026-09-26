@@ -66,42 +66,42 @@
  },
  "crash_site": {
   "cols": 26,
-  "glb_kb": 1745,
+  "glb_kb": 1933,
   "id": "crash_site",
   "lights": 0,
   "markers": 18,
-  "secs": 4.5,
+  "secs": 5.1,
   "surfaces": {
-   "detail": 13,
+   "detail": 14,
    "ground": 2,
    "interior": 10,
    "main": 12
   },
-  "total": 20532,
+  "total": 22540,
   "tris": {
-   "detail": 1564,
+   "detail": 3284,
    "ground": 2152,
    "interior": 3224,
-   "main": 13592
+   "main": 13880
   }
  },
  "fire_lookout": {
-  "cols": 30,
-  "glb_kb": 510,
+  "cols": 33,
+  "glb_kb": 528,
   "id": "fire_lookout",
   "lights": 1,
   "markers": 8,
-  "secs": 1.5,
+  "secs": 4.1,
   "surfaces": {
    "detail": 1,
    "interior": 10,
    "main": 9
   },
-  "total": 5440,
+  "total": 5612,
   "tris": {
    "detail": 12,
-   "interior": 1674,
-   "main": 3754
+   "interior": 1802,
+   "main": 3798
   }
  },
  "glacier_camp": {
@@ -122,20 +122,20 @@
   }
  },
  "ice_cave": {
-  "cols": 97,
-  "glb_kb": 633,
+  "cols": 101,
+  "glb_kb": 648,
   "id": "ice_cave",
   "lights": 2,
   "markers": 6,
-  "secs": 0.9,
+  "secs": 0.7,
   "surfaces": {
    "detail": 3,
    "main": 8
   },
-  "total": 7264,
+  "total": 7450,
   "tris": {
    "detail": 1318,
-   "main": 5946
+   "main": 6132
   }
  },
  "ice_cave_entrance": {

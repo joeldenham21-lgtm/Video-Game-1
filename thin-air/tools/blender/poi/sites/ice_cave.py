@@ -84,7 +84,7 @@ def build_interior():
     s.bucket("detail", vis_end=40.0)
     # Local frame: origin = inside of the mouth transition; the passage winds north (+Y).
     path = [Vector((0, 0, 0)), Vector((0.5, 7, 0.2)), Vector((-2.0, 15, 0.5)), Vector((-1.0, 24, 0.7)), Vector((2.5, 31, 0.9)),
-            Vector((3.0, 36, 1.0))]
+            Vector((3.4, 37.6, 1.0))]
     widths = [3.6, 3.2, 2.8, 3.4, 3.0, 4.0]
     heights = [3.2, 2.8, 2.5, 3.0, 2.8, 3.6]
     me, dense, wd, hd = ice_passage(path, widths, heights, 1.0)

@@ -39,10 +39,11 @@ void fragment() {
 		float d = 0.06 + float(k) * 0.14;
 		vec3 p = v_wpos + into * d - v_wn * d;
 		// annual layers: noise stretched horizontally, warped
-		float lay = tri_noise(vec3(p.x * 0.05, p.y * 0.9, p.z * 0.05) + vec3(0.0, tri_noise(p * 0.07, w) * 0.4, 0.0), w);
+		float warp = tri_noise(p * 0.11, w) * 0.6;
+		float lay = tri_noise(vec3(p.x * 0.16, p.y * 0.75 + warp, p.z * 0.16), w);
 		float att = 1.0 / (1.0 + float(k) * 1.2);
-		white += smoothstep(0.56, 0.7, lay) * att;
-		debris += smoothstep(0.74, 0.8, lay) * smoothstep(0.35, 0.6, tri_noise(p * 0.3, w)) * att;
+		white += smoothstep(0.58, 0.72, lay) * att * smoothstep(0.3, 0.6, tri_noise(p * 0.45 + 0.5, w));
+		debris += smoothstep(0.79, 0.83, lay) * smoothstep(0.45, 0.7, tri_noise(p * 0.3, w)) * att * 0.6;
 		depth_col += (tri_noise(p * 0.5 + float(k) * 0.31, w) - 0.5) * att;
 	}
 	vec2 uvx = v_wpos.zy, uvy = v_wpos.xz, uvz = v_wpos.xy;
@@ -53,8 +54,8 @@ void fragment() {
 	float thin = clamp(COLOR.r, 0.0, 1.6);
 	float day = smoothstep(5.2, 7.8, time_of_day) * (1.0 - smoothstep(17.0, 19.6, time_of_day));
 	vec3 col = mix(deep_color, glow_color, clamp(thin * 0.45 + depth_col * 0.8 + scallop * 0.25, 0.0, 1.0));
-	col = mix(col, white_color, clamp(white * 0.55, 0.0, 0.8));
-	col = mix(col, debris_color, clamp(debris * 0.8, 0.0, 0.85));
+	col = mix(col, white_color, clamp(white * 0.45, 0.0, 0.6));
+	col = mix(col, debris_color, clamp(debris * 0.7, 0.0, 0.6));
 	ALBEDO = col * 0.3;
 	EMISSION = col * glow_energy * thin * (0.45 + 0.35 * scallop) * mix(night_glow, 1.0, day) * (1.0 - debris * 0.7);
 	NORMAL_MAP = nt * 0.5 + 0.5;

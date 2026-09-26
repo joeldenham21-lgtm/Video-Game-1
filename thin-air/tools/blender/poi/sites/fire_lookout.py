@@ -70,16 +70,22 @@ def build():
         lp = Vector((b.x, b.y, z1))
         st_all.extend(box(1.1, 1.1, 0.06, "wood_planks", 'x', tint=TIM).transformed(T(lp.x, lp.y, z1 - 0.03)))
         s.col_box("wood", Vector((lp.x, lp.y, z1 - 0.05)), (1.1, 1.1, 0.1))
-        st_all.extend(AR.railing([a + Vector((0, 0, 0)), b], 0.95, "wood_log", 0.03, 2.0, TIM).transformed(
-            T(0, 0, 0)).transformed(T(0, 0, 0)) if False else AR.railing([Vector((a.x, a.y, z0)), Vector((b.x, b.y, z1))], 0.95, "wood_log", 0.025, 2.5, TIM))
+        n = Vector((d.y, -d.x, 0)).normalized()
+        if n.dot(Vector((a.x, a.y, 0))) < 0:
+            n = -n
+        st_all.extend(AR.railing([Vector((a.x, a.y, z0)) + n * 0.42, Vector((b.x, b.y, z1)) + n * 0.42], 0.95, "wood_log", 0.025, 2.5, TIM))
     s.add(st_all, None, "main")
     # cab deck + catwalk
     deck_w = CAB + 1.8
-    s.add(box(deck_w, deck_w, 0.12, "wood_planks", 'x', seg=1.2, tint=TIM), T(0, 0, H + 0.06), "main")
+    # deck boards around the trap-door hole where the last flight comes up into the cab (x -2.0..-1.0, y -1.6..0.6)
+    hx0, hx1, hy0, hy1 = -2.0, -1.0, -1.6, 0.6
+    hw_ = deck_w / 2
+    for (x0, x1, y0, y1) in ((-hw_, hx0, -hw_, hw_), (hx1, hw_, -hw_, hw_), (hx0, hx1, -hw_, hy0), (hx0, hx1, hy1, hw_)):
+        s.add(box(x1 - x0, y1 - y0, 0.12, "wood_planks", 'x', seg=1.2, tint=TIM), T((x0 + x1) / 2, (y0 + y1) / 2, H + 0.06), "main")
+        s.col_box("wood", Vector(((x0 + x1) / 2, (y0 + y1) / 2, H + 0.05)), (x1 - x0, y1 - y0, 0.14))
     for sx in (-1, 1):
         s.add(box(deck_w + 0.2, 0.2, 0.25, "wood_log", 'x', tint=TIM), T(0, sx * deck_w / 2, H - 0.12), "main")
         s.add(box(0.2, deck_w + 0.2, 0.25, "wood_log", 'y', tint=TIM), T(sx * deck_w / 2, 0, H - 0.12), "main")
-    s.col_box("wood", Vector((0, 0, H + 0.05)), (deck_w, deck_w, 0.14))
     hw = deck_w / 2 - 0.05
     rail = AR.railing([(-hw, -hw, H + 0.12), (hw, -hw, H + 0.12), (hw, hw, H + 0.12), (-hw, hw, H + 0.12), (-hw, -hw + 1.0, H + 0.12)],
                       1.05, "wood_log", 0.03, 1.5, TIM)
@@ -87,7 +93,7 @@ def build():
     for (x, y, w_, d_) in ((0, -hw, deck_w, 0.1), (hw, 0, 0.1, deck_w), (0, hw, deck_w, 0.1), (-hw, 0.5, 0.1, deck_w - 1.0)):
         s.col_box("wood", Vector((x, y, H + 0.6)), (w_, d_, 1.1))
     # trap hatch at the top of the last flight (north-west corner) - open
-    s.add(box(1.0, 1.0, 0.05, "wood_planks", tint=TIM), T(-B1 + 0.75, B1 - 0.3, H + 0.6) @ RX(-80), "detail")
+    s.add(box(1.0, 2.2, 0.05, "wood_planks", tint=TIM), T(-0.95, -0.5, H + 0.6) @ RY(-80) @ T(0.0, 0, 0), "detail")
     # cab: lower wall panels, continuous glazing with mullions, hip roof
     c = CAB / 2
     cab = P.Mesh()
@@ -138,6 +144,8 @@ def build():
     s.add(roof, None, "main")
     s.col_box("wood", Vector((0, 0, H + 2.6 + rh / 2)), (CAB + 1.0, CAB + 1.0, rh))
     s.add(box(CAB - 0.1, CAB - 0.1, 0.03, "wood_fresh", 'x', tint=(0.9, 0.85, 0.75), flags=P.F_NOEXP), T(0, 0, H + 2.44), "interior")
+    # railing around the stair hole inside the cab
+    s.add(AR.railing([(-1.0, -1.6, H + 0.12), (-1.0, 0.6, H + 0.12), (-2.0, 0.6, H + 0.12)], 0.9, "wood_log", 0.02, 1.2, TIM), None, "interior")
     # interior: fire finder, cot, stove, stool, shelf
     I = T(0, 0, H + 0.12)
     ff = cyl(0.09, 1.0, "wood_log", 10, tint=TIM)
@@ -155,9 +163,9 @@ def build():
     s.col_box("wood", I @ Vector((0, 0, 0.55)), (0.85, 0.85, 1.1))
     s.add(PR.bunk(0.8, 1.9, 0.45, "metal_bare", (0.4, 0.4, 0.35)), I @ T(c - 0.55, 0.6, 0), "interior")
     s.col_box("wood", I @ Vector((c - 0.55, 0.6, 0.3)), (0.8, 1.9, 0.6))
-    s.add(PR.table(0.8, 0.5, 0.75, "wood_fresh"), I @ T(-c + 0.35, 0.8, 0) @ RZ(90), "interior")
-    s.add(PR.stove_canister(), I @ T(-c + 0.35, 1.0, 0.75), "interior")
-    s.add(box(0.25, 0.3, 0.02, "decal", flags=P.F_NOAO), I @ T(-c + 0.35, 0.5, 0.755), "interior")
+    s.add(PR.table(0.8, 0.5, 0.75, "wood_fresh"), I @ T(-c + 0.35, 1.5, 0) @ RZ(90), "interior")
+    s.add(PR.stove_canister(), I @ T(-c + 0.35, 1.7, 0.75), "interior")
+    s.add(box(0.25, 0.3, 0.02, "decal", flags=P.F_NOAO), I @ T(-c + 0.35, 1.25, 0.755), "interior")
     stool = box(0.35, 0.35, 0.03, "wood_fresh").transformed(T(0, 0, 0.55))
     for sx in (-0.13, 0.13):
         for sy in (-0.13, 0.13):
@@ -174,7 +182,7 @@ def build():
     s.marker("Use_FireFinder", (0.0, -0.55, H + 1.2), 0)
     s.marker("Use_Door_Cab", (-c + 2.15, -c - 0.15, H + 1.1), 0)
     s.marker("Use_Bed", (c - 0.55, 0.6, H + 0.7), 0)
-    s.marker("Loot_Table", (-c + 0.35, 0.6, H + 0.9), 90)
+    s.marker("Loot_Table", (-c + 0.35, 1.3, H + 0.9), 90)
     s.marker("Loot_Shelf", (-0.7, c - 0.3, H + 0.6), 180)
     s.marker("Scan_FireFinder", (0.0, 0.0, H + 1.3), 0)
     return [s]

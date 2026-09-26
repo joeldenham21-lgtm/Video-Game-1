@@ -274,13 +274,21 @@ def engine(site, W, bucket):
     zc = 0.1
     E = W @ T(0, 0, zc)
     # cowling: upper 230 deg, crumpled, pushed up/left
-    cow = cyl(0.68, 1.0, "metal_aircraft", 22, caps=False, a0=-20, arc=230, vseg=3, tint=RED, smooth_=True)
+    cow = cyl(0.68, 1.0, "metal_aircraft", 30, caps=False, a0=-20, arc=230, vseg=7, tint=RED, smooth_=True)
     cow.extend(cyl(0.66, 0.08, "metal_aircraft", 22, r2=0.54, caps=False, a0=-20, arc=230, tint=RED).transformed(T(0, 0, 1.0)))
-    cow.displace(lambda p: Vector((0.05 * P.nz(p, 3.0, 2.0), 0.05 * P.nz(p, 3.0, 5.0), 0.06 * P.nz(p, 2.0, 9.0))))
+    def crush(p):
+        # impact dent on the lower left of the cowling ring, wrinkles everywhere, front lip folded back
+        a = math.atan2(p.y, p.x)
+        dent = max(0.0, math.cos(a - math.radians(215))) ** 2 * (0.28 * (1 - p.z / 1.1))
+        inward = Vector((-math.cos(a), -math.sin(a), 0.0)) * dent
+        wr = Vector((0.1 * P.nz(p, 4.0, 2.0), 0.1 * P.nz(p, 4.0, 5.0), 0.08 * P.nz(p, 3.0, 9.0)))
+        fold = Vector((0, 0, -0.18 * max(0.0, p.z - 0.85) * (1 + P.nz(p, 6.0, 3.0))))
+        return inward + wr + fold
+    cow.displace(crush)
     inner = cyl(0.66, 1.0, "metal_dark", 22, caps=False, a0=-20, arc=230, vseg=1, tint=(0.4, 0.4, 0.4))
     P.flip(inner)
     cow.extend(inner)
-    Mc = E @ T(4.88, 0.05, 0.08) @ RZ(6) @ RY(90) @ RX(8)
+    Mc = E @ T(4.86, 0.08, 0.14) @ RZ(11) @ RY(90) @ RX(13)
     site.add(cow, Mc, bucket)
     # crankcase + 9 finned cylinders
     eng = lathe([(0.0, 0.0), (0.3, 0.0), (0.34, 0.12), (0.3, 0.38), (0.22, 0.46), (0.12, 0.62), (0.0, 0.64)],
@@ -295,7 +303,7 @@ def engine(site, W, bucket):
     # exhaust collector
     pts = [Vector((0.5 * math.cos(2 * math.pi * k / 12), 0.5 * math.sin(2 * math.pi * k / 12), 0.05)) for k in range(10)]
     eng.extend(tube(pts, 0.035, "metal_rusty", 6))
-    site.add(eng, E @ T(4.95, 0.04, 0.08) @ RZ(5) @ RY(90) @ RX(10), bucket)
+    site.add(eng, E @ T(4.93, 0.07, 0.12) @ RZ(10) @ RY(90) @ RX(14), bucket)
     # prop hub + blades: one blade dug into the turf (curled back hard), two bent back
     hub = lathe([(0.0, -0.1), (0.16, -0.1), (0.2, 0.0), (0.18, 0.18), (0.12, 0.28), (0.0, 0.32)], "metal_bare", 12,
                 tint=(0.5, 0.5, 0.52))
@@ -304,7 +312,7 @@ def engine(site, W, bucket):
         a = 200 + k * 120
         hub.extend(blade(bend, seed_=k).transformed(RZ(0) @ RX(0) @ RY(0) @ Matrix.Rotation(math.radians(a), 4, 'Z')
                                                     @ RX(-90)))
-    site.add(hub, E @ T(6.02, 0.1, 0.12) @ RZ(8) @ RY(90) @ RX(6), bucket)
+    site.add(hub, E @ T(5.98, 0.2, 0.22) @ RZ(13) @ RY(90) @ RX(10), bucket)
 
 
 def wheel(r=0.4, w=0.24):
@@ -331,6 +339,35 @@ def spruce_top(length, r, seed_):
             me.extend(rod(p0, p0 + d.normalized() * L, max(0.008, rr * 0.25), "bark_dead", 4, caps=False))
         z += P.rnd(0.35, 0.55)
     return me
+
+
+def torn_structure(x_edge, direction, seed_):
+    """Exposed airframe at a fuselage break: two frames (Z-section rings) just inside the tear and bent stringers
+    and a hanging cable bundle sticking out of it. direction = +1 if the open end faces +x."""
+    P.seed(seed_)
+    me = P.Mesh()
+    for k, dx in enumerate((0.18, 0.55)):
+        x = x_edge - direction * dx
+        ring = [p for p in ring_pts(x, 0.06)]
+        me.extend(P.strip_tube(ring + [ring[0]], 0.025, 0.07, "metal_bare", tint=(0.65, 0.66, 0.62)))
+    pts = ring_pts(x_edge - direction * 0.3, 0.03)
+    for k in range(0, len(pts), 3):
+        p0 = pts[k]
+        L = P.rnd(0.15, 0.6)
+        bend = Vector((0, P.rnd(-0.2, 0.2), P.rnd(-0.25, 0.1)))
+        p1 = p0 + Vector((direction * L * 0.6, 0, 0)) + bend * 0.5
+        p2 = p1 + Vector((direction * L * 0.5, 0, 0)) + bend
+        me.extend(P.strip_tube([p0, p1, p2], 0.02, 0.02, "metal_bare", tint=(0.6, 0.6, 0.58)))
+    me.extend(tube([Vector((x_edge - direction * 0.4, 0.3, 0.8)), Vector((x_edge + direction * 0.2, 0.25, 0.3)),
+                    Vector((x_edge + direction * 0.35, 0.1, -0.4))], 0.025, "rubber", 5))
+    for k, col in enumerate(((0.6, 0.05, 0.03), (0.9, 0.85, 0.1), (0.1, 0.2, 0.6))):
+        me.extend(tube([Vector((x_edge - direction * 0.4, 0.33 + k * 0.02, 0.8)), Vector((x_edge + direction * 0.25, 0.33 + k * 0.05, 0.2)),
+                        Vector((x_edge + direction * (0.3 + k * 0.1), 0.2 + k * 0.1, -0.2 - k * 0.2))], 0.006, "plastic", 4, tint=col))
+    return me
+
+
+def ring_pts(x, inset):
+    return ring(x, inset)
 
 
 def extras(s, Wf, Wa, hinge, Wr, yaw):
@@ -709,6 +746,8 @@ def build():
         s.col_box("wood", (q.x, q.y, G.h(q.x, q.y) + H / 2), (r * 1.6, r * 1.6, H))
 
     extras(s, Wf, Wa, hinge, Wr, yaw)
+    s.add(torn_structure(0.1, -1, 3), Wf, "detail")
+    s.add(torn_structure(-0.25, 1, 5), Wa, "detail")
 
     # --- sockets ------------------------------------------------------------------------------------------------
     def A(x, y, z):

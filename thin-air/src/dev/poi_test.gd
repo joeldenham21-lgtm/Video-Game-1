@@ -9,6 +9,7 @@ extends Node
 ##          (deg, relative to the site's yaw; 0 = site north)  --hours=H --weather=W --preset=P --fov=F
 ##          --lights=1 (site interior lights on)  --snow=S  --perf --perf_at=N  --save=abs.jpg (frame at perf_at, quit)
 ##          --all (instance every location, not only --site)  --list (print the sockets of the site)  --torch=E (a hand torch on the camera, energy E)
+##          --batch=site:shot,site:shot,...  --outdir=/abs/dir  (one world load, every shot saved as <site>_<shot>.jpg)
 
 const SHOTS := {
 	# site -> shot -> [cam (site-local x, y above ground, z) | socket name, look (yaw, pitch), hours, fov, lights,
@@ -23,7 +24,8 @@ const SHOTS := {
 		"aerial": [Vector3(-20.0, 16.0, 18.0), Vector2(-45.0, -32.0), 15.5, 55.0, false],
 	},
 	&"kestrel_station": {
-		"hero": [Vector3(14.0, 2.0, 30.0), Vector2(25.0, -1.0), 16.9, 58.0, false],
+		"hero": [Vector3(22.0, 3.0, 22.0), Vector2(45.0, -4.0), 16.6, 60.0, false],
+		"shedside": [Vector3(14.0, 2.0, 30.0), Vector2(25.0, -1.0), 16.9, 58.0, false],
 		"pad": [Vector3(-24.0, 2.2, 27.0), Vector2(-38.0, -2.0), 17.1, 60.0, false],
 		"night": [Vector3(-14.0, 2.0, 20.0), Vector2(-30.0, 0.0), 21.5, 60.0, true],
 		"galley": [Vector3(0.6, 3.45, 3.9), Vector2(8.0, -10.0), 13.0, 78.0, true],
@@ -76,9 +78,13 @@ const SHOTS := {
 
 var args := {}
 var cam: Camera3D
+var torch: SpotLight3D
 var frame := 0
 var perf_at := 30
 var site: Node3D
+var jobs: Array = []        # [site_id, shot]
+var job := -1
+var structures: Node
 
 
 func _ready() -> void:
@@ -88,35 +94,73 @@ func _ready() -> void:
 	perf_at = int(args.get("perf_at", "30"))
 	if args.has("preset"):
 		Settings.apply_preset(StringName(args["preset"]))
-	var site_id := StringName(args.get("site", "crash_site"))
-	var shots: Dictionary = SHOTS.get(site_id, {})
-	var spec: Array = shots.get(String(args.get("shot", "hero")), [Vector3(0, 1.7, 12), Vector2(0, -5), 15.0, 60.0, false])
+	if args.has("batch"):
+		for j in String(args["batch"]).split(",", false):
+			var p := j.split(":")
+			jobs.append([StringName(p[0]), p[1] if p.size() > 1 else "hero"])
+	else:
+		jobs.append([StringName(args.get("site", "crash_site")), String(args.get("shot", "hero"))])
 	var W = load("res://src/world/world.gd")
 	W.dev_no_player = true
 	if not args.has("all"):
 		var S = load("res://scenes/poi/structures.gd")
-		S.only_ids = [site_id] as Array[StringName]
+		var ids: Array[StringName] = []
+		for jb in jobs:
+			if not ids.has(jb[0]):
+				ids.append(jb[0])
+		S.only_ids = ids
 	Game.is_new_game = false
 	Game.flags.clear()
 	Climate.day = 3
-	Climate.hours = float(args.get("hours", str(spec[2])))
 	Climate.wind_speed = 3.0
 	Climate.wind_direction = Vector3(0.8, 0.0, -0.6).normalized()
 	if args.has("snow"):
 		Climate.set(&"snow_cover", float(args["snow"]))
+	Climate.hours = 12.0
 	var world: Node = (load("res://scenes/world/world.tscn") as PackedScene).instantiate()
 	add_child(world)
 	Climate.set_weather(StringName(args.get("weather", "clear")), 0.0)
 	Climate.locked = true
-	var st := world.get_node_or_null(^"Structures")
-	if st and st.has_method(&"get_site"):
-		site = st.call(&"get_site", site_id)
+	structures = world.get_node_or_null(^"Structures")
+	cam = Camera3D.new()
+	cam.near = 0.05
+	cam.far = float(Settings.get_value(&"view_distance", 4000.0))
+	add_child(cam)
+	cam.make_current()
+	if args.has("torch"):
+		torch = SpotLight3D.new()
+		torch.light_energy = float(args["torch"])
+		torch.spot_range = 25.0
+		torch.spot_angle = 32.0
+		torch.light_color = Color(1.0, 0.9, 0.78)
+		torch.shadow_enabled = true
+		torch.position = Vector3(0.25, -0.2, 0.0)
+		cam.add_child(torch)
+		torch.add_to_group(&"local_light")
+	_next_job()
+
+
+func _next_job() -> void:
+	job += 1
+	frame = 0
+	if job >= jobs.size():
+		get_tree().quit()
+		return
+	var site_id: StringName = jobs[job][0]
+	var shots: Dictionary = SHOTS.get(site_id, {})
+	var spec: Array = shots.get(jobs[job][1], [Vector3(0, 1.7, 12), Vector2(0, -5), 15.0, 60.0, false])
+	Climate.hours = float(args.get("hours", str(spec[2])))
+	site = null
+	if structures and structures.has_method(&"get_site"):
+		site = structures.call(&"get_site", site_id)
 	if site == null:
 		push_error("poi_test: site %s not placed" % site_id)
+		_next_job()
 		return
-	if args.has("lights") or bool(spec[4]):
-		if site.has_method(&"set_interior_lights"):
-			site.call(&"set_interior_lights", args.get("lights", "1") != "0")
+	for s in (structures.get(&"sites") as Dictionary).values():
+		if s.has_method(&"set_interior_lights"):
+			var on := args.has("lights") or bool(spec[4])
+			s.call(&"set_interior_lights", on if s == site else bool(s.get(&"interior_lights_on")))
 	if args.has("list") and site.has_method(&"get_sockets"):
 		for m: Marker3D in site.call(&"get_sockets", ""):
 			print("SOCKET ", m.name, " ", m.global_position)
@@ -129,11 +173,7 @@ func _ready() -> void:
 	if args.has("look"):
 		var l := String(args["look"]).split(",")
 		look = Vector2(float(l[0]), float(l[1]))
-	cam = Camera3D.new()
 	cam.fov = float(args.get("fov", str(spec[3])))
-	cam.near = 0.05
-	cam.far = float(Settings.get_value(&"view_distance", 4000.0))
-	add_child(cam)
 	var xf := site.global_transform
 	if socket_shot and not args.has("cam"):
 		var m := site.call(&"get_socket", String(spec[0])) as Marker3D
@@ -148,39 +188,31 @@ func _ready() -> void:
 		cam.global_position = Vector3(wp.x, gy + local.y, wp.z)
 		var site_yaw := rad_to_deg(xf.basis.get_euler().y)
 		cam.rotation_degrees = Vector3(look.y, site_yaw + look.x, 0.0)
-	cam.make_current()
-	if args.has("torch"):
-		var sp := SpotLight3D.new()
-		sp.light_energy = float(args["torch"])
-		sp.spot_range = 25.0
-		sp.spot_angle = 32.0
-		sp.light_color = Color(1.0, 0.9, 0.78)
-		sp.shadow_enabled = true
-		sp.position = Vector3(0.25, -0.2, 0.0)
-		cam.add_child(sp)
-		sp.add_to_group(&"local_light")
 
 
 func _process(_d: float) -> void:
 	frame += 1
-	if frame == 3:
+	if frame == 3 or frame == perf_at - 4:
 		var sky := get_tree().get_first_node_in_group(&"sky")
 		if sky and sky.has_method(&"snap"):
 			sky.call(&"snap")
 	if cam:
 		RenderingServer.global_shader_parameter_set(&"player_position", cam.global_position)
-	if frame == perf_at:
+	if frame == perf_at and job < jobs.size():
 		if args.has("perf"):
-			print("PERF draw_calls=", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+			print("PERF ", jobs[job][0], ":", jobs[job][1], " draw_calls=", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
 				" primitives=", Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME),
 				" objects=", Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
 				" vram_mb=", snappedf(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0, 0.1))
-		if args.has("save"):
+		var path := String(args.get("save", ""))
+		if args.has("outdir"):
+			path = String(args["outdir"]).path_join("%s_%s.jpg" % [jobs[job][0], jobs[job][1]])
+		if path != "":
 			var img := get_viewport().get_texture().get_image()
-			var path := String(args["save"])
 			if path.ends_with(".jpg"):
 				img.save_jpg(path, 0.9)
 			else:
 				img.save_png(path)
 			print("saved ", path)
-			get_tree().quit()
+		if path != "" or args.has("batch"):
+			_next_job()
