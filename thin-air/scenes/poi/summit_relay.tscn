@@ -1,0 +1,122 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/poi/summit_relay.glb" id="1"]
+[ext_resource type="Script" path="res://scenes/poi/poi_site.gd" id="2"]
+[ext_resource type="Script" path="res://scenes/poi/poi_shelter.gd" id="3"]
+
+[sub_resource type="BoxShape3D" id="Box_0"]
+size = Vector3(0.7, 15, 0.7)
+
+[sub_resource type="BoxShape3D" id="Box_1"]
+size = Vector3(0.5, 1.8, 0.3)
+
+[sub_resource type="BoxShape3D" id="Box_2"]
+size = Vector3(2.2, 2.3, 1.7)
+
+[sub_resource type="BoxShape3D" id="Box_3"]
+size = Vector3(1, 0.6, 0.6)
+
+[sub_resource type="BoxShape3D" id="Box_4"]
+size = Vector3(2.2, 2, 0.6)
+
+[sub_resource type="BoxShape3D" id="Box_5"]
+size = Vector3(0.9, 1.8, 0.9)
+
+[sub_resource type="BoxShape3D" id="Box_6"]
+size = Vector3(2.4, 2, 2.4)
+
+[node name="summit_relay" instance=ExtResource("1")]
+script = ExtResource("2")
+poi_id = &"summit_relay"
+interior = false
+lit_materials = PackedStringArray()
+interior_lights_on = false
+
+[node name="main" parent="."]
+visibility_range_end = 2500
+visibility_range_end_margin = 200
+
+[node name="detail" parent="."]
+visibility_range_end = 140
+visibility_range_end_margin = 11.2
+
+[node name="rime" parent="."]
+visibility_range_end = 160
+visibility_range_end_margin = 12.8
+cast_shadow = 0
+
+[node name="Collision" type="Node3D" parent="."]
+
+[node name="Body_metal" type="StaticBody3D" parent="Collision"]
+collision_mask = 0
+metadata/surface = &"metal"
+
+[node name="S0" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 7.5, 0)
+shape = SubResource("Box_0")
+
+[node name="S1" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0.45)
+shape = SubResource("Box_1")
+
+[node name="S2" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(0.99027, 0, 0.13917, 0, 1, 0, -0.13917, 0, 0.99027, 4.2, 0.94102, 1.4)
+shape = SubResource("Box_2")
+
+[node name="S3" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 0.13596, 1.1)
+shape = SubResource("Box_3")
+
+[node name="S4" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.2, 0.69333, 4)
+shape = SubResource("Box_4")
+
+[node name="Body_rock" type="StaticBody3D" parent="Collision"]
+collision_mask = 0
+metadata/surface = &"rock"
+
+[node name="S0" type="CollisionShape3D" parent="Collision/Body_rock"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2, 0.89861, -1.6)
+shape = SubResource("Box_5")
+
+[node name="Sockets" type="Node3D" parent="."]
+
+[node name="Arrive_Default" type="Marker3D" parent="Sockets"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0.5, -0.51188, -12)
+
+[node name="Use_Relay" type="Marker3D" parent="Sockets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0.8)
+
+[node name="Use_Antenna" type="Marker3D" parent="Sockets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0.9)
+
+[node name="Use_BatteryBox" type="Marker3D" parent="Sockets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 0.43596, 1.8)
+
+[node name="Use_Door_Hut" type="Marker3D" parent="Sockets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 0.94102, 2.6)
+
+[node name="Spot_HaleBody" type="Marker3D" parent="Sockets"]
+transform = Transform3D(-0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.93969, 5.8, -0.08948, -0.2)
+
+[node name="Log_hale_03" type="Marker3D" parent="Sockets"]
+transform = Transform3D(-0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.93969, 5.4, -0.0148, 0.1)
+
+[node name="Log_hale_notebook" type="Marker3D" parent="Sockets"]
+transform = Transform3D(-0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.93969, 5.9, 0.10532, -0.1)
+
+[node name="Spot_Transmit" type="Marker3D" parent="Sockets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.6)
+
+[node name="Shelter_Lee" type="Area3D" parent="." groups=["shelter"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.6, -0.12594, 0)
+collision_layer = 128
+collision_mask = 0
+monitoring = false
+monitorable = false
+script = ExtResource("3")
+shelter_factor = 0.35
+
+[node name="Shape" type="CollisionShape3D" parent="Shelter_Lee"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("Box_6")

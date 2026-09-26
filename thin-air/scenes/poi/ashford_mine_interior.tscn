@@ -509,7 +509,7 @@ ambient_mode = 2
 ambient_color = Color(0.004, 0.004, 0.005, 1)
 ambient_color_energy = 1
 box_projection = true
-cull_mask = 1048573
+max_distance = 120
 
 [node name="Shelter_Mine" type="Area3D" parent="." groups=["shelter"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 0, -6)

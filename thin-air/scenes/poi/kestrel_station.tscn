@@ -1261,7 +1261,7 @@ ambient_mode = 2
 ambient_color = Color(0.04, 0.045, 0.05, 1)
 ambient_color_energy = 1
 box_projection = true
-cull_mask = 1048573
+max_distance = 21
 
 [node name="Probe_B" type="ReflectionProbe" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.1, 0)
@@ -1272,7 +1272,7 @@ ambient_mode = 2
 ambient_color = Color(0.04, 0.045, 0.05, 1)
 ambient_color_energy = 1
 box_projection = true
-cull_mask = 1048573
+max_distance = 21
 
 [node name="Probe_C" type="ReflectionProbe" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.5, 3.1, 0)
@@ -1283,7 +1283,7 @@ ambient_mode = 2
 ambient_color = Color(0.04, 0.045, 0.05, 1)
 ambient_color_energy = 1
 box_projection = true
-cull_mask = 1048573
+max_distance = 21
 
 [node name="Probe_Shed" type="ReflectionProbe" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1.55, 16)
@@ -1294,7 +1294,7 @@ ambient_mode = 2
 ambient_color = Color(0.04, 0.045, 0.05, 1)
 ambient_color_energy = 1
 box_projection = true
-cull_mask = 1048573
+max_distance = 15.2
 
 [node name="Shelter_A" type="Area3D" parent="." groups=["shelter"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.5, 1.85, 0)

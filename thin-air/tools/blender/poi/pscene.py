@@ -86,6 +86,7 @@ MATS = {
     "vinyl_floor": lib("concrete", desat=1.0, lum=1.0, rough_mul=0.5, normal_strength=0.2,
                        tint=(0.55, 0.52, 0.47)),
     "snow_packed": lib("snow_packed", snow_accept=0.0),
+    "rime": two(lib("snow_packed", snow_accept=0.0, tint=(0.93, 0.96, 1.0), rough_mul=0.9)),
     "rock": lib("rock_boulder"),
     "gravel": ter("gravel"),
     "dirt": ter("dirt"),
@@ -370,7 +371,7 @@ def write_scene(site, glb_res, mats_by_bucket):
                 ("intensity", _f(P["intensity"])),
                 ("ambient_mode", "2"), ("ambient_color", "Color(%s, 1)" % _vec(P["ambient"])),
                 ("ambient_color_energy", _f(P["energy"])), ("box_projection", "true"),
-                ("cull_mask", "1048573")])
+                ("max_distance", _f(max(s[0], s[1], s[2]) + 10.0))])
     if site.shelters:
         sh = t.ext_res("Script", "res://scenes/poi/poi_shelter.gd")
         for S_ in site.shelters:

@@ -25,9 +25,14 @@ const SITES := {
 
 var sites: Dictionary = {}   # scene id -> PoiSite
 
+## Dev/QA filter: when non-empty only these scene ids are instanced (src/dev/poi_test.gd).
+static var only_ids: Array[StringName] = []
+
 
 func _ready() -> void:
 	for id: StringName in SITES:
+		if not only_ids.is_empty() and not only_ids.has(id):
+			continue
 		var path := "res://scenes/poi/%s.tscn" % id
 		if not ResourceLoader.exists(path):
 			continue

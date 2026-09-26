@@ -1,0 +1,123 @@
+[remap]
+
+importer="scene"
+importer_version=1
+type="PackedScene"
+uid="uid://b0rmybk182pe4"
+path="res://.godot/imported/fire_lookout.glb-f38722aa7f2acf4e849efc7e797fa8ce.scn"
+
+[deps]
+
+source_file="res://assets/models/poi/fire_lookout.glb"
+dest_files=["res://.godot/imported/fire_lookout.glb-f38722aa7f2acf4e849efc7e797fa8ce.scn"]
+
+[params]
+
+nodes/root_type=""
+nodes/root_name=""
+nodes/root_script=null
+mesh_library/use_node_names_as_mesh_names=false
+array_mesh/deduplicate_surfaces=true
+nodes/apply_root_scale=true
+nodes/root_scale=1.0
+nodes/import_as_skeleton_bones=false
+nodes/use_name_suffixes=false
+nodes/use_node_type_suffixes=false
+meshes/ensure_tangents=true
+meshes/generate_lods=true
+meshes/create_shadow_meshes=true
+meshes/light_baking=1
+meshes/lightmap_texel_size=0.2
+meshes/force_disable_compression=false
+skins/use_named_skins=true
+animation/import=false
+animation/fps=30
+animation/trimming=false
+animation/remove_immutable_tracks=true
+animation/import_rest_as_RESET=false
+import_script/path=""
+materials/extract=0
+materials/extract_format=0
+materials/extract_path=""
+_subresources={
+"materials": {
+"canvas": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/canvas.tres",
+"use_external/path": "res://assets/models/poi/materials/canvas.tres"
+},
+"concrete": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/concrete.tres",
+"use_external/path": "res://assets/models/poi/materials/concrete.tres"
+},
+"decal": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/decal.tres",
+"use_external/path": "res://assets/models/poi/materials/decal.tres"
+},
+"glass": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/glass.tres",
+"use_external/path": "res://assets/models/poi/materials/glass.tres"
+},
+"lamp": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/lamp.tres",
+"use_external/path": "res://assets/models/poi/materials/lamp.tres"
+},
+"metal_bare": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/metal_bare.tres",
+"use_external/path": "res://assets/models/poi/materials/metal_bare.tres"
+},
+"metal_dark": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/metal_dark.tres",
+"use_external/path": "res://assets/models/poi/materials/metal_dark.tres"
+},
+"metal_rusty": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/metal_rusty.tres",
+"use_external/path": "res://assets/models/poi/materials/metal_rusty.tres"
+},
+"paint_metal": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/paint_metal.tres",
+"use_external/path": "res://assets/models/poi/materials/paint_metal.tres"
+},
+"wood_endgrain": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/wood_endgrain.tres",
+"use_external/path": "res://assets/models/poi/materials/wood_endgrain.tres"
+},
+"wood_fresh": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/wood_fresh.tres",
+"use_external/path": "res://assets/models/poi/materials/wood_fresh.tres"
+},
+"wood_log": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/wood_log.tres",
+"use_external/path": "res://assets/models/poi/materials/wood_log.tres"
+},
+"wood_paint": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/wood_paint.tres",
+"use_external/path": "res://assets/models/poi/materials/wood_paint.tres"
+},
+"wood_planks": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/wood_planks.tres",
+"use_external/path": "res://assets/models/poi/materials/wood_planks.tres"
+},
+"wool": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/wool.tres",
+"use_external/path": "res://assets/models/poi/materials/wool.tres"
+}
+}
+}
+gltf/naming_version=2
+gltf/embedded_image_handling=1
+gltf/texture_map_mode=0

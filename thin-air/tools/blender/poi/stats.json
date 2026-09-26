@@ -5,7 +5,7 @@
   "id": "ashford_mine",
   "lights": 0,
   "markers": 11,
-  "secs": 1.9,
+  "secs": 1.8,
   "surfaces": {
    "detail": 6,
    "ground": 1,
@@ -26,7 +26,7 @@
   "id": "ashford_mine_interior",
   "lights": 2,
   "markers": 17,
-  "secs": 1.7,
+  "secs": 2.3,
   "surfaces": {
    "detail": 2,
    "main": 15
@@ -43,7 +43,7 @@
   "id": "crash_site",
   "lights": 0,
   "markers": 18,
-  "secs": 3.0,
+  "secs": 2.9,
   "surfaces": {
    "detail": 9,
    "ground": 2,
@@ -58,13 +58,83 @@
    "main": 13716
   }
  },
+ "fire_lookout": {
+  "cols": 30,
+  "glb_kb": 510,
+  "id": "fire_lookout",
+  "lights": 1,
+  "markers": 8,
+  "secs": 1.5,
+  "surfaces": {
+   "detail": 1,
+   "interior": 10,
+   "main": 9
+  },
+  "total": 5440,
+  "tris": {
+   "detail": 12,
+   "interior": 1674,
+   "main": 3754
+  }
+ },
+ "glacier_camp": {
+  "cols": 7,
+  "glb_kb": 413,
+  "id": "glacier_camp",
+  "lights": 0,
+  "markers": 7,
+  "secs": 0.7,
+  "surfaces": {
+   "detail": 4,
+   "main": 13
+  },
+  "total": 5266,
+  "tris": {
+   "detail": 396,
+   "main": 4870
+  }
+ },
+ "ice_cave": {
+  "cols": 165,
+  "glb_kb": 378,
+  "id": "ice_cave",
+  "lights": 2,
+  "markers": 6,
+  "secs": 0.3,
+  "surfaces": {
+   "detail": 3,
+   "main": 8
+  },
+  "total": 4280,
+  "tris": {
+   "detail": 1318,
+   "main": 2962
+  }
+ },
+ "ice_cave_entrance": {
+  "cols": 45,
+  "glb_kb": 291,
+  "id": "ice_cave_entrance",
+  "lights": 0,
+  "markers": 4,
+  "secs": 0.4,
+  "surfaces": {
+   "detail": 2,
+   "main": 4
+  },
+  "total": 3744,
+  "tris": {
+   "detail": 48,
+   "main": 3696
+  }
+ },
  "kestrel_station": {
   "cols": 204,
   "glb_kb": 2510,
   "id": "kestrel_station",
   "lights": 6,
   "markers": 31,
-  "secs": 5.5,
+  "secs": 5.8,
   "surfaces": {
    "detail": 10,
    "ground": 1,
@@ -79,13 +149,30 @@
    "main": 13666
   }
  },
+ "owens_bivouac": {
+  "cols": 5,
+  "glb_kb": 293,
+  "id": "owens_bivouac",
+  "lights": 0,
+  "markers": 6,
+  "secs": 0.4,
+  "surfaces": {
+   "detail": 10,
+   "main": 5
+  },
+  "total": 3480,
+  "tris": {
+   "detail": 1620,
+   "main": 1860
+  }
+ },
  "ranger_cabin": {
   "cols": 41,
   "glb_kb": 1346,
   "id": "ranger_cabin",
   "lights": 1,
   "markers": 17,
-  "secs": 4.3,
+  "secs": 4.2,
   "surfaces": {
    "detail": 7,
    "ground": 1,
@@ -98,6 +185,44 @@
    "ground": 32,
    "interior": 3848,
    "main": 9972
+  }
+ },
+ "summit_relay": {
+  "cols": 6,
+  "glb_kb": 1046,
+  "id": "summit_relay",
+  "lights": 0,
+  "markers": 9,
+  "secs": 2.2,
+  "surfaces": {
+   "detail": 3,
+   "main": 11,
+   "rime": 1
+  },
+  "total": 8510,
+  "tris": {
+   "detail": 594,
+   "main": 2748,
+   "rime": 5168
+  }
+ },
+ "trapper_cabin": {
+  "cols": 20,
+  "glb_kb": 634,
+  "id": "trapper_cabin",
+  "lights": 0,
+  "markers": 8,
+  "secs": 1.4,
+  "surfaces": {
+   "detail": 4,
+   "interior": 5,
+   "main": 5
+  },
+  "total": 6984,
+  "tris": {
+   "detail": 480,
+   "interior": 1464,
+   "main": 5040
   }
  }
 }

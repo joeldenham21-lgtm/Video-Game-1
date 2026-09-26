@@ -8,7 +8,7 @@ extends Node
 ## Options: --site=<scene id> --shot=<name> (see SHOTS)  --cam=x,y,z (site-local, Godot axes)  --look=yaw,pitch
 ##          (deg, relative to the site's yaw; 0 = site north)  --hours=H --weather=W --preset=P --fov=F
 ##          --lights=1 (site interior lights on)  --snow=S  --perf --perf_at=N  --save=abs.jpg (frame at perf_at, quit)
-##          --list (print the sockets of the site)  --torch=E (a hand torch on the camera, energy E)
+##          --all (instance every location, not only --site)  --list (print the sockets of the site)  --torch=E (a hand torch on the camera, energy E)
 
 const SHOTS := {
 	# site -> shot -> [cam (site-local x, y above ground, z), look (yaw, pitch), hours, fov, lights]
@@ -65,6 +65,9 @@ func _ready() -> void:
 	var spec: Array = shots.get(String(args.get("shot", "hero")), [Vector3(0, 1.7, 12), Vector2(0, -5), 15.0, 60.0, false])
 	var W = load("res://src/world/world.gd")
 	W.dev_no_player = true
+	if not args.has("all"):
+		var S = load("res://scenes/poi/structures.gd")
+		S.only_ids = [site_id] as Array[StringName]
 	Game.is_new_game = false
 	Game.flags.clear()
 	Climate.day = 3

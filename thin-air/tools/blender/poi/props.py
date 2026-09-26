@@ -319,3 +319,106 @@ def splinter_top(r, mat="wood_fresh", h=0.35, n=9, seed_=0.0):
                   .transformed(T(x, y, -0.02) @ RX(P.rnd(-12, 12)) @ RY(P.rnd(-12, 12))))
     me.extend(cyl(r * 0.98, 0.01, "wood_endgrain", 10, cap_mat="wood_endgrain").transformed(T(0, 0, -0.01)))
     return me
+
+
+def dome_tent(a=1.1, b=0.75, h=1.05, tint=(0.85, 0.55, 0.05), vestibule=True, sag=0.06, res=12, seed_=0.0):
+    """Geodesic mountaineering tent: fly over a 2a x 2b ellipse, crossing poles, vestibule on -Y, guy points.
+    Returns (mesh, guy anchor points on the fly)."""
+    me = P.Mesh()
+    rings = []
+    for j in range(res + 1):
+        r = j / res
+        ring = []
+        for i in range(24):
+            ang = 2 * math.pi * i / 24
+            x = math.cos(ang) * a * (1 - r * r) ** 0.5 if False else math.cos(ang) * a * (1 - r)
+            y = math.sin(ang) * b * (1 - r)
+            if vestibule and math.sin(ang) < -0.3:
+                y -= 0.55 * (-math.sin(ang) - 0.3) * (1 - r) ** 1.5
+            z = h * (1 - (1 - r) ** 2) ** 0.62
+            # fabric sags between the poles (poles run along the diagonals)
+            pole = abs(math.sin(2 * ang))
+            z -= sag * (1 - pole) * math.sin(math.pi * r) * 1.2
+            z += 0.012 * P.nz((x, y, seed_), 6.0)
+            ring.append(Vector((x, y, max(0.0, z))))
+        rings.append(ring)
+    fly = P.loft(rings, "nylon_paint_2s", True, True, tint)
+    if P.face_normal(fly, 3).z < 0:
+        P.flip(fly)
+    me.extend(fly)
+    # poles (visible sleeves) along the two diagonals
+    for s_ in (1, -1):
+        pts = []
+        for k in range(13):
+            t = k / 12
+            ang = math.atan2(b, a * s_)
+            rr = 1 - 2 * abs(t - 0.5)
+            u = (t - 0.5) * 2
+            x = u * a * math.cos(math.atan(b / a)) * s_ * 0.98
+            y = u * b * math.sin(math.atan(b / a)) * 0.98
+            z = h * (1 - u * u) ** 0.62 + 0.01
+            pts.append(Vector((x, y, z)))
+        me.extend(tube(pts, 0.012, "nylon", 5, tint=(0.15, 0.15, 0.15)))
+    anchors = [Vector((a * 0.9, b * 0.9, h * 0.45)), Vector((-a * 0.9, b * 0.9, h * 0.45)),
+               Vector((a * 0.9, -b * 0.9, h * 0.45)), Vector((-a * 0.9, -b * 0.9, h * 0.45))]
+    return me, anchors
+
+
+def zarges_box(w=0.8, d=0.55, h=0.45):
+    """Ribbed aluminium expedition case."""
+    me = box(w, d, h, "metal_bare", 'x', tint=(0.85, 0.85, 0.85)).transformed(T(0, 0, h / 2))
+    for z in (h * 0.25, h * 0.6):
+        me.extend(box(w + 0.01, d + 0.01, 0.025, "metal_bare", 'x', tint=(0.75, 0.75, 0.75)).transformed(T(0, 0, z)))
+    for sx in (-1, 1):
+        me.extend(box(0.12, 0.03, 0.03, "metal_dark").transformed(T(sx * w * 0.3, -d / 2 - 0.02, h * 0.85)))
+    return me
+
+
+def stove_canister():
+    """Mountaineering canister stove with a pot on it."""
+    me = lathe([(0.0, 0.0), (0.05, 0.0), (0.055, 0.02), (0.055, 0.08), (0.03, 0.1), (0.0, 0.1)], "paint_metal", 10,
+               tint=(0.1, 0.25, 0.55))
+    me.extend(cyl(0.012, 0.04, "metal_bare", 6).transformed(T(0, 0, 0.1)))
+    for k in range(3):
+        a = math.radians(k * 120)
+        me.extend(rod((0, 0, 0.14), (0.07 * math.cos(a), 0.07 * math.sin(a), 0.15), 0.004, "metal_bare", 4))
+    me.extend(cyl(0.08, 0.11, "metal_bare", 14, tint=(0.8, 0.8, 0.8)).transformed(T(0, 0, 0.15)))
+    return me
+
+
+def rime(me_src, wind_dir, amount=1.0, seed_=0, step=0.18, mat="rime"):
+    """Rime-ice feathers growing INTO the wind from the windward faces of `me_src` (a Mesh): small wedges
+    extending up to ~0.35 m * amount toward -wind_dir. Returns a new Mesh."""
+    out = P.Mesh()
+    wdir = Vector(wind_dir).normalized()
+    into = -wdir
+    P.seed(seed_ + 17)
+    acc = 0.0
+    for fi, f in enumerate(me_src.f):
+        n = P.face_normal(me_src, fi)
+        facing = n.dot(into)
+        if facing < 0.25:
+            continue
+        c = sum((me_src.v[j] for j in f), Vector()) / len(f)
+        # area-proportional sampling
+        area = 0.0
+        for k in range(1, len(f) - 1):
+            area += (me_src.v[f[k]] - me_src.v[f[0]]).cross(me_src.v[f[k + 1]] - me_src.v[f[0]]).length * 0.5
+        acc += area * facing
+        while acc > step * step:
+            acc -= step * step
+            L = amount * P.rnd(0.06, 0.35) * facing
+            w = L * P.rnd(0.35, 0.6)
+            base = c + (me_src.v[f[P._rng.randrange(len(f))]] - c) * P.rnd(0.0, 0.8)
+            tip = base + into * L + Vector((0, 0, P.rnd(-0.02, 0.05)))
+            side = into.cross(Vector((0, 0, 1)))
+            if side.length < 1e-3:
+                side = Vector((1, 0, 0))
+            side.normalize()
+            up = side.cross(into).normalized()
+            q = [base + side * w * 0.5, base + up * w * 0.4, base - side * w * 0.5, base - up * w * 0.4]
+            ids = [out.vert(p) for p in q]
+            t = out.vert(tip)
+            for k in range(4):
+                out.face([ids[k], ids[(k + 1) % 4], t], [(0, 0), (w, 0), (w / 2, L)], mat, True, (0.95, 0.97, 1.0), P.F_EXP)
+    return out

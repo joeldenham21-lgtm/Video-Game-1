@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://assets/models/poi/shaders/poi_ice.gdshader" id="1"]
+[ext_resource type="Texture2D" path="res://assets/models/poi/textures/poi_noise.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/textures/terrain/ice_normal.png" id="3"]
+[ext_resource type="Texture2D" path="res://assets/textures/terrain/ice_albedo.png" id="4"]
+
+[resource]
+resource_name = "ice_cave"
+render_priority = 0
+shader = ExtResource("1")
+shader_parameter/noise_tex = ExtResource("2")
+shader_parameter/ice_normal = ExtResource("3")
+shader_parameter/ice_albedo = ExtResource("4")
