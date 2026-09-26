@@ -251,7 +251,8 @@ def build():
         dx = cx - 2.1 + 1.65 + 0.45 if sy < 0 else cx + 2.1 - 1.65 - 0.45
         y = sy * (ML / 2)
         leaf = AR.door_leaf(0.9, 2.05, 0.07, "paint_metal", (0.85, 0.85, 0.82), window_=True)
-        s.add(leaf, T(dx, y + sy * 0.0, F) @ RZ(yaw), "main")
+        # left open, swung inwards (somebody went out and never came back to close it)
+        s.add(leaf, T(dx, y, F) @ RZ(yaw) @ T(-0.45, -0.04, 0) @ RZ(100) @ T(0.45, 0, 0), "main")
         ext_stair(s, (dx, y + sy * 0.05, F), yaw, F, landing=(1.5, 1.4))
         s.add(box(0.22, 0.14, 0.12, "paint_metal", tint=(0.2, 0.2, 0.2)), T(dx, y + sy * 0.15, F + 2.35), "detail")
         s.add(box(0.18, 0.02, 0.08, "lamp", flags=P.F_NOAO), T(dx, y + sy * 0.22, F + 2.3), "detail")

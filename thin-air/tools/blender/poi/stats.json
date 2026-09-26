@@ -91,7 +91,7 @@
   "id": "fire_lookout",
   "lights": 1,
   "markers": 8,
-  "secs": 2.0,
+  "secs": 4.4,
   "surfaces": {
    "detail": 1,
    "interior": 10,
@@ -157,11 +157,11 @@
  },
  "kestrel_station": {
   "cols": 204,
-  "glb_kb": 2507,
+  "glb_kb": 2508,
   "id": "kestrel_station",
   "lights": 6,
   "markers": 31,
-  "secs": 7.5,
+  "secs": 9.2,
   "surfaces": {
    "detail": 11,
    "ground": 1,

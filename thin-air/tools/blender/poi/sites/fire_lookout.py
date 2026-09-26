@@ -122,7 +122,8 @@ def build():
         s.col_box("wood", Mw @ Vector((CAB / 2, 0, 1.7)), (CAB, 0.1, 1.3), Mw) if k != 0 else (
             s.col_box("wood", Mw @ Vector((0.85, 0, 1.7)), (1.7, 0.1, 1.3), Mw), s.col_box("wood", Mw @ Vector((3.45, 0, 1.7)), (1.7, 0.1, 1.3), Mw))
     # door (glazed upper half), hip roof
-    cab.extend(AR.door_leaf(0.85, 2.05, 0.05, "wood_paint", PAINT, window_=True).transformed(T(-c + 2.15, -c, H + 0.12)))
+    cab.extend(AR.door_leaf(0.85, 2.05, 0.05, "wood_paint", PAINT, window_=True).transformed(
+        T(-c + 2.15, -c, H + 0.12) @ T(-0.425, 0.03, 0) @ RZ(95) @ T(0.425, 0, 0)))
     s.add(cab, None, "main")
     rh = 1.3
     roof = P.Mesh()
