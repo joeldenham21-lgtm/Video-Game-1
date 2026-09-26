@@ -103,6 +103,8 @@ func build_visual() -> void:
 		_register(arm)
 	if ext:
 		_holder.add_child(ext)
+		if is_lantern:
+			_bind_ext_globe(ext)
 	else:
 		_holder.add_child(mi)
 	_light = OmniLight3D.new()
@@ -344,3 +346,15 @@ func _set_lit(on: bool, instant := false) -> void:
 	elif not instant and _loop == null:
 		_loop = Audio.play_loop(&"torch_loop", _light, -6.0)
 	damage_type = &"fire" if on else &"blunt"
+
+
+## Authored lantern (assets/models/fp/lantern.glb): its "glass" surfaces get the glowing globe material.
+func _bind_ext_globe(n: Node) -> void:
+	var gm := n as MeshInstance3D
+	if gm and gm.mesh:
+		for s in gm.mesh.get_surface_count():
+			var sm := gm.mesh.surface_get_material(s)
+			if sm and sm.resource_name.begins_with("glass"):
+				gm.set_surface_override_material(s, _globe_mat)
+	for c in n.get_children():
+		_bind_ext_globe(c)

@@ -68,7 +68,12 @@ def run_arms(report):
 def run_registry(kind, report):
     """items / fp / props: modules register builders with lib.registry."""
     from lib import registry
-    import models_tools, models_items, models_props  # noqa: F401  (registration side effects)
+    for mod in ("models_tools", "models_items", "models_props"):   # registration side effects
+        try:
+            importlib.import_module(mod)
+        except ModuleNotFoundError as e:
+            if e.name != mod:
+                raise
     out = []
     for mid, fn in sorted(registry.MODELS[kind].items()):
         if ONLY and mid not in ONLY:

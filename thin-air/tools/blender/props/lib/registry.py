@@ -16,10 +16,14 @@ from .geo import MB
 MODELS = {"items": {}, "fp": {}, "props": {}}
 
 
+def _wants_id(fn):
+    return fn.__code__.co_argcount - len(fn.__defaults__ or ()) > 0
+
+
 def item(*ids):
     def deco(fn):
         for i in ids:
-            MODELS["items"][i] = (lambda i=i: fn(i)) if fn.__code__.co_argcount else fn
+            MODELS["items"][i] = (lambda i=i: fn(i)) if _wants_id(fn) else fn
         return fn
     return deco
 
@@ -27,7 +31,7 @@ def item(*ids):
 def fp(*ids):
     def deco(fn):
         for i in ids:
-            MODELS["fp"][i] = (lambda i=i: fn(i)) if fn.__code__.co_argcount else fn
+            MODELS["fp"][i] = (lambda i=i: fn(i)) if _wants_id(fn) else fn
         return fn
     return deco
 
@@ -35,7 +39,7 @@ def fp(*ids):
 def prop(*ids):
     def deco(fn):
         for i in ids:
-            MODELS["props"][i] = (lambda i=i: fn(i)) if fn.__code__.co_argcount else fn
+            MODELS["props"][i] = (lambda i=i: fn(i)) if _wants_id(fn) else fn
         return fn
     return deco
 

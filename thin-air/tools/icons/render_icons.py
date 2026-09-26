@@ -2,7 +2,7 @@
 
 Renders every model listed in tools/icons/_cache/manifest.json (written by export_meshes.gd) with a studio
 light rig, soft contact shadow and AgX view transform, to tools/icons/_cache/raw/<id>.png (512 px, alpha).
-Hero models (assets/models/items/<id>.glb) are imported as-is; procedural OBJs get their materials rebuilt
+Hero models (assets/models/items/<id>.glb) and procedural OBJs both get their materials rebuilt
 from scenes/items/materials/materials.json so icons match the in-game materials exactly.
 Then tools/icons/finish_icons.py crops/scales them into assets/icons/<id>.png (256 px).
 
@@ -276,13 +276,16 @@ def import_model(entry):
     new = [o for o in bpy.data.objects if o not in before]
     for o in new:
         o["icon_model"] = True
-        if o.type == "MESH" and not entry.get("glb"):
+        if o.type == "MESH":
+            # hero glbs (tools/blender/props) carry only library material names, like the OBJs
             for slot in o.material_slots:
                 if slot.material is not None:
                     key = slot.material.name.split(".")[0]
-                    slot.material = build_material(key)
-            for poly in o.data.polygons:
-                poly.use_smooth = True
+                    if key in MATS:
+                        slot.material = build_material(key)
+            if not entry.get("glb"):
+                for poly in o.data.polygons:
+                    poly.use_smooth = True
     return [o for o in new if o.type == "MESH"]
 
 
