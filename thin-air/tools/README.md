@@ -9,6 +9,7 @@ Everything under `tools/` is ignored by Godot (`.gdignore`). Every generator is 
 | PBR material library | `python3 thin-air/tools/textures/gen_materials.py [--only bark_pine,rope] [--preview] [--no-write]` | `assets/textures/<set>/<set>_{albedo,normal,orm[,height]}.png`, `assets/materials/<set>.tres` (ORMMaterial3D), `assets/materials/materials.json` (~3 min) |
 | Texture seam QA | `python3 thin-air/tools/textures/check_seams.py [set ...]` | prints wrap-around continuity per map (same statistic as `tests/test_textures.gd`) |
 | Texture contact sheet | `python3 thin-air/tools/textures/contact_sheet.py out.jpg mat_rope terrain_rock ...` | tiles the CPU previews written by `--preview` (in `tools/textures/_cache/preview/`, git-ignored) |
+| Terrain (heightfield, masks, layout) | `python3.12 thin-air/tools/terrain/gen_terrain.py [--stage far\|mid\|fine\|fine2\|out] [--stop out] [--preview DIR]` | `assets/terrain/{height.f32,mid.f32,far.f32,masks.bin,masks2.bin,normal.png,detail.png}`, `data/world_layout.json` (~7 min from `far`; stages cache in `tools/terrain/_cache/`, git-ignored) |
 | Material preview stage | `DISPLAY=:99 godot --path thin-air --write-movie /tmp/m.png --fixed-fps 30 --quit-after 10 res://scenes/dev/material_preview.tscn -- --mode=grid` | lit renders: `--mode=grid`, `--mode=sets --sets=a,b`, `--mode=terrain --layer=rock`, `--mode=strips --layers=a,b`, `--mode=wall --layer=cliff --ground=scree`; `--macro=1`, `--sun=elev,az`, `--perf` |
 | Viewmodel textures (player) | `python3 thin-air/tools/player/gen_fp_textures.py` → import → `python3 thin-air/tools/player/gen_fp_textures.py --fix-imports` → import | `scenes/player/textures/*` (512² seamless PBR sets: wood ash/dark/raw, steel, stone, leather, fabric, knit, rubber, aluminium, plastic, canvas; topo map; flame/smoke/spark sprites). Needs numpy + PIL (`python3.12` in this container). |
 | Item textures + campfire FX | `python3.12 thin-air/tools/icons/gen_item_textures.py [set ...]` | `scenes/items/materials/tex/*` (PBR sets for the item material library `scenes/items/materials/materials.json`), `scenes/items/fx/` flame flipbook, smoke puffs, ember/glow sprites |
@@ -95,3 +96,37 @@ Requires `python3.12` (the system python that has numpy/scipy), fluidsynth, sox,
 | `stinger_discovery` / `_danger` / `_objective` / `_death` / `_blueprint` | stingers | one-shots, 5–10 s, -16 LUFS | | |
 Loops are mastered so the file end flows into sample 0; the Audio director (`src/audio/`) may cross-fade
 on `phrase_starts_s` (every 4 bars) listed per cue in `data/music.json`.
+
+## Terrain (terrain stream)
+
+`tools/terrain/` builds the mountain deterministically (seed 20261024). Python 3.12 + numpy/scipy/Pillow; the heavy
+kernels are C (`terrain_c.c`, compiled on first use into `_cache/libterrain.so` with `gcc -O2`, called via ctypes
+from `tlib.py`). Files: `design.py` (the hand-designed world: POIs with altitudes, valley-floor and crest
+skeletons, lake, rivers, trails, ramps, gorges, zones), `macro.py` (design surface), `fields.py` (polyline distance
+fields with exact segment projection), `gen_terrain.py` (stages), `fine.py` (1.5 m map features), `outputs.py`
+(masks, normals, stitching, layout JSON), `preview.py` (CPU hillshade + perspective previews).
+
+Stages (`--stage X` resumes from a cached stage; `--preview DIR` writes hillshades and 6 perspective views):
+1. **far** (48 m, +-24.6 km): the designed skeleton near the map, a sea of ridged-multifractal peaks over the
+   regional valley network (warped, meandering) further out, fall-line erosion noise. Rendered as the horizon.
+2. **mid** (12 m design -> 6 m, +-3,072 m): harmonic (Laplace) fields for the valley-to-crest coordinate and the
+   floor / crest heights; a cliff-base profile (gentle below ~1,950 m, walls above, suppressed along the golden-path
+   RAMPS); the lower envelope of valley-wall cones (<= 33 deg forested walls from every floor edge, steeper for high
+   cirques and the designed GORGES) caps it; then facets, ragged crests, a coarse-to-fine cascade of fall-line
+   erosion noise (C `erosion_noise`, dendritic gullies/spurs), layer-cake benches above the cliff base, footslope
+   fillets, graded RAMP corridors. Matched to FAR at its border.
+3. **fine** (1.5 m, the 2049^2 map): POI altitude corrections, metre-scale gullies/ribs/hummocks, strata cliff bands
+   and ledges, the Corrigan Glacier (smooth ice with convex tongue, serac-chaos icefall, shallow crevasses, lateral
+   moraines, steep snout), 1.6 M droplet hydraulic erosion + 36 deg thermal talus on soft ground (pads protected).
+4. **fine2**: Loon Lake basin + shore, tarns, snout moraines, rivers (downstream-monotone isotonic water profile,
+   channel + limited banks; braided gravel plain), POI pads (walkable blend rings), trails (least-cost switchback
+   router with a turning penalty `route_turn`, grade-limited tread, bench cuts, fords graded to the water), summit
+   cap (Mount Corrigan is the highest point).
+5. **out**: masks (snow by altitude/aspect/wind/curvature incl. snow-filled couloirs; rock; meadow; forest with
+   treeline, avalanche chutes and clearings; scree below its repose angle; gravel; glacier ice; wetness), world
+   normals + horizon AO (`normal.png`), `detail.png` (trail, strata band index, crevasses, cliff bands), MID/FAR
+   stitched to the map edge, `world_layout.json` (CONTRACT §6; compact numeric arrays).
+
+Runtime: `src/autoload/terrain_data.gd` (queries + GPU textures + shader globals), `src/world/terrain.gd`
+(geometry clipmap, Jolt heightfield collider with NaN holes for the mine adit / ice cave, map boundary, heightfield
+sun-shadow pass `terrain_shadow_tex`), shaders `assets/shaders/terrain*.gdshader(inc)`. Tests: `tests/test_terrain.gd`.
