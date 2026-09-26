@@ -67,6 +67,7 @@ void vertex() {
 }
 
 void fragment() {
+	v_sunvis = veg_sun_visibility(v_world, length(VERTEX));
 	if (v_obj_y < clip_below || v_obj_y > clip_above) {
 		discard;
 	}
@@ -124,4 +125,9 @@ void fragment() {
 	AO = ao;
 	AO_LIGHT_AFFECT = ao_light;
 	BACKLIGHT = alb * translucency * (1.0 - snow * 0.8);
+}
+
+void light() {
+	veg_light(NORMAL, LIGHT, VIEW, LIGHT_COLOR, ATTENUATION, LIGHT_IS_DIRECTIONAL, ROUGHNESS, SPECULAR_AMOUNT,
+		BACKLIGHT, v_sunvis, DIFFUSE_LIGHT, SPECULAR_LIGHT);
 }

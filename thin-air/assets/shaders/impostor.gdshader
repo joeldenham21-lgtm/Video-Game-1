@@ -152,6 +152,7 @@ vec4 tap(sampler2DArray tex, vec2 tile, vec2 uv, float lod) {
 }
 
 void fragment() {
+	v_sunvis = veg_sun_visibility((INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz, length(VERTEX));
 	float dith = veg_ign(FRAGCOORD.xy, v_inst * 7.0);
 	if (veg_faded_out(dith, v_fade)) {
 		discard;
@@ -193,4 +194,9 @@ void fragment() {
 	ROUGHNESS = mix(roughness, 0.75, snow);
 	SPECULAR = specular;
 	BACKLIGHT = alb * translucency * (1.0 - snow * 0.8);
+}
+
+void light() {
+	veg_light(NORMAL, LIGHT, VIEW, LIGHT_COLOR, ATTENUATION, LIGHT_IS_DIRECTIONAL, ROUGHNESS, SPECULAR_AMOUNT,
+		BACKLIGHT, v_sunvis, DIFFUSE_LIGHT, SPECULAR_LIGHT);
 }

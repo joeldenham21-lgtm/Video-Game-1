@@ -256,11 +256,14 @@ static func generate_cell(ctx: VegScatter.Context, c: Vector2i, sp: float, dens:
 			var p := (meadow + floor_cover) * dens * (0.3 + 0.7 * smoothstep(0.25, 0.6, clump)) * 1.25
 			if r_acc >= p:
 				continue
+			# POI pads: soft, noisy clearing instead of a hard circle (pad_keep); trails stay hard-excluded
+			if r_acc >= p * VegScatter.pad_keep(ctx, x, z):
+				continue
 			var slope: float = t.get_slope_deg(x, z)
 			if slope > 38.0:
 				continue
 			var y: float = t.get_height(x, z)
-			if VegScatter.in_water(ctx, x, z, y, 0.0) or VegScatter.excluded(ctx, x, z, 0.5):
+			if VegScatter.in_water(ctx, x, z, y, 0.0) or VegScatter.on_trail(ctx, x, z, 0.5):
 				continue
 			var kind := 0
 			var forest_share := floor_cover / maxf(meadow + floor_cover, 1e-4)

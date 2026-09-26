@@ -143,3 +143,56 @@ void veg_face_card(inout vec3 v, inout vec3 n, inout vec3 t, vec2 uv, float widt
 	}
 	t = w;
 }
+
+// Heightfield sun shadow (published by src/world/terrain.gd). Far ridges must shade trees, shrubs and ground
+// cover exactly like the terrain under them: without this a meadow in a ridge's shadow at golden hour showed
+// sunlit tufts and trunks on dark ground (a glowing band out to the grass-ring edge). G = occluders beyond
+// ~60 m (the shadow map covers nearer casters), R = all occluders (where the shadow map has run out).
+global uniform sampler2D terrain_shadow_tex : filter_linear, repeat_disable;
+global uniform vec4 terrain_shadow_params;
+varying float v_sunvis;
+
+float veg_sun_visibility(vec3 wp, float dist) {
+	if (terrain_shadow_params.w < 0.5) {
+		return 1.0;
+	}
+	vec2 suv = (wp.xz - terrain_shadow_params.xy) / terrain_shadow_params.z;
+	if (suv.x <= 0.0 || suv.y <= 0.0 || suv.x >= 1.0 || suv.y >= 1.0) {
+		return 1.0;
+	}
+	vec2 t = texture(terrain_shadow_tex, suv).rg;
+	return mix(t.g, t.r, smoothstep(90.0, 200.0, dist));
+}
+
+// Same model as the built-in diffuse_burley + specular_schlick_ggx (+ backlight), with the directional light
+// scaled by the heightfield sun visibility.
+void veg_light(vec3 N, vec3 L, vec3 V, vec3 light_color, float attenuation, bool directional, float roughness,
+		float spec_amount, vec3 backlight, float sunvis, inout vec3 diffuse_light, inout vec3 specular_light) {
+	float att = attenuation * (directional ? sunvis : 1.0);
+	if (att <= 0.0) {
+		return;
+	}
+	float ndl = clamp(dot(N, L), 0.0, 1.0);
+	float ndv = max(dot(N, V), 1e-4);
+	vec3 H = normalize(V + L);
+	float ldh = clamp(dot(L, H), 0.0, 1.0);
+	float ndh = clamp(dot(N, H), 0.0, 1.0);
+	float r = clamp(roughness, 0.04, 1.0);
+	float fd90m1 = 2.0 * ldh * ldh * r - 0.5;
+	float fdv = 1.0 + fd90m1 * pow(1.0 - ndv, 5.0);
+	float fdl = 1.0 + fd90m1 * pow(1.0 - ndl, 5.0);
+	float diff = (1.0 / PI) * fdv * fdl * ndl;
+	diffuse_light += light_color * diff * att;
+	diffuse_light += light_color * max(vec3(1.0 / PI) - vec3(diff), vec3(0.0)) * backlight * att;
+	if (ndl > 0.0) {
+		float a = r * r;
+		float a2 = a * a;
+		float d = ndh * ndh * (a2 - 1.0) + 1.0;
+		float D = a2 / (PI * d * d);
+		float gv = ndl * sqrt(ndv * ndv * (1.0 - a2) + a2);
+		float gl = ndv * sqrt(ndl * ndl * (1.0 - a2) + a2);
+		float vis = 0.5 / max(gv + gl, 1e-5);
+		float F = 0.03 + 0.97 * pow(1.0 - ldh, 5.0);
+		specular_light += light_color * att * ndl * D * vis * F * spec_amount;
+	}
+}

@@ -71,6 +71,7 @@ void vertex() {
 }
 
 void fragment() {
+	v_sunvis = veg_sun_visibility(v_world, length(VERTEX));
 	vec4 tex = texture(albedo_tex, UV);
 	ALPHA = tex.a;
 	ALPHA_SCISSOR_THRESHOLD = alpha_cut;
@@ -96,4 +97,9 @@ void fragment() {
 	AO = ao;
 	AO_LIGHT_AFFECT = 0.4;
 	BACKLIGHT = alb * translucency * (1.0 - snow);
+}
+
+void light() {
+	veg_light(NORMAL, LIGHT, VIEW, LIGHT_COLOR, ATTENUATION, LIGHT_IS_DIRECTIONAL, ROUGHNESS, SPECULAR_AMOUNT,
+		BACKLIGHT, v_sunvis, DIFFUSE_LIGHT, SPECULAR_LIGHT);
 }

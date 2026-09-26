@@ -32,6 +32,8 @@ const SHRUB_SPACING := 5.5
 const LOG_SPACING := 13.0
 ## Largest margin passed to excluded() + slack (m).
 const EXCL_REACH := 6.0
+## Width of the soft ground-cover / shrub fade beyond a POI pad's flat radius (pad_keep()).
+const PAD_FADE := 14.0
 
 const MAX_SLOPE := {Cat.TREE: 38.0, Cat.SAPLING: 38.0, Cat.SHRUB: 40.0, Cat.DEADWOOD: 30.0, Cat.ROCK_BIG: 48.0,
 	Cat.ROCK_SMALL: 44.0}
@@ -172,7 +174,7 @@ static func _cells_touching(x0: float, z0: float, x1: float, z1: float) -> Array
 static func _index_exclusions(ctx: Context) -> void:
 	for p in ctx.pads:
 		var pad: Vector3 = p
-		var r := pad.z + EXCL_REACH
+		var r := pad.z + EXCL_REACH + PAD_FADE
 		for ci in _cells_touching(pad.x - r, pad.y - r, pad.x + r, pad.y + r):
 			if not ctx.cell_pads.has(ci):
 				ctx.cell_pads[ci] = []
@@ -252,6 +254,50 @@ static func excluded(ctx: Context, x: float, z: float, margin: float) -> bool:
 	return false
 
 
+## Soft edge around POI pads for ground cover and shrubs: 0 on the pad (flat radius r: buildings, the wreck), then
+## a noisy ramp to full density at r + PAD_FADE. With the hard pad circle alone every pad was ringed by a
+## sharp-edged hedge of tufts/shrubs (at the crash meadow: an orange band from 22 m out to the grass-ring edge).
+static func pad_keep(ctx: Context, x: float, z: float) -> float:
+	var pads: Variant = ctx.cell_pads.get(cell_index(cell_of(x, z).x, cell_of(x, z).y))
+	if pads == null:
+		return 1.0
+	var keep := 1.0
+	for p in pads:
+		var pad: Vector3 = p
+		var d := Vector2(x - pad.x, z - pad.y).length()
+		if d >= pad.z + PAD_FADE + 2.0:
+			continue
+		if d < pad.z:
+			return 0.0
+		var wob := noise2(x, z, 9.0, 77) * 0.6 + noise2(x, z, 3.1, 78) * 0.4
+		var t := (d - pad.z) / PAD_FADE * 1.25 - 0.1 + (wob - 0.5) * 0.6
+		keep = minf(keep, smoothstep(0.0, 1.0, clampf(t, 0.0, 1.0)))
+	return keep
+
+
+## True when (x, z) is within half-width + margin of a trail (the trail half of excluded()).
+static func on_trail(ctx: Context, x: float, z: float, margin: float) -> bool:
+	var segs: Variant = ctx.cell_segs.get(cell_index(cell_of(x, z).x, cell_of(x, z).y))
+	if segs == null:
+		return false
+	var f: PackedFloat32Array = segs
+	for k in range(0, f.size(), 6):
+		var ax := f[k]
+		var az := f[k + 1]
+		var abx := f[k + 2] - ax
+		var abz := f[k + 3] - az
+		var l2 := abx * abx + abz * abz
+		var u := 0.0
+		if l2 > 1e-6:
+			u = clampf(((x - ax) * abx + (z - az) * abz) / l2, 0.0, 1.0)
+		var px := ax + abx * u - x
+		var pz := az + abz * u - z
+		var hw := lerpf(f[k + 4], f[k + 5], u) + margin
+		if px * px + pz * pz < hw * hw:
+			return true
+	return false
+
+
 ## Secondary masks: R scree/talus/moraine, G gravel bars, B glacier ice, A wetness. Falls back to
 ## get_surface() == scree when the terrain has no get_masks2().
 static func masks2(ctx: Context, x: float, z: float) -> Color:
@@ -283,10 +329,12 @@ static func species_weights(y: float, south: float, moist: float, burn: float) -
 	var w := {}
 	w["spruce"] = _bell(y, 1300.0, 1650.0, 2050.0, 2200.0) * (0.55 + 0.9 * moist) * (1.0 - 0.6 * south)
 	w["fir"] = _bell(y, 1420.0, 1750.0, 2150.0, 2330.0) * (0.75 + 0.4 * moist) * (1.0 - 0.35 * south)
-	w["lodgepole"] = _bell(y, 1300.0, 1400.0, 1800.0, 1980.0) * (0.12 + 1.3 * south * (1.0 - moist) + 0.9 * burn)
+	# lodgepole (tall, crown only in the top third) belongs on dry south slopes and old burns, not on the moist
+	# valley floor, where it read as bare poles around the meadows
+	w["lodgepole"] = _bell(y, 1300.0, 1400.0, 1800.0, 1980.0) * (0.05 + 1.3 * south * (1.0 - moist) + 0.6 * burn)
 	w["larch"] = _bell(y, 1920.0, 2040.0, 2230.0, 2340.0) * (0.9 + 0.4 * (1.0 - south))
 	w["whitebark"] = _bell(y, 1950.0, 2080.0, 2280.0, 2380.0) * (0.5 + 1.2 * south)
-	w["snag"] = 0.05 + 0.08 * _bell(y, 2000.0, 2150.0, 2300.0, 2400.0) + 0.5 * burn
+	w["snag"] = 0.025 + 0.08 * _bell(y, 2000.0, 2150.0, 2300.0, 2400.0) + 0.3 * burn
 	return w
 
 
@@ -362,10 +410,15 @@ static func generate_cell(ctx: Context, cx: int, cz: int) -> CellData:
 	if not ctx.shrubs.is_empty():
 		rng.seed = _hash(cx, cz, 41)
 		_grid(ctx, out, rng, placed, o, SHRUB_SPACING, Cat.SHRUB, func(x: float, z: float, y: float, m: Color, _slope: float) -> float:
+			# Forest-edge ecotone. m.a*(1-m.a) alone peaks on the exact mid-contour of the forest mask, which
+			# is a thin, continuous line wherever the mask is cut sharply (trails, river gravel, clearings) -
+			# a hard-edged hedge of one species. Instead the edge position wobbles by +-17 m-scale noise and
+			# the ecotone is broad and sparse, so shrubs thin out into the forest and the open ground.
+			var fa := clampf(m.a + (noise2(x, z, 17.0, 12) - 0.5) * 0.8, 0.0, 1.0)
+			var edge := smoothstep(0.05, 0.4, fa) * (1.0 - smoothstep(0.45, 0.9, fa))
 			var open := 1.0 - m.a
-			var edge := m.a * (1.0 - m.a) * 4.0
-			var patch := smoothstep(0.35, 0.7, noise2(x, z, 23.0, 7))
-			return clampf((m.b * 0.25 + edge * 0.25 + open * 0.1 * (1.0 - m.r)) * patch * (1.0 - smoothstep(2300.0, 2500.0, y)), 0.0, 0.7))
+			var patch := smoothstep(0.38, 0.75, noise2(x, z, 23.0, 7) * 0.7 + noise2(x, z, 7.0, 13) * 0.3)
+			return clampf((m.b * 0.2 + edge * 0.16 + open * 0.08 * (1.0 - m.r)) * patch * (1.0 - smoothstep(2300.0, 2500.0, y)), 0.0, 0.55) * pad_keep(ctx, x, z))
 	# 5) small rocks and talus stones
 	if not ctx.rock_small.is_empty():
 		rng.seed = _hash(cx, cz, 53)
@@ -484,8 +537,16 @@ static func _pick_tree(ctx: Context, t: Object, x: float, z: float, y: float, r_
 	var wl: float = t.get_water_level(x, z)
 	var wetness := masks2(ctx, x, z).a if ctx.has_masks2 else 0.0
 	var moist := clampf(0.35 + (0.4 if wl > -1e20 else 0.0) + wetness * 0.4 + (1.0 - smoothstep(1350.0, 1700.0, y)) * 0.35 - south * 0.3, 0.0, 1.0)
-	var burn := smoothstep(0.72, 0.85, noise2(x, z, 160.0, 9))
+	var burn := smoothstep(0.76, 0.88, noise2(x, z, 160.0, 9))
 	var w := species_weights(y, south, moist, burn)
+	# open-grown edge trees (meadows, clearings, trail margins) are the ones seen whole: favour full-crowned
+	# spruce/fir there, and no dead snags right at the edge
+	var fa: float = (t.get_masks(x, z) as Color).a
+	var openness := 1.0 - smoothstep(0.35, 0.8, fa)
+	if w.has("lodgepole"):
+		w["lodgepole"] = float(w["lodgepole"]) * (1.0 - 0.7 * openness)
+	if w.has("snag"):
+		w["snag"] = float(w["snag"]) * (1.0 - 0.85 * openness)
 	var keys := w.keys()
 	for k in keys:
 		if not ctx.species_variants.has(k):
@@ -520,7 +581,13 @@ static func _pick_shrub(ctx: Context, t: Object, x: float, z: float, y: float, m
 	w["willow"] = wet * 1.2 * (1.0 - smoothstep(2100.0, 2350.0, y)) + 0.1
 	w["alder"] = (0.3 + wet * 0.6) * (1.0 - smoothstep(1900.0, 2150.0, y))
 	w["juniper"] = (0.2 + south * 1.0) * (1.0 - m.a) + smoothstep(1900.0, 2150.0, y) * 0.6
-	w["huckleberry"] = m.a * 0.9 * _bell(y, 1350.0, 1450.0, 1950.0, 2150.0)
+	w["huckleberry"] = m.a * 0.6 * _bell(y, 1350.0, 1450.0, 1950.0, 2150.0)
+	# species grow in patches (clonal thickets), not as an even mix: each species' weight swings 0.2-1.8x
+	# over ~45 m, so no single colour follows a contour for hundreds of metres
+	var salt := 20
+	for k in w.keys():
+		w[k] = float(w[k]) * (0.2 + 1.6 * noise2(x, z, 45.0, salt))
+		salt += 1
 	for k in w.keys():
 		if not ctx.shrubs.has(k):
 			w.erase(k)

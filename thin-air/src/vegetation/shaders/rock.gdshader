@@ -51,6 +51,7 @@ vec3 whiteout(vec3 base_ts, vec3 detail_ts) {
 }
 
 void fragment() {
+	v_sunvis = veg_sun_visibility(v_world, length(VERTEX));
 	if (veg_faded_out(veg_ign(FRAGCOORD.xy, v_inst * 7.0), v_fade)) {
 		discard;
 	}
@@ -96,4 +97,9 @@ void fragment() {
 	AO = ao;
 	AO_LIGHT_AFFECT = 0.35;
 	NORMAL = normalize((VIEW_MATRIX * vec4(Nd, 0.0)).xyz);
+}
+
+void light() {
+	veg_light(NORMAL, LIGHT, VIEW, LIGHT_COLOR, ATTENUATION, LIGHT_IS_DIRECTIONAL, ROUGHNESS, SPECULAR_AMOUNT,
+		vec3(0.0), v_sunvis, DIFFUSE_LIGHT, SPECULAR_LIGHT);
 }

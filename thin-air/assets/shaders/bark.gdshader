@@ -47,6 +47,7 @@ void vertex() {
 }
 
 void fragment() {
+	v_sunvis = veg_sun_visibility(v_world, length(VERTEX));
 	if (v_obj_y < clip_below || v_obj_y > clip_above) {
 		discard;
 	}
@@ -72,4 +73,9 @@ void fragment() {
 	AO_LIGHT_AFFECT = 0.25;
 	NORMAL_MAP = texture(normal_tex, uv).xyz;
 	NORMAL_MAP_DEPTH = normal_strength * (1.0 - snow * 0.7);
+}
+
+void light() {
+	veg_light(NORMAL, LIGHT, VIEW, LIGHT_COLOR, ATTENUATION, LIGHT_IS_DIRECTIONAL, ROUGHNESS, SPECULAR_AMOUNT,
+		vec3(0.0), v_sunvis, DIFFUSE_LIGHT, SPECULAR_LIGHT);
 }
