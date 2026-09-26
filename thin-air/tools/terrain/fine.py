@@ -239,7 +239,9 @@ class Fine:
 		g = np.where(hardband[band], g, fr)
 		delta = (g - fr) * T
 		s = slope_deg(blur(h, 2.5), DX)
-		w = smoothstep(33.0, 50.0, s) * (0.4 + 0.4 * smoothstep(1900.0, 2600.0, h))
+		# massive faces vs banded faces: the strata show strongly in some places, hardly at all in others
+		patch = smoothstep(-0.25, 0.35, self.noise(1 / 500.0, 3, seed=45))
+		w = smoothstep(33.0, 50.0, s) * (0.4 + 0.4 * smoothstep(1900.0, 2600.0, h)) * (0.25 + 0.75 * patch)
 		w = w * (1 - self.floor_w) * (1 - self.ramp_w) * (1 - self.pad_zone)
 		self.h = (h + delta * w).astype(np.float32)
 		cliff = hardband[band] & (fr > 1 - cf)
@@ -265,7 +267,9 @@ class Fine:
 		Ltot = F.S[-1]
 		sn = F.s / Ltot                                           # 0 at the neve head, 1 at the snout
 		wob = self.noise(1 / 220.0, 3, seed=51)[sl]
-		w = w0 * (1.0 + 0.12 * wob)
+		wob2 = self.noise(1 / 70.0, 2, seed=58)[sl]
+		# the neve spreads into the cirque; margins wander (no ruler-straight ice edges)
+		w = w0 * (1.0 + 0.35 * (1.0 - sn) ** 2) * (1.0 + 0.22 * wob + 0.07 * wob2)
 		u = F.d / w
 		head_d = np.where(F.k <= 1, np.maximum(-F.along, 0.0), 0.0)
 		snout_d = np.where(F.k >= F.last - 1, np.maximum(F.along, 0.0), 0.0)
@@ -300,6 +304,12 @@ class Fine:
 		wi = (1 - smoothstep(0.82, 1.0, u)) * (1 - smoothstep(0.0, 45.0, head_d))
 		front = smoothstep(0.0, 1.0, 1 - snout_d / np.maximum(w * 0.35, 6.0))
 		wi = wi * front
+		# neve basin: above and around the upper glacier the snowpack buries the gullies - smooth broad snowfields
+		# up to the headwall (no fall-line grooves radiating from the col)
+		hb = blur(self.h, 10.0)[sl].astype(np.float64)
+		nz = (1 - smoothstep(0.45, 0.7, sn)) * (1 - smoothstep(1.0, 1.9, u)) * (1 - smoothstep(60.0, 160.0, head_d))
+		nz = np.clip(nz, 0.0, 1.0) * 0.9
+		h = h * (1 - nz) + hb * nz
 		new = h * (1 - wi) + yi * wi
 		# lateral moraines on the tongue (sharp-crested ridges just outside the ice), none on the neve
 		mh = np.interp(sn, [0.0, 0.45, 0.6, 1.0], [0.0, 2.0, 11.0, 16.0])

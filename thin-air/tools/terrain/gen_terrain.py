@@ -137,7 +137,7 @@ def noise_on(n, x0, dx, freq, octaves, seed, kind="fbm", **kw):
 	return tlib.noise(n, n, x0, x0, dx, freq, octaves, seed=SEED + seed, kind=kind, **kw)
 
 
-def sculpt(h0, s, rel, floor, n, x0, dx, seed, facet=0.05, crest=0.05, cascade=None, warp=350.0):
+def sculpt(h0, s, rel, floor, n, x0, dx, seed, facet=0.05, crest=0.05, cascade=None, warp=350.0, dv=None):
 	"""Break the harmonic design surface into mountain form: large facet undulation (spurs/bowls), ragged
 	crests (ridged noise near s = 1), then a cascade of fall-line gully/spur erosion noise from coarse to fine.
 	Each level's gradient is taken from the result so far, so smaller gullies run down the flanks of the larger
@@ -148,7 +148,10 @@ def sculpt(h0, s, rel, floor, n, x0, dx, seed, facet=0.05, crest=0.05, cascade=N
 		cascade = [(650.0, 0.05, 3), (260.0, 0.02, 3), (110.0, 0.008, 3)]
 	wx = noise_on(n, x0, dx, 1 / 1800.0, 3, seed + 1) * warp
 	wz = noise_on(n, x0, dx, 1 / 1800.0, 3, seed + 2) * warp
-	body = smoothstep(0.0, 0.3, s) * (1 - smoothstep(0.85, 1.0, s) * 0.5)
+	# how far up the valley side we are: distance beyond the floor edge where known (the harmonic s stays
+	# small over the broad lower slopes, which would leave them untouched)
+	up_s = smoothstep(0.0, 0.3, s) if dv is None else np.maximum(smoothstep(8.0, 260.0, dv), smoothstep(0.0, 0.3, s))
+	body = up_s * (1 - smoothstep(0.85, 1.0, s) * 0.5)
 	h = h0 + rel * facet * noise_on(n, x0, dx, 1 / 1400.0, 4, seed + 3, warpx=wx, warpz=wz) * body
 	cr = smoothstep(0.55, 1.0, s)
 	h = h + rel * crest * (noise_on(n, x0, dx, 1 / 380.0, 5, seed + 4, "ridged", warpx=wx * 0.4,
@@ -156,7 +159,7 @@ def sculpt(h0, s, rel, floor, n, x0, dx, seed, facet=0.05, crest=0.05, cascade=N
 	# floors: noise tapers in over ~30 m instead of stopping at the floor edge
 	fw = np.clip(blur(floor.astype(np.float32), 30.0 / dx) * 1.6, 0.0, 1.0)
 	h = h0 + (h - h0) * (1 - fw)
-	on = smoothstep(0.02, 0.3, s) * (1 - fw)
+	on = (smoothstep(0.02, 0.3, s) if dv is None else np.maximum(smoothstep(3.0, 90.0, dv), smoothstep(0.02, 0.3, s))) * (1 - fw)
 	for k, (scale, amp, octs) in enumerate(cascade):
 		gx, gz = gradient(h, dx, max(scale / 8.0 / dx, 1.0))
 		E = tlib.erosion_noise(gx, gz, x0, x0, dx, 1 / scale, octs, 0.45, 2.0, 0.5, 0.05, seed=SEED + seed + 5 + k)
@@ -231,7 +234,7 @@ def stage_mid(args):
 	floor = up(R["floor"].astype(np.float32), 1) > 0.5
 	dv = up(R["dv"], 1)
 	rel = np.maximum(Hc - Hv, 60.0)
-	h = sculpt(h0, s, rel, floor, MID_N, MID_X0, MID_DX, 200)
+	h = sculpt(h0, s, rel, floor, MID_N, MID_X0, MID_DX, 200, dv=dv)
 	# layer-cake benches and cliff bands above the cliff base (the Rockies' look; walkable ledges between walls)
 	X6, Z6 = grid(MID_N, MID_X0, MID_DX)
 	H1 = D.CLIFF_BASE + D.CLIFF_BASE_VAR * noise_on(MID_N, MID_X0, MID_DX, 1 / 900.0, 3, 300)

@@ -112,7 +112,7 @@ def compute_masks(F, log):
 	treeline = D.TREELINE + 70.0 * nz3 - 70.0 * aspect_n + 25.0 * nz1
 	f_alt = 1 - smoothstep(treeline - 160.0, treeline + 10.0, h)
 	f_low = smoothstep(1290.0, 1330.0, h)
-	f_slope = 1 - smoothstep(33.0, 43.0, slope_s)
+	f_slope = 1 - smoothstep(39.0, 48.0, slope_s)
 	# avalanche chutes: concentrated flow on steep forested faces stays open
 	chute = smoothstep(3.6, 4.6, logA) * smoothstep(26.0, 34.0, slope_s) * smoothstep(1500.0, 1700.0, h)
 	chute = np.clip(blur(chute, 3.5) * 2.2, 0, 1)
