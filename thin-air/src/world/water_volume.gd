@@ -7,7 +7,7 @@ extends Area3D
 ## * Lakes join group "water" and answer get_water_surface() (the Player's sensor uses it on top of
 ##   TerrainData.get_water_level); river volumes are sloped, so they stay out of that group ("water_river")
 ##   and everything asks TerrainData for the level there.
-## The surface height always comes from TerrainData.get_water_level() — the same number the renderer uses.
+## The surface height comes from WaterQuery.surface_at() — the surface exactly as the meshes draw it.
 
 const LAYER_WATER := 1 << 5
 const MASK_ITEMS := 1 << 3
@@ -159,7 +159,7 @@ func _physics_process(delta: float) -> void:
 ## Archimedes + drag for one body (static so tests can drive it directly).
 static func apply_buoyancy(rb: RigidBody3D, info: Vector2, g: float, delta: float) -> float:
 	var p := rb.global_position
-	var lvl := TerrainData.get_water_level(p.x, p.z)
+	var lvl := WaterQuery.surface_at(p.x, p.z)
 	if lvl == -INF:
 		return 0.0
 	var hh := info.x

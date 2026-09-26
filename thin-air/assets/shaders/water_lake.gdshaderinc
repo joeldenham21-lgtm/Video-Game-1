@@ -92,9 +92,10 @@ void fragment() {
 	float shade = clamp(0.5 - bed_n.z * 1.5, 0.0, 1.0) * 0.5 + (1.0 - tn.a) * 0.8;   // north aspect + enclosure
 	float cold = clamp(ice_amount + v_cold * 0.6 + cold_bias, 0.0, 1.5);
 	vec4 fz = texture(foam_tex, v_world.xz / 23.0);
-	float ice_reach = cold * (0.25 + 0.9 * shade) * (0.75 + 0.5 * fz.b);   // metres of depth covered
-	float ice = smoothstep(ice_reach, ice_reach * 0.7, depth) * step(0.02, cold);
-	float frost = smoothstep(ice_reach * 0.45, 0.0, depth);                  // white rime at the very edge
+	// metres of water depth the rim ice reaches: a few cm in the valley, decimetres at the tarns / in shade
+	float ice_reach = cold * cold * (0.06 + 0.3 * shade + 0.35 * v_cold) * (0.6 + 0.8 * fz.b);
+	float ice = smoothstep(ice_reach, ice_reach * 0.6, depth) * step(0.02, cold);
+	float frost = smoothstep(ice_reach * 0.35, ice_reach * 0.05, depth);    // white rime at the very edge
 
 	// ---- surface normal: wind ripples, flattened under ice and in sheltered shallows
 	float calm = clamp(ice * 1.2, 0.0, 1.0) * 0.97;
@@ -156,10 +157,10 @@ void fragment() {
 	}
 
 	// ---- skim ice / rime
-	vec3 ice_col = mix(vec3(0.05, 0.075, 0.08), vec3(0.62, 0.66, 0.68), frost * (0.6 + 0.4 * fz.r));
+	vec3 ice_col = mix(vec3(0.04, 0.06, 0.065), vec3(0.58, 0.62, 0.64), frost * (0.5 + 0.5 * fz.r));
 	float crack = smoothstep(0.55, 0.9, texture(foam_tex, v_world.xz / 1.7).r) * (1.0 - frost);
 	ice_col = mix(ice_col, vec3(0.3, 0.33, 0.34), crack * 0.6);
-	float ice_alpha = mix(0.55, 0.96, frost);
+	float ice_alpha = mix(0.3, 0.9, frost);   // black ice is clear: mostly reflection + a grey film
 	albedo = mix(albedo, ice_col, ice);
 	body = mix(body, ice_alpha, ice);
 	alpha = mix(alpha, ice_alpha, ice);
@@ -189,9 +190,10 @@ void fragment() {
 	spec *= edge;
 	emis *= edge;
 
-	ALBEDO = albedo;
+	// premultiplied: Godot's PREMUL_ALPHA_FACTOR scales the whole lit colour (specular too) and does not
+	// compile on the Mobile renderer in 4.7, so the (1−F)(1−T) body weight goes into the albedo instead
+	ALBEDO = albedo * clamp(body, 0.0, 1.0);
 	ALPHA = clamp(alpha, 0.0, 1.0);
-	PREMUL_ALPHA_FACTOR = clamp(body, 0.0, 1.0);
 	SPECULAR = spec;
 	ROUGHNESS = rough;
 	METALLIC = 0.0;

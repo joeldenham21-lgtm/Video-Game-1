@@ -3,7 +3,7 @@
 // Lighting model (render_mode blend_premul_alpha): the surface pixel is
 //     F·reflection + (1−F)·[T·background + (1−T)·in-scattered body colour]
 // Godot adds the specular (sky radiance + sun/moon glints, SPECULAR tuned to water's F0 = 0.02) unscaled,
-// the diffuse "body" term is scaled by PREMUL_ALPHA_FACTOR = (1−F)(1−T), and the blend keeps (1−ALPHA) of
+// the diffuse "body" term is pre-weighted into ALBEDO by (1−F)(1−T), and the blend keeps (1−ALPHA) of
 // what is behind, with ALPHA = 1 − (1−F)·T. Depth comes from the terrain heightfield global (no depth
 // texture needed, so the Mobile renderer gets the same look); T is the transmittance along the view path.
 
@@ -21,8 +21,8 @@ uniform sampler2D ripple_b : hint_normal, filter_linear_mipmap_anisotropic, repe
 uniform sampler2D foam_tex : hint_default_black, filter_linear_mipmap, repeat_enable;
 
 // water optics (per metre): milky glacial "rock flour" water — red dies in a metre, green/blue carry a few
-uniform vec3 extinction = vec3(0.62, 0.21, 0.19);
-uniform vec3 body_albedo : source_color = vec3(0.035, 0.16, 0.165);  // diffuse reflectance of deep water
+uniform vec3 extinction = vec3(0.6, 0.24, 0.23);
+uniform vec3 body_albedo : source_color = vec3(0.045, 0.24, 0.235);  // diffuse reflectance of deep water
 // light for the heightfield "reflection" of the surrounding range (set every frame by water.gd)
 uniform vec3 refl_sun = vec3(1.0);            // sun/moon colour × energy
 uniform vec3 refl_amb = vec3(0.3, 0.35, 0.4); // sky ambient

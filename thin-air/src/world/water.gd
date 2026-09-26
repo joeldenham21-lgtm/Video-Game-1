@@ -2,8 +2,9 @@ class_name WaterSystem
 extends Node3D
 ## THIN AIR — lakes, rivers, falls, water volumes and the underwater view (Water stream).
 ## Instanced by world.gd as the "Water" part (scenes/world/water.tscn). Everything is generated at load from
-## data/world_layout.json via TerrainData, and TerrainData.get_water_level() is the one truth for the surface:
-## the meshes sit exactly at those levels (tests/test_water.gd samples both).
+## data/world_layout.json via TerrainData: lakes at their levels, rivers along the polyline profiles. The drawn
+## surface is WaterQuery.surface_at(); tests/test_water.gd samples it against the meshes and against
+## TerrainData.get_water_level() (equal on lakes and gentle reaches; see WaterQuery for the steep/braided caveat).
 ##
 ## Children built at runtime:
 ##   Lakes (1 draw call: Loon Lake + tarns)      Rivers_* (≤ 4 draw calls, 2×2 map buckets)

@@ -123,9 +123,10 @@ void fragment() {
 		body = alpha;
 	}
 
-	ALBEDO = albedo;
+	// premultiplied: Godot's PREMUL_ALPHA_FACTOR scales the whole lit colour (specular too) and does not
+	// compile on the Mobile renderer in 4.7, so the (1−F)(1−T) body weight goes into the albedo instead
+	ALBEDO = albedo * clamp(body, 0.0, 1.0);
 	ALPHA = clamp(alpha, 0.0, 1.0);
-	PREMUL_ALPHA_FACTOR = clamp(body, 0.0, 1.0);
 	SPECULAR = spec;
 	ROUGHNESS = rough;
 	METALLIC = 0.0;

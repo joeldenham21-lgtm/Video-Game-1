@@ -1,7 +1,7 @@
 class_name WaterUnderwater
 extends CanvasLayer
 ## Underwater camera effect — Water stream. Whenever the active camera is below the water surface
-## (TerrainData.get_water_level, the same level the renderer draws) a full-screen overlay tints, fogs and (on
+## (WaterQuery.surface_at: the surface as drawn) a full-screen overlay tints, fogs and (on
 ## Forward+) blurs the view; the audio is muffled while there is no Player doing that itself.
 ## Mobile path: water_underwater_mobile.gdshader (no screen texture read).
 
@@ -40,7 +40,7 @@ func _apply_shader() -> void:
 
 ## Is this world point under water (and how deep)? Returns the depth below the surface, or -1.
 static func depth_below_surface(p: Vector3) -> float:
-	var wl := TerrainData.get_water_level(p.x, p.z)
+	var wl := WaterQuery.surface_at(p.x, p.z)
 	if wl == -INF or p.y >= wl or wl - TerrainData.get_height(p.x, p.z) <= 0.0:
 		return -1.0
 	return wl - p.y
