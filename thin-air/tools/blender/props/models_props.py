@@ -144,8 +144,14 @@ def oil_drum():
     prof += [(r * k / 5, h - 0.004) for k in range(4, 0, -1)] + [(0.0001, h - 0.004)]
     f0 = len(mb.f)
     mb.lathe(prof, seg=36, mat="paint_blue")
-    _noise_split(mb, f0, "rust", freq=11.0, thresh=0.3, seed=1.0,
-                 bias=lambda c: 0.35 * (1.0 - smoothstep(0.0, 0.25, c.y)) + 0.25 * smoothstep(0.8, 0.88, c.y))
+    # paint fails where drums get knocked: the rolling hoops, the chimes, and a ragged band along the bottom
+    for fc in mb.f[f0:]:
+        c = sum((mb.v[i] for i in fc.idx), Vector()) / len(fc.idx)
+        rr = math.hypot(c.x, c.z)
+        n = noise.noise(c * 14.0 + Vector((1.3, 2.1, 0.7)))
+        chime = (c.y < 0.025 or c.y > h - 0.025) and rr > r - 0.02
+        if rr > r + 0.003 or chime or (c.y < 0.09 + 0.07 * n and rr > r - 0.01):
+            fc.mat = "rust"
     for (x, z, rr) in ((0.17, 0.05, 0.03), (-0.19, -0.02, 0.018)):
         mb.lathe([(0.0001, 0.0), (rr, 0.0), (rr, 0.012), (0.0001, 0.012)], seg=12, mat="rust",
                  m=R.T(x, h - 0.006, z))
@@ -190,7 +196,6 @@ def jerrycan20():
              seg=18, mat="paint_olive", m=R.T(sx, 0, 0))
     mb.tube([Vector((sx - 0.025, Hy + 0.03, 0.0)), Vector((sx - 0.06, Hy + 0.04, 0.0))], (0.005, 0.01), seg=8,
             mat="steel_dark", up=(0, 0, 1))
-    _noise_split(mb, f0, "rust", freq=18.0, thresh=0.55, seed=5.0)
     ob = R.obj(mb, "jerrycan", bevel=0.001, bevel_segments=1)
     R.rest_on_ground([ob])
     return {"objects": [ob], "body": "rigid", "mass": 18.0}
@@ -247,7 +252,6 @@ def ammo_box():
     for sz in (-1, 1):                                                                              # stiffening ribs
         for x in (-0.09, 0.0, 0.09):
             mb.box((0.012, H - 0.06, 0.004), (x, (H - 0.02) / 2, sz * (W / 2 + 0.002)), mat="paint_olive")
-    _noise_split(mb, f0, "rust", freq=22.0, thresh=0.62, seed=8.0)
     ob = R.obj(mb, "ammo_box", bevel=0.0015, bevel_segments=1)
     t = _text("CARTRIDGES CAL .50", 0.016, R.T(0.0, 0.1, W / 2 + 0.0015), "paint_yellow", extrude=0.0003)
     R.rest_on_ground([ob, t])
@@ -677,3 +681,96 @@ def antlers():
     R.xform([ob], R.rot("Z", 70))
     R.rest_on_ground([ob])
     return {"objects": [ob], "body": "rigid", "mass": 0.8}
+
+
+# ================================================================================================ station / ranch
+
+@R.prop("fuel_tank")
+def fuel_tank():
+    """1,000 L horizontal diesel tank on steel saddles (generator shed): cream paint streaked with rust, fill
+    cap, sight gauge, outlet valve and hose."""
+    mb = MB()
+    r, L, cy = 0.5, 1.8, 0.78
+    prof = [(0.0001, -L / 2 - 0.06), (r * 0.5, -L / 2 - 0.05), (r * 0.85, -L / 2 - 0.025), (r, -L / 2)]
+    prof += [(r, lerp(-L / 2, L / 2, k / 14)) for k in range(1, 14)]
+    prof += [(r, L / 2), (r * 0.85, L / 2 + 0.025), (r * 0.5, L / 2 + 0.05), (0.0001, L / 2 + 0.06)]
+    f0 = len(mb.f)
+    mb.lathe(prof, seg=32, mat="paint_white", m=R.T(0, cy, 0) @ R.rot("Z", 90))
+    for x in (-0.6, 0.6):                                                            # saddles
+        saddle = [(-0.42, 0.0), (0.42, 0.0), (0.42, 0.06), (0.3, 0.06), (0.25, cy - 0.3), (-0.25, cy - 0.3),
+                  (-0.3, 0.06), (-0.42, 0.06)]
+        mb.prism(saddle, 0.08, mat="steel_dark", m=R.T(x, 0, 0) @ R.rot("Y", 90))
+        mb.box((0.1, 0.02, 0.9), (x, 0.01, 0.0), mat="steel_dark")
+    mb.lathe([(0.0001, cy + r - 0.01), (0.07, cy + r - 0.01), (0.07, cy + r + 0.05), (0.06, cy + r + 0.06),
+              (0.0001, cy + r + 0.06)], seg=16, mat="steel_dark", m=R.T(0.45, 0, 0))            # fill cap
+    mb.tube([Vector((-0.3, cy + r - 0.02, 0.0)), Vector((-0.3, cy + r + 0.12, 0.0))], 0.02, seg=10, mat="glass")  # gauge
+    mb.lathe([(0.0001, 0.0), (0.035, 0.0), (0.035, 0.08), (0.0001, 0.08)], seg=12, mat="brass",
+             m=R.T(-L / 2 - 0.03, 0.4, 0.0) @ R.rot("Z", 90))                                    # outlet valve
+    mb.tube([Vector((-L / 2 - 0.1, 0.4, 0.0)), Vector((-L / 2 - 0.2, 0.3, 0.05)), Vector((-L / 2 - 0.22, 0.05, 0.15)),
+             Vector((-L / 2 - 0.1, 0.02, 0.4))], 0.016, seg=8, mat="rubber")
+    ob = R.obj(mb, "fuel_tank", smooth_angle=40)
+    t = _text("DIESEL", 0.12, R.T(0.0, cy + 0.05, r + 0.001), "paint_red", extrude=0.0008)
+    R.rest_on_ground([ob, t])
+    return {"objects": [ob, t],
+            "collision": [{"type": "cylinder", "radius": r, "height": L + 0.1, "pos": [0, cy, 0], "roll": 90.0},
+                          _box_col((1.3, cy - 0.28, 0.9), (0, (cy - 0.28) / 2, 0))],
+            "body": "static"}
+
+
+@R.prop("skis")
+def skis():
+    """A pair of old hickory touring skis with cable bindings and leather straps, lying side by side."""
+    objs = []
+    for (ox, yaw) in ((-0.06, -1.5), (0.07, 2.0)):
+        mb = MB()
+        L, Wd, T = 2.0, 0.072, 0.022
+
+        def ski(u, v, p):
+            x = lerp(-L / 2, L / 2, u)
+            w = Wd * (1.0 - 0.12 * math.sin(u * math.pi)) * (0.6 + 0.4 * smoothstep(0.98, 0.9, u))
+            z = (v - 0.5) * w
+            tip = smoothstep(0.86, 1.0, u)
+            y = 0.1 * tip ** 2.2 + 0.006 * math.sin(u * math.pi)                    # tip curl + camber
+            return Vector((x, y + T, z))
+        mb.grid(1.0, 1.0, 40, 2, mat="wood", fn=ski, two_sided=True, thickness=T)
+        mb.box((0.09, 0.03, 0.085), (-0.05, T + 0.02, 0.0), mat="steel_dark")        # toe iron
+        mb.tube([Vector((-0.02, T + 0.03, -0.045)), Vector((-0.2, T + 0.035, -0.05)), Vector((-0.3, T + 0.04, 0.0)),
+                 Vector((-0.2, T + 0.035, 0.05)), Vector((-0.02, T + 0.03, 0.045))], 0.0028, seg=5, mat="steel")
+        mb.tube([Vector((-0.04, T + 0.03, -0.05)), Vector((-0.04, T + 0.07, 0.0)), Vector((-0.04, T + 0.03, 0.05))],
+                (0.009, 0.002), seg=5, mat="leather_dark", up=(1, 0, 0))
+        ob = R.obj(mb, "ski", smooth_angle=50)
+        R.xform([ob], R.T(0, 0, ox) @ R.rot("Y", yaw))
+        objs.append(ob)
+    R.rest_on_ground(objs)
+    return {"objects": objs, "body": "rigid", "mass": 4.5}
+
+
+@R.prop("fence_barbed_wire")
+def fence_barbed_wire():
+    """A 3 m section of old ranch fence: split cedar posts, three sagging strands of barbed wire, staples."""
+    mb = MB()
+    posts = [(-1.5, 3.0), (1.5, -4.0)]
+    for (x, lean) in posts:
+        p = MB()
+        p.blob((0.0, 0.62, 0.0), (0.06, 0.64, 0.055), subdiv=3, mat="wood_weathered", amp=0.05, freq=3.0,
+               seed=int(x * 10) + 20)
+        p.xform(R.T(x, 0.0, 0.0) @ R.rot("Z", lean))
+        mb.merge(p)
+    for k, h in enumerate((0.45, 0.78, 1.1)):
+        pts = []
+        for i in range(31):
+            t = i / 30
+            x = lerp(-1.5, 1.5, t)
+            sag = 0.05 * math.sin(t * math.pi) + 0.004 * math.sin(t * 40.0 + k)
+            pts.append(Vector((x, h - sag, 0.058)))
+        mb.tube(pts, 0.0016, seg=4, mat="rust")
+        for i in range(1, 12):                                                      # barbs every 25 cm
+            t = i / 12
+            c = Vector((lerp(-1.5, 1.5, t), h - 0.05 * math.sin(t * math.pi), 0.058))
+            for d in (Vector((0.0, 0.012, 0.012)), Vector((0.0, 0.012, -0.012))):
+                mb.tube([c - d, c + d], 0.0011, seg=3, mat="rust")
+    ob = R.obj(mb, "fence_barbed_wire", smooth_angle=45)
+    R.rest_on_ground([ob])
+    return {"objects": [ob], "collision": [_box_col((0.14, 1.3, 0.14), (-1.5, 0.65, 0.0)),
+                                           _box_col((0.14, 1.3, 0.14), (1.5, 0.65, 0.0)),
+                                           _box_col((3.0, 0.75, 0.04), (0.0, 0.78, 0.058))], "body": "static"}
