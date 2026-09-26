@@ -46,6 +46,11 @@ _subresources={
 "use_external/fallback_path": "res://assets/models/poi/materials/decal.tres",
 "use_external/path": "res://assets/models/poi/materials/decal.tres"
 },
+"flame": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/flame.tres",
+"use_external/path": "res://assets/models/poi/materials/flame.tres"
+},
 "glass": {
 "use_external/enabled": true,
 "use_external/fallback_path": "res://assets/models/poi/materials/glass.tres",
@@ -55,11 +60,6 @@ _subresources={
 "use_external/enabled": true,
 "use_external/fallback_path": "res://assets/models/poi/materials/ice_floor.tres",
 "use_external/path": "res://assets/models/poi/materials/ice_floor.tres"
-},
-"lamp": {
-"use_external/enabled": true,
-"use_external/fallback_path": "res://assets/models/poi/materials/lamp.tres",
-"use_external/path": "res://assets/models/poi/materials/lamp.tres"
 },
 "metal_dark": {
 "use_external/enabled": true,

@@ -18,3 +18,4 @@ shader_parameter/noise_tex = ExtResource("5")
 shader_parameter/tint = Color(1, 1, 1, 1)
 shader_parameter/desaturate = 1
 shader_parameter/lum_norm = 2.6
+shader_parameter/snow_accept = 0.25

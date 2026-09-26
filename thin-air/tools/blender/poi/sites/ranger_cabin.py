@@ -206,7 +206,7 @@ def build():
     for (x, y) in ((-1.0, 0.0), (1.2, 2.0)):
         s.add(rod((x, y, PLATE - 0.25), (x, y, PLATE - 0.55), 0.004, "metal_dark", 4), None, "interior")
         s.add(PR.lantern(), T(x, y, PLATE - 0.85), "interior")
-    s.light("Lantern", Vector((-1.0, 0.0, PLATE - 0.72)), (1.0, 0.7, 0.4), 1.2, 7.0, shadow=True)
+    s.light("Lantern", Vector((-1.0, 0.0, PLATE - 0.72)), (1.0, 0.7, 0.4), 1.2, 6.0)
     s.probe("Probe_Cabin", Vector((0, (Y0 + Y1) / 2, 1.6)), (L_fb - 0.2, L_side - 0.2, 2.8), ambient=(0.05, 0.045, 0.04))
     s.shelter("Shelter_Cabin", Vector((0, (Y0 + Y1) / 2, FLOOR)), (L_fb - 0.3, L_side - 0.3, 2.6), 1.0)
     s.shelter("Shelter_Porch", Vector((0, (PY0 + PY1) / 2, FLOOR)), (L_fb, PY1 - PY0, 2.2), 0.35)

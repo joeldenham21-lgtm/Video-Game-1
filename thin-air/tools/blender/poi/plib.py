@@ -927,8 +927,42 @@ def to_object(name, m, cols):
         pass
     for mt in mats:
         me.materials.append(_bmat(mt))
+    # Our own (deterministic) split normals: flat faces keep the face normal, smooth faces average the area-weighted
+    # normals of the faces around each vertex that lie within 38 deg (Blender's own smoothing is not bit-stable
+    # between runs, which made every rebuild a new binary).
+    fn = []
+    for f in m.f:
+        a = Vector((0, 0, 0))
+        for k in range(len(f)):
+            p = m.v[f[k]]
+            q = m.v[f[(k + 1) % len(f)]]
+            a.x += (p.y - q.y) * (p.z + q.z)
+            a.y += (p.z - q.z) * (p.x + q.x)
+            a.z += (p.x - q.x) * (p.y + q.y)
+        fn.append(a)
+    vf = {}
+    for fi, f in enumerate(m.f):
+        if m.s[fi]:
+            for vi in f:
+                vf.setdefault(vi, []).append(fi)
+    cos_t = math.cos(math.radians(38.0))
+    loop_n = [None] * nloops
+    for pi, poly in enumerate(me.polygons):
+        n0 = fn[pi].normalized() if fn[pi].length > 1e-12 else Vector((0, 0, 1))
+        for k in range(poly.loop_total):
+            if not m.s[pi]:
+                nn = n0
+            else:
+                acc = Vector((0, 0, 0))
+                for fj in vf.get(m.f[pi][k], ()):
+                    nj = fn[fj]
+                    if nj.length > 1e-12 and nj.normalized().dot(n0) >= cos_t:
+                        acc += nj
+                nn = acc.normalized() if acc.length > 1e-12 else n0
+            loop_n[poly.loop_start + k] = (round(nn.x, 5), round(nn.y, 5), round(nn.z, 5))
     me.use_auto_smooth = True
-    me.auto_smooth_angle = math.radians(38.0)
+    me.auto_smooth_angle = math.radians(180.0)
+    me.normals_split_custom_set(loop_n)
     ob = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(ob)
     return ob, mats
@@ -1039,3 +1073,173 @@ class Ground:
         n = Vector((-hx, -hy, 1.0)).normalized()
         q = Vector((0, 0, 1)).rotation_difference(n)
         return q.to_matrix().to_4x4()
+
+
+def clean(site):
+    """Drops degenerate faces (repeated vertices or ~zero area): their normals are undefined, which made the glTF
+    export non-deterministic (and they add nothing)."""
+    n = 0
+    for m in site.buckets.values():
+        def bad(c, i, m=m):
+            f = m.f[i]
+            if len(set(f)) < len(f):
+                return True
+            a = Vector((0, 0, 0))
+            for k in range(len(f)):
+                p = m.v[f[k]]
+                q = m.v[f[(k + 1) % len(f)]]
+                a.x += (p.y - q.y) * (p.z + q.z)
+                a.y += (p.z - q.z) * (p.x + q.x)
+                a.z += (p.x - q.x) * (p.y + q.y)
+            return a.length < 1e-9
+        before = len(m.f)
+        remove_faces(m, bad)
+        n += before - len(m.f)
+    return n
+
+
+# ------------------------------------------------------------------------------------------------ glTF writer
+# A small deterministic glTF 2.0 binary writer (Blender's exporter re-derives split normals with threaded code
+# and was not bit-stable between runs). One node + mesh per bucket, one primitive per material.
+
+def _split_normals(m, angle=38.0):
+    fn = []
+    for f in m.f:
+        a = Vector((0, 0, 0))
+        for k in range(len(f)):
+            p = m.v[f[k]]
+            q = m.v[f[(k + 1) % len(f)]]
+            a.x += (p.y - q.y) * (p.z + q.z)
+            a.y += (p.z - q.z) * (p.x + q.x)
+            a.z += (p.x - q.x) * (p.y + q.y)
+        fn.append(a)
+    vf = {}
+    for fi, f in enumerate(m.f):
+        if m.s[fi]:
+            for vi in f:
+                vf.setdefault(vi, []).append(fi)
+    cos_t = math.cos(math.radians(angle))
+    out = []
+    for fi, f in enumerate(m.f):
+        n0 = fn[fi].normalized() if fn[fi].length > 1e-12 else Vector((0, 0, 1))
+        corners = []
+        for vi in f:
+            if not m.s[fi]:
+                corners.append(n0)
+                continue
+            acc = Vector((0, 0, 0))
+            for fj in vf.get(vi, ()):
+                nj = fn[fj]
+                if nj.length > 1e-12 and nj.normalized().dot(n0) >= cos_t:
+                    acc += nj
+            corners.append(acc.normalized() if acc.length > 1e-12 else n0)
+        out.append(corners)
+    return out
+
+
+def write_glb(path, buckets, cols):
+    """buckets: {name: Mesh}, cols: {name: per-face per-corner RGBA}. Returns {bucket: [material names]}."""
+    import json
+    import struct
+    binchunks = []
+    offset = 0
+    views = []
+    accessors = []
+    meshes = []
+    nodes = []
+    materials = []
+    mat_index = {}
+    mats_by_bucket = {}
+
+    def add_view(data, target):
+        nonlocal offset
+        pad = (-offset) % 4
+        if pad:
+            binchunks.append(b"\0" * pad)
+            offset += pad
+        views.append({"buffer": 0, "byteOffset": offset, "byteLength": len(data), "target": target})
+        binchunks.append(data)
+        offset += len(data)
+        return len(views) - 1
+
+    for bname, m in buckets.items():
+        if not m.f:
+            continue
+        normals = _split_normals(m)
+        prims = {}
+        order = []
+        for fi, f in enumerate(m.f):
+            mat = m.m[fi]
+            if mat not in prims:
+                prims[mat] = ({}, [], [])        # vertex key -> index, vertex list, indices
+                order.append(mat)
+            vmap, verts, idx = prims[mat]
+            ids = []
+            for k, vi in enumerate(f):
+                p = m.v[vi]
+                n = normals[fi][k]
+                u, v = m.uv[fi][k]
+                c = cols[bname][fi][k]
+                key = (round(p.x, 5), round(p.y, 5), round(p.z, 5), round(n.x, 4), round(n.y, 4), round(n.z, 4),
+                       round(u, 5), round(v, 5), round(c[0], 4), round(c[1], 4), round(c[2], 4), round(c[3], 4))
+                j = vmap.get(key)
+                if j is None:
+                    j = len(verts)
+                    vmap[key] = j
+                    verts.append(key)
+                ids.append(j)
+            for k in range(1, len(ids) - 1):
+                idx.extend((ids[0], ids[k], ids[k + 1]))
+        prim_json = []
+        mats_by_bucket[bname] = list(order)
+        for mat in order:
+            vmap, verts, idx = prims[mat]
+            if mat not in mat_index:
+                mat_index[mat] = len(materials)
+                materials.append({"name": mat, "pbrMetallicRoughness": {"metallicFactor": 0.0, "roughnessFactor": 0.8}})
+            pos = bytearray()
+            nor = bytearray()
+            tex = bytearray()
+            col = bytearray()
+            mn = [1e30] * 3
+            mx = [-1e30] * 3
+            for key in verts:
+                gx, gy, gz = key[0], key[2], -key[1]          # Blender Z-up -> glTF Y-up
+                pos += struct.pack("<3f", gx, gy, gz)
+                for a, val in enumerate((gx, gy, gz)):
+                    mn[a] = min(mn[a], val)
+                    mx[a] = max(mx[a], val)
+                nor += struct.pack("<3f", key[3], key[5], -key[4])
+                tex += struct.pack("<2f", key[6], 1.0 - key[7])
+                col += struct.pack("<4f", *key[8:12])
+            n = len(verts)
+            big = n > 65535
+            ind = struct.pack("<%d%s" % (len(idx), "I" if big else "H"), *idx)
+            a_pos = len(accessors)
+            accessors.append({"bufferView": add_view(bytes(pos), 34962), "componentType": 5126, "count": n, "type": "VEC3",
+                              "min": [float(x) for x in struct.unpack("<3f", struct.pack("<3f", *mn))],
+                              "max": [float(x) for x in struct.unpack("<3f", struct.pack("<3f", *mx))]})
+            accessors.append({"bufferView": add_view(bytes(nor), 34962), "componentType": 5126, "count": n, "type": "VEC3"})
+            accessors.append({"bufferView": add_view(bytes(tex), 34962), "componentType": 5126, "count": n, "type": "VEC2"})
+            accessors.append({"bufferView": add_view(bytes(col), 34962), "componentType": 5126, "count": n, "type": "VEC4"})
+            accessors.append({"bufferView": add_view(ind, 34963), "componentType": 5125 if big else 5123, "count": len(idx),
+                              "type": "SCALAR"})
+            prim_json.append({"attributes": {"POSITION": a_pos, "NORMAL": a_pos + 1, "TEXCOORD_0": a_pos + 2, "COLOR_0": a_pos + 3},
+                              "indices": a_pos + 4, "material": mat_index[mat], "mode": 4})
+        meshes.append({"name": bname, "primitives": prim_json})
+        nodes.append({"name": bname, "mesh": len(meshes) - 1})
+    binary = b"".join(binchunks)
+    binary += b"\0" * ((-len(binary)) % 4)
+    gltf = {"asset": {"version": "2.0", "generator": "THIN AIR tools/blender/poi/plib.py"}, "scene": 0,
+            "scenes": [{"nodes": list(range(len(nodes)))}], "nodes": nodes, "meshes": meshes, "materials": materials,
+            "accessors": accessors, "bufferViews": views, "buffers": [{"byteLength": len(binary)}]}
+    js = json.dumps(gltf, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    js += b" " * ((-len(js)) % 4)
+    total = 12 + 8 + len(js) + 8 + len(binary)
+    with open(path, "wb") as fh:
+        fh.write(struct.pack("<III", 0x46546C67, 2, total))
+        fh.write(struct.pack("<II", len(js), 0x4E4F534A))
+        fh.write(js)
+        fh.write(struct.pack("<II", len(binary), 0x004E4942))
+        fh.write(binary)
+    return mats_by_bucket

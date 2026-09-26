@@ -132,7 +132,7 @@ size = Vector3(1.8, 2.1, 0.3)
 script = ExtResource("2")
 poi_id = &"ashford_mine_interior"
 interior = true
-lit_materials = PackedStringArray("lamp")
+lit_materials = PackedStringArray()
 interior_lights_on = false
 
 [node name="main" parent="."]

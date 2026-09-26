@@ -16,3 +16,4 @@ shader_parameter/normal_tex = ExtResource("4")
 shader_parameter/uv_scale = Vector2(3.33333, 3.33333)
 shader_parameter/noise_tex = ExtResource("5")
 shader_parameter/tint = Color(1, 1, 1, 1)
+shader_parameter/snow_accept = 0.25

@@ -337,8 +337,8 @@ def build():
     s.col_box("wood", B @ Vector((0.2, 3.5, 0.45)), (0.9, 1.2, 0.9))
     for L_, pos in (("L_Galley", (0.3, -1.2)), ("L_Comms", (0.0, 4.1))):
         s.add(box(0.9, 0.25, 0.05, "lamp", flags=P.F_NOAO), B @ T(pos[0], pos[1], 2.42), "interior")
-    s.light("Galley", B @ Vector((0.3, -1.2, 2.2)), (1.0, 0.86, 0.7), 1.6, 7.0)
-    s.light("Comms", B @ Vector((0.0, 4.1, 2.2)), (1.0, 0.9, 0.78), 1.3, 5.5)
+    s.light("Galley", B @ Vector((0.3, -1.2, 2.2)), (1.0, 0.86, 0.7), 1.6, 5.2)
+    s.light("Comms", B @ Vector((0.0, 4.1, 2.2)), (1.0, 0.9, 0.78), 1.3, 4.6)
 
     # ---------------------------------------------------------------- A interior: lab
     A = T(MODS["A"], 0, F)
@@ -370,7 +370,7 @@ def build():
     s.col_box("metal", A @ Vector((0, 5.1, 1.0)), (3.4, 0.4, 2.0))
     s.add(PR.decal("topo_map", 1.2, 0.8).transformed(RZ(90)), A @ T(-1.985, -1.3, 1.55), "interior")
     s.add(box(0.8, 0.25, 0.05, "lamp", flags=P.F_NOAO), A @ T(0, 0, 2.42), "interior")
-    s.light("Lab", A @ Vector((0.0, 0.0, 2.2)), (0.95, 0.95, 1.0), 1.8, 8.0)
+    s.light("Lab", A @ Vector((0.0, 0.0, 2.2)), (0.95, 0.95, 1.0), 1.8, 6.0)
 
     # ---------------------------------------------------------------- C interior: bunks
     C = T(MODS["C"], 0, F)
@@ -388,12 +388,12 @@ def build():
     s.col_box("metal", C @ Vector((-1.8, -3.6, 0.95)), (0.5, 2.1, 1.9))
     s.add(PR.table(0.9, 0.6, 0.74, "wood_fresh"), C @ T(-1.5, 1.0, 0) @ RZ(90), "interior")
     s.add(PR.chair(), C @ T(-0.9, 1.1, 0) @ RZ(80), "interior")
-    s.add(PR.lantern(), C @ T(-1.45, 0.9, 0.74), "interior")
+    s.add(PR.lantern("flame"), C @ T(-1.45, 0.9, 0.74), "interior")
     s.add(tube([(-2.0, -1.0, 2.0), (0.0, -0.2, 1.95), (2.0, 0.6, 2.0)], 0.004, "rope", 4), C, "interior")
     for k in range(3):
         s.add(box(0.35, 0.02, 0.45, "wool_2s" if False else "canvas", tint=(0.5, 0.45, 0.4)), C @ T(-1.2 + k * 0.8, -0.8 + k * 0.3, 1.72), "interior")
     s.add(box(0.8, 0.25, 0.05, "lamp", flags=P.F_NOAO), C @ T(0, 0, 2.42), "interior")
-    s.light("Bunks", C @ Vector((0.0, 0.0, 2.2)), (1.0, 0.85, 0.68), 1.3, 7.0)
+    s.light("Bunks", C @ Vector((0.0, 0.0, 2.2)), (1.0, 0.85, 0.68), 1.3, 5.2)
     s.light("Lantern", C @ Vector((-1.45, 0.9, 0.95)), (1.0, 0.72, 0.42), 0.9, 4.5, group="Lights_Lantern")
     for key, c in (("A", A), ("B", B), ("C", C)):
         s.probe("Probe_" + key, c @ Vector((0, 0, 1.25)), (MW, ML, 2.5), ambient=(0.04, 0.045, 0.05), energy=1.0)

@@ -10,6 +10,7 @@ extends Node
 ##          --lights=1 (site interior lights on)  --snow=S  --perf --perf_at=N  --save=abs.jpg (frame at perf_at, quit)
 ##          --all (instance every location, not only --site)  --list (print the sockets of the site)  --torch=E (a hand torch on the camera, energy E)
 ##          --batch=site:shot,site:shot,...  --outdir=/abs/dir  (one world load, every shot saved as <site>_<shot>.jpg)
+##          --flat (no terrain / vegetation: sky + a flat meadow or snowfield at each location's altitude; light on RAM)
 
 const SHOTS := {
 	# site -> shot -> [cam (site-local x, y above ground, z) | socket name, look (yaw, pitch), hours, fov, lights,
@@ -118,11 +119,17 @@ func _ready() -> void:
 	if args.has("snow"):
 		Climate.set(&"snow_cover", float(args["snow"]))
 	Climate.hours = 12.0
-	var world: Node = (load("res://scenes/world/world.tscn") as PackedScene).instantiate()
-	add_child(world)
+	if args.has("flat"):
+		add_child((load("res://scenes/world/sky.tscn") as PackedScene).instantiate())
+		structures = (load("res://scenes/poi/structures.tscn") as PackedScene).instantiate()
+		add_child(structures)
+		_flat_grounds()
+	else:
+		var world: Node = (load("res://scenes/world/world.tscn") as PackedScene).instantiate()
+		add_child(world)
+		structures = world.get_node_or_null(^"Structures")
 	Climate.set_weather(StringName(args.get("weather", "clear")), 0.0)
 	Climate.locked = true
-	structures = world.get_node_or_null(^"Structures")
 	cam = Camera3D.new()
 	cam.near = 0.05
 	cam.far = float(Settings.get_value(&"view_distance", 4000.0))
@@ -139,6 +146,25 @@ func _ready() -> void:
 		cam.add_child(torch)
 		torch.add_to_group(&"local_light")
 	_next_job()
+
+
+## --flat: a 900 m ground plane under every placed exterior (meadow below the snow line, snowfield above).
+func _flat_grounds() -> void:
+	for s: Node3D in (structures.get(&"sites") as Dictionary).values():
+		if bool(s.get(&"interior")):
+			continue
+		var y := s.global_position.y
+		var snowy := y > 1800.0
+		var mat := (load("res://assets/models/poi/materials/%s.tres" % ("snow" if snowy else "grass_t")) as ShaderMaterial).duplicate() as ShaderMaterial
+		var tile := 6.0 if snowy else 3.0
+		mat.set_shader_parameter(&"uv_scale", Vector2(900.0 / tile, 900.0 / tile))
+		var pm := PlaneMesh.new()
+		pm.size = Vector2(900, 900)
+		var mi := MeshInstance3D.new()
+		mi.mesh = pm
+		mi.material_override = mat
+		add_child(mi)
+		mi.global_position = Vector3(s.global_position.x, y - 0.03, s.global_position.z)
 
 
 func _next_job() -> void:
@@ -185,7 +211,7 @@ func _next_job() -> void:
 	else:
 		var wp := xf * Vector3(local.x, 0.0, local.z)
 		var interior := bool(site.get(&"interior"))
-		var gy := xf.origin.y if interior else TerrainData.get_height(wp.x, wp.z)
+		var gy := xf.origin.y if (interior or args.has("flat")) else TerrainData.get_height(wp.x, wp.z)
 		cam.global_position = Vector3(wp.x, gy + local.y, wp.z)
 		var site_yaw := rad_to_deg(xf.basis.get_euler().y)
 		cam.rotation_degrees = Vector3(look.y, site_yaw + look.x, 0.0)

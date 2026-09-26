@@ -72,11 +72,12 @@ MATS = {
     "metal_dark": lib("metal_bare", tint=(0.32, 0.31, 0.3), rough_add=0.15),  # blued/black steel, cast iron
     "galvanized": lib("metal_corrugated", normal_strength=0.25),
     # fabric, soft
-    "canvas": lib("canvas"),
-    "canvas_2s": two(lib("canvas")),
-    "nylon": lib("fabric_nylon"),
-    "nylon_2s": two(lib("fabric_nylon")),
-    "nylon_paint_2s": two(lib("fabric_nylon", desat=1.0, lum=2.6)),          # tents/tarps: colour from tint
+    # taut fabric sheds snow: tents, tarps and bags only hold a little in their folds
+    "canvas": lib("canvas", snow_accept=0.35),
+    "canvas_2s": two(lib("canvas", snow_accept=0.35)),
+    "nylon": lib("fabric_nylon", snow_accept=0.25),
+    "nylon_2s": two(lib("fabric_nylon", snow_accept=0.25)),
+    "nylon_paint_2s": two(lib("fabric_nylon", desat=1.0, lum=2.6, snow_accept=0.25)),   # tents/tarps: tint colour
     "wool": lib("fabric_wool"),
     "leather": lib("leather"),
     "rope": lib("rope"),
@@ -106,6 +107,8 @@ MATS = {
     "glass_lit": dict(kind="glass", glow=2.6, frost=0.3),
     "lamp": dict(kind="surface", albedo=None, color=(0.9, 0.88, 0.8), emission=(1.0, 0.78, 0.5), emission_energy=5.0,
                  lit_param=True, snow_accept=0.0),
+    "flame": dict(kind="surface", albedo=None, color=(1.0, 0.8, 0.5), emission=(1.0, 0.62, 0.28), emission_energy=4.0,
+                  snow_accept=0.0),                                             # always-burning lantern / stove glow
     "screen": dict(kind="surface", albedo=None, color=(0.02, 0.025, 0.03), rough=0.12,
                    emission=(0.35, 0.62, 0.8), emission_energy=0.9, lit_param=True, snow_accept=0.0),
     "led_red": dict(kind="surface", albedo=None, color=(0.3, 0.02, 0.02), rough=0.3, emission=(1.0, 0.08, 0.05),
@@ -427,22 +430,15 @@ def build(site, bake=True):
     """Bake vertex colours, export the glb, write materials / .import / .tscn. Returns stats dict."""
     import time
     t0 = time.time()
-    plib.clear_scene()
+    dropped = plib.clean(site)
+    if dropped:
+        print("[poi] %s: dropped %d degenerate faces" % (site.id, dropped))
     cols = plib.bake_colors(site) if bake else {
         b: [[(*m.t[i], 1.0)] * len(m.f[i]) for i in range(len(m.f))] for b, m in site.buckets.items()}
-    objs = []
-    mats_by_bucket = {}
-    all_mats = set()
-    for b, m in site.buckets.items():
-        if not m.f:
-            continue
-        ob, mats = plib.to_object(b, m, cols[b])
-        objs.append(ob)
-        mats_by_bucket[b] = mats
-        all_mats.update(mats)
     os.makedirs(OUT_MODELS, exist_ok=True)
     glb_path = os.path.join(OUT_MODELS, site.id + ".glb")
-    plib.export_glb(glb_path, objs)
+    mats_by_bucket = plib.write_glb(glb_path, site.buckets, cols)
+    all_mats = set(m for ms in mats_by_bucket.values() for m in ms)
     glb_res = "res://assets/models/poi/%s.glb" % site.id
     for m in all_mats:
         write_material(m)

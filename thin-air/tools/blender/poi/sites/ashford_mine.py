@@ -600,7 +600,7 @@ def build_interior():
     s.add(coil, T(dp + Vector((0.2, -0.7, 0.02))), "main")
     pad = box(0.55, 1.8, 0.03, "plastic", 'y', tint=(0.1, 0.35, 0.12))
     s.add(pad, T(dp + Vector((-0.4, 0.5, 0.04))) @ RZ(8), "main")
-    s.add(PR.lantern(), T(dp + Vector((0.95, 0.45, 0.62))), "main")
+    s.add(PR.lantern("flame"), T(dp + Vector((0.95, 0.45, 0.62))), "main")
     s.add(PR.decal("paint_arrow", 0.6, 0.15).transformed(RZ(180)), T(Vector((-29.4, -1.02, 1.5))) @ RZ(0), "main")
     s.add(PR.decal("sign_drift2", 0.8, 0.3), T(Vector((-60.2, 3.0, 2.1))) @ RZ(-60), "main")
     # entrance door (inside face) + daylight spill

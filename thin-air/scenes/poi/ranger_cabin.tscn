@@ -367,11 +367,11 @@ visible = false
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, -1, 2.08, 0)
 light_color = Color(1, 0.7, 0.4, 1)
 light_energy = 1.2
-shadow_enabled = true
+shadow_enabled = false
 distance_fade_enabled = true
 distance_fade_begin = 30.0
 distance_fade_length = 10.0
-omni_range = 7
+omni_range = 6
 omni_attenuation = 1
 
 [node name="Probe_Cabin" type="ReflectionProbe" parent="."]

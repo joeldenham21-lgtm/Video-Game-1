@@ -1201,7 +1201,7 @@ shadow_enabled = false
 distance_fade_enabled = true
 distance_fade_begin = 30.0
 distance_fade_length = 10.0
-omni_range = 7
+omni_range = 5.2
 omni_attenuation = 1
 
 [node name="Comms" type="OmniLight3D" parent="Lights_Interior"]
@@ -1212,7 +1212,7 @@ shadow_enabled = false
 distance_fade_enabled = true
 distance_fade_begin = 30.0
 distance_fade_length = 10.0
-omni_range = 5.5
+omni_range = 4.6
 omni_attenuation = 1
 
 [node name="Lab" type="OmniLight3D" parent="Lights_Interior"]
@@ -1223,7 +1223,7 @@ shadow_enabled = false
 distance_fade_enabled = true
 distance_fade_begin = 30.0
 distance_fade_length = 10.0
-omni_range = 8
+omni_range = 6
 omni_attenuation = 1
 
 [node name="Bunks" type="OmniLight3D" parent="Lights_Interior"]
@@ -1234,7 +1234,7 @@ shadow_enabled = false
 distance_fade_enabled = true
 distance_fade_begin = 30.0
 distance_fade_length = 10.0
-omni_range = 7
+omni_range = 5.2
 omni_attenuation = 1
 
 [node name="Generator" type="OmniLight3D" parent="Lights_Interior"]
