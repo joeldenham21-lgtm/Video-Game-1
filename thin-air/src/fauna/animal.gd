@@ -228,6 +228,7 @@ func activate(pos: Vector3, yaw_rad: float, seed_value: int) -> void:
 		anim.play(C_IDLE)
 		anim.seek(rng.randf() * 2.0, true)
 	_shell_n = -1
+	lod = -1                                  # forces set_lod() on the manager's first pass
 	on_activated()
 
 
@@ -581,8 +582,23 @@ func _hits_per_item() -> float:
 	return float(def.harvest_hits) / maxf(float(_loot_seq.size()), 1.0)
 
 
-func harvest_hit(tool_id: StringName, power: float, hit_position: Vector3, hit_normal: Vector3, _player: Node) -> void:
-	if not dead or butchered:
+func harvest_hit(tool_id: StringName, power: float, hit_position: Vector3, hit_normal: Vector3, player: Node) -> void:
+	if not dead:
+		# MeleeTool.do_impact() prefers harvest_hit over take_damage: on a live animal a swing is an attack.
+		var tool: Dictionary = ItemDB.get_item(tool_id).get("tool", {}) if tool_id != &"" else {}
+		var dmg := float(tool.get("damage", 4.0))
+		var t := StringName(String(tool.get("type", "")))
+		var dtype: StringName = &"blunt"
+		match t:
+			&"axe", &"knife", &"ice_axe":
+				dtype = &"cut"
+			&"spear":
+				dtype = &"pierce"
+			&"torch", &"flare":
+				dtype = &"fire"
+		take_damage(dmg * (0.6 if power <= 0.0 else 1.0), dtype, player, hit_position)
+		return
+	if butchered:
 		return
 	var knife := String(tool_id).contains("knife")
 	harvest_progress += maxf(power, 0.2) * (1.0 if knife else 0.35)

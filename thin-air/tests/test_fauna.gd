@@ -210,6 +210,9 @@ func _test_damage_death_harvest() -> void:
 	a.take_damage(20.0, &"pierce", target, a.global_position + Vector3.UP * 0.5)
 	check(not a.dead and absf(a.health - 35.0) < 0.01 and a.awareness == 1.0, "damage: arrow wound, alerted")
 	check(a.current_clip() == &"hit", "damage: hit reaction plays")
+	var hp := a.health
+	a.harvest_hit(&"knife", 1.0, a.global_position, Vector3.UP, target)
+	check(not a.dead and a.health < hp and a.harvest_index == 0, "melee: a knife swing at a live animal wounds it")
 	a.take_damage(100.0, &"pierce", target)
 	check(a.dead and _killed == k0 + 1, "death: killed, Events.animal_killed emitted")
 	check(a.is_in_group(&"harvestable") and not a.is_in_group(&"damageable"), "death: corpse is harvestable, not damageable")
