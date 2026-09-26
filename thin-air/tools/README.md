@@ -157,3 +157,15 @@ quads); far field: one impostor MultiMesh per 256 m cell. `veg_grass.gd` = groun
 rank-sorted instances for density LOD), `veg_colliders.gd` = pooled `VegProxy` bodies near the player (trunks
 layer 10, boulders layer 1, shrubs/small rocks interact-only layer 5), `veg_harvest.gd` + `veg_felled_tree.gd` =
 chopping/felling/bucking, shrub and rock yields, persistence (key "vegetation").
+## Building (`tools/blender/building/`, building stream)
+| Tool | Command (from repo root) | Output |
+|---|---|---|
+| Building pieces | `blender -b -P thin-air/tools/blender/building/build_all.py -- [--only=walls,roof,camp_bed,...] [--stats]` | `assets/models/building/*.glb` (≈20 s): `walls` (log wall / window / doorway bodies in even + odd courses, saddle-notch corner stubs), `gables` (log infill cut to the roof pitch), `roof` (shake roof slope / peak ± eave, gable overhang strips, ridge caps), `foundation` (puncheon deck, sill, stilt posts, footing, brace), `misc` (upper floor, stairs, pillar, railing, door leaf), `camp_*` (fire pit, torch stand, drying rack, snow melter, bough bed, hide bed, lean-to, rope ladder, windbreak) |
+| Building textures | `python3.12 thin-air/tools/blender/building/gen_textures.py` | `assets/models/building/textures/spruce_bough_{albedo,normal}.png` (alpha-scissor spruce bough for beds, lean-to thatch) |
+| Building QA scene / shots | `DISPLAY=:99 godot --path thin-air --rendering-method forward_plus --fixed-fps 30 --resolution 1280x720 res://scenes/dev/building_test.tscn -- --shot=<exterior\|interior\|stilts\|frames\|camp\|aerial\|closeup\|perf200\|ui_picker\|fp_ghost> [--save=/abs/x.jpg --perf]` | scripted camp (3×3 cabin, lean-to + fire, drying rack, beds, snow melter, frames); `docs/shots/building_*.jpg` |
+Geometry is authored in Godot coordinates by `blib.py` (logs with per-log irregularity, chamfered endgrain caps,
+boards, field stones, rope, lashings, alpha cards, plane clipping + capping) and exported with the vertex
+conventions the building shaders read: UV in metres (V along the grain), UV2 = per-part random offset,
+COLOR r = AO, g = build step (the order parts appear while a blueprint frame is filled), b = bark density /
+weathering, a = surface flag (wood / endgrain / chinking). Constants shared with `src/building/build_grid.gd`:
+2 m cells, 0.27 m log courses, wall plate 2.44 m, storey 2.6 m, roof rise 1.35 m per cell (34°).

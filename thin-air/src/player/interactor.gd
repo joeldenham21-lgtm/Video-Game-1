@@ -78,6 +78,10 @@ func tick(delta: float, input_enabled: bool) -> void:
 func _do_interact() -> void:
 	if target == null or not is_instance_valid(target):
 		return
+	# Building stream hook: a full shoulder (two logs) can't take another log.
+	var carry := player.get_node_or_null(^"LogCarry") if player else null
+	if carry and carry.has_method(&"blocks") and carry.call(&"blocks", target):
+		return
 	target.interact(player)
 	# Prompt may change immediately (door opened, item taken).
 	_refresh = 0.0
@@ -91,6 +95,9 @@ func _update_prompt() -> void:
 		hold_time = 0.0
 		return
 	prompt = String(target.get_interact_prompt(player))
+	var carry := player.get_node_or_null(^"LogCarry") if player else null
+	if carry and carry.has_method(&"filter_prompt"):
+		prompt = String(carry.call(&"filter_prompt", target, prompt))
 	hold_time = float(target.get_interact_hold_time()) if target.has_method(&"get_interact_hold_time") else 0.0
 
 
