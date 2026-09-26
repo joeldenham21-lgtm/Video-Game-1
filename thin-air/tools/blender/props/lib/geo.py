@@ -244,6 +244,8 @@ class MB:
             return s0
         if isinstance(radius, (int, float)):
             radius = [radius] * n
+        elif isinstance(radius, tuple) and len(radius) == 2 and all(isinstance(r, (int, float)) for r in radius):
+            radius = [radius] * n          # a tuple (rx, ry) = one elliptical radius; lists are per point
         rad = [(r, r) if isinstance(r, (int, float)) else (r[0], r[1]) for r in radius]
         if section is None:
             section = [(math.cos(TAU * j / seg), math.sin(TAU * j / seg)) for j in range(seg)]
