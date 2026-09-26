@@ -197,7 +197,7 @@ SPEC = dict(
     parts=[dict(prims=jaw, h=0.005, tris=900)], meshes=[ears, eyes],
     regions=["body", "hump", "belly", "chest", "neck", "head", "cheek", "muzzle", "nose", "jaw", "ear", "eye", "leg", "paw",
              "claw", "tail"],
-    pattern=pattern, extra_coats={"bear_oldgrey": pattern_old}, legs=LEGS, clips=CLIPS,
+    pattern=pattern, legs=LEGS, clips=CLIPS,
     bones=dict(pelvis="pelvis", spine=["spine1", "spine2"], chest="chest", neck=["neck1", "neck2"], head="head",
                jaw="jaw", ears=["ear.L", "ear.R"], tail=["tail1"]),
     chest_bone="chest", pelvis_bone="pelvis",

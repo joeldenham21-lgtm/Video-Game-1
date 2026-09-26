@@ -1196,6 +1196,16 @@ def build_creature(spec):
     Wg = np.concatenate(parts_W, 0)
     Rg = np.concatenate(parts_R, 0)
     Mg = np.concatenate(parts_mat, 0)
+    # drop degenerate triangles (repeated indices / zero area): Blender would silently remove them and the
+    # per-face arrays + glTF export would go out of sync (empty primitive)
+    e1 = Vg[Tg[:, 1]] - Vg[Tg[:, 0]]
+    e2 = Vg[Tg[:, 2]] - Vg[Tg[:, 0]]
+    area = np.linalg.norm(np.cross(e1, e2), axis=1)
+    ok = (Tg[:, 0] != Tg[:, 1]) & (Tg[:, 1] != Tg[:, 2]) & (Tg[:, 0] != Tg[:, 2]) & (area > 1e-12)
+    if not ok.all():
+        log("dropping %d degenerate triangles" % int((~ok).sum()))
+        Tg = Tg[ok]
+        Mg = Mg[ok]
     obj = mesh_from_arrays(name, Vg, Tg)
     me = obj.data
     me.polygons.foreach_set("use_smooth", [True] * len(me.polygons))

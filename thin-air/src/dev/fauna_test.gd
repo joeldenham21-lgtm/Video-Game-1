@@ -204,3 +204,7 @@ func _physics_process(delta: float) -> void:
 			Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME),
 			Performance.get_monitor(Performance.TIME_FPS), fauna.animals.size() if fauna else 0,
 			subjects[0].shell_count() if not subjects.is_empty() else 0])
+		for s in subjects:
+			var aabb := s.mesh.global_transform * s.mesh.get_aabb() if s.mesh else AABB()
+			print("SUBJECT %s pos=%s visible=%s mesh_aabb=%s clip=%s" % [s.def.id, s.global_position, s.is_visible_in_tree(),
+				aabb, s.current_clip()])
