@@ -143,10 +143,21 @@ def compute_masks(F, log):
 	s_curv = 1 + 0.35 * np.clip(curv, -1, 1)
 	wind_scour = np.clip(windward, 0, 1) * smoothstep(2500.0, 3000.0, h) * 0.45
 	lee = np.clip(-windward, 0, 1) * smoothstep(2300.0, 2800.0, h) * 0.25
-	snow = s_alt * s_slope * s_curv * (1 - wind_scour) + lee * s_slope
-	# snow-filled gullies and couloirs on steep faces (concave, shaded), the look of the range in late October
-	gully = smoothstep(38.0, 55.0, slope) * (1 - smoothstep(62.0, 72.0, slope)) * np.clip(curv * 2.5 - 0.15, 0, 1)
-	snow = np.maximum(snow, gully * s_alt * (0.75 + 0.25 * np.clip(aspect_n, 0, 1)))
+	snow_open = s_alt * s_slope * s_curv * (1 - wind_scour) + lee * s_slope
+	# steep faces (slope over ~7 m > ~35 deg): snow lodges only in couloir floors and concave gullies (continuous
+	# down the fall line), in broken patches on ledges (wind strips most of every ledge) and in small pockets -
+	# never as even bands following the strata. Aretes and buttresses stay bare.
+	slope_face = slope_deg(blur(h, 5.0), DX)
+	face = smoothstep(31.0, 43.0, slope_face)
+	gcurv = np.clip(ndimage.laplace(blur(h, 8.0)) / (DX * DX) * 45.0, -1, 1)
+	couloir = F.masks.get("couloir", np.zeros_like(h))
+	gully = np.clip(np.maximum(couloir * 1.3, np.maximum(gcurv, curv) * 2.0 - 0.2), 0, 1)
+	gully = gully * (1 - smoothstep(60.0, 72.0, slope))
+	ledge = 1 - smoothstep(27.0, 42.0, slope)
+	pk = F.noise(1 / 30.0, 3, seed=204) + 0.5 * F.noise(1 / 9.0, 2, seed=205) + 0.2 * np.clip(aspect_n, -1, 1)
+	pocket = ledge * smoothstep(0.05, 0.45, pk) * (1 - np.clip(-gcurv * 2.0, 0, 1))
+	snow_face = s_alt * np.maximum(gully * (0.8 + 0.2 * np.clip(aspect_n, 0, 1)), pocket * 0.9)
+	snow = snow_open * (1 - face) + snow_face * face
 	dust = smoothstep(1550.0, 1800.0, h) * np.clip(aspect_n, 0, 1) * 0.35 * s_slope     # shaded dusting below
 	snow = np.maximum(snow, dust)
 	snow = snow * (1 - 0.45 * forest * (h < 2150))
@@ -220,7 +231,10 @@ def write_all(F, mid, far, root, layout_path, log, seed, preview_dir=None):
 	Image.fromarray(to_u8(nrm), "RGBA").save(os.path.join(assets, "normal.png"), optimize=True)
 	_import_file(os.path.join(assets, "normal.png"))
 	strata = F.masks.get("cliffband", np.zeros_like(h))
-	band_idx = (np.floor((h + 0.105 * F.X - 0.07 * F.Z) / 37.0) * 0.618) % 1.0
+	# per-band rock colour from the (folded, variable-thickness) strata; old caches: a fixed 37 m banding
+	band_idx = getattr(F, "band_col", None)
+	if band_idx is None:
+		band_idx = (np.floor((h + 0.105 * F.X - 0.07 * F.Z) / 37.0) * 0.618) % 1.0
 	det = np.stack([F.masks.get("trail", np.zeros_like(h)) * (1 - F.masks["water"]), band_idx.astype(np.float32),
 					F.masks.get("crevasse", np.zeros_like(h)), strata], axis=-1)
 	Image.fromarray(to_u8(det), "RGBA").save(os.path.join(assets, "detail.png"), optimize=True)

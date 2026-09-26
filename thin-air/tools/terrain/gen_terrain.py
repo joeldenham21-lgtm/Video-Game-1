@@ -240,9 +240,20 @@ def stage_mid(args):
 	H1 = D.CLIFF_BASE + D.CLIFF_BASE_VAR * noise_on(MID_N, MID_X0, MID_DX, 1 / 900.0, 3, 300)
 	slope6 = np.degrees(np.arctan(np.hypot(*gradient(h, MID_DX, 2.0))))
 	wt = smoothstep(H1 - 80.0, H1 + 120.0, h) * smoothstep(28.0, 42.0, slope6) * (1 - floor)
-	wt = wt * np.clip(0.55 + 0.6 * noise_on(MID_N, MID_X0, MID_DX, 1 / 700.0, 3, 240), 0.0, 1.0)
-	h, _ = macro.terrace(h, X6, Z6, blur(wt, 2.0), SEED + 241,
-						 warp=noise_on(MID_N, MID_X0, MID_DX, 1 / 600.0, 3, 242) * 25.0)
+	wt = wt * np.clip(0.5 + 0.6 * noise_on(MID_N, MID_X0, MID_DX, 1 / 700.0, 3, 240), 0.0, 1.0)
+	# benches are broken by the big gullies (no bench survives across a couloir) and fade on spurs
+	gx6, gz6 = gradient(h, MID_DX, 4.0)
+	Eg = tlib.erosion_noise(gx6, gz6, MID_X0, MID_X0, MID_DX, 1 / 240.0, 3, 0.5, 2.0, 0.7, 0.05, seed=SEED + 243)
+	wt = wt * smoothstep(-0.45, 0.05, Eg)
+	# folded structure: the bench surfaces dip and swing (up to ~10 deg over 0.5-2 km) instead of running level
+	fold = noise_on(MID_N, MID_X0, MID_DX, 1 / 1700.0, 3, 244) * 110.0 + noise_on(MID_N, MID_X0, MID_DX, 1 / 520.0, 3, 245) * 28.0
+	h, _ = macro.terrace(h, X6, Z6, blur(wt, 2.0), SEED + 241, t_lo=60.0, t_hi=260.0, ledge_rate=0.5,
+						 cliff_lo=0.3, cliff_hi=0.6, warp=noise_on(MID_N, MID_X0, MID_DX, 1 / 600.0, 3, 242) * 25.0 + fold)
+	# couloirs cut down through the benches (fall-line gully noise taken from the terraced surface)
+	gx6, gz6 = gradient(h, MID_DX, 3.0)
+	Ec = tlib.erosion_noise(gx6, gz6, MID_X0, MID_X0, MID_DX, 1 / 170.0, 3, 0.5, 2.0, 0.8, 0.05, seed=SEED + 246)
+	steep6 = smoothstep(30.0, 42.0, np.degrees(np.arctan(np.hypot(gx6, gz6)))) * (1 - floor)
+	h = (h + np.minimum(rel * 0.012, 10.0) * np.minimum(Ec, 0.25) * steep6 * smoothstep(H1 - 120.0, H1 + 60.0, h)).astype(np.float32)
 	# concave footslopes: fans / talus aprons ease every valley wall into its floor (no hard kink)
 	Wf = 55.0 + 45.0 * noise_on(MID_N, MID_X0, MID_DX, 1 / 500.0, 3, 230) + 25.0 * np.clip(rel / 1200.0, 0, 1)
 	t = np.clip(dv / np.maximum(Wf, 20.0), 0.0, 1.0)
@@ -275,10 +286,12 @@ def stage_fine(args):
 	F = FN.Fine(mid, log, SEED)
 	log("FINE: altitude corrections")
 	F.correct_altitudes()
-	log("FINE: detail + couloirs")
-	F.detail()
+	log("FINE: summit pyramid")
+	F.summit_pyramid()
 	log("FINE: strata")
 	F.strata()
+	log("FINE: detail + couloirs")
+	F.detail()
 	log("FINE: glacier")
 	F.glacier()
 	log("FINE: erosion")

@@ -1,6 +1,7 @@
 """FINE stage: the playable 3,072 m map at 1.5 m (2049 x 2049).
 
-Order: POI altitude corrections -> detail noise -> couloirs -> strata (cliff bands + ledges) -> glacier
+Order: POI altitude corrections -> summit pyramid -> strata (folded cliff bands + ledges) -> detail noise +
+couloirs (cut through the strata) -> glacier
 (surface, icefall seracs, crevasses, lateral moraines) -> droplet + thermal erosion -> lake + rivers ->
 terminal moraines + avalanche chutes -> trails (least-cost routed, grade limited) -> POI pads -> water re-check.
 Every step records what it did in `ctx` (masks the OUT stage turns into textures and the layout).
@@ -14,8 +15,8 @@ from scipy import ndimage
 
 import design as D
 import tlib
-from fields import (bilinear, blur, closed_spline, open_spline, point_in_polygon, resample, slope_deg,
-					smoothstep)
+from fields import (bilinear, blur, closed_spline, open_spline, point_in_polygon, polyline_nearest, resample,
+					slope_deg, smoothstep)
 
 N, DX, X0 = 2049, 1.5, -1536.0
 
@@ -204,50 +205,130 @@ class Fine:
 		rid2 = self.noise(1 / 75.0, 3, "ridged", seed=37)
 		h += ((rid - 0.45) * 3.0 + (rid2 - 0.45) * 6.0) * rock
 		h += self.noise(1 / 45.0, 3, seed=33) * (0.35 + 0.9 * steep) + self.noise(1 / 9.0, 3, seed=34) * 0.12
+		# couloirs: incised fall-line gullies (3-9 m deep, 40-150 m apart) on steep faces, cutting through the
+		# strata ledges (detail runs after strata) - their floors collect the snow on a face (outputs.py)
+		E2 = tlib.erosion_noise(gx, gz, X0, X0, DX, 1 / 95.0, 3, 0.45, 2.0, 0.8, 0.08, seed=self.seed + 38)
+		face = smoothstep(30.0, 44.0, s) * (1 - fl) * (1 - self.ramp_w) * smoothstep(1750.0, 2100.0, hb)
+		h -= smoothstep(0.08, 0.7, -E2) * (3.0 + 6.0 * smoothstep(40.0, 55.0, s)) * face
+		self.masks["couloir"] = (smoothstep(0.1, 0.6, -E2) * face).astype(np.float32)
 		# valley floors: terraces, old channels and hummocky ground rather than a flat plate
 		h += fl * (self.noise(1 / 170.0, 3, seed=35) * 1.6 + self.noise(1 / 55.0, 3, seed=36) * 0.5)
 		self.h = h.astype(np.float32)
 
+	def summit_pyramid(self):
+		"""Mount Corrigan's summit pyramid. The corrected macro surface is a smooth dome here; carve it into a
+		real horn: sharp aretes along the designed summit crests (W ridge to the col = the golden path, N and E
+		ridges), steep faces between them (each arete is a 'tent' of ~52-60 deg flanks, the faces are where two
+		tents meet, so every face is slightly concave with a central couloir), radial couloirs incised into the
+		faces and a small, blocky summit block. The faces only remove rock (never raise the glacier/cirques at
+		their foot); near the top the aretes may be built up a little. Blended out by ~430 m (the station pad
+		at 556 m is untouched)."""
+		p = D.POI["summit"]
+		sx, sz, sy = p["x"], p["z"], p["y"]
+		R_in, R = 260.0, 430.0
+		i0, i1 = max(0, int((sx - R - X0) / DX)), min(N, int((sx + R - X0) / DX) + 2)
+		j0, j1 = max(0, int((sz - R - X0) / DX)), min(N, int((sz + R - X0) / DX) + 2)
+		Xw, Zw = self.X[j0:j1, i0:i1].astype(np.float64), self.Z[j0:j1, i0:i1].astype(np.float64)
+		hw = self.h[j0:j1, i0:i1].astype(np.float64)
+		r = np.hypot(Xw - sx, Zw - sz)
+		nz = lambda f, o, sd, kind="fbm": tlib.noise(j1 - j0, i1 - i0, float(Xw[0, 0]), float(Zw[0, 0]), DX, f, o,
+													  seed=self.seed + sd, kind=kind)
+		# aretes wander a little (never a ruler-straight crest), more further down
+		wob = smoothstep(20.0, 200.0, r)
+		qx = Xw + nz(1 / 120.0, 3, 131) * 9.0 * wob
+		qz = Zw + nz(1 / 120.0, 3, 132) * 9.0 * wob
+		kf = np.tan(np.radians(56.0 + 5.0 * nz(1 / 160.0, 3, 133)))
+		best = np.full(r.shape, -1e9)
+		dmin = np.full(r.shape, 1e9)
+		for name in ("summit_w", "summit_n", "summit_e"):
+			pts = [(float(a[0]), float(a[1]), float(a[2])) for a in D.MAP_CRESTS[name]]
+			if abs(pts[0][0] - sx) > 1 or abs(pts[0][1] - sz) > 1:
+				pts = pts[::-1]
+			pts[0] = (sx, sz, sy + 4.0)
+			d, attrs, _ = polyline_nearest(qx, qz, pts)
+			# the arete itself: a narrow rounded crest (2-4 m), then the flanks
+			tent = attrs[0] - kf * np.sqrt(d * d + 9.0) + 3.0 * kf
+			best = np.maximum(best, tent)
+			dmin = np.minimum(dmin, d)
+		hp = best
+		# radial couloirs on the faces: fall-line gully noise of the pyramid itself, incised only, deepest
+		# mid-face (none on the aretes, none on the summit block)
+		gz, gx = np.gradient(blur(hp.astype(np.float32), 2.0).astype(np.float64), DX)
+		E = tlib.erosion_noise(gx, gz, float(Xw[0, 0]), float(Zw[0, 0]), DX, 1 / 70.0, 3, 0.5, 2.0, 0.8, 0.05,
+							   seed=self.seed + 134)
+		face = smoothstep(12.0, 45.0, dmin) * smoothstep(25.0, 90.0, r)
+		hp = hp - smoothstep(0.05, 0.6, -E) * (4.0 + 7.0 * smoothstep(80.0, 300.0, r)) * face
+		# buttresses / ribs between the couloirs and blocky summit rock
+		hp = hp + (nz(1 / 34.0, 3, 135, "ridged") - 0.45) * 3.0 * face
+		blk = (1 - smoothstep(10.0, 45.0, r)) * smoothstep(4.0, 9.0, r)
+		hp = hp + (nz(1 / 11.0, 2, 136, "ridged") - 0.5) * 2.4 * blk
+		# faces carve (up to 140 m), aretes may add up to 20 m near the top, nothing is added lower down
+		up = 20.0 * (1 - smoothstep(120.0, 260.0, r))
+		target = np.clip(hp, hw - 140.0, hw + up)
+		w = 1 - smoothstep(R_in, R, r * (1 + 0.12 * nz(1 / 200.0, 2, 137)))
+		w = w * (1 - self.pad_zone[j0:j1, i0:i1]) * (1 - self.ramp_w[j0:j1, i0:i1] * 0.5)
+		self.h[j0:j1, i0:i1] = (hw + (target - hw) * w).astype(np.float32)
+		pm = np.zeros((N, N), np.float32)
+		pm[j0:j1, i0:i1] = (w * smoothstep(2.0, 20.0, dmin) * (1 - blk)).astype(np.float32)
+		self.masks["pyramid"] = pm
+		self.log("   summit pyramid: max %.1f, carved %.0f m max" % (float(self.h[j0:j1, i0:i1].max()),
+																		float((hw - self.h[j0:j1, i0:i1]).max())))
+
 	def strata(self):
-		"""Tilted sedimentary bands: steep faces become cliff bands with snow-holding ledges (the look of the
-		Canadian Rockies). Records hardness (cliff bands resist erosion)."""
+		"""Tilted, folded sedimentary bands: steep faces get cliff bands with snow-holding ledges (the look of
+		the Canadian Rockies) - but like real strata they dip, fold, vary in thickness (thin-bedded runs and
+		massive walls), and their ledges pinch out along strike, so faces never read as level contour stripes.
+		Couloirs cut through them afterwards (detail()). Records hardness (cliff bands resist erosion) and a
+		per-band colour for the shader."""
 		X, Z, h = self.X, self.Z, self.h
 		warp = self.noise(1 / 700.0, 3, seed=41) * 30.0 + self.noise(1 / 170.0, 3, seed=42) * 6.0
-		sc = (h + 0.105 * X - 0.07 * Z + warp).astype(np.float64)   # bands dip ~7 deg to the SW
+		# folds: the dip changes over 0.5-2 km (up to ~15 deg extra), so neighbouring faces show different dips
+		fold = self.noise(1 / 1600.0, 3, seed=46) * 90.0 + self.noise(1 / 480.0, 3, seed=47) * 22.0
+		sc = (h + 0.105 * X - 0.07 * Z + warp + fold).astype(np.float64)   # regional dip ~7 deg to the SW
 		rng = np.random.default_rng(self.seed + 44)
 		lo, hi = float(sc.min()) - 200.0, float(sc.max()) + 200.0
 		thick = []
 		edges = [lo]
 		while edges[-1] < hi:
-			t = rng.uniform(14.0, 46.0)
+			# thin-bedded runs (6-20 m) between massive units (30-80 m)
+			t = rng.uniform(30.0, 80.0) if rng.random() < 0.3 else rng.uniform(6.0, 20.0)
 			thick.append(t)
 			edges.append(edges[-1] + t)
 		thick = np.array(thick)
 		edges = np.array(edges)
-		hardband = rng.random(len(thick)) < 0.55
-		cfrac = rng.uniform(0.25, 0.45, len(thick))
+		hardband = rng.random(len(thick)) < 0.5
+		cfrac = rng.uniform(0.3, 0.7, len(thick))
+		bcol = rng.random(len(thick))
 		band = np.clip(np.searchsorted(edges, sc) - 1, 0, len(thick) - 1)
 		T = thick[band]
 		fr = (sc - edges[band]) / T
 		cf = cfrac[band]
-		r = 0.42
+		r = 0.5
 		# inclined scree ledge (lower part, rises at r x the face rate), cliff above (steeper), soft bands untouched
 		g_ledge = r * fr
 		g_cliff = r * (1 - cf) + (fr - (1 - cf)) * (1 - r * (1 - cf)) / cf
 		kink = smoothstep(1 - cf - 0.06, 1 - cf + 0.06, fr)
 		g = g_ledge * (1 - kink) + g_cliff * kink
+		# ledges pinch out along strike: where this noise is low the hard band is one continuous wall
+		lc = smoothstep(-0.2, 0.3, self.noise(1 / 110.0, 3, seed=48) + 0.45 * self.noise(1 / 32.0, 2, seed=49))
+		g = fr + (g - fr) * lc
 		g = np.where(hardband[band], g, fr)
 		delta = (g - fr) * T
 		s = slope_deg(blur(h, 2.5), DX)
 		# massive faces vs banded faces: the strata show strongly in some places, hardly at all in others
 		patch = smoothstep(-0.25, 0.35, self.noise(1 / 500.0, 3, seed=45))
-		w = smoothstep(33.0, 50.0, s) * (0.4 + 0.4 * smoothstep(1900.0, 2600.0, h)) * (0.25 + 0.75 * patch)
+		# alpine faces only: below ~1,800 m the forested valley walls (and the valley trails) keep plain slopes
+		w = smoothstep(33.0, 50.0, s) * (0.35 + 0.35 * smoothstep(1900.0, 2600.0, h)) * (0.2 + 0.8 * patch)
+		w = w * smoothstep(1650.0, 1900.0, h)
 		w = w * (1 - self.floor_w) * (1 - self.ramp_w) * (1 - self.pad_zone)
 		self.h = (h + delta * w).astype(np.float32)
 		cliff = hardband[band] & (fr > 1 - cf)
 		self.hard = np.where(cliff, 0.12, np.where(hardband[band], 0.6, 1.0)).astype(np.float32)
 		self.strata_w = w.astype(np.float32)
-		self.masks["cliffband"] = (cliff * w).astype(np.float32)
+		self.masks["cliffband"] = (cliff * w * (0.4 + 0.6 * lc)).astype(np.float32)
+		# rock colour per band (grey limestone / buff dolomite / dark shale), graded within the band
+		self.band_col = np.clip(bcol[band] * 0.8 + 0.2 * fr + 0.08 * self.noise(1 / 60.0, 2, seed=50),
+								0.0, 1.0).astype(np.float32)
 
 	# ------------------------------------------------------------------ 3. glacier
 	def glacier(self):

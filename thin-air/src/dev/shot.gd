@@ -9,6 +9,8 @@ extends Node
 ## With --player (the real Player, first-person view; --pos/--look place it):  --campfire=D (a lit campfire D m
 ## ahead, a little to the right)  --equip=<item id> (in hand, or worn)  --give=id,id,… (into the pack; "id*n" for n)
 ## --inventory=<frame>[,inventory|equipment|crafting] (open the inventory screen on that tab at that frame)
+## --size=WxH  render 3D at ~W px wide (scaling_3d_scale = W / window width): Movie Maker keeps the window size of
+## project.godot's override (1600x900) whatever --resolution says, so this is how to keep lavapipe renders short
 
 var args := {}
 var cam: Camera3D
@@ -56,6 +58,10 @@ func _ready() -> void:
 	var look := String(args.get("look", "0,0")).split(",")
 	cam.rotation_degrees = Vector3(float(look[1]) if look.size() > 1 else 0.0, float(look[0]), 0.0)
 	cam.make_current()
+	if args.has("size"):
+		var sw := float(String(args["size"]).get_slice("x", 0))
+		if sw > 0.0:
+			get_viewport().scaling_3d_scale = clampf(sw / float(get_window().size.x), 0.25, 1.0)
 	RenderingServer.global_shader_parameter_set(&"player_position", pos)
 
 
@@ -101,7 +107,7 @@ func _setup_player() -> void:
 func _process(_d: float) -> void:
 	frame += 1
 	# --player: once the campfire/torch exist, settle the eye adaptation (no 3 s lag in a 3 s clip).
-	if args.has("player") and frame == 6:
+	if (args.has("player") and frame == 6) or (not args.has("player") and frame == 3):
 		var sky := get_tree().get_first_node_in_group(&"sky")
 		if sky and sky.has_method(&"snap"):
 			sky.call(&"snap")
