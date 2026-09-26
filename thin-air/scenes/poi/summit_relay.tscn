@@ -101,9 +101,11 @@ transform = Transform3D(-0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.93969, 5.
 
 [node name="Log_hale_03" type="Marker3D" parent="Sockets"]
 transform = Transform3D(-0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.93969, 5.4, -0.0148, 0.1)
+metadata/log_id = &"log_hale_03"
 
 [node name="Log_hale_notebook" type="Marker3D" parent="Sockets"]
 transform = Transform3D(-0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.93969, 5.9, 0.10532, -0.1)
+metadata/log_id = &"hale_notebook"
 
 [node name="Spot_Transmit" type="Marker3D" parent="Sockets"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.6)

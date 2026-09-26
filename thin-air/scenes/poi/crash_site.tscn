@@ -213,6 +213,7 @@ transform = Transform3D(-0.46947, 0, -0.88295, 0, 1, 0, 0.88295, 0, -0.46947, -2
 
 [node name="Log_dale_logbook" type="Marker3D" parent="Sockets"]
 transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -2.22384, -0.09694, -2.19336)
+metadata/log_id = &"dale_logbook"
 
 [node name="Loot_FirstAid" type="Marker3D" parent="Sockets"]
 transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -0.48436, 0.65029, -2.8003)

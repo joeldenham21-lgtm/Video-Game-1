@@ -17,6 +17,7 @@ RES_SH = "res://assets/models/poi/shaders/%s.gdshader"
 NOISE = "res://assets/models/poi/textures/poi_noise.png"
 DECALS = "res://assets/models/poi/textures/poi_decals_albedo.png"
 
+_LOGS = json.load(open(os.path.join(ROOT, "data", "logs.json")))
 _LIBJ = json.load(open(os.path.join(ROOT, "assets", "materials", "materials.json")))
 _TERJ = {d["name"]: d for d in json.load(open(os.path.join(ROOT, "assets", "textures", "terrain", "layers.json")))}
 
@@ -340,7 +341,13 @@ def write_scene(site, glb_res, mats_by_bucket):
         for name, M in site.markers:
             assert name not in seen, "duplicate socket " + name
             seen.add(name)
-            t.node('[node name="%s" type="Marker3D" parent="Sockets"]' % name, [("transform", gd_transform(M))])
+            props = [("transform", gd_transform(M))]
+            if name.startswith("Log_"):
+                # exact data/logs.json id (sockets drop a leading "log_": Log_hale_01 -> log_hale_01)
+                lid = name[4:] if name[4:] in _LOGS else "log_" + name[4:]
+                assert lid in _LOGS, "unknown log id for socket " + name
+                props.append(("metadata/log_id", '&"%s"' % lid))
+            t.node('[node name="%s" type="Marker3D" parent="Sockets"]' % name, props)
     groups = {}
     for L in site.lights:
         groups.setdefault(L["group"], []).append(L)

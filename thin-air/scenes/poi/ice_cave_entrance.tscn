@@ -294,6 +294,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, -0.27312, -5.4)
 
 [node name="Log_park_03" type="Marker3D" parent="Sockets"]
 transform = Transform3D(0.93969, 0, 0.34202, 0, 1, 0, -0.34202, 0, 0.93969, -1.2, -1.99274, 4.2)
+metadata/log_id = &"log_park_03"
 
 [node name="Shelter_Mouth" type="Area3D" parent="." groups=["shelter"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, -1.47312, -1.5)

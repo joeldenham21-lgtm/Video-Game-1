@@ -4,7 +4,8 @@ extends Node3D
 ## The scene is an inherited instance of assets/models/poi/<id>.glb (merged static meshes, one surface per
 ## library material) plus, generated alongside:
 ##   Collision/Body_<surface>   StaticBody3D (layer 1 "world") per footstep surface (meta "surface": wood/metal/rock/…)
-##   Sockets/<name>             Marker3D gameplay sockets: Loot_*, Log_<log id>, Use_* (Use_Radio, Use_Generator,
+##   Sockets/<name>             Marker3D gameplay sockets: Loot_*, Log_* (meta "log_id" = the exact data/logs.json id),
+##                              Use_* (Use_Radio, Use_Generator,
 ##                              Use_Door_Mine, …), Arrive_* (spawn / arrival points), Npc_*, Spot_*
 ##   Lights_Interior            lights that come on with power / a lit lamp (off by default where noted)
 ##   Shelter areas (group "shelter"), heat-source slots (group "heat_source", inactive until lit), ReflectionProbes

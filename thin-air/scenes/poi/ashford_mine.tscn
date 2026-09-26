@@ -268,6 +268,7 @@ transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -43.95, 1.45389, -6)
 
 [node name="Log_miner_diary_1" type="Marker3D" parent="Sockets"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.30915, 0.1, 14.30905)
+metadata/log_id = &"miner_diary_1"
 
 [node name="Loot_Bunkhouse" type="Marker3D" parent="Sockets"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.5, 14.5)

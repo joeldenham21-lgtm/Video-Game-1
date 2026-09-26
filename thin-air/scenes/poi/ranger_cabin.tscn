@@ -327,9 +327,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 2.08, 0)
 
 [node name="Log_ranger_logbook" type="Marker3D" parent="Sockets"]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 2.62, 1.22, -0.35)
+metadata/log_id = &"ranger_logbook"
 
 [node name="Log_ranger_note" type="Marker3D" parent="Sockets"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4, 1.18, -0.5)
+metadata/log_id = &"ranger_note"
 
 [node name="Loot_RadioHandheld" type="Marker3D" parent="Sockets"]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 2.65, 1.2, -1.5)

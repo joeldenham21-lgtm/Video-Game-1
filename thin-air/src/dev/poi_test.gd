@@ -13,7 +13,8 @@ extends Node
 const SHOTS := {
 	# site -> shot -> [cam (site-local x, y above ground, z), look (yaw, pitch), hours, fov, lights]
 	&"crash_site": {
-		"hero": [Vector3(-12.5, 1.7, 9.0), Vector2(-62.0, -4.0), 16.9, 58.0, false],
+		"hero": [Vector3(-7.5, 1.6, 7.0), Vector2(-48.0, -5.0), 16.3, 55.0, false],
+		"wide": [Vector3(-12.5, 1.7, 9.0), Vector2(-62.0, -4.0), 16.9, 58.0, false],
 		"trail": [Vector3(22.0, 2.4, 20.0), Vector2(55.0, -6.0), 16.6, 60.0, false],
 		"cabin": [Vector3(0.9, 0.95, -2.1), Vector2(-60.0, -6.0), 16.9, 75.0, false],
 		"cockpit": [Vector3(-0.5, 0.95, -4.2), Vector2(-120.0, -8.0), 16.9, 75.0, false],
@@ -38,6 +39,29 @@ const SHOTS := {
 		"hero": [Vector3(22.0, 1.8, 2.0), Vector2(84.0, 4.0), 15.8, 62.0, false],
 		"portal": [Vector3(-28.0, 1.7, -3.0), Vector2(71.0, 4.0), 15.0, 62.0, false],
 		"bunkhouse": [Vector3(-4.0, 1.8, 22.0), Vector2(45.0, -8.0), 15.5, 62.0, false],
+	},
+	&"summit_relay": {
+		"hero": [Vector3(-3.0, 1.7, -11.0), Vector2(-160.0, 12.0), 16.9, 60.0, false],
+	},
+	&"owens_bivouac": {
+		"hero": [Vector3(4.0, 1.6, 5.0), Vector2(34.0, -8.0), 16.5, 60.0, false],
+	},
+	&"glacier_camp": {
+		"hero": [Vector3(6.0, 1.7, 8.0), Vector2(37.0, -6.0), 16.4, 60.0, false],
+	},
+	&"fire_lookout": {
+		"hero": [Vector3(-12.0, 1.7, -4.0), Vector2(-108.0, 16.0), 16.6, 62.0, false],
+		"cab": [Vector3(1.5, 13.7, 1.5), Vector2(45.0, -16.0), 16.6, 78.0, false],
+	},
+	&"trapper_cabin": {
+		"hero": [Vector3(4.0, 1.7, 5.0), Vector2(39.0, -6.0), 16.2, 60.0, false],
+	},
+	&"ice_cave": {
+		"passage": [Vector3(0.0, 1.6, -2.0), Vector2(0.0, 0.0), 13.0, 75.0, false],
+		"chamber": [Vector3(2.0, 2.6, -36.0), Vector2(-14.0, -8.0), 13.0, 78.0, false],
+	},
+	&"ice_cave_entrance": {
+		"hero": [Vector3(2.0, 1.7, 12.0), Vector2(11.0, 3.0), 14.5, 60.0, false],
 	},
 	&"ashford_mine_interior": {
 		"adit": [Vector3(-2.0, 1.6, 0.0), Vector2(90.0, -3.0), 12.0, 75.0, false],

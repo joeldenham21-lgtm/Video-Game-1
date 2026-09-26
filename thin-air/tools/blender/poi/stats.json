@@ -5,7 +5,7 @@
   "id": "ashford_mine",
   "lights": 0,
   "markers": 11,
-  "secs": 1.8,
+  "secs": 2.3,
   "surfaces": {
    "detail": 6,
    "ground": 1,
@@ -26,7 +26,7 @@
   "id": "ashford_mine_interior",
   "lights": 2,
   "markers": 17,
-  "secs": 2.3,
+  "secs": 2.8,
   "surfaces": {
    "detail": 2,
    "main": 15
@@ -43,7 +43,7 @@
   "id": "crash_site",
   "lights": 0,
   "markers": 18,
-  "secs": 2.9,
+  "secs": 4.3,
   "surfaces": {
    "detail": 9,
    "ground": 2,
@@ -83,7 +83,7 @@
   "id": "glacier_camp",
   "lights": 0,
   "markers": 7,
-  "secs": 0.7,
+  "secs": 0.6,
   "surfaces": {
    "detail": 4,
    "main": 13
@@ -100,7 +100,7 @@
   "id": "ice_cave",
   "lights": 2,
   "markers": 6,
-  "secs": 0.3,
+  "secs": 0.4,
   "surfaces": {
    "detail": 3,
    "main": 8
@@ -134,7 +134,7 @@
   "id": "kestrel_station",
   "lights": 6,
   "markers": 31,
-  "secs": 5.8,
+  "secs": 6.4,
   "surfaces": {
    "detail": 10,
    "ground": 1,
@@ -172,7 +172,7 @@
   "id": "ranger_cabin",
   "lights": 1,
   "markers": 17,
-  "secs": 4.2,
+  "secs": 4.8,
   "surfaces": {
    "detail": 7,
    "ground": 1,
@@ -193,7 +193,7 @@
   "id": "summit_relay",
   "lights": 0,
   "markers": 9,
-  "secs": 2.2,
+  "secs": 3.4,
   "surfaces": {
    "detail": 3,
    "main": 11,
@@ -212,7 +212,7 @@
   "id": "trapper_cabin",
   "lights": 0,
   "markers": 8,
-  "secs": 1.4,
+  "secs": 1.3,
   "surfaces": {
    "detail": 4,
    "interior": 5,
