@@ -1,0 +1,123 @@
+[remap]
+
+importer="scene"
+importer_version=1
+type="PackedScene"
+uid="uid://b3b34532u5doe"
+path="res://.godot/imported/ashford_mine.glb-36e0a7fe571df8ef63c9c1870d9aa64f.scn"
+
+[deps]
+
+source_file="res://assets/models/poi/ashford_mine.glb"
+dest_files=["res://.godot/imported/ashford_mine.glb-36e0a7fe571df8ef63c9c1870d9aa64f.scn"]
+
+[params]
+
+nodes/root_type=""
+nodes/root_name=""
+nodes/root_script=null
+mesh_library/use_node_names_as_mesh_names=false
+array_mesh/deduplicate_surfaces=true
+nodes/apply_root_scale=true
+nodes/root_scale=1.0
+nodes/import_as_skeleton_bones=false
+nodes/use_name_suffixes=false
+nodes/use_node_type_suffixes=false
+meshes/ensure_tangents=true
+meshes/generate_lods=true
+meshes/create_shadow_meshes=true
+meshes/light_baking=1
+meshes/lightmap_texel_size=0.2
+meshes/force_disable_compression=false
+skins/use_named_skins=true
+animation/import=false
+animation/fps=30
+animation/trimming=false
+animation/remove_immutable_tracks=true
+animation/import_rest_as_RESET=false
+import_script/path=""
+materials/extract=0
+materials/extract_format=0
+materials/extract_path=""
+_subresources={
+"materials": {
+"canvas": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/canvas.tres",
+"use_external/path": "res://assets/models/poi/materials/canvas.tres"
+},
+"concrete": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/concrete.tres",
+"use_external/path": "res://assets/models/poi/materials/concrete.tres"
+},
+"decal": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/decal.tres",
+"use_external/path": "res://assets/models/poi/materials/decal.tres"
+},
+"gravel": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/gravel.tres",
+"use_external/path": "res://assets/models/poi/materials/gravel.tres"
+},
+"ice_floor": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/ice_floor.tres",
+"use_external/path": "res://assets/models/poi/materials/ice_floor.tres"
+},
+"metal_bare": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/metal_bare.tres",
+"use_external/path": "res://assets/models/poi/materials/metal_bare.tres"
+},
+"metal_corrugated": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/metal_corrugated.tres",
+"use_external/path": "res://assets/models/poi/materials/metal_corrugated.tres"
+},
+"metal_dark": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/metal_dark.tres",
+"use_external/path": "res://assets/models/poi/materials/metal_dark.tres"
+},
+"metal_rusty": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/metal_rusty.tres",
+"use_external/path": "res://assets/models/poi/materials/metal_rusty.tres"
+},
+"rock": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/rock.tres",
+"use_external/path": "res://assets/models/poi/materials/rock.tres"
+},
+"rock_t": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/rock_t.tres",
+"use_external/path": "res://assets/models/poi/materials/rock_t.tres"
+},
+"rope": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/rope.tres",
+"use_external/path": "res://assets/models/poi/materials/rope.tres"
+},
+"wood_endgrain": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/wood_endgrain.tres",
+"use_external/path": "res://assets/models/poi/materials/wood_endgrain.tres"
+},
+"wood_log": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/wood_log.tres",
+"use_external/path": "res://assets/models/poi/materials/wood_log.tres"
+},
+"wood_planks": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/wood_planks.tres",
+"use_external/path": "res://assets/models/poi/materials/wood_planks.tres"
+}
+}
+}
+gltf/naming_version=2
+gltf/embedded_image_handling=1
+gltf/texture_map_mode=0

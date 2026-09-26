@@ -1,0 +1,103 @@
+{
+ "ashford_mine": {
+  "cols": 32,
+  "glb_kb": 1073,
+  "id": "ashford_mine",
+  "lights": 0,
+  "markers": 11,
+  "secs": 1.9,
+  "surfaces": {
+   "detail": 6,
+   "ground": 1,
+   "interior": 4,
+   "main": 11
+  },
+  "total": 11712,
+  "tris": {
+   "detail": 3840,
+   "ground": 220,
+   "interior": 1168,
+   "main": 6484
+  }
+ },
+ "ashford_mine_interior": {
+  "cols": 68,
+  "glb_kb": 1442,
+  "id": "ashford_mine_interior",
+  "lights": 2,
+  "markers": 17,
+  "secs": 1.7,
+  "surfaces": {
+   "detail": 2,
+   "main": 15
+  },
+  "total": 16794,
+  "tris": {
+   "detail": 448,
+   "main": 16346
+  }
+ },
+ "crash_site": {
+  "cols": 24,
+  "glb_kb": 1657,
+  "id": "crash_site",
+  "lights": 0,
+  "markers": 18,
+  "secs": 3.0,
+  "surfaces": {
+   "detail": 9,
+   "ground": 2,
+   "interior": 10,
+   "main": 12
+  },
+  "total": 19666,
+  "tris": {
+   "detail": 1208,
+   "ground": 2152,
+   "interior": 2590,
+   "main": 13716
+  }
+ },
+ "kestrel_station": {
+  "cols": 204,
+  "glb_kb": 2510,
+  "id": "kestrel_station",
+  "lights": 6,
+  "markers": 31,
+  "secs": 5.5,
+  "surfaces": {
+   "detail": 10,
+   "ground": 1,
+   "interior": 20,
+   "main": 19
+  },
+  "total": 28824,
+  "tris": {
+   "detail": 2518,
+   "ground": 2598,
+   "interior": 10042,
+   "main": 13666
+  }
+ },
+ "ranger_cabin": {
+  "cols": 41,
+  "glb_kb": 1346,
+  "id": "ranger_cabin",
+  "lights": 1,
+  "markers": 17,
+  "secs": 4.3,
+  "surfaces": {
+   "detail": 7,
+   "ground": 1,
+   "interior": 14,
+   "main": 10
+  },
+  "total": 15216,
+  "tris": {
+   "detail": 1364,
+   "ground": 32,
+   "interior": 3848,
+   "main": 9972
+  }
+ }
+}

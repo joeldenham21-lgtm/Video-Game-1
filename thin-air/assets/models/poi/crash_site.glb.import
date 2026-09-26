@@ -1,0 +1,148 @@
+[remap]
+
+importer="scene"
+importer_version=1
+type="PackedScene"
+uid="uid://b6tec51hi25q8"
+path="res://.godot/imported/crash_site.glb-29e348b1d8ed95ac41980b500d57d257.scn"
+
+[deps]
+
+source_file="res://assets/models/poi/crash_site.glb"
+dest_files=["res://.godot/imported/crash_site.glb-29e348b1d8ed95ac41980b500d57d257.scn"]
+
+[params]
+
+nodes/root_type=""
+nodes/root_name=""
+nodes/root_script=null
+mesh_library/use_node_names_as_mesh_names=false
+array_mesh/deduplicate_surfaces=true
+nodes/apply_root_scale=true
+nodes/root_scale=1.0
+nodes/import_as_skeleton_bones=false
+nodes/use_name_suffixes=false
+nodes/use_node_type_suffixes=false
+meshes/ensure_tangents=true
+meshes/generate_lods=true
+meshes/create_shadow_meshes=true
+meshes/light_baking=1
+meshes/lightmap_texel_size=0.2
+meshes/force_disable_compression=false
+skins/use_named_skins=true
+animation/import=false
+animation/fps=30
+animation/trimming=false
+animation/remove_immutable_tracks=true
+animation/import_rest_as_RESET=false
+import_script/path=""
+materials/extract=0
+materials/extract_format=0
+materials/extract_path=""
+_subresources={
+"materials": {
+"bark_dead": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/bark_dead.tres",
+"use_external/path": "res://assets/models/poi/materials/bark_dead.tres"
+},
+"bark_spruce": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/bark_spruce.tres",
+"use_external/path": "res://assets/models/poi/materials/bark_spruce.tres"
+},
+"canvas": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/canvas.tres",
+"use_external/path": "res://assets/models/poi/materials/canvas.tres"
+},
+"decal": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/decal.tres",
+"use_external/path": "res://assets/models/poi/materials/decal.tres"
+},
+"dirt": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/dirt.tres",
+"use_external/path": "res://assets/models/poi/materials/dirt.tres"
+},
+"fuel_sheen": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/fuel_sheen.tres",
+"use_external/path": "res://assets/models/poi/materials/fuel_sheen.tres"
+},
+"glass": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/glass.tres",
+"use_external/path": "res://assets/models/poi/materials/glass.tres"
+},
+"grass_t": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/grass_t.tres",
+"use_external/path": "res://assets/models/poi/materials/grass_t.tres"
+},
+"leather": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/leather.tres",
+"use_external/path": "res://assets/models/poi/materials/leather.tres"
+},
+"metal_aircraft": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/metal_aircraft.tres",
+"use_external/path": "res://assets/models/poi/materials/metal_aircraft.tres"
+},
+"metal_bare": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/metal_bare.tres",
+"use_external/path": "res://assets/models/poi/materials/metal_bare.tres"
+},
+"metal_dark": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/metal_dark.tres",
+"use_external/path": "res://assets/models/poi/materials/metal_dark.tres"
+},
+"metal_rusty": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/metal_rusty.tres",
+"use_external/path": "res://assets/models/poi/materials/metal_rusty.tres"
+},
+"nylon": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/nylon.tres",
+"use_external/path": "res://assets/models/poi/materials/nylon.tres"
+},
+"paint_metal": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/paint_metal.tres",
+"use_external/path": "res://assets/models/poi/materials/paint_metal.tres"
+},
+"plastic": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/plastic.tres",
+"use_external/path": "res://assets/models/poi/materials/plastic.tres"
+},
+"rope": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/rope.tres",
+"use_external/path": "res://assets/models/poi/materials/rope.tres"
+},
+"rubber": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/rubber.tres",
+"use_external/path": "res://assets/models/poi/materials/rubber.tres"
+},
+"wood_endgrain": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/wood_endgrain.tres",
+"use_external/path": "res://assets/models/poi/materials/wood_endgrain.tres"
+},
+"wood_fresh": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://assets/models/poi/materials/wood_fresh.tres",
+"use_external/path": "res://assets/models/poi/materials/wood_fresh.tres"
+}
+}
+}
+gltf/naming_version=2
+gltf/embedded_image_handling=1
+gltf/texture_map_mode=0

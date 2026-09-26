@@ -1,0 +1,278 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/poi/crash_site.glb" id="1"]
+[ext_resource type="Script" path="res://scenes/poi/poi_site.gd" id="2"]
+[ext_resource type="Script" path="res://scenes/poi/poi_shelter.gd" id="3"]
+
+[sub_resource type="BoxShape3D" id="Box_0"]
+size = Vector3(1.9, 0.26, 7.6)
+
+[sub_resource type="BoxShape3D" id="Box_1"]
+size = Vector3(1.5, 1.6, 1.3)
+
+[sub_resource type="BoxShape3D" id="Box_2"]
+size = Vector3(0.5, 0.2, 0.5)
+
+[sub_resource type="BoxShape3D" id="Box_3"]
+size = Vector3(5, 0.12, 1.64)
+
+[sub_resource type="BoxShape3D" id="Box_4"]
+size = Vector3(4.8, 2, 0.06)
+
+[sub_resource type="BoxShape3D" id="Box_5"]
+size = Vector3(5, 0.1, 1.64)
+
+[sub_resource type="BoxShape3D" id="Box_6"]
+size = Vector3(0.5, 1.8, 1.5)
+
+[sub_resource type="BoxShape3D" id="Box_7"]
+size = Vector3(1.2, 1.35, 1.35)
+
+[sub_resource type="BoxShape3D" id="Box_8"]
+size = Vector3(1.98, 0.3, 1.8)
+
+[sub_resource type="BoxShape3D" id="Box_9"]
+size = Vector3(1.98, 0.3, 2.6)
+
+[sub_resource type="BoxShape3D" id="Box_10"]
+size = Vector3(1.98, 0.3, 5.4)
+
+[sub_resource type="BoxShape3D" id="Box_11"]
+size = Vector3(0.9, 0.5, 0.9)
+
+[sub_resource type="BoxShape3D" id="Box_12"]
+size = Vector3(1, 0.1, 1)
+
+[sub_resource type="BoxShape3D" id="Box_13"]
+size = Vector3(0.85, 0.56, 0.65)
+
+[sub_resource type="BoxShape3D" id="Box_14"]
+size = Vector3(0.75, 0.5, 0.55)
+
+[sub_resource type="BoxShape3D" id="Box_15"]
+size = Vector3(0.72, 0.5, 0.52)
+
+[sub_resource type="BoxShape3D" id="Box_16"]
+size = Vector3(0.62, 0.4, 0.47)
+
+[sub_resource type="BoxShape3D" id="Box_17"]
+size = Vector3(0.32, 7.5, 0.32)
+
+[sub_resource type="BoxShape3D" id="Box_18"]
+size = Vector3(0.384, 9, 0.384)
+
+[sub_resource type="BoxShape3D" id="Box_19"]
+size = Vector3(0.288, 6, 0.288)
+
+[sub_resource type="BoxShape3D" id="Box_20"]
+size = Vector3(3.8, 1.8, 1.5)
+
+[node name="crash_site" instance=ExtResource("1")]
+script = ExtResource("2")
+poi_id = &"crash_site"
+interior = false
+lit_materials = PackedStringArray()
+interior_lights_on = false
+
+[node name="main" parent="."]
+visibility_range_end = 900
+visibility_range_end_margin = 72
+
+[node name="detail" parent="."]
+visibility_range_end = 90
+visibility_range_end_margin = 7.2
+
+[node name="interior" parent="."]
+visibility_range_end = 35
+visibility_range_end_margin = 2.8
+
+[node name="ground" parent="."]
+visibility_range_end = 220
+visibility_range_end_margin = 17.6
+cast_shadow = 0
+
+[node name="Collision" type="Node3D" parent="."]
+
+[node name="Body_metal" type="StaticBody3D" parent="Collision"]
+collision_mask = 0
+metadata/surface = &"metal"
+
+[node name="S0" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(0.52919, -0.02773, -0.84805, -0.05234, -0.99863, 0, -0.84689, 0.04438, -0.52992, -14.27082, 0.15549, -8.30049)
+shape = SubResource("Box_0")
+
+[node name="S1" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.99751, -0.02724, -0.06512, -0.04886, 0.9323, 0.35837, 0.05095, 0.36066, -0.93131, -2.50633, 1.18669, 2.20824)
+shape = SubResource("Box_1")
+
+[node name="S2" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.99751, -0.02724, -0.06512, -0.04886, 0.9323, 0.35837, 0.05095, 0.36066, -0.93131, -1.01007, 1.25998, 2.13182)
+shape = SubResource("Box_1")
+
+[node name="S3" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.99751, -0.02724, -0.06512, -0.04886, 0.9323, 0.35837, 0.05095, 0.36066, -0.93131, 0.48618, 1.33327, 2.05539)
+shape = SubResource("Box_1")
+
+[node name="S4" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.8808, -0.09824, 0.46319, -0.06976, 0.99449, 0.07827, -0.46833, 0.03663, -0.8828, -1.90346, -0.00648, -2.42503)
+shape = SubResource("Box_2")
+
+[node name="S5" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.8808, -0.09824, 0.46319, -0.06976, 0.99449, 0.07827, -0.46833, 0.03663, -0.8828, -1.55143, 0.053, -3.09596)
+shape = SubResource("Box_2")
+
+[node name="S6" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.8808, -0.09824, 0.46319, -0.06976, 0.99449, 0.07827, -0.46833, 0.03663, -0.8828, -0.51764, -0.36201, -2.15988)
+shape = SubResource("Box_3")
+
+[node name="S7" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.8808, -0.09824, 0.46319, -0.06976, 0.99449, 0.07827, -0.46833, 0.03663, -0.8828, -1.07718, 0.54221, -1.45576)
+shape = SubResource("Box_4")
+
+[node name="S8" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.8808, -0.09824, 0.46319, -0.06976, 0.99449, 0.07827, -0.46833, 0.03663, -0.8828, -0.32681, 0.66901, -2.88588)
+shape = SubResource("Box_4")
+
+[node name="S9" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.8808, -0.09824, 0.46319, -0.06976, 0.99449, 0.07827, -0.46833, 0.03663, -0.8828, -0.71411, 1.62696, -2.08663)
+shape = SubResource("Box_5")
+
+[node name="S10" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.8808, -0.09824, 0.46319, -0.06976, 0.99449, 0.07827, -0.46833, 0.03663, -0.8828, -2.67396, 0.34921, -3.22822)
+shape = SubResource("Box_6")
+
+[node name="S11" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.8808, -0.09824, 0.46319, -0.06976, 0.99449, 0.07827, -0.46833, 0.03663, -0.8828, -3.31017, 0.49928, -3.54872)
+shape = SubResource("Box_7")
+
+[node name="S12" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.8808, -0.09824, 0.46319, -0.06976, 0.99449, 0.07827, -0.46833, 0.03663, -0.8828, -0.64175, 1.79306, -2.03393)
+shape = SubResource("Box_8")
+
+[node name="S13" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.8808, -0.09824, 0.46319, -0.06976, 0.99449, 0.07827, -0.46833, 0.03663, -0.8828, -1.61445, 1.62869, -0.18006)
+shape = SubResource("Box_9")
+
+[node name="S14" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(-0.85297, -0.29781, 0.42865, -0.03323, 0.85056, 0.52482, -0.5209, 0.43342, -0.7354, -3.43772, 0.04749, 3.07715)
+shape = SubResource("Box_10")
+
+[node name="S15" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.66826, 0.24981, 5.51704)
+shape = SubResource("Box_11")
+
+[node name="S16" type="CollisionShape3D" parent="Collision/Body_metal"]
+transform = Transform3D(0.93969, 0, 0.34202, 0, 1, 0, -0.34202, 0, 0.93969, 15.54495, 0.06, 1.34508)
+shape = SubResource("Box_12")
+
+[node name="Body_wood" type="StaticBody3D" parent="Collision"]
+collision_mask = 0
+metadata/surface = &"wood"
+
+[node name="S0" type="CollisionShape3D" parent="Collision/Body_wood"]
+transform = Transform3D(-0.93669, -0.09824, 0.3361, -0.07997, 0.99449, 0.0678, -0.34091, 0.03663, -0.93938, -0.477, -0.00347, -2.50324)
+shape = SubResource("Box_13")
+
+[node name="S1" type="CollisionShape3D" parent="Collision/Body_wood"]
+transform = Transform3D(-0.99515, -0.09824, -0.00453, -0.09834, 0.99449, 0.03636, 0.00094, 0.03663, -0.99933, 0.51798, 0.04734, -2.03332)
+shape = SubResource("Box_14")
+
+[node name="S2" type="CollisionShape3D" parent="Collision/Body_wood"]
+transform = Transform3D(0.76604, 0, 0.64279, 0, 1, 0, -0.64279, 0, 0.76604, 8.16422, 0.22, -1.76696)
+shape = SubResource("Box_15")
+
+[node name="S3" type="CollisionShape3D" parent="Collision/Body_wood"]
+transform = Transform3D(0.42262, 0, -0.90631, 0, 1, 0, 0.90631, 0, 0.42262, 4.30249, 0.2, -1.68266)
+shape = SubResource("Box_16")
+
+[node name="S4" type="CollisionShape3D" parent="Collision/Body_wood"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 39.428, 4.78627, 17.59346)
+shape = SubResource("Box_17")
+
+[node name="S5" type="CollisionShape3D" parent="Collision/Body_wood"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43.94094, 5.33539, 11.04187)
+shape = SubResource("Box_18")
+
+[node name="S6" type="CollisionShape3D" parent="Collision/Body_wood"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.32353, 4.22774, 16.01464)
+shape = SubResource("Box_19")
+
+[node name="Sockets" type="Node3D" parent="."]
+
+[node name="Arrive_Wake" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, 0.0865, -0.2423, -1.60573)
+
+[node name="Arrive_Default" type="Marker3D" parent="Sockets"]
+transform = Transform3D(-0.46947, 0, -0.88295, 0, 1, 0, 0.88295, 0, -0.46947, 3.35001, 0.02447, -0.09631)
+
+[node name="Spot_Dale" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -1.91328, 0.09297, -2.42137)
+
+[node name="Use_Radio" type="Marker3D" parent="Sockets"]
+transform = Transform3D(-0.46947, 0, -0.88295, 0, 1, 0, 0.88295, 0, -0.46947, -2.29209, 0.7344, -3.10698)
+
+[node name="Log_dale_logbook" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -2.22384, -0.09694, -2.19336)
+
+[node name="Loot_FirstAid" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -0.48436, 0.65029, -2.8003)
+
+[node name="Loot_SurvivalManual" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -1.31853, 0.12156, -2.96768)
+
+[node name="Loot_FlareGun" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -1.90881, -0.07054, -3.43035)
+
+[node name="Loot_EmergencyBlanket" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -0.27184, 0.15784, -1.41844)
+
+[node name="Loot_Hatchet" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -0.89238, 0.21249, -2.92859)
+
+[node name="Loot_Scanner" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, 0.80995, 0.09978, -1.30909)
+
+[node name="Loot_Cargo_1" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -0.5104, 0.33466, -2.49079)
+
+[node name="Loot_Cargo_2" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, 0.49637, 0.26613, -2.02526)
+
+[node name="Loot_Backpack" type="Marker3D" parent="Sockets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.4946, 0.2, 3.70191)
+
+[node name="Loot_Crate_Trail" type="Marker3D" parent="Sockets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.16422, 0.5, -1.76696)
+
+[node name="Scan_Engine" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -3.26613, 0.50276, -3.52531)
+
+[node name="Scan_Wing" type="Marker3D" parent="Sockets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.27498, 0.0057, -8.29383)
+
+[node name="Spot_Campfire" type="Marker3D" parent="Sockets"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 0, 4.5)
+
+[node name="Probe_Cabin" type="ReflectionProbe" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.52583, 0.61956, -2.07715)
+size = Vector3(4.6, 2.2, 4.6)
+interior = true
+intensity = 1
+ambient_mode = 2
+ambient_color = Color(0.09, 0.095, 0.1, 1)
+ambient_color_energy = 1
+box_projection = true
+cull_mask = 1048573
+
+[node name="Shelter_Cabin" type="Area3D" parent="." groups=["shelter"]]
+transform = Transform3D(-0.88295, 0, 0.46947, 0, 1, 0, -0.46947, 0, -0.88295, -0.16827, -0.30428, -1.97145)
+collision_layer = 128
+collision_mask = 0
+monitoring = false
+monitorable = false
+script = ExtResource("3")
+shelter_factor = 0.6
+
+[node name="Shape" type="CollisionShape3D" parent="Shelter_Cabin"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("Box_20")
