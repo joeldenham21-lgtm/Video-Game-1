@@ -5,9 +5,19 @@ extends EditorScenePostImport
 ## so no texture is duplicated per model; here each surface gets the real library material (ItemMaterials),
 ## set on the mesh resource itself so every user of the mesh (pickups, carried logs, icons) sees it.
 ## Nodes named "*-col" / "*-colonly" are handled by Godot's name suffixes; "SOCKET_*" empties stay as Node3D.
+## The library script is loaded by path (not through its class_name) so a fresh clone's first import works even
+## before the global class cache exists.
+
+const LIBRARY := "res://src/items/item_materials.gd"
+
+var _lib: Script = null
 
 
 func _post_import(scene: Node) -> Object:
+	_lib = load(LIBRARY) as Script
+	if _lib == null:
+		push_warning("prop_import: %s missing; %s keeps placeholder materials" % [LIBRARY, get_source_file()])
+		return scene
 	_bind(scene)
 	return scene
 
@@ -19,8 +29,8 @@ func _bind(n: Node) -> void:
 		for s in mesh.get_surface_count():
 			var cur := mesh.surface_get_material(s)
 			var key := _key_of(cur)
-			if key != "" and ItemMaterials.has_material(StringName(key)):
-				mesh.surface_set_material(s, ItemMaterials.get_material(StringName(key)))
+			if key != "" and _lib.call(&"has_material", StringName(key)):
+				mesh.surface_set_material(s, _lib.call(&"get_material", StringName(key)) as Material)
 	for c in n.get_children():
 		_bind(c)
 
