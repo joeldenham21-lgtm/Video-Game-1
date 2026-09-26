@@ -131,6 +131,10 @@ interior = true
 lit_materials = PackedStringArray("lamp")
 interior_lights_on = false
 
+[node name="main" parent="."]
+visibility_range_end = 220
+visibility_range_end_margin = 17.6
+
 [node name="detail" parent="."]
 visibility_range_end = 45
 visibility_range_end_margin = 3.6

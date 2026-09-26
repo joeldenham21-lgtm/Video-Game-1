@@ -692,5 +692,89 @@ def build_interior():
     return s
 
 
+def build_kit():
+    """The tunnel kit as separate pieces (one MeshInstance3D each, 6 m grid, portal faces along -X / +X):
+    kit_straight (timbered), kit_straight_rock, kit_bend (90 deg left), kit_junction (T), kit_dead_end,
+    kit_stope (chamber with stulls), kit_raise (ladder raise). Laid out 12 m apart along +Y for preview/reuse."""
+    s = P.Site("ashford_tunnel_kit", ground=False, interior=True, seed_=61)
+    pieces = []
+
+    def piece(name, fn, k):
+        off = Vector((0, k * 12.0, 0))
+        s.bucket(name, vis_end=220.0)
+        fn(name, off)
+        pieces.append(name)
+
+    def straight(name, off, timbered=True):
+        me, dense = tunnel([off + Vector((3, 0, 0)), off + Vector((-3, 0, 0))], 2.0, 2.45, 11.0 + off.y)
+        s.add(me, None, name)
+        if timbered:
+            for k in range(4):
+                s.add(timber_set(off + Vector((2.4 - k * 1.6, 0, 0)), (-1, 0, 0), 1.8, 2.22, seed_=k), None, name)
+        s.add(rails([off + Vector((3, 0, 0)), off + Vector((-3, 0, 0))]), None, name)
+    piece("kit_straight", lambda n, o: straight(n, o, True), 0)
+    piece("kit_straight_rock", lambda n, o: straight(n, o, False), 1)
+
+    def bend(name, off):
+        pts = [off + Vector((3, 0, 0))] + [off + Vector((0, 3, 0)) + Vector((3 * math.cos(math.radians(-90 - a)), 0, 0)) * 0 +
+                                            Vector((3 * math.sin(math.radians(a)), -3 * math.cos(math.radians(a)), 0)) for a in range(15, 91, 15)]
+        pts = [off + Vector((3, 0, 0)), off + Vector((0.0, 0, 0))] + [off + Vector((-3 * math.sin(math.radians(a)), 3 - 3 * math.cos(math.radians(a)), 0)) for a in range(15, 91, 15)]
+        me, dense = tunnel(pts, 2.0, 2.45, 12.0 + off.y)
+        s.add(me, None, name)
+        s.add(rails(pts), None, name)
+    piece("kit_bend", bend, 2)
+
+    def junction(name, off):
+        me, dense = tunnel([off + Vector((3, 0, 0)), off + Vector((-3, 0, 0))], 2.0, 2.45, 13.0)
+        P.remove_faces(me, lambda c, i: c.y < -0.7 and abs(c.x - off.x) < 1.05 and c.z < 2.3)
+        br, _d = tunnel([off + Vector((0, 0, 0)), off + Vector((0, -3.5, 0))], 1.9, 2.4, 14.0)
+        P.remove_faces(br, lambda c, i: c.y - off.y > -1.0)
+        s.add(me, None, name)
+        s.add(br, None, name)
+    piece("kit_junction", junction, 3)
+
+    def dead_end(name, off):
+        me, dense = tunnel([off + Vector((3, 0, 0)), off + Vector((-2.5, 0, 0))], 2.0, 2.45, 15.0)
+        s.add(me, None, name)
+        s.add(P.blob((0, 0, 0), (1.2, 1.3, 1.4), "rock_cliff", 10, 0.2, 5.0), T(off + Vector((-2.8, 0, 1.1))), name)
+        for k in range(8):
+            s.add(P.blob((0, 0, 0), (P.rnd(0.2, 0.5),) * 2 + (P.rnd(0.15, 0.3),), "rock_cliff", 7, 0.3, k * 1.7, rings=4),
+                  T(off + Vector((P.rnd(-2.4, -1.0), P.rnd(-0.7, 0.7), 0))), name)
+    piece("kit_dead_end", dead_end, 4)
+
+    def stope(name, off):
+        rings = []
+        for k in range(9):
+            t = k / 8
+            p = off + Vector(((t - 0.5) * 10.0, 0, 0))
+            rings.append(tunnel_ring(p, (1, 0, 0), 3.0 + 4.0 * math.sin(math.pi * t) ** 0.7, 2.6 + 3.8 * math.sin(math.pi * t) ** 0.6,
+                                     0.35, 21.0 + k * 0.1, 0.08))
+        me = P.loft(rings, "rock_cliff", True, True, ROCK_T)
+        fi = len(me.f) // 2
+        c = sum((me.v[j] for j in me.f[fi]), Vector()) / len(me.f[fi])
+        if P.face_normal(me, fi).dot(off + Vector((0, 0, 1.5)) - c) < 0:
+            P.flip(me)
+        s.add(me, None, name)
+        for k in range(5):
+            p = off + Vector((-3.2 + k * 1.6, 0.0, 2.0 + (k % 2) * 1.3))
+            s.add(rod(p - Vector((0, 3.0, 0)), p + Vector((0, 3.0, 0)), 0.14, "wood_log", 8, cap_mat="wood_endgrain", tint=TIMBER), None, name)
+    piece("kit_stope", stope, 5)
+
+    def raise_(name, off):
+        straight(name, off, True)
+        crib = P.Mesh()
+        for k in range(10):
+            z = 2.3 + k * 0.3
+            for sy in (-1, 1):
+                crib.extend(box(1.6, 0.2, 0.2, "wood_log", 'x', tint=TIMBER, end_mat="wood_endgrain").transformed(T(off + Vector((0, sy * 0.7, z)))))
+                crib.extend(box(0.2, 1.6, 0.2, "wood_log", 'y', tint=TIMBER, end_mat="wood_endgrain").transformed(T(off + Vector((sy * 0.7, 0, z + 0.15)))))
+        s.add(crib, None, name)
+        s.add(PR.ladder(5.2, 0.45), T(off + Vector((0.45, 0, 0))) @ RZ(90) @ RX(-6), name)
+    piece("kit_raise", raise_, 6)
+    s.marker("Arrive_KitPreview", (8.0, 36.0, 0.0), 90)
+    s.meta["poi_id"] = "ashford_tunnel_kit"
+    return s
+
+
 def build():
-    return [build_exterior(), build_interior()]
+    return [build_exterior(), build_interior(), build_kit()]

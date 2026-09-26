@@ -22,7 +22,7 @@ def ice_ring(p, t, w, h, seed_, noise=0.25):
     t = Vector(t).normalized()
     side = Vector((-t.y, t.x, 0)).normalized()
     pts = []
-    n = 16
+    n = 24
     for k in range(n):
         a = math.pi * k / (n - 1)          # 0 .. pi over the vault
         x = -math.cos(a) * w / 2
@@ -32,14 +32,14 @@ def ice_ring(p, t, w, h, seed_, noise=0.25):
         q += (side * (-math.cos(a)) + Vector((0, 0, math.sin(a)))).normalized() * d
         pts.append(q)
     # floor back across (slightly dished)
-    for k in range(1, 5):
-        u = k / 5
+    for k in range(1, 7):
+        u = k / 7
         x = w / 2 - u * w
         pts.append(p + side * x + Vector((0, 0, -0.08 * math.sin(math.pi * u) + 0.03 * P.nz(p + side * x, 1.5, seed_))))
     return pts
 
 
-def ice_passage(path, widths, heights, seed_, step=0.9):
+def ice_passage(path, widths, heights, seed_, step=0.55):
     pts = [Vector(p) for p in path]
     dense = []
     wd = []
@@ -57,7 +57,7 @@ def ice_passage(path, widths, heights, seed_, step=0.9):
     for i, p in enumerate(dense):
         t = dense[min(i + 1, len(dense) - 1)] - dense[max(i - 1, 0)]
         rings.append(ice_ring(p, t, wd[i], hd[i], seed_ + i * 0.01))
-    nv = 16
+    nv = 24
 
     def mats(k, i):
         return "ice_cave" if i < nv - 1 else "scree"
@@ -92,13 +92,13 @@ def build_interior():
     # domed chamber at the end
     cc = Vector((3.5, 42.0, 1.0))
     rings = []
-    for k in range(9):
-        t = k / 8
+    for k in range(15):
+        t = k / 14
         p = cc + Vector((0, (t - 0.5) * 10.0, 0))
         wdt = 3.8 + 5.0 * math.sin(math.pi * t) ** 0.6
         hgt = 3.4 + 2.6 * math.sin(math.pi * t) ** 0.7
         rings.append(ice_ring(p, (0, 1, 0), wdt, hgt, 5.0 + k * 0.1, 0.3))
-    nv = 16
+    nv = 24
     ch = P.loft(rings, "ice_cave", True, True, cap1=True, mats=lambda k, i: "ice_cave" if i < nv - 1 else "scree")
     fi = 3
     c = sum((ch.v[j] for j in ch.f[fi]), Vector()) / len(ch.f[fi])
@@ -151,7 +151,9 @@ def build_interior():
     for k in range(3):
         s.add(cyl(0.035, 0.18, "metal_bare", 8, tint=(0.8, 0.8, 0.8) if k else (0.7, 0.1, 0.1)), T(J + Vector((1.0 + k * 0.1, 1.2, 0.0))), "detail")
     # collision: floor + walls + vault along the passage, chamber boxes
-    for a, b, w, h in zip(dense, dense[1:], wd, hd):
+    for a, b, w, h in zip(dense[::3], dense[3::3] + [dense[-1]], wd[::3], hd[::3]):
+        if (b - a).length < 0.2:
+            continue
         d = b - a
         L = d.length
         c = (a + b) / 2
@@ -190,7 +192,7 @@ def build_entrance():
     # arch: an ice passage stub from the snout outward (mouth at y = -3.5) running 7 m into the slope
     z0 = G.h(0, -3.0)
     path = [Vector((0, -3.8, z0)), Vector((0, 0.0, z0 + 0.1)), Vector((0.3, 6.0, z0 + 0.3))]
-    me, dense, wd, hd = ice_passage(path, [4.4, 3.8, 3.4], [3.6, 3.2, 3.0], 12.0, 0.8)
+    me, dense, wd, hd = ice_passage(path, [4.4, 3.8, 3.4], [3.6, 3.2, 3.0], 12.0, 0.5)
     s.add(me, None, "main")
     # glacier front around the mouth: big scalloped ice slabs rising into the slope
     for k in range(9):
@@ -216,7 +218,9 @@ def build_entrance():
     # the note weighted with a stone at the mouth
     s.add(box(0.21, 0.3, 0.004, "decal", flags=P.F_NOAO), T(-1.2, -4.2, G.h(-1.2, -4.2) + 0.02) @ RZ(20), "detail")
     s.add(P.blob((0, 0, 0), (0.12, 0.1, 0.07), "rock", 6, 0.3, 2.0, rings=3), T(-1.15, -4.15, G.h(-1.2, -4.2) + 0.05), "detail")
-    for a, b, w, h in zip(dense, dense[1:], wd, hd):
+    for a, b, w, h in zip(dense[::3], dense[3::3] + [dense[-1]], wd[::3], hd[::3]):
+        if (b - a).length < 0.2:
+            continue
         d = b - a
         L = d.length
         c = (a + b) / 2

@@ -5,7 +5,7 @@
   "id": "ashford_mine",
   "lights": 0,
   "markers": 11,
-  "secs": 2.0,
+  "secs": 2.1,
   "surfaces": {
    "detail": 6,
    "ground": 1,
@@ -26,7 +26,7 @@
   "id": "ashford_mine_interior",
   "lights": 2,
   "markers": 17,
-  "secs": 2.0,
+  "secs": 1.8,
   "surfaces": {
    "detail": 2,
    "main": 15
@@ -35,6 +35,33 @@
   "tris": {
    "detail": 448,
    "main": 16346
+  }
+ },
+ "ashford_tunnel_kit": {
+  "cols": 0,
+  "glb_kb": 420,
+  "id": "ashford_tunnel_kit",
+  "lights": 0,
+  "markers": 1,
+  "secs": 0.4,
+  "surfaces": {
+   "kit_bend": 3,
+   "kit_dead_end": 1,
+   "kit_junction": 1,
+   "kit_raise": 5,
+   "kit_stope": 3,
+   "kit_straight": 5,
+   "kit_straight_rock": 3
+  },
+  "total": 4764,
+  "tris": {
+   "kit_bend": 552,
+   "kit_dead_end": 780,
+   "kit_junction": 320,
+   "kit_raise": 1596,
+   "kit_stope": 396,
+   "kit_straight": 752,
+   "kit_straight_rock": 368
   }
  },
  "crash_site": {
@@ -95,37 +122,37 @@
   }
  },
  "ice_cave": {
-  "cols": 165,
-  "glb_kb": 378,
+  "cols": 97,
+  "glb_kb": 632,
   "id": "ice_cave",
   "lights": 2,
   "markers": 6,
-  "secs": 0.4,
+  "secs": 0.8,
   "surfaces": {
    "detail": 3,
    "main": 8
   },
-  "total": 4280,
+  "total": 7264,
   "tris": {
    "detail": 1318,
-   "main": 2962
+   "main": 5946
   }
  },
  "ice_cave_entrance": {
-  "cols": 45,
-  "glb_kb": 291,
+  "cols": 29,
+  "glb_kb": 349,
   "id": "ice_cave_entrance",
   "lights": 0,
   "markers": 4,
-  "secs": 0.4,
+  "secs": 0.7,
   "surfaces": {
    "detail": 2,
    "main": 4
   },
-  "total": 3744,
+  "total": 4444,
   "tris": {
    "detail": 48,
-   "main": 3696
+   "main": 4396
   }
  },
  "kestrel_station": {

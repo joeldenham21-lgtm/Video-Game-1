@@ -1,0 +1,44 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/poi/ashford_tunnel_kit.glb" id="1"]
+[ext_resource type="Script" path="res://scenes/poi/poi_site.gd" id="2"]
+
+[node name="ashford_tunnel_kit" instance=ExtResource("1")]
+script = ExtResource("2")
+poi_id = &"ashford_tunnel_kit"
+interior = true
+lit_materials = PackedStringArray()
+interior_lights_on = false
+
+[node name="kit_straight" parent="."]
+visibility_range_end = 220
+visibility_range_end_margin = 17.6
+
+[node name="kit_straight_rock" parent="."]
+visibility_range_end = 220
+visibility_range_end_margin = 17.6
+
+[node name="kit_bend" parent="."]
+visibility_range_end = 220
+visibility_range_end_margin = 17.6
+
+[node name="kit_junction" parent="."]
+visibility_range_end = 220
+visibility_range_end_margin = 17.6
+
+[node name="kit_dead_end" parent="."]
+visibility_range_end = 220
+visibility_range_end_margin = 17.6
+
+[node name="kit_stope" parent="."]
+visibility_range_end = 220
+visibility_range_end_margin = 17.6
+
+[node name="kit_raise" parent="."]
+visibility_range_end = 220
+visibility_range_end_margin = 17.6
+
+[node name="Sockets" type="Node3D" parent="."]
+
+[node name="Arrive_KitPreview" type="Marker3D" parent="Sockets"]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 8, 0, -36)
