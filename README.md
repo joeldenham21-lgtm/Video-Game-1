@@ -1,3 +1,12 @@
+# 🏔️ THIN AIR — mountain survival (Godot 4.7)
+
+**New:** [`thin-air/`](thin-air/) holds **THIN AIR**, a realistic first-person survival game for the Galaxy S25 Ultra
+(Android) and Windows laptops, built with Godot, Blender and in-house generators: *Subnautica in the mountains, with
+Sons of the Forest's survival*. Download the latest build from the repository's **Releases** page (`thin-air-preview`),
+and read [`thin-air/README.md`](thin-air/README.md) for install instructions, controls and how it was made.
+
+---
+
 # ⚔️ ELDERFALL — A Tale of Emberhollow
 
 An **open-world, first-person fantasy RPG that runs in your phone's browser**. No install, no app store — just open the link and play. Inspired by Skyrim, The Witcher 3, and Middle-earth.
