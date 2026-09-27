@@ -1,0 +1,1724 @@
+{
+ "_doc": "THIN AIR story graph (DESIGN.md §2), read by src/autoload/story.gd through src/story/story_graph.gd. objectives: {id, act, text, poi?, requires: [objective ids that must be done before it is added], trigger?: condition that must also hold before it is added, complete: condition, on_start/on_complete: [actions], hint?: {voice, text, after (s)}, autosave?}. Conditions: {type: item|poi|event|use|flag|crafted|log|scan|time|dawn|altitude|near|insulation|objective, ...} or {all:[...]}, {any:[...]}. Actions: {do: voice|voice3d|stinger|music|flag|weather|notify|give|log|blueprint_flag|event|sequence|reveal|act, ...}. beats: one-shot reactions {id, when, do, radio?}. hints: contextual radio hints {id (voice line), when, cooldown_h, max}. uses: interactables placed by scenes/poi/structures.gd at a site socket (or a local 'at' position) that call Story.use_socket(). scans: extra scannables.",
+ "acts": {
+  "0": {
+   "name": "Prologue",
+   "music": "silence"
+  },
+  "1": {
+   "name": "The Crash",
+   "music": "explore"
+  },
+  "2": {
+   "name": "Hollow Creek",
+   "music": "explore"
+  },
+  "3": {
+   "name": "Ashford Mine",
+   "music": "explore"
+  },
+  "4": {
+   "name": "Above the Trees",
+   "music": "explore"
+  },
+  "5": {
+   "name": "Kestrel Station",
+   "music": "explore"
+  },
+  "6": {
+   "name": "The Summit",
+   "music": "explore"
+  }
+ },
+ "pois": {
+  "crash_site": {
+   "radius": 40
+  },
+  "loon_lake": {
+   "radius": 200
+  },
+  "ranger_cabin": {
+   "radius": 35
+  },
+  "fire_lookout": {
+   "radius": 35
+  },
+  "ashford_mine": {
+   "radius": 60
+  },
+  "trapper_cabin": {
+   "radius": 30
+  },
+  "owens_bivouac": {
+   "radius": 30
+  },
+  "glacier_camp": {
+   "radius": 35
+  },
+  "icefall": {
+   "radius": 110
+  },
+  "ice_cave": {
+   "radius": 35
+  },
+  "kestrel_station": {
+   "radius": 70,
+   "music": "station"
+  },
+  "summit": {
+   "radius": 45,
+   "music": "summit"
+  }
+ },
+ "interiors": {
+  "ashford_mine_interior": {
+   "reverb": "cave",
+   "music": "silence"
+  },
+  "ice_cave": {
+   "reverb": "cave",
+   "music": "silence"
+  }
+ },
+ "objectives": [
+  {
+   "id": "gather_firewood",
+   "act": 1,
+   "text": "Gather sticks and stones for a fire (5 sticks, 6 stones)",
+   "poi": "crash_site",
+   "requires": [],
+   "complete": {
+    "any": [
+     {
+      "all": [
+       {
+        "type": "item",
+        "id": "stick",
+        "count": 5,
+        "held": true
+       },
+       {
+        "type": "item",
+        "id": "stone",
+        "count": 6,
+        "held": true
+       }
+      ]
+     },
+     {
+      "type": "crafted",
+      "id": "campfire"
+     },
+     {
+      "type": "event",
+      "id": "campfire_lit"
+     }
+    ]
+   },
+   "hint": {
+    "text": "Dead sticks lie under the spruces at the meadow's edge. Stones line the creek bank.",
+    "after": 150
+   }
+  },
+  {
+   "id": "build_campfire",
+   "act": 1,
+   "text": "Get warm: build a campfire (Build menu) and light it",
+   "poi": "crash_site",
+   "requires": [
+    "gather_firewood"
+   ],
+   "complete": {
+    "type": "event",
+    "id": "campfire_lit"
+   },
+   "on_complete": [
+    {
+     "do": "stinger",
+     "id": "objective"
+    }
+   ],
+   "hint": {
+    "text": "Open the build menu, place the campfire, feed it sticks, then light it. The cargo hold had matches.",
+    "after": 120
+   }
+  },
+  {
+   "id": "salvage_wreck",
+   "act": 1,
+   "text": "Salvage the wreck: first-aid kit, flare gun, survival manual, blanket, hatchet, backpack, scanner",
+   "poi": "crash_site",
+   "requires": [],
+   "complete": {
+    "all": [
+     {
+      "type": "item",
+      "id": "first_aid_kit"
+     },
+     {
+      "type": "item",
+      "id": "flare_gun"
+     },
+     {
+      "type": "item",
+      "id": "survival_manual"
+     },
+     {
+      "type": "item",
+      "id": "emergency_blanket"
+     },
+     {
+      "type": "item",
+      "id": "hatchet"
+     },
+     {
+      "type": "item",
+      "id": "backpack_torn"
+     },
+     {
+      "type": "item",
+      "id": "survey_scanner"
+     }
+    ]
+   },
+   "progress": [
+    "first_aid_kit",
+    "flare_gun",
+    "survival_manual",
+    "emergency_blanket",
+    "hatchet",
+    "backpack_torn",
+    "survey_scanner"
+   ],
+   "hint": {
+    "text": "Check the cabin of the Otter, the cargo netting, and the trail of debris downhill of the wreck.",
+    "after": 300
+   }
+  },
+  {
+   "id": "read_manual",
+   "act": 1,
+   "text": "Read the survival manual",
+   "requires": [],
+   "trigger": {
+    "type": "item",
+    "id": "survival_manual"
+   },
+   "complete": {
+    "type": "event",
+    "id": "read_survival_manual"
+   },
+   "on_complete": [
+    {
+     "do": "notify",
+     "text": "The manual's fold-out map marks a ranger cabin on the east shore of Loon Lake.",
+     "kind": "info"
+    },
+    {
+     "do": "reveal",
+     "ids": [
+      "loon_lake",
+      "ranger_cabin"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "wreck_radio",
+   "act": 1,
+   "text": "Check the cockpit radio",
+   "poi": "crash_site",
+   "requires": [
+    "build_campfire"
+   ],
+   "complete": {
+    "type": "event",
+    "id": "beacon_heard"
+   },
+   "hint": {
+    "text": "The Otter's radio is still hissing. Listen to it in the cockpit.",
+    "after": 90
+   }
+  },
+  {
+   "id": "find_ranger_cabin",
+   "act": 1,
+   "text": "Follow the lake shore east to the ranger cabin on Loon Lake",
+   "poi": "ranger_cabin",
+   "requires": [
+    "wreck_radio"
+   ],
+   "complete": {
+    "type": "poi",
+    "id": "ranger_cabin"
+   },
+   "on_start": [
+    {
+     "do": "reveal",
+     "ids": [
+      "loon_lake",
+      "ranger_cabin"
+     ]
+    }
+   ],
+   "on_complete": [
+    {
+     "do": "act",
+     "id": 2
+    }
+   ],
+   "autosave": true,
+   "hint": {
+    "text": "Loon Lake lies east of the meadow. The cabin stands on its eastern shore.",
+    "after": 420
+   }
+  },
+  {
+   "id": "cabin_radio",
+   "act": 2,
+   "text": "Find the ranger's radio (channel 6)",
+   "poi": "ranger_cabin",
+   "requires": [
+    "find_ranger_cabin"
+   ],
+   "complete": {
+    "type": "item",
+    "id": "radio_handheld"
+   },
+   "on_complete": [
+    {
+     "do": "flag",
+     "id": "has_radio"
+    },
+    {
+     "do": "voice",
+     "id": "mara_contact_1"
+    },
+    {
+     "do": "voice",
+     "id": "mara_contact_2"
+    },
+    {
+     "do": "voice",
+     "id": "mara_contact_3",
+     "then": "mara_contact_done"
+    }
+   ],
+   "hint": {
+    "text": "The handheld radio sits on its charger by the desk.",
+    "after": 120
+   }
+  },
+  {
+   "id": "take_bow",
+   "act": 2,
+   "text": "Take the bow from the cabin",
+   "poi": "ranger_cabin",
+   "requires": [
+    "cabin_radio"
+   ],
+   "trigger": {
+    "type": "event",
+    "id": "mara_contact_done"
+   },
+   "complete": {
+    "type": "item",
+    "id": "bow"
+   }
+  },
+  {
+   "id": "go_to_mine",
+   "act": 2,
+   "text": "Reach Ashford Mine: lake shore east to the creek, then the old mine road up the north bank",
+   "poi": "ashford_mine",
+   "requires": [
+    "cabin_radio"
+   ],
+   "trigger": {
+    "type": "event",
+    "id": "mara_contact_done"
+   },
+   "on_start": [
+    {
+     "do": "reveal",
+     "ids": [
+      "ashford_mine"
+     ]
+    }
+   ],
+   "complete": {
+    "type": "poi",
+    "id": "ashford_mine"
+   },
+   "on_complete": [
+    {
+     "do": "act",
+     "id": 3
+    },
+    {
+     "do": "voice",
+     "id": "mara_mine_arrive"
+    }
+   ],
+   "autosave": true,
+   "hint": {
+    "voice": "hint_food",
+    "text": "Follow the creek east of the lake and climb the old mine road on its north bank.",
+    "after": 600
+   }
+  },
+  {
+   "id": "enter_adit",
+   "act": 3,
+   "text": "Find the adit behind the bunkhouse",
+   "poi": "ashford_mine",
+   "requires": [
+    "go_to_mine"
+   ],
+   "complete": {
+    "type": "event",
+    "id": "enter_ashford_mine_interior"
+   },
+   "on_complete": [
+    {
+     "do": "voice",
+     "id": "mara_mine_inside"
+    }
+   ]
+  },
+  {
+   "id": "find_depot",
+   "act": 3,
+   "text": "Find Owen's depot: first crosscut on the left, orange paint on the timbers",
+   "requires": [
+    "enter_adit"
+   ],
+   "complete": {
+    "any": [
+     {
+      "type": "event",
+      "id": "depot_locked_seen"
+     },
+     {
+      "type": "event",
+      "id": "depot_opened"
+     }
+    ]
+   }
+  },
+  {
+   "id": "find_owen",
+   "act": 3,
+   "text": "The depot is padlocked. Find Owen: he carried the key",
+   "requires": [
+    "find_depot"
+   ],
+   "trigger": {
+    "type": "event",
+    "id": "depot_locked_seen"
+   },
+   "complete": {
+    "type": "item",
+    "id": "mine_key"
+   }
+  },
+  {
+   "id": "open_depot",
+   "act": 3,
+   "text": "Open Owen's depot",
+   "requires": [
+    "find_depot"
+   ],
+   "complete": {
+    "type": "event",
+    "id": "depot_opened"
+   },
+   "on_complete": [
+    {
+     "do": "flag",
+     "id": "depot_open"
+    },
+    {
+     "do": "flag",
+     "id": "owen_depot_found"
+    },
+    {
+     "do": "blueprint_flag",
+     "id": "owen_depot_found"
+    }
+   ]
+  },
+  {
+   "id": "take_gear",
+   "act": 3,
+   "text": "Take Owen's gear: ice axe, climbing rope and generator diesel",
+   "requires": [
+    "open_depot"
+   ],
+   "complete": {
+    "all": [
+     {
+      "type": "item",
+      "id": "ice_axe"
+     },
+     {
+      "type": "item",
+      "id": "climbing_rope"
+     },
+     {
+      "type": "item",
+      "id": "fuel_can",
+      "count": 2
+     }
+    ]
+   },
+   "on_complete": [
+    {
+     "do": "voice",
+     "id": "mara_depot_found"
+    },
+    {
+     "do": "act",
+     "id": 4
+    }
+   ],
+   "autosave": true
+  },
+  {
+   "id": "make_crampons",
+   "act": 4,
+   "text": "Make crampons at a workbench from Owen's pattern (scrap steel, rope, hide)",
+   "requires": [
+    "take_gear"
+   ],
+   "complete": {
+    "type": "item",
+    "id": "crampons"
+   },
+   "hint": {
+    "voice": "hint_scanner",
+    "text": "Owen left scrap steel and rope in the depot. A workbench needs logs; cured hide comes from a hunt or the trapper's cabin.",
+    "after": 900
+   }
+  },
+  {
+   "id": "dress_warm",
+   "act": 4,
+   "text": "Dress for the cold before the treeline (warm hat, parka or hide coat)",
+   "requires": [
+    "take_gear"
+   ],
+   "complete": {
+    "type": "insulation",
+    "min": 15
+   },
+   "hint": {
+    "voice": "hint_cold",
+    "text": "Owen's spare parka hung in the depot. The ranger kept a wool hat on the shelf.",
+    "after": 600
+   }
+  },
+  {
+   "id": "reach_icefall",
+   "act": 4,
+   "text": "Climb past the treeline and cross the moraine to the foot of the Corrigan Icefall",
+   "poi": "icefall",
+   "requires": [
+    "make_crampons",
+    "dress_warm"
+   ],
+   "on_start": [
+    {
+     "do": "reveal",
+     "ids": [
+      "owens_bivouac",
+      "glacier_camp",
+      "icefall"
+     ]
+    }
+   ],
+   "complete": {
+    "type": "poi",
+    "id": "icefall"
+   },
+   "hint": {
+    "voice": "hint_shelter",
+    "text": "Owen's bivouac marks the route above the trees; the glacier camp sits below the icefall.",
+    "after": 900
+   }
+  },
+  {
+   "id": "climb_icefall",
+   "act": 4,
+   "text": "Climb the icefall with crampons and ice axe",
+   "poi": "kestrel_station",
+   "requires": [
+    "reach_icefall"
+   ],
+   "complete": {
+    "any": [
+     {
+      "type": "altitude",
+      "min": 2850
+     },
+     {
+      "type": "poi",
+      "id": "kestrel_station"
+     }
+    ]
+   },
+   "on_complete": [
+    {
+     "do": "act",
+     "id": 5
+    }
+   ],
+   "autosave": true
+  },
+  {
+   "id": "reach_station",
+   "act": 5,
+   "text": "Reach Kestrel Station on the col",
+   "poi": "kestrel_station",
+   "requires": [
+    "climb_icefall"
+   ],
+   "on_start": [
+    {
+     "do": "reveal",
+     "ids": [
+      "kestrel_station"
+     ]
+    }
+   ],
+   "complete": {
+    "type": "poi",
+    "id": "kestrel_station"
+   }
+  },
+  {
+   "id": "find_mara",
+   "act": 5,
+   "text": "Find Mara: east module, the door with the red handle",
+   "poi": "kestrel_station",
+   "requires": [
+    "reach_station"
+   ],
+   "complete": {
+    "type": "use",
+    "id": "kestrel_station/Npc_Mara"
+   },
+   "on_complete": [
+    {
+     "do": "voice3d",
+     "id": "mara_station_meet",
+     "at": "kestrel_station/Npc_Mara"
+    },
+    {
+     "do": "voice3d",
+     "id": "mara_generator",
+     "at": "kestrel_station/Npc_Mara"
+    },
+    {
+     "do": "log",
+     "id": "log_voss_03"
+    },
+    {
+     "do": "log",
+     "id": "log_voss_04"
+    },
+    {
+     "do": "flag",
+     "id": "met_mara"
+    }
+   ],
+   "autosave": true
+  },
+  {
+   "id": "fuel_generator",
+   "act": 5,
+   "text": "Pour diesel into the generator's day tank (2 jerrycans)",
+   "poi": "kestrel_station",
+   "requires": [
+    "find_mara"
+   ],
+   "complete": {
+    "type": "flag",
+    "id": "generator_fueled"
+   }
+  },
+  {
+   "id": "start_generator",
+   "act": 5,
+   "text": "Bleed the injector pump and start the generator",
+   "poi": "kestrel_station",
+   "requires": [
+    "fuel_generator"
+   ],
+   "complete": {
+    "type": "flag",
+    "id": "generator_running"
+   },
+   "on_complete": [
+    {
+     "do": "voice3d",
+     "id": "mara_generator_on",
+     "at": "kestrel_station/Npc_Mara"
+    },
+    {
+     "do": "voice3d",
+     "id": "mara_relay_explain",
+     "at": "kestrel_station/Npc_Mara",
+     "then": "relay_explained"
+    }
+   ]
+  },
+  {
+   "id": "relay_parts",
+   "act": 5,
+   "text": "Collect the spare transceiver module (stores, bin C-4) and the lithium battery pack",
+   "poi": "kestrel_station",
+   "requires": [
+    "start_generator"
+   ],
+   "trigger": {
+    "type": "event",
+    "id": "relay_explained"
+   },
+   "complete": {
+    "all": [
+     {
+      "type": "item",
+      "id": "transceiver_module"
+     },
+     {
+      "type": "item",
+      "id": "battery_pack"
+     }
+    ]
+   }
+  },
+  {
+   "id": "fill_oxygen",
+   "act": 5,
+   "text": "Charge oxygen cylinders at the concentrator (lab module)",
+   "poi": "kestrel_station",
+   "requires": [
+    "start_generator"
+   ],
+   "complete": {
+    "type": "item",
+    "id": "o2_bottle"
+   }
+  },
+  {
+   "id": "summit",
+   "act": 6,
+   "text": "Climb the east ridge to the summit relay",
+   "poi": "summit",
+   "requires": [
+    "relay_parts",
+    "fill_oxygen"
+   ],
+   "on_start": [
+    {
+     "do": "act",
+     "id": 6
+    },
+    {
+     "do": "voice3d",
+     "id": "mara_summit_depart",
+     "at": "kestrel_station/Npc_Mara"
+    },
+    {
+     "do": "reveal",
+     "ids": [
+      "summit"
+     ]
+    },
+    {
+     "do": "weather",
+     "id": "overcast",
+     "transition": 240
+    }
+   ],
+   "complete": {
+    "type": "poi",
+    "id": "summit"
+   },
+   "on_complete": [
+    {
+     "do": "voice",
+     "id": "mara_summit_storm"
+    },
+    {
+     "do": "weather",
+     "id": "snow",
+     "transition": 300,
+     "lock": true
+    }
+   ],
+   "autosave": true,
+   "hint": {
+    "voice": "hint_oxygen",
+    "text": "Wear the oxygen mask and carry the charged cylinders. The route follows the east ridge.",
+    "after": 900
+   }
+  },
+  {
+   "id": "find_hale",
+   "act": 6,
+   "text": "Find Elias Hale",
+   "poi": "summit",
+   "requires": [
+    "summit"
+   ],
+   "complete": {
+    "any": [
+     {
+      "type": "log",
+      "id": "log_hale_03"
+     },
+     {
+      "type": "log",
+      "id": "hale_notebook"
+     },
+     {
+      "type": "use",
+      "id": "summit_relay/Spot_HaleBody"
+     }
+    ]
+   }
+  },
+  {
+   "id": "repair_relay",
+   "act": 6,
+   "text": "Repair the relay: battery pack in the tray, then the new transceiver module",
+   "poi": "summit",
+   "requires": [
+    "summit"
+   ],
+   "complete": {
+    "type": "event",
+    "id": "relay_repaired"
+   },
+   "on_complete": [
+    {
+     "do": "voice",
+     "id": "mara_come_home"
+    }
+   ]
+  },
+  {
+   "id": "return_station",
+   "act": 6,
+   "text": "Get back to Kestrel Station before the storm closes in",
+   "poi": "kestrel_station",
+   "requires": [
+    "repair_relay"
+   ],
+   "on_start": [
+    {
+     "do": "weather",
+     "id": "blizzard",
+     "transition": 420,
+     "lock": true
+    },
+    {
+     "do": "music",
+     "state": "blizzard"
+    }
+   ],
+   "complete": {
+    "type": "near",
+    "poi": "kestrel_station",
+    "radius": 40
+   },
+   "on_complete": [
+    {
+     "do": "music",
+     "state": "station"
+    },
+    {
+     "do": "voice3d",
+     "id": "mara_last_night",
+     "at": "kestrel_station/Npc_Mara"
+    }
+   ],
+   "autosave": true
+  },
+  {
+   "id": "survive_night",
+   "act": 6,
+   "text": "Survive the night at the station (sleep in the bunk room or keep warm until dawn)",
+   "poi": "kestrel_station",
+   "requires": [
+    "return_station"
+   ],
+   "on_start": [
+    {
+     "do": "flag",
+     "id": "final_night"
+    },
+    {
+     "do": "sequence",
+     "id": "final_night"
+    }
+   ],
+   "complete": {
+    "any": [
+     {
+      "type": "dawn"
+     },
+     {
+      "type": "time",
+      "hours": 14
+     }
+    ]
+   }
+  },
+  {
+   "id": "rescue",
+   "act": 6,
+   "text": "Meet the rescue helicopter on the pad",
+   "poi": "kestrel_station",
+   "requires": [
+    "survive_night"
+   ],
+   "on_start": [
+    {
+     "do": "sequence",
+     "id": "rescue"
+    }
+   ],
+   "complete": {
+    "type": "event",
+    "id": "rescue_boarded"
+   },
+   "on_complete": [
+    {
+     "do": "sequence",
+     "id": "ending"
+    }
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "id": "wreck_beacon",
+   "when": {
+    "type": "use",
+    "id": "crash_site/Use_Radio"
+   },
+   "do": [
+    {
+     "do": "voice3d",
+     "id": "beacon_mara",
+     "at": "crash_site/Use_Radio"
+    },
+    {
+     "do": "voice3d",
+     "id": "beacon_live",
+     "at": "crash_site/Use_Radio",
+     "then": "beacon_heard"
+    }
+   ]
+  },
+  {
+   "id": "first_morning",
+   "when": {
+    "all": [
+     {
+      "type": "flag",
+      "id": "has_radio"
+     },
+     {
+      "type": "dawn"
+     }
+    ]
+   },
+   "do": [
+    {
+     "do": "voice",
+     "id": "mara_first_night_end"
+    }
+   ]
+  },
+  {
+   "id": "bear_warning",
+   "when": {
+    "type": "creature_near",
+    "species": "old_grey",
+    "radius": 70
+   },
+   "do": [
+    {
+     "do": "flag",
+     "id": "old_grey_seen"
+    },
+    {
+     "do": "music",
+     "state": "danger"
+    },
+    {
+     "do": "voice",
+     "id": "mara_bear_warning",
+     "radio": true
+    }
+   ]
+  },
+  {
+   "id": "grey_signs",
+   "when": {
+    "type": "event",
+    "id": "enter_ashford_mine_interior"
+   },
+   "do": [
+    {
+     "do": "notify",
+     "text": "Claw marks score the timbers at head height. The dust by the rails is torn up. Something big uses this adit.",
+     "kind": "warning"
+    }
+   ]
+  },
+  {
+   "id": "owen_found",
+   "when": {
+    "type": "use",
+    "id": "ashford_mine_interior/Spot_Owen"
+   },
+   "do": [
+    {
+     "do": "flag",
+     "id": "owen_found"
+    },
+    {
+     "do": "voice",
+     "id": "mara_owen_found",
+     "radio": true
+    }
+   ]
+  },
+  {
+   "id": "treeline",
+   "when": {
+    "all": [
+     {
+      "type": "flag",
+      "id": "has_radio"
+     },
+     {
+      "type": "altitude",
+      "min": 2150
+     }
+    ]
+   },
+   "do": [
+    {
+     "do": "voice",
+     "id": "mara_treeline"
+    }
+   ]
+  },
+  {
+   "id": "glacier",
+   "when": {
+    "all": [
+     {
+      "type": "flag",
+      "id": "has_radio"
+     },
+     {
+      "type": "altitude",
+      "min": 2450
+     }
+    ]
+   },
+   "do": [
+    {
+     "do": "voice",
+     "id": "mara_glacier"
+    }
+   ]
+  },
+  {
+   "id": "icefall_seen",
+   "when": {
+    "type": "poi",
+    "id": "icefall"
+   },
+   "do": [
+    {
+     "do": "voice",
+     "id": "mara_icefall",
+     "radio": true
+    }
+   ]
+  },
+  {
+   "id": "ice_cave_seen",
+   "when": {
+    "type": "poi",
+    "id": "ice_cave"
+   },
+   "do": [
+    {
+     "do": "voice",
+     "id": "mara_ice_cave",
+     "radio": true
+    }
+   ]
+  },
+  {
+   "id": "altitude",
+   "when": {
+    "all": [
+     {
+      "type": "flag",
+      "id": "has_radio"
+     },
+     {
+      "type": "altitude",
+      "min": 2800
+     }
+    ]
+   },
+   "do": [
+    {
+     "do": "voice",
+     "id": "mara_altitude"
+    }
+   ]
+  },
+  {
+   "id": "station_approach",
+   "when": {
+    "all": [
+     {
+      "type": "near",
+      "poi": "kestrel_station",
+      "radius": 190
+     },
+     {
+      "not": {
+       "type": "flag",
+       "id": "met_mara"
+      }
+     }
+    ]
+   },
+   "do": [
+    {
+     "do": "voice",
+     "id": "mara_station_approach",
+     "radio": true
+    }
+   ]
+  },
+  {
+   "id": "hale_body",
+   "when": {
+    "type": "near",
+    "socket": "summit_relay/Spot_HaleBody",
+    "radius": 7
+   },
+   "do": [
+    {
+     "do": "voice",
+     "id": "mara_hale_found",
+     "radio": true
+    }
+   ]
+  },
+  {
+   "id": "relay_guide",
+   "when": {
+    "type": "near",
+    "socket": "summit_relay/Use_Relay",
+    "radius": 9
+   },
+   "do": [
+    {
+     "do": "voice",
+     "id": "mara_relay_guide",
+     "radio": true
+    }
+   ]
+  },
+  {
+   "id": "elias_story",
+   "when": {
+    "all": [
+     {
+      "type": "objective",
+      "id": "fill_oxygen"
+     },
+     {
+      "type": "near",
+      "socket": "kestrel_station/Npc_Mara",
+      "radius": 5
+     }
+    ]
+   },
+   "do": [
+    {
+     "do": "voice3d",
+     "id": "mara_about_elias",
+     "at": "kestrel_station/Npc_Mara"
+    }
+   ]
+  }
+ ],
+ "hints": [
+  {
+   "id": "mara_night",
+   "when": {
+    "all": [
+     {
+      "type": "hour_between",
+      "from": 17.0,
+      "to": 18.3
+     },
+     {
+      "type": "altitude",
+      "max": 2900
+     }
+    ]
+   },
+   "cooldown_h": 20,
+   "max": 2
+  },
+  {
+   "id": "hint_cold",
+   "when": {
+    "type": "vital_below",
+    "vital": "warmth",
+    "value": 35
+   },
+   "cooldown_h": 10,
+   "max": 3
+  },
+  {
+   "id": "hint_fire",
+   "when": {
+    "all": [
+     {
+      "type": "vital_below",
+      "vital": "warmth",
+      "value": 45
+     },
+     {
+      "type": "hour_between",
+      "from": 18.0,
+      "to": 6.0
+     }
+    ]
+   },
+   "cooldown_h": 16,
+   "max": 2
+  },
+  {
+   "id": "hint_water",
+   "when": {
+    "type": "vital_below",
+    "vital": "water",
+    "value": 30
+   },
+   "cooldown_h": 12,
+   "max": 3
+  },
+  {
+   "id": "hint_food",
+   "when": {
+    "type": "vital_below",
+    "vital": "food",
+    "value": 28
+   },
+   "cooldown_h": 12,
+   "max": 3
+  },
+  {
+   "id": "hint_shelter",
+   "when": {
+    "all": [
+     {
+      "type": "weather",
+      "ids": [
+       "snow",
+       "blizzard"
+      ]
+     },
+     {
+      "type": "vital_below",
+      "vital": "warmth",
+      "value": 50
+     }
+    ]
+   },
+   "cooldown_h": 12,
+   "max": 2
+  },
+  {
+   "id": "hint_wolves",
+   "when": {
+    "type": "creature_near",
+    "species": "wolf",
+    "radius": 45
+   },
+   "cooldown_h": 8,
+   "max": 3
+  },
+  {
+   "id": "hint_scanner",
+   "when": {
+    "type": "item",
+    "id": "survey_scanner"
+   },
+   "cooldown_h": 999,
+   "max": 1
+  },
+  {
+   "id": "hint_oxygen",
+   "when": {
+    "type": "vital_below",
+    "vital": "oxygen",
+    "value": 70
+   },
+   "cooldown_h": 6,
+   "max": 3
+  },
+  {
+   "id": "hint_storm",
+   "when": {
+    "type": "weather",
+    "ids": [
+     "blizzard"
+    ]
+   },
+   "cooldown_h": 24,
+   "max": 2
+  }
+ ],
+ "uses": {
+  "crash_site/Use_Radio": {
+   "prompt": "Listen to the cockpit radio",
+   "hold": 0.4,
+   "repeat": true,
+   "size": [
+    0.6,
+    0.5,
+    0.5
+   ]
+  },
+  "ranger_cabin/Use_Radio": {
+   "prompt": "Try the base radio",
+   "repeat": true,
+   "text": "The base set's battery is flat. The handheld on the charger beside it still shows a charge."
+  },
+  "ranger_cabin/Use_Stove": {
+   "prompt": "Light the wood stove (3 sticks)",
+   "kind": "stove",
+   "requires": {
+    "stick": 3
+   },
+   "consume": {
+    "stick": 3
+   },
+   "repeat": true,
+   "heat_hours": 8
+  },
+  "ranger_cabin/Use_Lantern": {
+   "prompt": "Light the lantern",
+   "kind": "lights",
+   "repeat": true
+  },
+  "ranger_cabin/Use_Bed": {
+   "prompt": "Sleep in the ranger's bunk",
+   "kind": "bed",
+   "repeat": true,
+   "size": [
+    1.8,
+    0.6,
+    0.9
+   ]
+  },
+  "trapper_cabin/Use_Stove": {
+   "prompt": "Light the stove (3 sticks)",
+   "kind": "stove",
+   "requires": {
+    "stick": 3
+   },
+   "consume": {
+    "stick": 3
+   },
+   "repeat": true,
+   "heat_hours": 8,
+   "add_heat": true
+  },
+  "fire_lookout/Use_FireFinder": {
+   "prompt": "Take bearings with the fire finder",
+   "hold": 0.8,
+   "reveal": [
+    "ashford_mine",
+    "trapper_cabin",
+    "loon_lake",
+    "ranger_cabin",
+    "kestrel_station",
+    "summit"
+   ],
+   "text": "Through the sights: the Ashford headframe on the east flank, a trapper's roof in the western timber, and far up on the col, the Kestrel Station mast."
+  },
+  "fire_lookout/Use_Bed": {
+   "prompt": "Sleep in the lookout cot",
+   "kind": "bed",
+   "repeat": true,
+   "size": [
+    1.8,
+    0.6,
+    0.9
+   ]
+  },
+  "ashford_mine_interior/Use_Depot": {
+   "prompt": "Open Owen's depot locker",
+   "at": [
+    -30.3,
+    0.9,
+    15.3
+   ],
+   "hold": 0.8,
+   "size": [
+    1.4,
+    1.6,
+    1.4
+   ],
+   "kind": "depot",
+   "requires": {
+    "mine_key": 1
+   },
+   "locked_prompt": "Owen's depot locker (padlocked)",
+   "locked_event": "depot_locked_seen",
+   "locked_text": "A heavy padlock on the locker. Owen would have carried the key.",
+   "event": "depot_opened",
+   "flag": "depot_open",
+   "blueprint_flag": "owen_depot_found",
+   "sfx": "door_open_metal"
+  },
+  "ashford_mine_interior/Spot_Owen": {
+   "prompt": "Search Owen's jacket",
+   "hold": 1.2,
+   "give": {
+    "mine_key": 1
+   },
+   "size": [
+    1.6,
+    0.6,
+    0.9
+   ],
+   "text": "Owen Burke. The bear found him before the cold did. His jacket pocket holds a key on an orange tag: DEPOT."
+  },
+  "ashford_mine_interior/Use_Ladder_Raise": {
+   "prompt": "Climb the raise ladder",
+   "repeat": true,
+   "text": "The rungs are rotten through. Nobody has climbed this raise since 1935."
+  },
+  "glacier_camp/Use_Snowmobile": {
+   "prompt": "Check the snowmobile",
+   "repeat": true,
+   "text": "The track is shattered and the tank is dry. It isn't going anywhere."
+  },
+  "glacier_camp/Use_GPS": {
+   "prompt": "Read the survey GPS",
+   "hold": 0.6,
+   "reveal": [
+    "ice_cave",
+    "icefall",
+    "kestrel_station"
+   ],
+   "text": "The GPS still holds the survey waypoints: the icefall route, an ice cave on its east side, and Kestrel Station."
+  },
+  "owens_bivouac/Use_Tent": {
+   "prompt": "Rest in Owen's tent",
+   "kind": "bed",
+   "repeat": true,
+   "size": [
+    1.6,
+    0.8,
+    1.2
+   ]
+  },
+  "kestrel_station/Npc_Mara": {
+   "prompt": "Talk to Mara",
+   "kind": "mara",
+   "repeat": true,
+   "size": [
+    1.2,
+    1.4,
+    1.2
+   ]
+  },
+  "kestrel_station/Use_Fuel_Tank": {
+   "prompt": "Pour diesel into the day tank (2 jerrycans)",
+   "hold": 2.0,
+   "requires": {
+    "fuel_can": 2
+   },
+   "consume": {
+    "fuel_can": 2
+   },
+   "locked_prompt": "Generator day tank (needs 2 jerrycans of diesel)",
+   "flag": "generator_fueled",
+   "sfx": "splash"
+  },
+  "kestrel_station/Use_Generator": {
+   "prompt": "Bleed the injector pump and crank the generator",
+   "hold": 2.5,
+   "requires_flag": "generator_fueled",
+   "locked_prompt": "Generator (the day tank is dry)",
+   "event": "generator_start",
+   "sequence": "generator_on"
+  },
+  "kestrel_station/Use_O2Concentrator": {
+   "prompt": "Charge empty oxygen cylinders",
+   "hold": 1.2,
+   "kind": "o2_fill",
+   "requires_flag": "station_power",
+   "locked_prompt": "Oxygen concentrator (no power)",
+   "repeat": true,
+   "sfx": "o2_hiss"
+  },
+  "kestrel_station/Use_O2Rack": {
+   "prompt": "Take two charged cylinders and a mask",
+   "hold": 0.6,
+   "requires_flag": "station_power",
+   "locked_prompt": "Oxygen rack (the cylinders are empty; no power)",
+   "give": {
+    "o2_bottle": 2,
+    "o2_mask": 1
+   }
+  },
+  "kestrel_station/Use_Radio": {
+   "prompt": "Listen to the station radio",
+   "repeat": true,
+   "text": "Mara's handset is tuned here. The satellite side is dead: the relay is down."
+  },
+  "kestrel_station/Use_CommsRack": {
+   "prompt": "Read the relay link diagnostics",
+   "hold": 0.8,
+   "flag": "relay_inspected",
+   "blueprint_flag": "relay_inspected",
+   "text": "LINK DOWN. Carrier lost 04:12. Transceiver not responding. Not ice: the module itself failed."
+  },
+  "kestrel_station/Use_Bunk": {
+   "prompt": "Sleep in a bunk",
+   "at": [
+    9.6,
+    2.85,
+    -2.8
+   ],
+   "kind": "bed",
+   "repeat": true,
+   "size": [
+    1.8,
+    0.6,
+    0.9
+   ]
+  },
+  "summit_relay/Use_BatteryBox": {
+   "prompt": "Install the battery pack (red to red)",
+   "hold": 2.0,
+   "requires": {
+    "battery_pack": 1
+   },
+   "consume": {
+    "battery_pack": 1
+   },
+   "locked_prompt": "Relay battery tray (needs the lithium battery pack)",
+   "flag": "relay_battery",
+   "event": "relay_battery_installed",
+   "sfx": "build_hammer"
+  },
+  "summit_relay/Use_Relay": {
+   "prompt": "Swap the transceiver module",
+   "hold": 3.0,
+   "requires": {
+    "transceiver_module": 1
+   },
+   "requires_flag": "relay_battery",
+   "consume": {
+    "transceiver_module": 1
+   },
+   "locked_prompt": "Relay transceiver (install the battery pack first, then the new module)",
+   "locked_flag": "relay_inspected",
+   "sequence": "relay_repair",
+   "sfx": "metal_creak"
+  },
+  "summit_relay/Use_Antenna": {
+   "prompt": "Inspect the antenna",
+   "repeat": true,
+   "text": "Rime on the feed horn, but the dish and cable are sound. Hale was wrong about the ice."
+  },
+  "summit_relay/Use_Door_Hut": {
+   "prompt": "Try the relay hut door",
+   "repeat": true,
+   "text": "Frozen shut, rime a hand thick. The equipment tray is outside, in the lee."
+  },
+  "summit_relay/Spot_HaleBody": {
+   "prompt": "Kneel by Elias Hale",
+   "hold": 1.0,
+   "size": [
+    1.6,
+    0.6,
+    1.0
+   ],
+   "text": "Dr. Elias Hale sits in the lee of the hut, hood up, as if waiting out the weather."
+  }
+ },
+ "scans": {
+  "crash_site/Scan_Engine": {
+   "id": "otter_engine",
+   "name": "Otter engine cowling",
+   "unlocks": [
+    "cooking_pot_scrap"
+   ]
+  },
+  "crash_site/Scan_Wing": {
+   "id": "otter_wing",
+   "name": "Otter wing panel",
+   "unlocks": [
+    "snow_melter"
+   ]
+  },
+  "ashford_mine/Scan_Headframe": {
+   "id": "ashford_headframe",
+   "name": "Ashford headframe",
+   "unlocks": [
+    "rope_ladder"
+   ]
+  },
+  "ashford_mine/Scan_Boiler": {
+   "id": "ashford_boiler",
+   "name": "Hoist boiler",
+   "unlocks": [
+    "charcoal"
+   ]
+  },
+  "ashford_mine_interior/Loot_Crampons": {
+   "id": "crampon_diagram",
+   "name": "Owen's crampon pattern",
+   "offset": [
+    0.0,
+    0.25,
+    -0.35
+   ],
+   "size": [
+    0.5,
+    0.4,
+    0.3
+   ]
+  },
+  "ashford_mine_interior/Loot_IceAxe": {
+   "id": "owen_depot",
+   "name": "Owen's mountaineering depot",
+   "offset": [
+    0.0,
+    0.2,
+    -0.7
+   ],
+   "size": [
+    1.4,
+    1.2,
+    0.6
+   ]
+  },
+  "fire_lookout/Scan_FireFinder": {
+   "id": "osborne_firefinder",
+   "name": "Osborne fire finder"
+  },
+  "kestrel_station/Use_Generator": {
+   "id": "kubota_generator",
+   "name": "Kubota 6 kW generator"
+  },
+  "kestrel_station/Use_CommsRack": {
+   "id": "kestrel_comms_rack",
+   "name": "Relay comms rack",
+   "unlocks": [
+    "battery_pack"
+   ]
+  },
+  "kestrel_station/Use_O2Concentrator": {
+   "id": "o2_concentrator",
+   "name": "Oxygen concentrator"
+  },
+  "summit_relay/Use_Antenna": {
+   "id": "summit_relay",
+   "name": "Summit satellite relay"
+  }
+ },
+ "mara_talk": [
+  {
+   "when": {
+    "not": {
+     "type": "flag",
+     "id": "generator_running"
+    }
+   },
+   "lines": [
+    "mara_generator"
+   ]
+  },
+  {
+   "when": {
+    "not": {
+     "type": "event",
+     "id": "relay_explained"
+    }
+   },
+   "lines": [
+    "mara_generator_on"
+   ]
+  },
+  {
+   "when": {
+    "not": {
+     "type": "objective",
+     "id": "relay_parts"
+    }
+   },
+   "lines": [
+    "mara_relay_explain"
+   ]
+  },
+  {
+   "when": {
+    "not": {
+     "type": "objective",
+     "id": "summit"
+    }
+   },
+   "lines": [
+    "mara_about_elias",
+    "mara_summit_depart"
+   ]
+  },
+  {
+   "when": {
+    "not": {
+     "type": "objective",
+     "id": "survive_night"
+    }
+   },
+   "lines": [
+    "mara_last_night"
+   ]
+  },
+  {
+   "when": {
+    "type": "flag",
+    "id": "game_complete"
+   },
+   "lines": [
+    "mara_ending"
+   ]
+  }
+ ]
+}

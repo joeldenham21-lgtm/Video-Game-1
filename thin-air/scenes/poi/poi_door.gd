@@ -33,6 +33,11 @@ func interact(player: Node) -> void:
 	var st := get_tree().get_first_node_in_group(&"poi_structures")
 	if st == null or not st.has_method(&"get_socket"):
 		return
+	# Story stream hook: faded transition + interior reverb/music + Story "enter_<site>" event
+	if st.has_method(&"travel"):
+		Audio.play_sfx(&"door_open", global_position)
+		st.call(&"travel", player, target_site, target_socket)
+		return
 	var m := st.call(&"get_socket", target_site, target_socket) as Marker3D
 	if m == null:
 		return

@@ -142,6 +142,9 @@ func _save_line() -> String:
 		var digits := loc.to_int()
 		parts.append(UITheme.metres(digits) if digits > 0 else loc)
 	parts.append("%s played" % UITheme.duration(float(info.get("playtime", 0.0))))
+	# Story stream hook: a finished story continues as free roam
+	if Story.has_method(&"save_is_complete") and Story.save_is_complete(0):
+		parts.append("Story complete: free roam")
 	return "  ·  ".join(parts)
 
 

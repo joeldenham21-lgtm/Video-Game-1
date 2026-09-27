@@ -1,0 +1,109 @@
+{
+ "_doc": "World loot placed by scenes/poi/structures.gd at the Loot_* sockets of each story location (src/story/loot_tables.gd). sites.<scene id>.<socket> = list of entries: {item, count} fixed (quest items and set dressing always at the same spot) or {table, rolls} random consumables (seeded per site+socket, so the same world always rolls the same loot). Optional per entry: requires_flag (spawned only once that Game flag is true, e.g. Owen's padlocked depot), offset [x,y,z] in socket space. Each pickup is frozen world loot with a stable persist_id, so ItemsRoot remembers it as collected across saves. tables.<name> = [{id, w (weight), min, max}].",
+ "tables": {
+  "wreck_cargo": [
+   {"id": "ration_bar", "w": 3, "min": 1, "max": 2}, {"id": "canned_beans", "w": 2, "min": 1, "max": 1}, {"id": "coffee", "w": 1, "min": 1, "max": 1},
+   {"id": "duct_tape", "w": 2, "min": 1, "max": 1}, {"id": "wire", "w": 2, "min": 1, "max": 3}, {"id": "electronics", "w": 1, "min": 1, "max": 1},
+   {"id": "battery", "w": 2, "min": 1, "max": 2}, {"id": "cloth", "w": 2, "min": 1, "max": 2}, {"id": "bandage", "w": 2, "min": 1, "max": 2},
+   {"id": "flare", "w": 1, "min": 1, "max": 1}, {"id": "painkillers", "w": 1, "min": 1, "max": 1}, {"id": "scrap_metal", "w": 2, "min": 1, "max": 2}
+  ],
+  "cabin_food": [
+   {"id": "canned_beans", "w": 3, "min": 1, "max": 2}, {"id": "coffee", "w": 2, "min": 1, "max": 1}, {"id": "ration_bar", "w": 1, "min": 1, "max": 1},
+   {"id": "matches", "w": 1, "min": 1, "max": 1}, {"id": "bottle_empty", "w": 1, "min": 1, "max": 1}
+  ],
+  "cabin_supplies": [
+   {"id": "bandage", "w": 2, "min": 1, "max": 2}, {"id": "matches", "w": 2, "min": 1, "max": 1}, {"id": "rope", "w": 2, "min": 1, "max": 1},
+   {"id": "nails", "w": 2, "min": 2, "max": 6}, {"id": "duct_tape", "w": 1, "min": 1, "max": 1}, {"id": "cloth", "w": 2, "min": 1, "max": 2},
+   {"id": "arrow", "w": 1, "min": 2, "max": 4}, {"id": "painkillers", "w": 1, "min": 1, "max": 1}
+  ],
+  "mine_scrap": [
+   {"id": "scrap_metal", "w": 3, "min": 1, "max": 3}, {"id": "nails", "w": 3, "min": 2, "max": 8}, {"id": "rope", "w": 1, "min": 1, "max": 1},
+   {"id": "wire", "w": 1, "min": 1, "max": 2}, {"id": "charcoal", "w": 1, "min": 1, "max": 3}
+  ],
+  "alpine_supplies": [
+   {"id": "ration_bar", "w": 3, "min": 1, "max": 2}, {"id": "coffee", "w": 2, "min": 1, "max": 1}, {"id": "canned_beans", "w": 1, "min": 1, "max": 1},
+   {"id": "bandage", "w": 1, "min": 1, "max": 1}, {"id": "duct_tape", "w": 1, "min": 1, "max": 1}, {"id": "battery", "w": 1, "min": 1, "max": 2},
+   {"id": "flare", "w": 1, "min": 1, "max": 1}
+  ],
+  "station_food": [
+   {"id": "canned_beans", "w": 3, "min": 1, "max": 3}, {"id": "ration_bar", "w": 2, "min": 1, "max": 2}, {"id": "coffee", "w": 2, "min": 1, "max": 2}
+  ],
+  "station_parts": [
+   {"id": "electronics", "w": 3, "min": 1, "max": 2}, {"id": "battery", "w": 3, "min": 2, "max": 4}, {"id": "wire", "w": 2, "min": 1, "max": 3},
+   {"id": "duct_tape", "w": 2, "min": 1, "max": 1}
+  ]
+ },
+ "sites": {
+  "crash_site": {
+   "Loot_FirstAid": [{"item": "first_aid_kit"}],
+   "Loot_SurvivalManual": [{"item": "survival_manual"}],
+   "Loot_FlareGun": [{"item": "flare_gun"}, {"item": "flare_shell", "count": 2, "offset": [0.18, 0.0, 0.08]}],
+   "Loot_EmergencyBlanket": [{"item": "emergency_blanket"}],
+   "Loot_Hatchet": [{"item": "hatchet"}],
+   "Loot_Scanner": [{"item": "survey_scanner"}],
+   "Loot_Cargo_1": [{"item": "matches"}, {"table": "wreck_cargo", "rolls": 1}],
+   "Loot_Cargo_2": [{"table": "wreck_cargo", "rolls": 2}],
+   "Loot_Backpack": [{"item": "backpack_torn"}],
+   "Loot_Crate_Trail": [{"table": "wreck_cargo", "rolls": 2}]
+  },
+  "ranger_cabin": {
+   "Loot_RadioHandheld": [{"item": "radio_handheld"}],
+   "Loot_Bow": [{"item": "bow"}, {"item": "arrow", "count": 6, "offset": [0.35, 0.0, 0.0]}],
+   "Loot_Shelf_1": [{"item": "wool_hat"}, {"table": "cabin_supplies", "rolls": 1}],
+   "Loot_Shelf_2": [{"table": "cabin_food", "rolls": 2}],
+   "Loot_Table": [{"table": "cabin_food", "rolls": 1}],
+   "Loot_Woodpile": [{"item": "stick", "count": 6}, {"item": "bark", "count": 2, "offset": [0.4, 0.0, 0.1]}],
+   "Loot_Outhouse": [{"table": "cabin_supplies", "rolls": 1}]
+  },
+  "fire_lookout": {
+   "Loot_Table": [{"item": "binoculars"}, {"item": "map", "offset": [0.3, 0.0, 0.0]}],
+   "Loot_Shelf": [{"table": "cabin_food", "rolls": 2}]
+  },
+  "ashford_mine": {
+   "Loot_Bunkhouse": [{"table": "mine_scrap", "rolls": 2}],
+   "Loot_Hoist": [{"table": "mine_scrap", "rolls": 1}],
+   "Loot_OreCar": [{"table": "mine_scrap", "rolls": 1}]
+  },
+  "ashford_mine_interior": {
+   "Loot_IceAxe": [{"item": "ice_axe", "requires_flag": "depot_open"}],
+   "Loot_Crampons": [{"item": "scrap_metal", "count": 4, "requires_flag": "depot_open"}, {"item": "rope", "count": 2, "requires_flag": "depot_open", "offset": [0.3, 0.0, 0.0]}],
+   "Loot_ClimbingRope": [{"item": "climbing_rope", "requires_flag": "depot_open"}, {"item": "parka", "requires_flag": "depot_open", "offset": [0.5, 0.0, -0.1]},
+    {"item": "hide_cured", "requires_flag": "depot_open", "offset": [0.9, 0.0, -0.1]}],
+   "Loot_FuelCan_1": [{"item": "fuel_can", "requires_flag": "depot_open"}],
+   "Loot_FuelCan_2": [{"item": "fuel_can", "requires_flag": "depot_open"}],
+   "Loot_FuelCan_3": [{"item": "fuel_can", "requires_flag": "depot_open"}],
+   "Loot_FuelCan_4": [{"item": "fuel_can", "requires_flag": "depot_open"}],
+   "Loot_Powder": [{"item": "hammer"}, {"table": "mine_scrap", "rolls": 1}]
+  },
+  "trapper_cabin": {
+   "Loot_Shelf": [{"table": "cabin_food", "rolls": 1}],
+   "Loot_Traps": [{"item": "hide_cured", "count": 2}],
+   "Loot_Snowshoes": [{"item": "wool_sweater"}],
+   "Loot_Cache": [{"table": "cabin_food", "rolls": 2}],
+   "Loot_Bunk": [{"item": "wool_blanket"}]
+  },
+  "owens_bivouac": {
+   "Loot_Pack": [{"item": "ration_bar", "count": 2}, {"table": "alpine_supplies", "rolls": 1}],
+   "Loot_Tent": [{"item": "work_gloves"}],
+   "Loot_Stove": [{"item": "coffee"}]
+  },
+  "glacier_camp": {
+   "Loot_Tent1": [{"table": "alpine_supplies", "rolls": 1}],
+   "Loot_Tent2": [{"table": "alpine_supplies", "rolls": 1}],
+   "Loot_Cases": [{"table": "station_parts", "rolls": 2}],
+   "Loot_Sled": [{"item": "rope"}, {"item": "flare", "count": 2, "offset": [0.3, 0.0, 0.0]}]
+  },
+  "ice_cave": {
+   "Loot_Camp": [{"table": "alpine_supplies", "rolls": 2}],
+   "Loot_Stove": [{"item": "ration_bar"}]
+  },
+  "kestrel_station": {
+   "Loot_TransceiverModule": [{"item": "transceiver_module"}],
+   "Loot_BatteryPack": [{"item": "battery_pack"}],
+   "Loot_Galley": [{"table": "station_food", "rolls": 2}],
+   "Loot_BootRoom": [{"item": "o2_bottle_empty", "count": 2}, {"item": "goggles", "offset": [0.0, 0.0, 0.35]}],
+   "Loot_Keycard": [{"item": "station_keycard"}],
+   "Loot_Lab": [{"item": "insulated_pants"}, {"table": "station_parts", "rolls": 1}]
+  }
+ }
+}
