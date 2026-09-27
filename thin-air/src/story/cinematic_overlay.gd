@@ -24,6 +24,7 @@ var _tween: Tween
 var _cap_tween: Tween
 var _chap_tween: Tween
 var _credits: Control = null
+var _touch_held := false
 
 
 func _ready() -> void:
@@ -113,7 +114,7 @@ func _process(delta: float) -> void:
 		if _sub_t <= 0.0:
 			clear_subtitle()
 	if _skip_visible and not _skip_done:
-		var held := false
+		var held := _touch_held
 		for a in SKIP_ACTIONS:
 			if InputMap.has_action(a) and Input.is_action_pressed(a):
 				held = true
@@ -123,6 +124,12 @@ func _process(delta: float) -> void:
 		_skip_bar.visible = _skip_t > 0.0
 		if _skip_t >= SKIP_HOLD:
 			_skip_done = true
+
+
+func _input(event: InputEvent) -> void:
+	# phones: hold a finger anywhere on the black screen to skip
+	if _skip_visible and event is InputEventScreenTouch:
+		_touch_held = (event as InputEventScreenTouch).pressed
 
 
 func _on_subtitle(speaker: String, text: String, duration: float) -> void:
@@ -184,7 +191,7 @@ func set_skip_visible(on: bool) -> void:
 	skip_label.visible = on
 	_skip_bar.visible = false
 	if on:
-		skip_label.text = "Hold %s to skip" % _action_key(&"interact")
+		skip_label.text = "Hold to skip" if Settings.is_mobile() else "Hold %s to skip" % _action_key(&"interact")
 
 
 func skip_requested() -> bool:

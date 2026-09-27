@@ -452,7 +452,8 @@ func _build_mara_curtain(corner: Node3D) -> void:
 	m.emission_enabled = true
 	m.emission_texture = ImageTexture.create_from_image(emi)
 	m.emission = Color(1, 1, 1)
-	m.emission_energy_multiplier = 1.1
+	# faint: interiors at night run at a high exposure, a strong emitter blows out to white
+	m.emission_energy_multiplier = 0.2
 	m.roughness = 1.0
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	q.material = m

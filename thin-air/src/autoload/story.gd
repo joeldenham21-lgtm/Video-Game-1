@@ -92,6 +92,21 @@ func _ready() -> void:
 	Events.scan_completed.connect(func(_id: StringName) -> void: _dirty = true)
 	Events.game_loaded.connect(_on_game_loaded)
 	Events.sleep_ended.connect(func() -> void: _dirty = true)
+	Game.state_changed.connect(_on_game_state)
+
+
+## Back at the main menu: drop the cinematic layer (it lives under this autoload) and any running scene.
+func _on_game_state(st: int) -> void:
+	if st != Game.State.MENU:
+		return
+	_in_cinematic = false
+	_vq.clear()
+	_v_busy = 0.0
+	_running_seq.clear()
+	if _overlay and is_instance_valid(_overlay):
+		_overlay.queue_free()
+	_overlay = null
+	_heli = null
 
 
 static func _read_json(path: String) -> Dictionary:
@@ -168,7 +183,7 @@ func find_log(log_id: StringName) -> void:
 		Game.notify("Journal: %s" % String(d.get("title", String(log_id).capitalize())), &"info")
 	var v: Variant = (_logs.get(String(log_id), {}) as Dictionary).get("voice", null)
 	if v != null and String(v) != "":
-		queue_voice(StringName(v), "plain", "", "", false, true)
+		queue_voice(StringName(v), "plain", "", "", true, true)
 	_dirty = true
 
 
@@ -738,6 +753,8 @@ func _creature_near(species: StringName, r: float) -> bool:
 			continue
 		if c.has_method(&"is_dead") and bool(c.call(&"is_dead")):
 			continue
+		if c.get(&"dead") == true or c.get(&"active") == false:
+			continue
 		var pid: Variant = c.get(&"persistent_id")
 		var sp: Variant = c.get(&"species")
 		if (pid != null and StringName(str(pid)) == species) or (sp != null and StringName(str(sp)) == species):
@@ -915,6 +932,8 @@ func queue_voice(id: StringName, mode := "radio", at := "", then := "", low := f
 		if _v_busy > 0.0 and _v_low:
 			Audio.stop_voice()
 			_finish_line()
+		elif _v_busy <= 0.0 and _voice_elsewhere():
+			Audio.stop_voice()      # the wreck's weather loop or another recording
 		_vq.push_front(e)
 	else:
 		_vq.append(e)
@@ -1177,6 +1196,8 @@ func _seq_ending() -> void:
 	var ov2 := _get_overlay()
 	ov2.call(&"show_credits")
 	await Signal(ov2, &"credits_finished")
+	if not is_instance_valid(ov2):
+		return
 	_in_cinematic = false
 	Events.cinematic_ended.emit(&"ending")
 	Game.quit_to_menu()

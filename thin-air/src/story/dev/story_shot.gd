@@ -22,6 +22,8 @@ func _ready() -> void:
 	if args.has("preset"):
 		Settings.apply_preset(StringName(args["preset"]))
 	_switch = int(args.get("switch", "24"))
+	# Movie Maker keeps project.godot's window size (1600x900): render 3D at ~960 px wide to keep lavapipe fast
+	get_viewport().scaling_3d_scale = clampf(float(args.get("size", "960")) / 1600.0, 0.25, 1.0)
 	Story.dev_fast = true
 	var shot := String(args.get("shot", "wake"))
 	Game.is_new_game = shot == "wake"
