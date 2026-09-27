@@ -654,7 +654,7 @@
 		"tags": ["light", "fire", "scare_animals"],
 		"equip_slot": "hand",
 		"tool": {"type": "torch", "damage": 6, "chop": 0, "mine": 0, "range": 1.8, "stamina": 4, "cooldown": 0.8, "durability": 1, "fire_damage": 4},
-		"light": {"radius": 9.0, "energy": 1.6, "color": "ffa04a", "burn_minutes": 40, "heat_celsius": 4.0}
+		"light": {"radius": 9.0, "energy": 1.6, "color": "ffa04a", "burn_minutes": 150, "heat_celsius": 4.0}
 	},
 	"flare": {
 		"name": "Road Flare",
@@ -667,7 +667,7 @@
 		"tags": ["light", "fire", "scare_animals", "throwable"],
 		"equip_slot": "hand",
 		"tool": {"type": "flare", "damage": 4, "chop": 0, "mine": 0, "range": 1.6, "stamina": 3, "cooldown": 0.8, "durability": 1, "fire_damage": 6},
-		"light": {"radius": 22.0, "energy": 3.0, "color": "ff3b24", "burn_minutes": 15, "heat_celsius": 2.0}
+		"light": {"radius": 22.0, "energy": 3.0, "color": "ff3b24", "burn_minutes": 30, "heat_celsius": 2.0}
 	},
 	"flare_gun": {
 		"name": "Flare Gun",
@@ -704,7 +704,7 @@
 		"tags": ["light", "fire"],
 		"equip_slot": "hand",
 		"tool": {"type": "lantern", "damage": 0, "chop": 0, "mine": 0, "range": 1.2, "stamina": 0, "cooldown": 0.5, "durability": 1},
-		"light": {"radius": 12.0, "energy": 1.4, "color": "ffb46b", "burn_minutes": 360, "fuel": "lamp_oil", "heat_celsius": 1.0}
+		"light": {"radius": 12.0, "energy": 1.4, "color": "ffb46b", "burn_minutes": 1440, "fuel": "lamp_oil", "heat_celsius": 1.0}
 	},
 	"ice_axe": {
 		"name": "Ice Axe",

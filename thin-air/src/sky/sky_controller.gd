@@ -31,7 +31,7 @@ const ADAPT_SECONDS := 3.0
 ## Share of a local light's irradiance at the eye (facing it) that counts as scene key: the eye sees the lit
 ## ground and the flame, not only the flame's full face. A campfire 2.4 m away then adapts to exposure ≈ 1.4,
 ## a torch in hand to ≈ 1 — the exposures the items/player streams tuned those lights at.
-const LOCAL_KEY_WEIGHT := 0.6
+const LOCAL_KEY_WEIGHT := 0.45
 const LOCAL_LIGHT_REFRESH := 0.5
 const CLOUD_SCALE := 0.00005       # uv per metre on the cloud deck (one noise tile = 20 km)
 const LUT_ALTS: Array[float] = [1300.0, 2000.0, 2700.0, 3450.0]

@@ -201,7 +201,7 @@ func _ignite() -> void:
 ## Real seconds a flare burns: light.burn_minutes (game minutes; older data: fuel.burn_minutes).
 static func burn_seconds(d: Dictionary) -> float:
 	var ld: Dictionary = d.get("light", {})
-	var minutes := float(ld.get("burn_minutes", (d.get("fuel", {}) as Dictionary).get("burn_minutes", 15.0)))
+	var minutes := float(ld.get("burn_minutes", (d.get("fuel", {}) as Dictionary).get("burn_minutes", 30.0)))
 	return Climate.game_minutes_to_seconds(maxf(minutes, 0.1))
 
 
