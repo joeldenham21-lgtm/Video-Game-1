@@ -1,0 +1,255 @@
+{
+ "ashford_mine": {
+  "cols": 32,
+  "glb_kb": 1180,
+  "id": "ashford_mine",
+  "lights": 0,
+  "markers": 11,
+  "secs": 3.1,
+  "surfaces": {
+   "detail": 6,
+   "ground": 2,
+   "interior": 4,
+   "main": 14
+  },
+  "total": 13870,
+  "tris": {
+   "detail": 3824,
+   "ground": 652,
+   "interior": 1168,
+   "main": 8226
+  }
+ },
+ "ashford_mine_interior": {
+  "cols": 68,
+  "glb_kb": 1442,
+  "id": "ashford_mine_interior",
+  "lights": 2,
+  "markers": 17,
+  "secs": 4.4,
+  "surfaces": {
+   "detail": 2,
+   "main": 16
+  },
+  "total": 16794,
+  "tris": {
+   "detail": 448,
+   "main": 16346
+  }
+ },
+ "ashford_tunnel_kit": {
+  "cols": 0,
+  "glb_kb": 423,
+  "id": "ashford_tunnel_kit",
+  "lights": 0,
+  "markers": 1,
+  "secs": 0.6,
+  "surfaces": {
+   "kit_bend": 3,
+   "kit_dead_end": 1,
+   "kit_junction": 1,
+   "kit_raise": 6,
+   "kit_stope": 3,
+   "kit_straight": 5,
+   "kit_straight_rock": 3
+  },
+  "total": 4764,
+  "tris": {
+   "kit_bend": 552,
+   "kit_dead_end": 780,
+   "kit_junction": 320,
+   "kit_raise": 1596,
+   "kit_stope": 396,
+   "kit_straight": 752,
+   "kit_straight_rock": 368
+  }
+ },
+ "crash_site": {
+  "cols": 26,
+  "glb_kb": 1919,
+  "id": "crash_site",
+  "lights": 0,
+  "markers": 18,
+  "secs": 6.4,
+  "surfaces": {
+   "detail": 14,
+   "ground": 2,
+   "interior": 10,
+   "main": 12
+  },
+  "total": 22540,
+  "tris": {
+   "detail": 3284,
+   "ground": 2152,
+   "interior": 3224,
+   "main": 13880
+  }
+ },
+ "fire_lookout": {
+  "cols": 33,
+  "glb_kb": 528,
+  "id": "fire_lookout",
+  "lights": 1,
+  "markers": 8,
+  "secs": 4.4,
+  "surfaces": {
+   "detail": 1,
+   "interior": 10,
+   "main": 9
+  },
+  "total": 5612,
+  "tris": {
+   "detail": 12,
+   "interior": 1802,
+   "main": 3798
+  }
+ },
+ "glacier_camp": {
+  "cols": 7,
+  "glb_kb": 402,
+  "id": "glacier_camp",
+  "lights": 0,
+  "markers": 7,
+  "secs": 1.2,
+  "surfaces": {
+   "detail": 4,
+   "main": 13
+  },
+  "total": 5266,
+  "tris": {
+   "detail": 396,
+   "main": 4870
+  }
+ },
+ "ice_cave": {
+  "cols": 101,
+  "glb_kb": 647,
+  "id": "ice_cave",
+  "lights": 2,
+  "markers": 6,
+  "secs": 0.7,
+  "surfaces": {
+   "detail": 3,
+   "main": 8
+  },
+  "total": 7450,
+  "tris": {
+   "detail": 1318,
+   "main": 6132
+  }
+ },
+ "ice_cave_entrance": {
+  "cols": 29,
+  "glb_kb": 416,
+  "id": "ice_cave_entrance",
+  "lights": 0,
+  "markers": 4,
+  "secs": 0.8,
+  "surfaces": {
+   "detail": 2,
+   "main": 4
+  },
+  "total": 5318,
+  "tris": {
+   "detail": 48,
+   "main": 5270
+  }
+ },
+ "kestrel_station": {
+  "cols": 204,
+  "glb_kb": 2508,
+  "id": "kestrel_station",
+  "lights": 6,
+  "markers": 31,
+  "secs": 9.2,
+  "surfaces": {
+   "detail": 11,
+   "ground": 1,
+   "interior": 21,
+   "main": 20
+  },
+  "total": 29100,
+  "tris": {
+   "detail": 2626,
+   "ground": 2598,
+   "interior": 10042,
+   "main": 13834
+  }
+ },
+ "owens_bivouac": {
+  "cols": 5,
+  "glb_kb": 290,
+  "id": "owens_bivouac",
+  "lights": 0,
+  "markers": 6,
+  "secs": 1.2,
+  "surfaces": {
+   "detail": 10,
+   "main": 5
+  },
+  "total": 3480,
+  "tris": {
+   "detail": 1620,
+   "main": 1860
+  }
+ },
+ "ranger_cabin": {
+  "cols": 41,
+  "glb_kb": 1447,
+  "id": "ranger_cabin",
+  "lights": 1,
+  "markers": 17,
+  "secs": 6.8,
+  "surfaces": {
+   "detail": 7,
+   "ground": 1,
+   "interior": 14,
+   "main": 10
+  },
+  "total": 17056,
+  "tris": {
+   "detail": 1364,
+   "ground": 32,
+   "interior": 3848,
+   "main": 11812
+  }
+ },
+ "summit_relay": {
+  "cols": 6,
+  "glb_kb": 1093,
+  "id": "summit_relay",
+  "lights": 0,
+  "markers": 9,
+  "secs": 4.6,
+  "surfaces": {
+   "detail": 3,
+   "main": 14,
+   "rime": 1
+  },
+  "total": 8940,
+  "tris": {
+   "detail": 638,
+   "main": 3002,
+   "rime": 5300
+  }
+ },
+ "trapper_cabin": {
+  "cols": 20,
+  "glb_kb": 672,
+  "id": "trapper_cabin",
+  "lights": 0,
+  "markers": 8,
+  "secs": 1.7,
+  "surfaces": {
+   "detail": 4,
+   "interior": 5,
+   "main": 5
+  },
+  "total": 7724,
+  "tris": {
+   "detail": 480,
+   "interior": 1464,
+   "main": 5780
+  }
+ }
+}
