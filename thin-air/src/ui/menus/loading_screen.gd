@@ -1,8 +1,9 @@
 class_name LoadingScreen
 extends CanvasLayer
 ## Loading screen (scenes/ui/loading_screen.tscn; Game instances it while the world loads): a full-bleed
-## mountain vista (assets/ui/loading_vista.jpg, rendered from the menu vista), a subtle indeterminate
-## progress line and rotating survival tips.
+## mountain vista (assets/ui/loading_vista.jpg, rendered from the menu vista), a progress line (determinate
+## from Game.loading_progress while the world builds part by part, indeterminate otherwise), the stage being
+## built (Game.loading_stage) and rotating survival tips.
 
 const TIPS := [
 	"Wet clothes lose heat many times faster than dry ones. Dry off by a fire before you move on.",
@@ -27,6 +28,9 @@ const TIP_SECONDS := 7.0
 var _tip: Label
 var _line: Control
 var _t := 0.0
+var _shown := 0.0   # eased Game.loading_progress
+var _stage: Label
+var _stage_src := ""
 var _tip_i := 0
 var root: Control
 
@@ -77,6 +81,10 @@ func _ready() -> void:
 	var l := UITheme.caps("Loading", 13, UITheme.TEXT_DIM, 4)
 	l.name = "LoadingLabel"
 	root.add_child(l)
+	_stage = UITheme.label("", 13, UITheme.TEXT_DIM, "Light")
+	_stage.name = "StageLabel"
+	_stage.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	root.add_child(_stage)
 	_tip_i = int(Time.get_unix_time_from_system()) % TIPS.size()
 	_tip.text = TIPS[_tip_i]
 	get_viewport().size_changed.connect(_layout)
@@ -96,11 +104,16 @@ func _layout() -> void:
 	var ll: Control = root.get_node("LoadingLabel")
 	ll.size = ll.get_combined_minimum_size()
 	ll.position = Vector2(W - m - ll.size.x, H - m - 30.0)
+	_stage.size = Vector2(420.0, 20.0)
+	_stage.position = Vector2(W - m - 420.0, H - m + 10.0)
 
 
 func _draw_line() -> void:
 	var w := _line.size.x
 	_line.draw_rect(Rect2(Vector2.ZERO, Vector2(w, 2)), Color(1, 1, 1, 0.14))
+	if Game.loading_progress >= 0.0:
+		_line.draw_rect(Rect2(Vector2.ZERO, Vector2(w * clampf(_shown, 0.0, 1.0), 2)), UITheme.ACCENT)
+		return
 	var p := fposmod(_t * 0.45, 1.0)
 	var seg := w * 0.28
 	var x0 := -seg + (w + seg) * p
@@ -112,6 +125,11 @@ func _draw_line() -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
+	if Game.loading_progress >= 0.0:
+		_shown = move_toward(_shown, Game.loading_progress, maxf(delta * 1.5, (Game.loading_progress - _shown) * 0.25))
+	if _stage and _stage_src != Game.loading_stage:
+		_stage_src = Game.loading_stage
+		_stage.text = _stage_src + ("…" if _stage_src != "" else "")
 	_line.queue_redraw()
 	if fmod(_t, TIP_SECONDS) < delta:
 		_tip_i = (_tip_i + 1) % TIPS.size()

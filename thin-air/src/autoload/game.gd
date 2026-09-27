@@ -20,10 +20,68 @@ var playtime := 0.0
 var _loading_layer: CanvasLayer = null
 var _pending_load_slot := -1
 
+## World build progress while State.LOADING (0..1, -1 = unknown) and the stage being built; the loading screen
+## polls these. world_build_ms = Game.new_game/continue_game -> on_world_built (wall clock).
+var loading_progress := -1.0
+var loading_stage := ""
+var world_build_ms := 0.0
+var _build_t0 := 0
+
+## Boot options (release QA; user args after `--`, also accepted before it):
+##   --autostart   the main menu immediately starts a new game
+##   --autoquit=N  quit N seconds after the world is ready, printing one `BOOT ...` summary line
+##   --autoshot=/abs/path.png  with --autoquit: save the last frame there before quitting
+var boot_args := {}
+var errors: ErrorCounter = null
+
+
+## Counts engine/script/shader errors (and warnings) for the BOOT summary. Called from any thread.
+class ErrorCounter extends Logger:
+	var mutex := Mutex.new()
+	var errors := 0
+	var script_errors := 0
+	var warnings := 0
+	var first: Array[String] = []
+
+	func _log_error(function: String, file: String, line: int, code: String, rationale: String,
+			_editor_notify: bool, error_type: int, _script_backtraces: Array[ScriptBacktrace]) -> void:
+		mutex.lock()
+		if error_type == ERROR_TYPE_WARNING:
+			warnings += 1
+		else:
+			if error_type == ERROR_TYPE_SCRIPT:
+				script_errors += 1
+			else:
+				errors += 1
+			if first.size() < 3:
+				first.append("%s (%s:%d %s)" % [rationale if rationale != "" else code, file.get_file(), line, function])
+		mutex.unlock()
+
+	func _log_message(_message: String, _error: bool) -> void:
+		pass
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	Events.player_died.connect(_on_player_died)
+	for a in Array(OS.get_cmdline_args()) + Array(OS.get_cmdline_user_args()):
+		var s := String(a)
+		if s == "--autostart" or s.begins_with("--autoquit") or s.begins_with("--autoshot="):
+			var kv := s.trim_prefix("--").split("=", true, 1)
+			boot_args[kv[0]] = kv[1] if kv.size() > 1 else "1"
+	errors = ErrorCounter.new()
+	OS.add_logger(errors)
+
+
+## True when launched with --autostart (the main menu starts a new game at once).
+func boot_autostart() -> bool:
+	return boot_args.has("autostart")
+
+
+func set_loading_progress(p: float, stage := "") -> void:
+	loading_progress = p
+	if stage != "":
+		loading_stage = stage
 
 
 func _process(delta: float) -> void:
@@ -105,6 +163,11 @@ func register_world(w: Node3D) -> void:
 
 ## Called by world.gd once every part has been instanced and the player placed.
 func on_world_built() -> void:
+	if _build_t0 > 0:
+		world_build_ms = (Time.get_ticks_usec() - _build_t0) / 1000.0
+		_build_t0 = 0
+		print("[Game] world built in %.0f ms" % world_build_ms)
+	loading_progress = 1.0
 	_hide_loading()
 	if _pending_load_slot >= 0:
 		var ok: bool = Save.load_game(_pending_load_slot)
@@ -117,10 +180,38 @@ func on_world_built() -> void:
 	Events.game_started.emit(is_new_game)
 	if is_new_game and Story.has_method("start_prologue"):
 		Story.start_prologue()
+	if boot_args.has("autoquit"):
+		get_tree().create_timer(maxf(float(boot_args["autoquit"]), 0.0), true, false, true).timeout.connect(_boot_quit)
+
+
+## --autoquit: one-line boot summary, then quit (exit code 1 when any error was logged).
+func _boot_quit() -> void:
+	var e := errors
+	e.mutex.lock()
+	var n_err := e.errors
+	var n_script := e.script_errors
+	var n_warn := e.warnings
+	var first := "; ".join(e.first)
+	e.mutex.unlock()
+	print("BOOT %s world_build_ms=%d draw_calls=%d primitives=%d fps=%d vram_mb=%.0f script_errors=%d errors=%d warnings=%d renderer=%s%s" % [
+		"OK" if n_err + n_script == 0 else "ERRORS", int(world_build_ms),
+		int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
+		int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)),
+		int(Performance.get_monitor(Performance.TIME_FPS)),
+		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0, n_script, n_err, n_warn,
+		RenderingServer.get_current_rendering_method(), (" first=" + first) if first != "" else ""])
+	if boot_args.has("autoshot") and DisplayServer.get_name() != "headless":
+		var img := get_viewport().get_texture().get_image()
+		if img:
+			img.save_png(String(boot_args["autoshot"]))
+	get_tree().quit(0 if n_err + n_script == 0 else 1)
 
 
 func _load_world() -> void:
 	get_tree().paused = false
+	_build_t0 = Time.get_ticks_usec()
+	loading_progress = 0.0
+	loading_stage = ""
 	_set_state(State.LOADING)
 	_show_loading()
 	player = null

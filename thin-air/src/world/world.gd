@@ -19,15 +19,45 @@ const PARTS: Array = [
 ]
 
 
+## Loading-screen captions per part (Game.loading_stage).
+const STAGE_TEXT := {
+	"Sky": "Reading the weather", "Terrain": "Raising the mountain", "Water": "Filling the lakes",
+	"Vegetation": "Growing the forest", "Structures": "Placing the wreckage", "Fauna": "Waking the wildlife",
+	"Items": "Scattering supplies", "Building": "Laying out camp", "Player": "Finding the survivor",
+	"HUD": "Almost there",
+}
+
+## Per-part build time (ms: load + instantiate + add_child/_ready) of the last build, printed once built.
+var part_ms := {}
+
+
 func _ready() -> void:
 	Game.register_world(self)
+	# Through Game.new_game/continue_game (loading screen up): build one part per frame so the loading screen
+	# shows progress, the part scenes load on worker threads meanwhile, and nothing ticks until everything exists.
+	# Dev harnesses and tests instantiate the world directly and get the synchronous build.
+	var progressive := Game.state == Game.State.LOADING
+	var parts: Array = []
 	for part in PARTS:
-		var part_name: String = part[0]
-		if dev_no_player and (part_name == "Player" or part_name == "HUD"):
+		if dev_no_player and (part[0] == "Player" or part[0] == "HUD"):
 			continue
+		parts.append(part)
+	if progressive:
+		process_mode = Node.PROCESS_MODE_DISABLED
+		for part in parts:
+			if ResourceLoader.exists(part[1]):
+				ResourceLoader.load_threaded_request(part[1], "PackedScene", true)
+	var t_all := Time.get_ticks_usec()
+	for i in parts.size():
+		var part_name: String = parts[i][0]
+		var path: String = parts[i][1]
+		if progressive:
+			Game.set_loading_progress(float(i) / float(parts.size()), STAGE_TEXT.get(part_name, ""))
+			await get_tree().process_frame
+		var t0 := Time.get_ticks_usec()
 		var node: Node = null
-		if ResourceLoader.exists(part[1]):
-			var ps: PackedScene = load(part[1])
+		if ResourceLoader.exists(path):
+			var ps: PackedScene = ResourceLoader.load_threaded_get(path) if progressive else load(path)
 			if ps:
 				node = ps.instantiate()
 		if node == null:
@@ -35,8 +65,16 @@ func _ready() -> void:
 		if node:
 			node.name = part_name
 			add_child(node)
+		part_ms[part_name] = (Time.get_ticks_usec() - t0) / 1000.0
 	if not dev_no_player:
 		_place_player()
+	var summary := PackedStringArray()
+	for k in part_ms:
+		summary.append("%s %.0f" % [k, part_ms[k]])
+	print("[World] parts built in %.0f ms (%s)" % [(Time.get_ticks_usec() - t_all) / 1000.0, ", ".join(summary)])
+	if progressive:
+		Game.set_loading_progress(1.0, STAGE_TEXT["HUD"])
+		process_mode = Node.PROCESS_MODE_INHERIT
 	Game.on_world_built()
 
 

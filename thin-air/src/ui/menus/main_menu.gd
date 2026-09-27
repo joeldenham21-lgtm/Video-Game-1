@@ -51,6 +51,12 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout)
 	InputGlyphs.bus().device_changed.connect(func(_d: StringName) -> void: _build_hints())
 	_layout()
+	if Game.boot_autostart() and not Game.has_meta(&"autostarted"):
+		# release QA: `-- --autostart [--autoquit=N]` goes straight into a new game (once per process)
+		Game.set_meta(&"autostarted", true)
+		_busy = true
+		Game.new_game.call_deferred()
+		return
 	_intro()
 
 
