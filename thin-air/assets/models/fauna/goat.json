@@ -1,0 +1,81 @@
+{
+ "bones": [
+  "root",
+  "pelvis",
+  "spine1",
+  "spine2",
+  "chest",
+  "neck1",
+  "neck2",
+  "head",
+  "jaw",
+  "ear.L",
+  "ear.R",
+  "tail1",
+  "tail2",
+  "scapula.L",
+  "upperarm.L",
+  "forearm.L",
+  "hand.L",
+  "fpaw.L",
+  "thigh.L",
+  "shin.L",
+  "foot.L",
+  "hpaw.L",
+  "scapula.R",
+  "upperarm.R",
+  "forearm.R",
+  "hand.R",
+  "fpaw.R",
+  "thigh.R",
+  "shin.R",
+  "foot.R",
+  "hpaw.R"
+ ],
+ "clips": {
+  "death": {
+   "length": 1.8,
+   "loop": false
+  },
+  "gallop": {
+   "length": 0.5,
+   "loop": true,
+   "speed": 8.25
+  },
+  "hit": {
+   "length": 0.5,
+   "loop": false
+  },
+  "idle": {
+   "length": 4.0,
+   "loop": true
+  },
+  "look": {
+   "length": 3.2,
+   "loop": true
+  },
+  "sniff": {
+   "length": 3.0,
+   "loop": true
+  },
+  "trot": {
+   "length": 0.667,
+   "loop": true,
+   "speed": 2.25
+  },
+  "walk": {
+   "length": 1.0,
+   "loop": true,
+   "speed": 0.8999999999999999
+  }
+ },
+ "fur_length": 0.05,
+ "height": 1.308727741241455,
+ "length": 1.3652437925338745,
+ "mass": 75.0,
+ "species": "goat",
+ "tris": 12452,
+ "uv_meters": 2.030376401342147,
+ "verts": 6275,
+ "width": 0.3578106760978699
+}

@@ -1,0 +1,58 @@
+[gd_resource type="Resource" script_class="SpeciesDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/fauna/species_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"bear"
+display_name = "Grizzly bear"
+model_path = "res://assets/models/fauna/bear.glb"
+coat_path = "res://assets/textures/fauna/bear_albedo.png"
+ai_script = "res://src/fauna/bear.gd"
+scale_range = Vector2(0.9, 1.05)
+mass = 250.0
+health = 220.0
+body_radius = 0.36
+body_length = 1.7
+body_height = 0.72
+eye_height = 0.97
+fur_length = 0.06
+fur_sheen = 0.18
+eye_color = Color(0.12, 0.07, 0.03, 1)
+walk_speed = 1.3
+trot_speed = 2.8
+run_speed = 9.5
+accel = 5.0
+turn_rate = 150.0
+max_slope = 40.0
+wade_depth = 0.9
+gait_clips = PackedStringArray("walk", "trot", "gallop")
+sight_range = 70.0
+fov_deg = 260.0
+hearing = 1.3
+smell_range = 320.0
+fire_fear = 0.5
+skittish = 0.2
+aggression = 0.7
+flee_distance = 25.0
+damage = 34.0
+damage_type = &"claw"
+attack_range = 1.9
+attack_cooldown = 1.3
+loot = {"meat_raw": 10, "hide_raw": 3, "bone": 4}
+harvest_hits = 16
+sfx_call = &"bear_huff"
+sfx_alarm = &"bear_huff"
+sfx_hurt = &"bear_roar"
+sfx_attack = &"bear_attack"
+sfx_threat = &"bear_roar"
+sfx_death = &"bear_roar"
+biomes = PackedStringArray("valley", "forest")
+min_alt = 1300.0
+max_alt = 2250.0
+group_min = 1
+group_max = 1
+night_weight = 0.35
+day_weight = 0.6
+spawn_weight = 0.45
+slope_pref = Vector2(0, 25)

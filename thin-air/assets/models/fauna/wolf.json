@@ -1,0 +1,104 @@
+{
+ "bones": [
+  "root",
+  "pelvis",
+  "spine1",
+  "spine2",
+  "chest",
+  "neck1",
+  "neck2",
+  "head",
+  "jaw",
+  "ear.L",
+  "ear.R",
+  "tail1",
+  "tail2",
+  "tail3",
+  "tail4",
+  "scapula.L",
+  "upperarm.L",
+  "forearm.L",
+  "hand.L",
+  "fpaw.L",
+  "thigh.L",
+  "shin.L",
+  "foot.L",
+  "hpaw.L",
+  "scapula.R",
+  "upperarm.R",
+  "forearm.R",
+  "hand.R",
+  "fpaw.R",
+  "thigh.R",
+  "shin.R",
+  "foot.R",
+  "hpaw.R"
+ ],
+ "clips": {
+  "attack": {
+   "events": {
+    "bite": 0.52
+   },
+   "length": 1.0,
+   "loop": false,
+   "move": 0.9
+  },
+  "death": {
+   "length": 1.7,
+   "loop": false
+  },
+  "gallop": {
+   "length": 0.42,
+   "loop": true,
+   "speed": 8.5
+  },
+  "hit": {
+   "length": 0.5,
+   "loop": false
+  },
+  "howl": {
+   "length": 4.0,
+   "loop": false
+  },
+  "idle": {
+   "length": 4.0,
+   "loop": true
+  },
+  "look": {
+   "length": 3.2,
+   "loop": true
+  },
+  "snarl": {
+   "length": 2.0,
+   "loop": true
+  },
+  "sniff": {
+   "length": 3.0,
+   "loop": true
+  },
+  "stalk": {
+   "length": 1.5,
+   "loop": true,
+   "speed": 0.5
+  },
+  "trot": {
+   "length": 0.6,
+   "loop": true,
+   "speed": 2.6
+  },
+  "walk": {
+   "length": 0.9,
+   "loop": true,
+   "speed": 1.15
+  }
+ },
+ "fur_length": 0.042,
+ "height": 0.9322848320007324,
+ "length": 1.6504778861999512,
+ "mass": 42.0,
+ "species": "wolf",
+ "tris": 12652,
+ "uv_meters": 1.6736758179992666,
+ "verts": 6377,
+ "width": 0.28574299812316895
+}

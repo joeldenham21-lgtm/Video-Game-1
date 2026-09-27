@@ -1,0 +1,86 @@
+{
+ "bones": [
+  "root",
+  "pelvis",
+  "spine1",
+  "spine2",
+  "chest",
+  "neck1",
+  "neck2",
+  "head",
+  "jaw",
+  "ear.L",
+  "ear.R",
+  "tail1",
+  "tail2",
+  "scapula.L",
+  "upperarm.L",
+  "forearm.L",
+  "hand.L",
+  "fpaw.L",
+  "thigh.L",
+  "shin.L",
+  "foot.L",
+  "hpaw.L",
+  "scapula.R",
+  "upperarm.R",
+  "forearm.R",
+  "hand.R",
+  "fpaw.R",
+  "thigh.R",
+  "shin.R",
+  "foot.R",
+  "hpaw.R"
+ ],
+ "clips": {
+  "death": {
+   "length": 1.8,
+   "loop": false
+  },
+  "gallop": {
+   "length": 0.5,
+   "loop": true,
+   "speed": 11.0
+  },
+  "hit": {
+   "length": 0.5,
+   "loop": false
+  },
+  "idle": {
+   "length": 4.0,
+   "loop": true
+  },
+  "look": {
+   "length": 3.2,
+   "loop": true
+  },
+  "sniff": {
+   "length": 3.0,
+   "loop": true
+  },
+  "stot": {
+   "length": 0.8,
+   "loop": true,
+   "speed": 5.5
+  },
+  "trot": {
+   "length": 0.667,
+   "loop": true,
+   "speed": 3.0
+  },
+  "walk": {
+   "length": 1.0,
+   "loop": true,
+   "speed": 1.2
+  }
+ },
+ "fur_length": 0.02,
+ "height": 1.4609448909759521,
+ "length": 1.504296064376831,
+ "mass": 65.0,
+ "species": "deer",
+ "tris": 12824,
+ "uv_meters": 2.2885679421671363,
+ "verts": 6472,
+ "width": 0.4091974198818207
+}

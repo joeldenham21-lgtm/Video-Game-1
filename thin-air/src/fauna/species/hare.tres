@@ -1,0 +1,53 @@
+[gd_resource type="Resource" script_class="SpeciesDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/fauna/species_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"hare"
+display_name = "Snowshoe hare"
+model_path = "res://assets/models/fauna/hare.glb"
+coat_path = "res://assets/textures/fauna/hare_albedo.png"
+ai_script = "res://src/fauna/hare.gd"
+scale_range = Vector2(0.92, 1.08)
+mass = 1.5
+health = 6.0
+body_radius = 0.09
+body_length = 0.36
+body_height = 0.14
+eye_height = 0.2
+fur_length = 0.025
+fur_sheen = 0.18
+eye_color = Color(0.06, 0.04, 0.02, 1)
+walk_speed = 0.8
+trot_speed = 2.5
+run_speed = 11.0
+accel = 14.0
+turn_rate = 420.0
+max_slope = 40.0
+wade_depth = 0.12
+gait_clips = PackedStringArray("walk", "gallop")
+sight_range = 45.0
+fov_deg = 340.0
+hearing = 1.5
+smell_range = 40.0
+fire_fear = 1.0
+skittish = 0.9
+aggression = 0.0
+flee_distance = 40.0
+damage = 0.0
+damage_type = &"bite"
+attack_range = 1.5
+attack_cooldown = 2.0
+loot = {"meat_raw": 1, "hide_raw": 1}
+harvest_hits = 2
+sfx_death = &"hare_squeal"
+biomes = PackedStringArray("valley", "forest", "subalpine")
+min_alt = 1300.0
+max_alt = 2400.0
+group_min = 1
+group_max = 1
+night_weight = 1.0
+day_weight = 0.8
+spawn_weight = 0.9
+slope_pref = Vector2(0, 25)

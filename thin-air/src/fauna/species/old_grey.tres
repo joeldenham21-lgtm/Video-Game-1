@@ -1,0 +1,58 @@
+[gd_resource type="Resource" script_class="SpeciesDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/fauna/species_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"old_grey"
+display_name = "Old Grey"
+model_path = "res://assets/models/fauna/bear.glb"
+coat_path = "res://assets/textures/fauna/bear_oldgrey_albedo.png"
+ai_script = "res://src/fauna/bear.gd"
+scale_range = Vector2(1.16, 1.16)
+mass = 320.0
+health = 340.0
+body_radius = 0.36
+body_length = 1.7
+body_height = 0.72
+eye_height = 0.97
+fur_length = 0.065
+fur_sheen = 0.18
+eye_color = Color(0.1, 0.06, 0.03, 1)
+walk_speed = 1.3
+trot_speed = 2.8
+run_speed = 9.0
+accel = 5.0
+turn_rate = 140.0
+max_slope = 40.0
+wade_depth = 0.9
+gait_clips = PackedStringArray("walk", "trot", "gallop")
+sight_range = 70.0
+fov_deg = 260.0
+hearing = 1.3
+smell_range = 360.0
+fire_fear = 0.35
+skittish = 0.2
+aggression = 0.95
+flee_distance = 32.0
+damage = 42.0
+damage_type = &"claw"
+attack_range = 2.0
+attack_cooldown = 1.1
+loot = {"meat_raw": 12, "hide_raw": 4, "bone": 5}
+harvest_hits = 20
+sfx_call = &"bear_huff"
+sfx_alarm = &"bear_huff"
+sfx_hurt = &"bear_roar"
+sfx_attack = &"bear_attack"
+sfx_threat = &"bear_roar"
+sfx_death = &"bear_roar"
+biomes = PackedStringArray("forest")
+min_alt = 1300.0
+max_alt = 2250.0
+group_min = 1
+group_max = 1
+night_weight = 0.5
+day_weight = 1.0
+spawn_weight = 0.0
+slope_pref = Vector2(0, 25)

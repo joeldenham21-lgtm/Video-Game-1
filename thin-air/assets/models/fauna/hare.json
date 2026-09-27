@@ -1,0 +1,75 @@
+{
+ "bones": [
+  "root",
+  "pelvis",
+  "spine1",
+  "spine2",
+  "chest",
+  "neck1",
+  "neck2",
+  "head",
+  "jaw",
+  "ear.L",
+  "ear.R",
+  "tail1",
+  "scapula.L",
+  "upperarm.L",
+  "forearm.L",
+  "hand.L",
+  "fpaw.L",
+  "thigh.L",
+  "shin.L",
+  "foot.L",
+  "hpaw.L",
+  "scapula.R",
+  "upperarm.R",
+  "forearm.R",
+  "hand.R",
+  "fpaw.R",
+  "thigh.R",
+  "shin.R",
+  "foot.R",
+  "hpaw.R"
+ ],
+ "clips": {
+  "death": {
+   "length": 1.2,
+   "loop": false
+  },
+  "gallop": {
+   "length": 0.36,
+   "loop": true,
+   "speed": 6.0
+  },
+  "hit": {
+   "length": 0.4,
+   "loop": false
+  },
+  "idle": {
+   "length": 3.0,
+   "loop": true
+  },
+  "look": {
+   "length": 3.0,
+   "loop": true
+  },
+  "sniff": {
+   "length": 2.4,
+   "loop": true
+  },
+  "walk": {
+   "length": 0.6,
+   "loop": true,
+   "speed": 0.8
+  }
+ },
+ "fur_length": 0.025,
+ "height": 0.3208637535572052,
+ "length": 0.45888686180114746,
+ "mass": 1.5,
+ "species": "hare",
+ "tris": 5824,
+ "uv_meters": 0.6617848108535768,
+ "verts": 2972,
+ "width": 0.16592344641685486
+}

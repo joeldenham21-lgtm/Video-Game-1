@@ -7,6 +7,7 @@ Everything under `tools/` is ignored by Godot (`.gdignore`). Every generator is 
 | Project settings | `godot --headless --path thin-air -s $PWD/thin-air/tools/godot/setup_project.gd` | `project.godot` input map, layers, autoloads, shader globals; `assets/audio/bus_layout.tres` |
 | Terrain texture layers | `python3 thin-air/tools/textures/gen_terrain.py [--only snow,rock] [--preview] [--no-write]` | `assets/textures/terrain/<layer>_{albedo,normal,roughness,height}.png`, packed `terrain_albedo_height.png` + `terrain_normal_rough.png` (Texture2DArray, 9 layers), `terrain_macro_noise.png`, `layers.json` (~2 min) |
 | PBR material library | `python3 thin-air/tools/textures/gen_materials.py [--only bark_pine,rope] [--preview] [--no-write]` | `assets/textures/<set>/<set>_{albedo,normal,orm[,height]}.png`, `assets/materials/<set>.tres` (ORMMaterial3D), `assets/materials/materials.json` (~3 min) |
+| Fauna models + clips + coats | `blender -b -P thin-air/tools/blender/fauna/build_fauna.py -- wolf deer bear goat hare birds [--preview=DIR]` (then `python3 thin-air/tools/blender/fauna/write_species.py` for the species .tres table) | `assets/models/fauna/<sp>.glb` (skinned, 9–12 baked clips) + `<sp>.json` (clip lengths, native gait speeds, events, UV metres), `assets/textures/fauna/<sp>_albedo.png` (RGB coat, A fur length; `bear_oldgrey` extra coat), `fur_strands.png`, static `raven.glb`/`eagle.glb` (~1 min per species) |
 | Texture seam QA | `python3 thin-air/tools/textures/check_seams.py [set ...]` | prints wrap-around continuity per map (same statistic as `tests/test_textures.gd`) |
 | Texture contact sheet | `python3 thin-air/tools/textures/contact_sheet.py out.jpg mat_rope terrain_rock ...` | tiles the CPU previews written by `--preview` (in `tools/textures/_cache/preview/`, git-ignored) |
 | Props: gloved hands, tools, items, world props (Blender) | `blender -b -P thin-air/tools/blender/props/build.py -- --set=arms\|fp\|items\|props\|all [--only=id,id] [--preview=/abs/dir]` then `godot --headless --path thin-air --import` | `assets/models/fp/arms.glb` (one posed hand mesh per `FPHands.POSES` grip), `assets/models/fp/<tool>.glb` (first-person frames of the tool scripts), `assets/models/items/<id>.glb` (world/pickup/icon models), `assets/models/props/<id>.glb` + `scenes/props/<id>.tscn` (StaticBody layer 1 / RigidBody layer 4 + collision). Surfaces carry only item-material-library NAMES; `scenes/props/prop_import.gd` (set in each `.import`) binds the real `ItemMaterials` material at import. ~1 min for everything |
@@ -187,3 +188,14 @@ conventions the building shaders read: UV in metres (V along the grain), UV2 = p
 COLOR r = AO, g = build step (the order parts appear while a blueprint frame is filled), b = bark density /
 weathering, a = surface flag (wood / endgrain / chinking). Constants shared with `src/building/build_grid.gd`:
 2 m cells, 0.27 m log courses, wall plate 2.44 m, storey 2.6 m, roof rise 1.35 m per cell (34°).
+
+### Fauna pipeline (`tools/blender/fauna/`)
+`flib.py` builds a creature from a species spec (`sp_<id>.py`): anatomical SDF primitives in Godot axes (round
+cones + ellipsoids, smooth-min blended, eye sockets smooth-subtracted, fine value-noise skin displacement) →
+vectorised surface nets → Laplacian relax with SDF re-projection → Blender collapse decimation; separate lower
+jaw (so the mouth opens), cupped ear shells and eyeballs. Skin weights come from primitive ownership (soft-min of
+per-primitive distances accumulated per bone). The coat is baked by rasterising the smart-UV layout and evaluating
+the species pattern on each texel's rest-pose position/normal/anatomical region. Clips are authored procedurally:
+quadruped gait tables (lateral-sequence walk, diagonal trot, rotary gallop, stot, half-bound) drive planar 2-bone
+IK with pole vectors, metapodial/toe angles, scapula swing, spine flexion, bob/pitch/roll; behaviour clips (idle
+breathing + ear flicks, sniff/graze, look, howl, snarl, lunge-bite/swipe, hit, death roll) are pose functions of time.
