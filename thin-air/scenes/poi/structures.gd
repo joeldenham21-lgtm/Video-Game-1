@@ -437,23 +437,24 @@ func _build_mara_curtain(corner: Node3D) -> void:
 			var sag := 1.0 - 0.1 * absf(sin(u * PI * 4.0)) * (1.0 - v)
 			alb.set_pixel(x, y, Color(0.46, 0.39, 0.31) * fold * sag)
 			# lamp glow behind the blanket (lower right) and the sitting figure's shadow
-			var glow := clampf(1.0 - Vector2((u - 0.66) * 1.2, (v - 0.72) * 1.0).length() * 1.35, 0.0, 1.0)
+			# the lamp stands on the floor behind her, a little to the right: its light frames the figure
+			var glow := clampf(1.0 - Vector2((u - 0.52) * 1.1, (v - 0.6) * 0.95).length() * 1.25, 0.0, 1.0)
 			var head := Vector2((u - 0.42) / 0.075, (v - 0.37) / 0.095).length()
 			var shoulders := Vector2((u - 0.43) / 0.2, (v - 0.56) / 0.12).length()
 			var torso := 1.0 if (v > 0.56 and absf(u - 0.43) < 0.19 - (v - 0.56) * 0.08) else 2.0
 			var neck := 1.0 if (v > 0.42 and v < 0.5 and absf(u - 0.425) < 0.035) else 2.0
 			var d := minf(minf(head, shoulders), minf(torso, neck))
 			var shadow := 1.0 - smoothstep(0.75, 1.25, d)
-			var e := glow * glow * (1.0 - 0.85 * shadow) * fold
+			var e := glow * (0.35 + 0.65 * glow) * (1.0 - 0.92 * shadow) * fold
 			emi.set_pixel(x, y, Color(1.0, 0.58, 0.26) * e)
 	alb.generate_mipmaps()
 	emi.generate_mipmaps()
 	m.albedo_texture = ImageTexture.create_from_image(alb)
 	m.emission_enabled = true
 	m.emission_texture = ImageTexture.create_from_image(emi)
-	m.emission = Color(1, 1, 1)
-	# faint: interiors at night run at a high exposure, a strong emitter blows out to white
-	m.emission_energy_multiplier = 0.2
+	# emission_operator ADD: EMISSION = (emission + texture) * energy, so the base colour must be black
+	m.emission = Color(0, 0, 0)
+	m.emission_energy_multiplier = 0.9
 	m.roughness = 1.0
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	q.material = m
