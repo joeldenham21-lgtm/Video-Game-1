@@ -116,20 +116,45 @@ static func get_forearm_mesh(left: bool, sleeve_len := 0.42) -> ArrayMesh:
 	return mesh
 
 
-## Art override: assets/models/fp/arms.glb (first mesh = a right arm authored in the Hand frame: wrist at
-## the origin, fingers −Z, back of the hand +Y, forearm +Z). Replaces hand + forearm for every pose.
+## Art override: assets/models/fp/arms.glb. Preferred layout (tools/blender/props/arms.py): one mesh node per
+## pose named "Hand_<pose>", authored in the Hand frame (wrist at the origin, fingers −Z, back of the hand +Y,
+## thumb −X) with the same grip points as POSES; the procedural forearm/sleeve stays so clothing swaps work.
+## Legacy layout: any other first mesh = a whole right arm that replaces hand + forearm for every pose.
+static var _external_hands: Dictionary = {}
+
+
+static func _load_external() -> void:
+	if _external_checked:
+		return
+	_external_checked = true
+	if not ResourceLoader.exists(EXTERNAL_ARMS):
+		return
+	var ps := load(EXTERNAL_ARMS) as PackedScene
+	if ps == null:
+		return
+	var root := ps.instantiate()
+	var found := root.find_children("*", "MeshInstance3D", true, false)
+	for n in found:
+		var mi := n as MeshInstance3D
+		if mi.mesh and String(mi.name).begins_with("Hand_"):
+			_external_hands[StringName(String(mi.name).trim_prefix("Hand_"))] = mi.mesh
+	if _external_hands.is_empty() and not found.is_empty():
+		_external_mesh = (found[0] as MeshInstance3D).mesh
+	root.free()
+
+
+## Legacy whole-arm override (null when arms.glb provides per-pose hands).
 static func _external_arm() -> Mesh:
-	if not _external_checked:
-		_external_checked = true
-		if ResourceLoader.exists(EXTERNAL_ARMS):
-			var ps := load(EXTERNAL_ARMS) as PackedScene
-			if ps:
-				var root := ps.instantiate()
-				var found := root.find_children("*", "MeshInstance3D", true, false)
-				if not found.is_empty():
-					_external_mesh = (found[0] as MeshInstance3D).mesh
-				root.free()
+	_load_external()
 	return _external_mesh
+
+
+## Per-pose authored hand mesh (right hand), or null.
+static func external_hand(pose: StringName) -> Mesh:
+	_load_external()
+	if _external_hands.is_empty():
+		return null
+	return _external_hands.get(pose, _external_hands.get(&"relaxed", null))
 
 
 ## Grip centre (handle axis point) of a pose, in hand space (mirrored for left).
@@ -179,7 +204,14 @@ static func _build_arm(pose: StringName, left: bool, hand_basis: Basis, wrist: V
 			hand.scale = Vector3(-1.0, 1.0, 1.0)
 		FPModels._convert_tree(hand)
 		return root
-	hand.mesh = get_hand_mesh(pose, left)
+	var authored := external_hand(pose)
+	if authored:
+		hand.mesh = authored
+		if left:
+			hand.scale = Vector3(-1.0, 1.0, 1.0)
+		hand.set_surface_override_material(SURF_HAND, FPMaterials.vm(&"glove"))
+	else:
+		hand.mesh = get_hand_mesh(pose, left)
 	var fore := MeshInstance3D.new()
 	fore.name = "Forearm"
 	fore.mesh = get_forearm_mesh(left, sleeve_len)
@@ -212,7 +244,8 @@ static func set_pose(arm: Node3D, pose: StringName) -> void:
 	var hand := arm.get_node_or_null(^"Hand") as MeshInstance3D
 	if hand == null or _external_arm() != null:
 		return
-	hand.mesh = get_hand_mesh(pose, bool(arm.get_meta(&"left", false)))
+	var authored := external_hand(pose)
+	hand.mesh = authored if authored else get_hand_mesh(pose, bool(arm.get_meta(&"left", false)))
 	arm.set_meta(&"pose", pose)
 
 

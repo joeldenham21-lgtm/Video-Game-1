@@ -273,14 +273,21 @@ static func convert_standard(src: BaseMaterial3D) -> ShaderMaterial:
 	if src.normal_enabled and src.normal_texture:
 		m.set_shader_parameter(&"normal_tex", src.normal_texture)
 		m.set_shader_parameter(&"normal_strength", src.normal_scale)
-	if src.roughness_texture:
-		m.set_shader_parameter(&"orm_tex", src.roughness_texture)
+	var orm: Texture2D = (src as ORMMaterial3D).orm_texture if src is ORMMaterial3D else src.roughness_texture
+	if orm:
+		m.set_shader_parameter(&"orm_tex", orm)
 		m.set_shader_parameter(&"roughness_scale", src.roughness)
 		m.set_shader_parameter(&"metallic_scale", src.metallic)
 	else:
 		m.set_shader_parameter(&"roughness_scale", 0.0)
 		m.set_shader_parameter(&"roughness_offset", src.roughness)
 		m.set_shader_parameter(&"metallic_scale", 0.0)
+	# Library materials (ItemMaterials) tile by uv1_scale (metric UVs) or project triplanar in object space.
+	if src.uv1_triplanar:
+		m.set_shader_parameter(&"triplanar", 1.0)
+		m.set_shader_parameter(&"tri_scale", src.uv1_scale.x)
+	else:
+		m.set_shader_parameter(&"uv_scale", Vector2(src.uv1_scale.x, src.uv1_scale.y))
 	m.set_shader_parameter(&"emission", src.emission)
 	m.set_shader_parameter(&"emission_energy", src.emission_energy_multiplier if src.emission_enabled else 0.0)
 	m.set_shader_parameter(&"vm_fov", vm_fov)

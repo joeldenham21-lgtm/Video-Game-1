@@ -35,10 +35,14 @@ func build_visual() -> void:
 	var grip_cam := Vector3(0.19, -0.2, -0.38)
 	_holder.transform = Transform3D(basis, grip_cam - rest_pos - basis * Vector3(0.0, 0.07, 0.0))
 	model.add_child(_holder)
-	var mi := MeshInstance3D.new()
-	mi.mesh = FPModels.flare_mesh()
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_holder.add_child(mi)
+	var ext := FPModels.external(item_id)
+	if ext:
+		_holder.add_child(ext)
+	else:
+		var mi := MeshInstance3D.new()
+		mi.mesh = FPModels.flare_mesh()
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_holder.add_child(mi)
 	# Burning end: an emissive plug that glows once lit.
 	_tip_mat = FPMaterials.vm_emissive(&"plastic_red", Color(1.0, 0.25, 0.1), 0.0)
 	_tip = MeshInstance3D.new()

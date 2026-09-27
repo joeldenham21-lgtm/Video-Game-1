@@ -1,0 +1,20 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/models/props/lantern.glb" id="1_model"]
+
+[sub_resource type="CylinderShape3D" id="shape_0"]
+height = 0.25
+radius = 0.065
+
+[node name="Lantern" type="RigidBody3D"]
+collision_layer = 8
+collision_mask = 585
+mass = 1.4
+can_sleep = true
+sleeping = true
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+
+[node name="Shape0" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.125, 0)
+shape = SubResource("shape_0")
