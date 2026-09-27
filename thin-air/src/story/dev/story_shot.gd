@@ -42,6 +42,8 @@ func _setup_station() -> void:
 	Story.reset_story()
 	Story.events["woke"] = true
 	Story.set_act(5, true)
+	_story_done_until([&"reach_station", &"find_mara", &"fuel_generator", &"start_generator"], 5)
+	Story.events["relay_explained"] = true
 	for f in [&"generator_fueled", &"generator_running", &"station_power", &"met_mara", &"has_radio"]:
 		Game.set_flag(f, true)
 	var st := get_tree().get_first_node_in_group(&"poi_structures")
@@ -65,6 +67,7 @@ func _setup_rescue() -> void:
 	Story.reset_story()
 	Story.events["woke"] = true
 	Story.set_act(6, true)
+	_story_done_until([], 7)
 	var st := get_tree().get_first_node_in_group(&"poi_structures")
 	if st == null:
 		return
@@ -81,6 +84,21 @@ func _setup_rescue() -> void:
 	var pitch := rad_to_deg(atan2(d.y, Vector2(d.x, d.z).length()))
 	_views = [[eye, yaw, pitch]]
 	_apply_view(0)
+
+
+## Marks every objective before `act` (plus `extra`) done without running its actions, and every beat as
+## played, so the HUD shows the right objectives and no stray radio line plays over the shot.
+func _story_done_until(extra: Array, act: int) -> void:
+	for o in Story.graph.objectives:
+		if int(o.get("act", 0)) < act or extra.has(StringName(o["id"])):
+			Story.objectives.append({"id": StringName(o["id"]), "text": String(o["text"]), "done": true})
+	for b in Story.graph.beats:
+		Story.beats_done[String(b["id"])] = true
+	Story.hint_log.clear()
+	for h in Story.graph.hints:
+		Story.hint_log[String(h["id"])] = {"n": 99, "at": 0.0}
+	for f in [&"has_radio", &"met_mara"]:
+		Game.set_flag(f, true)
 
 
 func _apply_view(i: int) -> void:

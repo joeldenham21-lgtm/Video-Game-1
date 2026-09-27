@@ -400,7 +400,8 @@ func _process(delta: float) -> void:
 	if _eval_t <= 0.0 or _dirty:
 		_eval_t = 0.5
 		_dirty = false
-		_check_discovery()
+		if not _in_cinematic:
+			_check_discovery()
 		_evaluate_graph()
 		_evaluate_beats()
 		_update_music()

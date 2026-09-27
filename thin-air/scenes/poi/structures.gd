@@ -322,6 +322,8 @@ func _place_extras(id: StringName, site: Node3D) -> void:
 			_build_mara_corner(site)
 		&"summit_relay":
 			_build_relay_lamp(site)
+		&"crash_site":
+			_build_radio_glow(site)
 	# stoves in sites without a heat slot of their own
 	for key: String in (Story.graph.uses if Story.graph else {}):
 		var cfg: Dictionary = Story.graph.uses[key]
@@ -364,6 +366,7 @@ func _build_mara_corner(site: Node3D) -> void:
 		corner.add_child(p)
 		p.position = spec[1]
 		p.rotation.y = spec[2]
+	_build_mara_curtain(corner)
 	_mara_lamp = OmniLight3D.new()
 	_mara_lamp.name = "MaraLamp"
 	_mara_lamp.light_color = Color(1.0, 0.72, 0.42)
@@ -376,6 +379,103 @@ func _build_mara_corner(site: Node3D) -> void:
 	_mara_lamp.distance_fade_begin = 35.0
 	_mara_lamp.distance_fade_length = 10.0
 	corner.add_child(_mara_lamp)
+
+
+## The Otter's avionics are still on the battery bus: the radio's amber panel glow is the only light in the
+## wreck at dusk, and it draws the eye to the set that will receive Kestrel's beacon.
+func _build_radio_glow(site: Node3D) -> void:
+	var xf := _socket_xf(site, "Use_Radio")
+	if xf == Transform3D.IDENTITY:
+		return
+	var l := OmniLight3D.new()
+	l.name = "RadioGlow"
+	l.light_color = Color(1.0, 0.62, 0.28)
+	l.light_energy = 0.7
+	l.omni_range = 2.6
+	l.omni_attenuation = 1.4
+	l.shadow_enabled = false
+	l.distance_fade_enabled = true
+	l.distance_fade_begin = 30.0
+	l.distance_fade_length = 8.0
+	site.add_child(l)
+	l.global_position = xf.origin + xf.basis.z * 0.25 + Vector3.UP * 0.05
+	var panel := MeshInstance3D.new()
+	var q := QuadMesh.new()
+	q.size = Vector2(0.12, 0.035)
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.05, 0.03, 0.01)
+	m.emission_enabled = true
+	m.emission = Color(1.0, 0.55, 0.18)
+	m.emission_energy_multiplier = 2.2
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	q.material = m
+	panel.mesh = q
+	panel.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	panel.visibility_range_end = 40.0
+	site.add_child(panel)
+	panel.global_transform = Transform3D(xf.basis.orthonormalized(), xf.origin + xf.basis.z * 0.02)
+
+
+## A wool blanket hung on a line across Mara's bunk for warmth. Her lamp is behind it: from the room you see
+## the warm glow through the weave and the soft shadow of someone sitting up against the wall. No mesh of her.
+func _build_mara_curtain(corner: Node3D) -> void:
+	var w := 2.1
+	var h := 2.05
+	var mi := MeshInstance3D.new()
+	mi.name = "Curtain"
+	var q := QuadMesh.new()
+	q.size = Vector2(w, h)
+	var m := StandardMaterial3D.new()
+	var n := 96
+	var alb := Image.create(n, n, false, Image.FORMAT_RGB8)
+	var emi := Image.create(n, n, false, Image.FORMAT_RGB8)
+	for y in n:
+		for x in n:
+			var u := (float(x) + 0.5) / n
+			var v := (float(y) + 0.5) / n
+			var fold := 0.86 + 0.14 * sin(u * 38.0 + sin(v * 3.0) * 0.8)
+			var sag := 1.0 - 0.1 * absf(sin(u * PI * 4.0)) * (1.0 - v)
+			alb.set_pixel(x, y, Color(0.46, 0.39, 0.31) * fold * sag)
+			# lamp glow behind the blanket (lower right) and the sitting figure's shadow
+			var glow := clampf(1.0 - Vector2((u - 0.66) * 1.2, (v - 0.72) * 1.0).length() * 1.35, 0.0, 1.0)
+			var head := Vector2((u - 0.42) / 0.075, (v - 0.37) / 0.095).length()
+			var shoulders := Vector2((u - 0.43) / 0.2, (v - 0.56) / 0.12).length()
+			var torso := 1.0 if (v > 0.56 and absf(u - 0.43) < 0.19 - (v - 0.56) * 0.08) else 2.0
+			var neck := 1.0 if (v > 0.42 and v < 0.5 and absf(u - 0.425) < 0.035) else 2.0
+			var d := minf(minf(head, shoulders), minf(torso, neck))
+			var shadow := 1.0 - smoothstep(0.75, 1.25, d)
+			var e := glow * glow * (1.0 - 0.85 * shadow) * fold
+			emi.set_pixel(x, y, Color(1.0, 0.58, 0.26) * e)
+	alb.generate_mipmaps()
+	emi.generate_mipmaps()
+	m.albedo_texture = ImageTexture.create_from_image(alb)
+	m.emission_enabled = true
+	m.emission_texture = ImageTexture.create_from_image(emi)
+	m.emission = Color(1, 1, 1)
+	m.emission_energy_multiplier = 1.1
+	m.roughness = 1.0
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	q.material = m
+	mi.mesh = q
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	mi.visibility_range_end = 60.0
+	corner.add_child(mi)
+	# floor is ~0.62 m under the bunk socket; the blanket hangs from a line 2.05 m up, north of the bunk
+	mi.position = Vector3(0.0, -0.62 + h * 0.5, -1.15)
+	mi.rotation.y = PI
+	var line := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.004
+	cm.bottom_radius = 0.004
+	cm.height = w + 0.3
+	cm.radial_segments = 4
+	var lm := StandardMaterial3D.new()
+	lm.albedo_color = Color(0.2, 0.2, 0.19)
+	cm.material = lm
+	line.mesh = cm
+	line.rotation.z = PI * 0.5
+	line.position = Vector3(0.0, -0.62 + h + 0.02, -1.15)
+	corner.add_child(line)
 
 
 func _build_relay_lamp(site: Node3D) -> void:
