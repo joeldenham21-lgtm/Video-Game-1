@@ -119,7 +119,12 @@ func _process(_d: float) -> void:
 	if cam:
 		RenderingServer.global_shader_parameter_set(&"player_position", cam.global_position)
 	if args.has("perf") and frame == perf_at:
+		var vp := get_viewport().get_viewport_rid()
+		var RI := RenderingServer
 		print("PERF draw_calls=", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+			" shadow_draw_calls=", RI.viewport_get_render_info(vp, RI.VIEWPORT_RENDER_INFO_TYPE_SHADOW, RI.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME),
+			" shadow_primitives=", RI.viewport_get_render_info(vp, RI.VIEWPORT_RENDER_INFO_TYPE_SHADOW, RI.VIEWPORT_RENDER_INFO_PRIMITIVES_IN_FRAME),
+			" visible_draw_calls=", RI.viewport_get_render_info(vp, RI.VIEWPORT_RENDER_INFO_TYPE_VISIBLE, RI.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME),
 			" primitives=", Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME),
 			" objects=", Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
 			" vram_mb=", snappedf(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0, 0.1),
