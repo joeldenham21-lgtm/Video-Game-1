@@ -56,6 +56,9 @@ func _setup_station() -> void:
 		return
 	# [local eye position, yaw, pitch] from the POI QA views (galley, bunks)
 	_views = [[Vector3(0.6, 3.45, 3.9), 8.0, -10.0], [Vector3(9.9, 3.45, -4.8), 180.0, -12.0]]
+	if args.get("view", "") == "mara":
+		# close on Mara's blanket curtain in the east module
+		_views = [[Vector3(10.3, 3.45, -1.0), 208.0, -11.0]]
 	for v in _views:
 		v[0] = site.global_transform * (v[0] as Vector3)
 	_apply_view(0)
