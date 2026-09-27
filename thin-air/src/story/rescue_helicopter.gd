@@ -73,6 +73,16 @@ func start(pad_pos: Vector3, yaw_deg: float, from_dir := Vector3(-0.72, 0.0, 0.6
 		_loop = Audio.play_loop(&"helicopter_loop", self, 4.0)
 
 
+## Dev/QA: jump along the approach to `metres` before the hover point.
+func skip_to_remaining(metres: float) -> void:
+	_s = clampf(_len - metres, 0.0, _len)
+	_speed = lerpf(7.0, CRUISE, clampf(metres / APPROACH_SLOW, 0.0, 1.0))
+	global_position = _curve.sample_baked(_s, true)
+	_prev_pos = global_position
+	var ahead := _curve.sample_baked(minf(_len, _s + 5.0), true) - global_position
+	_yaw = atan2(-ahead.x, -ahead.z)
+
+
 func is_landed() -> bool:
 	return _phase == 2
 

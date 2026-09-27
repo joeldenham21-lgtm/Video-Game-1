@@ -58,6 +58,8 @@ var instant := false
 var autosave_enabled := true
 ## Dev: skip the 4-minute prologue scene (wake straight at the wreck).
 var skip_prologue := false
+## Dev QA renders (src/story/dev/story_shot.gd): the prologue auto-skips after half a second, waits are 20x shorter.
+var dev_fast := false
 
 var _voice: Dictionary = {}
 var _logs: Dictionary = {}
@@ -990,6 +992,8 @@ func _run_sequence(id: String) -> void:
 
 
 func _wait(seconds: float) -> void:
+	if dev_fast:
+		seconds *= 0.05
 	if instant or seconds <= 0.0 or not is_inside_tree():
 		return
 	await get_tree().create_timer(seconds, false).timeout
@@ -1003,6 +1007,7 @@ func _seq_prologue() -> void:
 	if pl and pl.has_method(&"set_input_enabled"):
 		pl.call(&"set_input_enabled", false)
 	_place_player(&"crash_site", &"Arrive_Wake")
+	_face_socket("crash_site/Use_Radio", -6.0)
 	Climate.locked = true
 	var ov := _get_overlay()
 	ov.call(&"show_black")
@@ -1027,7 +1032,7 @@ func _seq_prologue() -> void:
 				shook[k] = true
 				if pl and pl.has_method(&"add_trauma"):
 					pl.call(&"add_trauma", 0.25)
-		if bool(ov.call(&"skip_requested")):
+		if bool(ov.call(&"skip_requested")) or dev_fast and t > 0.45:
 			skipped = true
 			break
 	ov.call(&"set_skip_visible", false)
@@ -1051,6 +1056,7 @@ func _wake(fast: bool) -> void:
 	if fast:
 		Climate.reset_new_game()
 		_place_player(&"crash_site", &"Arrive_Wake")
+		_face_socket("crash_site/Use_Radio", -6.0)
 	var ov := _get_overlay()
 	events["woke"] = true
 	set_act(1, true)
@@ -1058,7 +1064,7 @@ func _wake(fast: bool) -> void:
 		var cockpit := _socket_node("crash_site/Use_Radio")
 		if cockpit:
 			Audio.play_sfx(&"metal_creak", cockpit.global_position)
-		ov.call(&"fade_from_black", 1.2 if fast else 5.0)
+		ov.call(&"fade_from_black", 0.6 if dev_fast else (1.2 if fast else 5.0))
 	_in_cinematic = false
 	Game.set_cinematic(false)
 	Events.cinematic_ended.emit(&"prologue")
@@ -1283,6 +1289,20 @@ func _place_player(site: StringName, socket: StringName) -> void:
 		(pl as Node3D).global_position = n.global_position
 
 
+## Turns the player to look at a socket (the wake: towards the cockpit, Dale and the radio).
+func _face_socket(key: String, pitch_deg: float) -> void:
+	var pl := Game.player
+	var n := _socket_node(key)
+	if pl == null or n == null or not (pl is Node3D):
+		return
+	var d := n.global_position - (pl as Node3D).global_position
+	var yaw := rad_to_deg(atan2(-d.x, -d.z))
+	if pl.has_method(&"set_look"):
+		pl.call(&"set_look", yaw, pitch_deg)
+	elif pl.has_method(&"teleport"):
+		pl.call(&"teleport", (pl as Node3D).global_position, yaw)
+
+
 func _player_pos() -> Vector3:
 	var pl := Game.player
 	if pl == null or not is_instance_valid(pl) or not (pl is Node3D):
@@ -1332,5 +1352,5 @@ func _get_overlay() -> CanvasLayer:
 	if _overlay == null or not is_instance_valid(_overlay):
 		_overlay = OverlayScript.new()
 		_overlay.name = "StoryOverlay"
-		get_tree().root.add_child(_overlay)
+		add_child(_overlay)   # under this autoload: the root may be busy instancing the world right now
 	return _overlay

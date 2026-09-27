@@ -217,3 +217,14 @@ rebuild of unchanged sources is bit-identical (no redundant binaries in git hist
 along the grain), `COLOR.rgb` = paint tint × baked AO (near occlusion + sky openness) × ground grime, `COLOR.a` = sky
 exposure (0 indoors .. 1 open sky) → snow settles on exposed up-facing surfaces (global `snow_cover` + altitude), rain
 wets. Materials reuse the shared texture library (no duplicated textures): repaintable variants desaturate + tint.
+
+## Story (story stream)
+No generators: the story is data. `data/story.json` holds the objective graph (30 objectives over acts 1–6, each with
+prerequisites, an optional trigger, a completion condition, start/complete actions and a stuck hint), the one-shot beats,
+Mara's contextual radio hints, the interactables placed at location sockets ("uses"), extra scanner targets and Mara's
+in-person talk lines. `data/loot.json` holds the loot tables and what lies at each Loot_* socket (seeded per site+socket).
+Voice lines are the audio stream's `data/voice.json` (no new lines were needed).
+| Tool | Command (from repo root) | Output |
+|---|---|---|
+| Story tests | `timeout 300 godot --headless --path thin-air res://tests/test_runner.tscn -- --test=res://tests/test_story.gd` | graph integrity + reachability, loot, Structures population, a scripted playthrough to the ending, save/load mid-act |
+| Story QA shots | `DISPLAY=:99 godot --path thin-air --rendering-method forward_plus --write-movie /abs/dir/f.png --fixed-fps 30 --quit-after 45 --resolution 960x540 res://scenes/story/story_shot.tscn -- --shot=wake` (or `--shot=station [--switch=24] [--hours=20.6]`) | `wake`: a real new game (prologue black + subtitles, auto-skipped by `Story.dev_fast`, then the fade-in at the wreck); `station`: Kestrel Station with the generator on, galley then Mara's corner; frames → `docs/shots/story_*.jpg` |
