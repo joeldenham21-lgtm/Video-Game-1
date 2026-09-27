@@ -122,20 +122,32 @@ Stages (`--stage X` resumes from a cached stage; `--preview DIR` writes hillshad
    floor / crest heights; a cliff-base profile (gentle below ~1,950 m, walls above, suppressed along the golden-path
    RAMPS); the lower envelope of valley-wall cones (<= 33 deg forested walls from every floor edge, steeper for high
    cirques and the designed GORGES) caps it; then facets, ragged crests, a coarse-to-fine cascade of fall-line
-   erosion noise (C `erosion_noise`, dendritic gullies/spurs), layer-cake benches above the cliff base, footslope
-   fillets, graded RAMP corridors. Matched to FAR at its border.
-3. **fine** (1.5 m, the 2049^2 map): POI altitude corrections, metre-scale gullies/ribs/hummocks, strata cliff bands
-   and ledges, the Corrigan Glacier (smooth ice with convex tongue, serac-chaos icefall, shallow crevasses, lateral
+   erosion noise (C `erosion_noise`, dendritic gullies/spurs), benches above the cliff base (60-260 m bands on a
+   folded structural surface - the dip swings up to ~10 deg over 0.5-2 km - broken wherever a big fall-line gully
+   runs, then couloirs re-cut through them, so no bench runs level across a whole face), footslope fillets, graded
+   RAMP corridors. Matched to FAR at its border.
+3. **fine** (1.5 m, the 2049^2 map): POI altitude corrections, Mount Corrigan's summit pyramid (sharp aretes along
+   the designed W/N/E summit crests, ~56 deg faces between them that only carve rock away, radial couloirs, a blocky
+   summit block; blended out by 430 m, the col/station untouched), folded strata (thin-bedded runs and massive
+   units, dip varying with folds, ledges that pinch out along strike; per-band rock colour), then metre-scale
+   gullies/ribs/hummocks and incised couloirs that cut through the strata, the Corrigan Glacier (smooth ice with convex tongue, serac-chaos icefall, shallow crevasses, lateral
    moraines, steep snout), 1.6 M droplet hydraulic erosion + 36 deg thermal talus on soft ground (pads protected).
 4. **fine2**: Loon Lake basin + shore, tarns, snout moraines, rivers (downstream-monotone isotonic water profile,
    channel + limited banks; braided gravel plain), POI pads (walkable blend rings), trails (least-cost switchback
    router with a turning penalty `route_turn`, grade-limited tread, bench cuts, fords graded to the water), summit
    cap (Mount Corrigan is the highest point).
-5. **out**: masks (snow by altitude/aspect/wind/curvature incl. snow-filled couloirs; rock; meadow; forest with
+5. **out**: masks (snow by altitude/aspect/wind/curvature; on steep faces snow only lodges in couloir floors and
+   concave gullies and in broken ledge patches - never in even bands along the strata; rock; meadow; forest with
    treeline, avalanche chutes and clearings; scree below its repose angle; gravel; glacier ice; wetness), world
    normals + horizon AO (`normal.png`), `detail.png` (trail, strata band index, crevasses, cliff bands), MID/FAR
    stitched to the map edge, `world_layout.json` (CONTRACT §6; compact numeric arrays).
 
+Shader (`assets/shaders/terrain_material.gdshaderinc`): up to 3 height-blended layers (desktop; 2 on Mobile),
+biplanar X/Z projection with height-aware weights on steep ground (every layer on desktop, rock/cliff/snow on
+Mobile), a noise-driven rotated 1/3.7 second fetch against tiling (desktop), a "macro rock" pass (the cliff layer
+re-projected at ~37 m and ~150 m for albedo + normal, 10 m to 5 km) so faces stay rocky beyond the 360 m texture
+range, snow that lodges in the macro rock's low parts on faces, weather dusting broken into patches on faces, and
+ground texture relief/contrast flattened under mostly-snowy cover (no tiled tufts printing through).
 Runtime: `src/autoload/terrain_data.gd` (queries + GPU textures + shader globals), `src/world/terrain.gd`
 (geometry clipmap, Jolt heightfield collider with NaN holes for the mine adit / ice cave, map boundary, heightfield
 sun-shadow pass `terrain_shadow_tex`), shaders `assets/shaders/terrain*.gdshader(inc)`. Tests: `tests/test_terrain.gd`.
@@ -156,7 +168,11 @@ with dithered cross-fades (`lod_begin/lod_end` instance uniforms), shadow-only p
 quads); far field: one impostor MultiMesh per 256 m cell. `veg_grass.gd` = ground-cover ring (24 m cells,
 rank-sorted instances for density LOD), `veg_colliders.gd` = pooled `VegProxy` bodies near the player (trunks
 layer 10, boulders layer 1, shrubs/small rocks interact-only layer 5), `veg_harvest.gd` + `veg_felled_tree.gd` =
-chopping/felling/bucking, shrub and rock yields, persistence (key "vegetation").
+chopping/felling/bucking, shrub and rock yields, persistence (key "vegetation"). Edges are kept natural: ground cover
+and shrubs fade in over a noisy 14 m ring outside POI pads (`VegScatter.pad_keep`, pads themselves stay clear), the
+shrub ecotone follows a noise-displaced forest edge and species grow in ~45 m patches, and open-grown edge trees
+favour full-crowned spruce/fir (few lodgepole/snags at meadow edges). All vegetation shaders take the heightfield
+sun shadow (`veg_light()` in `veg_common.gdshaderinc`), so trees and tufts in a ridge's shadow are not sunlit.
 ## Building (`tools/blender/building/`, building stream)
 | Tool | Command (from repo root) | Output |
 |---|---|---|

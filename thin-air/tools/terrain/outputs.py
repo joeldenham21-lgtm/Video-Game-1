@@ -153,7 +153,9 @@ def compute_masks(F, log):
 	couloir = F.masks.get("couloir", np.zeros_like(h))
 	gully = np.clip(np.maximum(couloir * 1.3, np.maximum(gcurv, curv) * 2.0 - 0.2), 0, 1)
 	gully = gully * (1 - smoothstep(60.0, 72.0, slope))
-	ledge = 1 - smoothstep(27.0, 42.0, slope)
+	# high up (late October above ~2,900 m) snow is plastered onto steeper ledges and rough rock as well
+	hi = smoothstep(2800.0, 3300.0, h)
+	ledge = 1 - smoothstep(27.0 + 12.0 * hi, 42.0 + 12.0 * hi, slope)
 	pk = F.noise(1 / 30.0, 3, seed=204) + 0.5 * F.noise(1 / 9.0, 2, seed=205) + 0.2 * np.clip(aspect_n, -1, 1)
 	pocket = ledge * smoothstep(0.05, 0.45, pk) * (1 - np.clip(-gcurv * 2.0, 0, 1))
 	snow_face = s_alt * np.maximum(gully * (0.8 + 0.2 * np.clip(aspect_n, 0, 1)), pocket * 0.9)

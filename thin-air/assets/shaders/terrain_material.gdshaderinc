@@ -52,57 +52,70 @@ struct Samp {
 	float rough;
 };
 
-Samp sample_layer(int i, vec3 wp, vec3 N, float far_w, bool side) {
+// Biplanar projection on steep ground (X and Z planes, image-up = world-up), so cliff strata, snow and scree
+// are never smeared down a face. Height-aware weights: where both projections overlap (faces at ~45 deg to
+// the axes) the taller texel wins instead of a ghosted double image.
+Samp sample_side(int i, vec3 wp, vec3 N, float tiling, vec2 ofs, float nstr) {
+	Samp s;
+	vec3 an = abs(N);
+	vec2 uvx = vec2(wp.z, -wp.y) / tiling + vec2(0.31, 0.17) + ofs;
+	vec2 uvz = vec2(wp.x, -wp.y) / tiling + ofs;
+	vec4 ax = texture(layer_ah, vec3(uvx, float(i)));
+	vec4 az = texture(layer_ah, vec3(uvz, float(i)));
+	vec4 nx = texture(layer_nr, vec3(uvx, float(i)));
+	vec4 nz = texture(layer_nr, vec3(uvz, float(i)));
+	vec2 wgt = pow(an.xz, vec2(4.0)) * (vec2(ax.a, az.a) + 0.3);
+	wgt /= max(wgt.x + wgt.y, 1e-4);
+	wgt = wgt * wgt;
+	wgt /= max(wgt.x + wgt.y, 1e-4);
+	vec3 tx = unpack_n(nx);
+	vec3 tz = unpack_n(nz);
+	tx.xy *= nstr;
+	tz.xy *= nstr;
+	vec3 wx = vec3(abs(tx.z) * N.x, tx.y + N.y, tx.x + N.z);
+	vec3 wz = vec3(tz.x + N.x, tz.y + N.y, abs(tz.z) * N.z);
+	s.albedo = ax.rgb * wgt.x + az.rgb * wgt.y;
+	s.height = ax.a * wgt.x + az.a * wgt.y;
+	s.nrm = normalize(wx * wgt.x + wz * wgt.y);
+	s.rough = nx.a * wgt.x + nz.a * wgt.y;
+	return s;
+}
+
+// anti: 0..1 weight of a second, rotated fetch at 3.7x the tile size (breaks the repeat; driven by distance
+// and by macro noise so near patches alternate too). Its tangent normal is rotated back into the first frame.
+Samp sample_layer(int i, vec3 wp, vec3 N, float far_w, bool side, float anti) {
 	Samp s;
 	if (side) {
-		// biplanar on steep ground: X and Z projections, image-up = world-up
-		vec3 an = abs(N);
-		vec2 wgt = pow(an.xz, vec2(4.0));
-		wgt /= max(wgt.x + wgt.y, 1e-4);
-		vec2 uvx = vec2(wp.z, -wp.y) / layer_tiling[i] + vec2(0.31, 0.17);
-		vec2 uvz = vec2(wp.x, -wp.y) / layer_tiling[i];
-		vec4 ax = texture(layer_ah, vec3(uvx, float(i)));
-		vec4 az = texture(layer_ah, vec3(uvz, float(i)));
-		vec4 nx = texture(layer_nr, vec3(uvx, float(i)));
-		vec4 nz = texture(layer_nr, vec3(uvz, float(i)));
-		vec3 tx = unpack_n(nx);
-		vec3 tz = unpack_n(nz);
-		tx.xy *= mix(1.0, 0.4, far_w);
-		tz.xy *= mix(1.0, 0.4, far_w);
-		vec3 wx = vec3(abs(tx.z) * N.x, tx.y + N.y, tx.x + N.z);
-		vec3 wz = vec3(tz.x + N.x, tz.y + N.y, abs(tz.z) * N.z);
-		s.albedo = ax.rgb * wgt.x + az.rgb * wgt.y;
-		s.height = ax.a * wgt.x + az.a * wgt.y;
-		s.nrm = normalize(wx * wgt.x + wz * wgt.y);
-		s.rough = nx.a * wgt.x + nz.a * wgt.y;
-	} else {
-		vec2 uv = layer_uv(vec2(wp.x, -wp.z), i);
-		vec4 ah = texture(layer_ah, vec3(uv, float(i)));
-		vec4 nr = texture(layer_nr, vec3(uv, float(i)));
-#ifndef TERRAIN_MOBILE
-		// anti-tiling: blend a rotated, 3.7x larger fetch in with distance
-		if (far_w > 0.02) {
-			vec2 uv2 = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8)) * uv / 3.7 + vec2(0.37, 0.71);
-			vec4 ah2 = texture(layer_ah, vec3(uv2, float(i)));
-			vec4 nr2 = texture(layer_nr, vec3(uv2, float(i)));
-			float k = far_w * 0.55;
-			ah = mix(ah, ah2, k);
-			nr = mix(nr, nr2, k);
-		}
-#endif
-		vec3 t = unpack_n(nr);
-		t.xy *= mix(1.0, 0.4, far_w);
-		// undo layer_uv's rotation: texture u-axis / image-up expressed in p = (x, -z) space
-		float a = float(i) * 1.1 + 0.4;
-		float ca = cos(a);
-		float sa = sin(a);
-		vec2 q = vec2(ca * t.x - sa * t.y, -sa * t.x - ca * t.y);
-		vec3 w = vec3(q.x + N.x, abs(t.z) * N.y, -q.y + N.z);
-		s.albedo = ah.rgb;
-		s.height = ah.a;
-		s.nrm = normalize(w);
-		s.rough = nr.a;
+		return sample_side(i, wp, N, layer_tiling[i], vec2(0.0), mix(1.0, 0.45, far_w));
 	}
+	vec2 uv = layer_uv(vec2(wp.x, -wp.z), i);
+	vec4 ah = texture(layer_ah, vec3(uv, float(i)));
+	vec4 nr = texture(layer_nr, vec3(uv, float(i)));
+	vec3 t = unpack_n(nr);
+#ifndef TERRAIN_MOBILE
+	if (anti > 0.02) {
+		mat2 rot = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8));
+		vec2 uv2 = rot * uv / 3.7 + vec2(0.37, 0.71);
+		vec4 ah2 = texture(layer_ah, vec3(uv2, float(i)));
+		vec4 nr2 = texture(layer_nr, vec3(uv2, float(i)));
+		vec3 t2 = unpack_n(nr2);
+		t2.xy = transpose(rot) * t2.xy;
+		ah = mix(ah, ah2, anti);
+		nr.a = mix(nr.a, nr2.a, anti);
+		t = normalize(mix(t, t2, anti));
+	}
+#endif
+	t.xy *= mix(1.0, 0.45, far_w);
+	// undo layer_uv's rotation: texture u-axis / image-up expressed in p = (x, -z) space
+	float a = float(i) * 1.1 + 0.4;
+	float ca = cos(a);
+	float sa = sin(a);
+	vec2 q = vec2(ca * t.x - sa * t.y, -sa * t.x - ca * t.y);
+	vec3 w = vec3(q.x + N.x, abs(t.z) * N.y, -q.y + N.z);
+	s.albedo = ah.rgb;
+	s.height = ah.a;
+	s.nrm = normalize(w);
+	s.rough = nr.a;
 	return s;
 }
 
@@ -147,16 +160,26 @@ void terrain_fragment(in vec3 vtx_view, in mat4 view_matrix, in vec3 world, in v
 		m = mix(pm, m, in_map);
 		m2 = mix(pm2, m2, in_map);
 	}
-	// fresh snow dusting from the weather (upward-facing, thinner in the valley)
+	// face-scale steepness (normal map ~4 mips down = ~12-24 m): a ledge on a cliff is still part of a face
+	vec3 Nc = N;
+	if (in_map > 0.0) {
+		Nc = normalize(mix(N, textureLod(terrain_normal_tex, fuv, 3.5).rgb * 2.0 - 1.0, in_map));
+	}
+	float face = smoothstep(0.24, 0.42, 1.0 - Nc.y);
+	// fine macro noise (19 m / 7 m): anti-tiling weights, snow-edge and ledge-dusting breakup
+	vec3 mh = texture(macro_noise, wp.xz / 19.0 + vec2(0.13, 0.57)).rgb;
+	// fresh snow dusting from the weather (upward-facing, thinner in the valley); on faces it only sticks in
+	// broken patches on ledges, never as a continuous band along every stratum
 	float dust = snow_cover * smoothstep(0.6, 0.9, N.y) * mix(0.55, 1.0, smoothstep(1350.0, 1700.0, alt)) *
 		(1.0 - m.a * 0.35) * (1.0 - m2.a * 0.9);
+	dust *= mix(1.0, smoothstep(0.42, 0.62, mh.g * 0.7 + mn.r * 0.3), face);
 	float snow_w = clamp(max(m.r, dust) + (mn.b - 0.5) * 0.12, 0.0, 1.0);
 
 	float w[9];
 	float sl = smoothstep(0.30, 0.52, steep);
 	w[0] = 0.0;
 	w[1] = m.g * (1.0 - sl);
-	w[2] = m.g * sl + smoothstep(0.55, 0.75, steep) * 0.6;
+	w[2] = m.g * sl + smoothstep(0.55, 0.75, steep) * 0.6 * (1.0 - m2.b);   // steep glacier ice stays ice (icefall)
 	w[3] = m2.r;
 	w[4] = m2.g;
 	w[5] = m.b;
@@ -180,6 +203,9 @@ void terrain_fragment(in vec3 vtx_view, in mat4 view_matrix, in vec3 world, in v
 	vec3 Nd = N;
 	float tex_w = 1.0 - smoothstep(detail_far * 0.6, detail_far, dist);
 	float far_w = smoothstep(12.0, 70.0, dist);
+	// second-fetch weight: distance (the documented 1/3.7 rotated fetch) + macro-noise patches near the camera
+	float anti = clamp(far_w * 0.4 + smoothstep(0.35, 0.75, mh.r) * 0.45, 0.0, 0.8);
+	bool side = steep > 0.28;
 	if (tex_w > 0.001) {
 		// pick the strongest layers
 		int i0 = 1;
@@ -198,24 +224,33 @@ void terrain_fragment(in vec3 vtx_view, in mat4 view_matrix, in vec3 world, in v
 				b2 = v; i2 = i;
 			}
 		}
-		bool side = steep > 0.28;
 #ifdef TERRAIN_MOBILE
-		side = false;
 		b2 = -1.0;
-#endif
-		Samp s0 = sample_layer(i0, wp, N, far_w, side && (i0 == 1 || i0 == 2));
+		// mobile: biplanar only for the rock layers (the ones that cover real faces)
+		Samp s0 = sample_layer(i0, wp, N, far_w, side && (i0 == 1 || i0 == 2), 0.0);
 		Samp s1 = s0;
 		Samp s2 = s0;
 		if (b1 > 0.02) {
-			s1 = sample_layer(i1, wp, N, far_w, side && (i1 == 1 || i1 == 2));
+			s1 = sample_layer(i1, wp, N, far_w, side && (i1 == 1 || i1 == 2), 0.0);
+		}
+#else
+		// desktop: every layer is biplanar on steep ground (no stretched scree / grass / dirt on 40-60 deg)
+		Samp s0 = sample_layer(i0, wp, N, far_w, side, anti);
+		Samp s1 = s0;
+		Samp s2 = s0;
+		if (b1 > 0.02) {
+			s1 = sample_layer(i1, wp, N, far_w, side, anti);
 		}
 		if (b2 > 0.02) {
-			s2 = sample_layer(i2, wp, N, far_w, side && (i2 == 1 || i2 == 2));
+			s2 = sample_layer(i2, wp, N, far_w, side, anti);
 		}
-		float depth = 0.18;
-		float h0 = s0.height * 0.55 + b0;
-		float h1 = b1 > 0.02 ? s1.height * 0.55 + b1 : -9.0;
-		float h2 = b2 > 0.02 ? s2.height * 0.55 + b2 : -9.0;
+#endif
+		// height-based blend: the layer whose texture stands higher wins (grass between stones, scree
+		// filling cracks) - a narrow transition band keeps the boundary crisp at any distance
+		float depth = 0.12;
+		float h0 = s0.height * 0.6 + b0;
+		float h1 = b1 > 0.02 ? s1.height * 0.6 + b1 : -9.0;
+		float h2 = b2 > 0.02 ? s2.height * 0.6 + b2 : -9.0;
 		float hm = max(h0, max(h1, h2));
 		float c0 = max(h0 - hm + depth, 0.0);
 		float c1 = max(h1 - hm + depth, 0.0);
@@ -235,8 +270,30 @@ void terrain_fragment(in vec3 vtx_view, in mat4 view_matrix, in vec3 world, in v
 	}
 	// rock colour: strata bands and a little warmth/greyness variation (lichen, oxidation)
 	float rockness = clamp((w[1] + w[2]) / max(wsum, 1e-4), 0.0, 1.0);
-	vec3 band = mix(vec3(0.86, 0.86, 0.87), vec3(1.12, 1.05, 0.95), det.g);
+	vec3 band = mix(vec3(0.9, 0.9, 0.92), vec3(1.1, 1.04, 0.95), det.g);
 	base_alb *= mix(vec3(1.0), band, rockness * in_map);
+	// macro rock: the cliff layer re-projected (biplanar) at ~37 m and ~150 m - joints, blocks, buttress-scale
+	// light/dark and a macro normal - so faces stay rocky and crisp from 30 m to kilometres (beyond the
+	// texture range too, where the base is only a flat average colour)
+	float mr_w = max(rockness, face * 0.7) * smoothstep(10.0, 45.0, dist) * (1.0 - smoothstep(3000.0, 5000.0, dist));
+	float mr_h = 0.5;
+	if (mr_w > 0.01) {
+		float t1 = layer_tiling[2] * 4.6;
+		float lum_avg = max(dot(layer_avg[2], vec3(0.3, 0.59, 0.11)), 1e-3);
+#ifdef TERRAIN_MOBILE
+		Samp mr = sample_side(2, wp, N, t1, vec2(0.53, 0.29), 1.8);
+		float lum = dot(mr.albedo, vec3(0.3, 0.59, 0.11)) / lum_avg;
+#else
+		Samp mr = sample_side(2, wp, N, t1, vec2(0.53, 0.29), 1.8);
+		Samp mr2 = sample_side(2, wp, N, t1 * 4.1, vec2(0.21, 0.83), 1.4);
+		float lum = dot(mr.albedo, vec3(0.3, 0.59, 0.11)) / lum_avg;
+		lum *= mix(1.0, dot(mr2.albedo, vec3(0.3, 0.59, 0.11)) / lum_avg, 0.5 * smoothstep(80.0, 400.0, dist));
+		mr.nrm = normalize(mix(mr.nrm, mr2.nrm, 0.4 * smoothstep(100.0, 600.0, dist)));
+#endif
+		mr_h = mr.height;
+		base_alb *= mix(1.0, clamp(pow(lum, 1.25), 0.4, 2.0), mr_w * 0.85);
+		Nd = normalize(mix(Nd, normalize(Nd + (mr.nrm - N) * 1.2), mr_w * 0.8));
+	}
 	// rock faces: dark water / lichen streaks running down the fall line, weathering patches (warm iron
 	// stains, grey-green lichen), so walls read as rock at any distance instead of plaster
 	if (rockness > 0.01) {
@@ -247,30 +304,41 @@ void terrain_fragment(in vec3 vtx_view, in mat4 view_matrix, in vec3 world, in v
 		vec3 sn1 = texture(macro_noise, vec2(u_face / 23.0, wp.y / 260.0)).rgb;
 		vec3 sn2 = texture(macro_noise, vec2(u_face / 7.0 + 0.31, wp.y / 90.0)).rgb;
 		float streak = smoothstep(0.45, 0.8, sn1.r) * 0.55 + smoothstep(0.5, 0.85, sn2.g) * 0.3;
-		float face = smoothstep(0.35, 0.6, steep);
+		float facek = smoothstep(0.35, 0.6, steep);
 		vec3 stain = mix(vec3(1.0), vec3(1.08, 0.97, 0.86), smoothstep(0.55, 0.8, mnf.g));
 		vec3 lichen = mix(vec3(1.0), vec3(0.9, 0.95, 0.88), smoothstep(0.5, 0.75, mn.r));
-		vec3 rock_mod = (1.0 - streak * face * 0.55) * stain * lichen * mix(1.0, 0.82, face);
+		vec3 rock_mod = (1.0 - streak * facek * 0.55) * stain * lichen * mix(1.0, 0.82, facek);
 		base_alb *= mix(vec3(1.0), rock_mod, rockness);
 	}
 	// macro variation: breaks up any remaining repetition near and far
 	float v_near = dot(mn - 0.5, vec3(0.5, 0.3, 0.2)) * 2.0;
 	float v_far = dot(mnf - 0.5, vec3(0.6, 0.3, 0.1)) * 2.0;
-	base_alb *= 1.0 + v_near * 0.28 + v_far * 0.22;
+	base_alb *= 1.0 + v_near * 0.28 + v_far * 0.22 + (mh.b - 0.5) * 0.12;
 	// crevasses: deep blue-grey shade in the cracks
 	base_alb = mix(base_alb, vec3(0.10, 0.20, 0.26), clamp(det.b * 0.85, 0.0, 1.0) * in_map);
+	// under a mostly-snowy cover the ground texture must not print through as a tiled pattern (grass tufts
+	// read as dark stars on white): flatten its height relief and pull its colour toward the layer mix average
+	float snowy = smoothstep(0.2, 0.7, snow_w) * (1.0 - rockness * 0.6);
+	base_h = mix(base_h, 0.35 + (base_h - 0.35) * 0.15, snowy);
+	base_alb = mix(base_alb, far_alb * (1.0 + v_near * 0.25), snowy * 0.8);
 
-	// snow overlay: fills hollows first, thin on bumps
+	// snow overlay: fills hollows first, thin on bumps; on rock faces it lodges in the low parts of the
+	// macro rock (cracks, ledges) with a noisy, non-repeating edge
 	vec3 snow_alb = layer_avg[0];
 	float snow_r = layer_rough[0];
 	vec3 snow_n = N;
 	if (snow_w > 0.01 && tex_w > 0.001) {
-		Samp ss = sample_layer(0, wp, N, far_w, false);
+#ifdef TERRAIN_MOBILE
+		Samp ss = sample_layer(0, wp, N, far_w, side, 0.0);
+#else
+		Samp ss = sample_layer(0, wp, N, far_w, side, anti);
+#endif
 		snow_alb = mix(snow_alb, ss.albedo, tex_w);
 		snow_r = mix(snow_r, ss.rough, tex_w);
 		snow_n = normalize(mix(N, ss.nrm, tex_w * 0.8));
 	}
-	float cover = clamp((snow_w * 1.35 - base_h * 0.45 - 0.1) * 3.5, 0.0, 1.0);
+	float edge_n = (mh.g - 0.5) * 0.22 + (texture(macro_noise, wp.xz / 4.3 + vec2(0.7, 0.2)).r - 0.5) * 0.18;
+	float cover = clamp((snow_w * 1.35 - base_h * 0.45 - 0.1 + edge_n - (mr_h - 0.5) * 0.6 * face) * 3.5, 0.0, 1.0);
 	cover = mix(cover, snow_w, 1.0 - tex_w);       // far: plain coverage
 	albedo = mix(base_alb, snow_alb * (1.0 + v_far * 0.05), cover);
 	rough = mix(base_r, snow_r, cover);

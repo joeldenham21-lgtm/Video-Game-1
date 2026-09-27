@@ -210,7 +210,7 @@ class Fine:
 		E2 = tlib.erosion_noise(gx, gz, X0, X0, DX, 1 / 95.0, 3, 0.45, 2.0, 0.8, 0.08, seed=self.seed + 38)
 		face = smoothstep(30.0, 44.0, s) * (1 - fl) * (1 - self.ramp_w) * smoothstep(1750.0, 2100.0, hb)
 		h -= smoothstep(0.08, 0.7, -E2) * (3.0 + 6.0 * smoothstep(40.0, 55.0, s)) * face
-		self.masks["couloir"] = (smoothstep(0.1, 0.6, -E2) * face).astype(np.float32)
+		self.masks["couloir"] = np.maximum(self.masks.get("couloir", 0.0), smoothstep(0.1, 0.6, -E2) * face).astype(np.float32)
 		# valley floors: terraces, old channels and hummocky ground rather than a flat plate
 		h += fl * (self.noise(1 / 170.0, 3, seed=35) * 1.6 + self.noise(1 / 55.0, 3, seed=36) * 0.5)
 		self.h = h.astype(np.float32)
@@ -238,6 +238,9 @@ class Fine:
 		qx = Xw + nz(1 / 120.0, 3, 131) * 9.0 * wob
 		qz = Zw + nz(1 / 120.0, 3, 132) * 9.0 * wob
 		kf = np.tan(np.radians(56.0 + 5.0 * nz(1 / 160.0, 3, 133)))
+		# gendarmes and steps along the aretes, towers and bays on the flanks (applied to every tent)
+		gend = (nz(1 / 30.0, 3, 138, "ridged") - 0.45) * 7.0 + nz(1 / 90.0, 3, 139) * 6.0
+		gend = gend * smoothstep(12.0, 70.0, r)
 		best = np.full(r.shape, -1e9)
 		dmin = np.full(r.shape, 1e9)
 		for name in ("summit_w", "summit_n", "summit_e"):
@@ -247,7 +250,7 @@ class Fine:
 			pts[0] = (sx, sz, sy + 4.0)
 			d, attrs, _ = polyline_nearest(qx, qz, pts)
 			# the arete itself: a narrow rounded crest (2-4 m), then the flanks
-			tent = attrs[0] - kf * np.sqrt(d * d + 9.0) + 3.0 * kf
+			tent = attrs[0] + gend - kf * np.sqrt(d * d + 9.0) + 3.0 * kf
 			best = np.maximum(best, tent)
 			dmin = np.minimum(dmin, d)
 		hp = best
@@ -256,10 +259,10 @@ class Fine:
 		gz, gx = np.gradient(blur(hp.astype(np.float32), 2.0).astype(np.float64), DX)
 		E = tlib.erosion_noise(gx, gz, float(Xw[0, 0]), float(Zw[0, 0]), DX, 1 / 70.0, 3, 0.5, 2.0, 0.8, 0.05,
 							   seed=self.seed + 134)
-		face = smoothstep(12.0, 45.0, dmin) * smoothstep(25.0, 90.0, r)
-		hp = hp - smoothstep(0.05, 0.6, -E) * (4.0 + 7.0 * smoothstep(80.0, 300.0, r)) * face
+		face = smoothstep(4.0, 18.0, dmin) * smoothstep(20.0, 80.0, r)
+		hp = hp - smoothstep(0.05, 0.6, -E) * (5.0 + 9.0 * smoothstep(60.0, 280.0, r)) * face
 		# buttresses / ribs between the couloirs and blocky summit rock
-		hp = hp + (nz(1 / 34.0, 3, 135, "ridged") - 0.45) * 3.0 * face
+		hp = hp + ((nz(1 / 34.0, 3, 135, "ridged") - 0.45) * 5.0 + (nz(1 / 95.0, 2, 140, "ridged") - 0.45) * 8.0) * face
 		blk = (1 - smoothstep(10.0, 45.0, r)) * smoothstep(4.0, 9.0, r)
 		hp = hp + (nz(1 / 11.0, 2, 136, "ridged") - 0.5) * 2.4 * blk
 		# faces carve (up to 140 m), aretes may add up to 20 m near the top, nothing is added lower down
@@ -271,6 +274,9 @@ class Fine:
 		pm = np.zeros((N, N), np.float32)
 		pm[j0:j1, i0:i1] = (w * smoothstep(2.0, 20.0, dmin) * (1 - blk)).astype(np.float32)
 		self.masks["pyramid"] = pm
+		cm = np.zeros((N, N), np.float32)
+		cm[j0:j1, i0:i1] = (smoothstep(0.1, 0.6, -E) * face * w).astype(np.float32)
+		self.masks["couloir"] = cm
 		self.log("   summit pyramid: max %.1f, carved %.0f m max" % (float(self.h[j0:j1, i0:i1].max()),
 																		float((hw - self.h[j0:j1, i0:i1]).max())))
 
