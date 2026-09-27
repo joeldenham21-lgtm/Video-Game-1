@@ -114,6 +114,22 @@ func _test_species() -> void:
 	var deer: SpeciesDef = fauna.defs.get(&"deer")
 	if deer:
 		check(not deer.clip(&"stot").is_empty(), "deer has the stotting clip")
+	# every species' glb must carry a real, non-empty skinned mesh (an exporter failure writes an empty primitive)
+	for sp in fauna.defs.keys():
+		var b := fauna.spawn_animal(sp, site + Vector3(3, 0, 0), 0.0, 1)
+		var ok := b != null and b.mesh != null and b.mesh.mesh != null and b.mesh.mesh.get_surface_count() > 0
+		var box := b.mesh.mesh.get_aabb() if ok else AABB()
+		check(ok and box.size.x > 0.05 and box.size.y > 0.05 and box.size.z > 0.05,
+				"%s mesh AABB non-empty (%s)" % [sp, str(box.size)])
+		if ok:
+			var tris := 0
+			for s in b.mesh.mesh.get_surface_count():
+				var arr := b.mesh.mesh.surface_get_arrays(s)
+				var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+				tris += idx.size() / 3
+			check(tris > 500, "%s mesh has triangles (%d)" % [sp, tris])
+		if b:
+			fauna.release(b)
 
 
 func _test_sight() -> void:

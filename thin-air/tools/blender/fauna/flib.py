@@ -1206,10 +1206,30 @@ def build_creature(spec):
         log("dropping %d degenerate triangles" % int((~ok).sum()))
         Tg = Tg[ok]
         Mg = Mg[ok]
+    # drop duplicate triangles (same vertex set, any winding): overlapping primitives (claw cones) produce them,
+    # Blender's validate() merges them and the per-face arrays would no longer match -> exporter
+    # 'Array length mismatch' and an EMPTY mesh in the glb
+    key = np.sort(Tg, axis=1)
+    _, first = np.unique(key, axis=0, return_index=True)
+    if len(first) != len(Tg):
+        first = np.sort(first)
+        log("dropping %d duplicate triangles" % (len(Tg) - len(first)))
+        Tg = Tg[first]
+        Mg = Mg[first]
     obj = mesh_from_arrays(name, Vg, Tg)
     me = obj.data
-    me.polygons.foreach_set("use_smooth", [True] * len(me.polygons))
-    me.polygons.foreach_set("material_index", Mg.tolist())
+    if me.validate(verbose=False):
+        log("mesh.validate() changed the mesh: %d -> %d polygons" % (len(Tg), len(me.polygons)))
+    # rebuild per-polygon material indices from the (validated) polygon list, keyed by the sorted vertex triple
+    mat_of = {tuple(k): int(m) for k, m in zip(np.sort(Tg, axis=1).tolist(), Mg.tolist())}
+    npoly = len(me.polygons)
+    PV = np.empty(npoly * 3, np.int32)
+    me.polygons.foreach_get("vertices", PV)
+    PV = np.sort(PV.reshape(-1, 3), axis=1)
+    Mp = [mat_of.get(tuple(r), 0) for r in PV.tolist()]
+    Tg = PV  # keep the triangle list in sync for the metadata (count only; winding not used after this)
+    me.polygons.foreach_set("use_smooth", [True] * npoly)
+    me.polygons.foreach_set("material_index", Mp)
     for mn in spec.get("materials", ["fur", "eye"]):
         mat = bpy.data.materials.new(mn)
         me.materials.append(mat)
