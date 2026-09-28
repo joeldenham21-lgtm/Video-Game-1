@@ -262,8 +262,7 @@ func _salvage() -> void:
 				failed.append("%s(%s)" % [id, "unreachable" if not ok else "not taken"])
 		if failed.is_empty():
 			break
-	if not failed.is_empty():
-		_log("NOTE wreck extras not taken: %s" % str(failed))
+	check(failed.is_empty(), "salvage: every wreck item (cargo rolls too) can be taken through the interaction ray %s" % str(failed))
 	var pl: Player = Game.player as Player
 	var missing: Array[String] = []
 	for id in ["first_aid_kit", "flare_gun", "survival_manual", "emergency_blanket", "hatchet", "backpack_torn", "survey_scanner", "matches"]:

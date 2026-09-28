@@ -103,6 +103,11 @@ func _ready() -> void:
 			Story.story_event.connect(_on_story_event)
 		Events.game_loaded.connect(func(_s: int) -> void: apply_story_state.call_deferred())
 		apply_story_state.call_deferred()
+		# colliders are only live once the world is enabled (the progressive build keeps it disabled)
+		if Game.state == Game.State.LOADING:
+			Game.world_ready.connect(_settle_loot, CONNECT_ONE_SHOT)
+		else:
+			_settle_loot.call_deferred()
 
 
 func get_site(id: StringName) -> Node3D:
@@ -205,6 +210,29 @@ func _spawn_loot(e: Dictionary, parent: Node3D) -> ItemPickup:
 	p.global_transform = Transform3D(xf.basis.orthonormalized(), above_ground(xf * (e["offset"] as Vector3)))
 	_loot_nodes.append(p)
 	return p
+
+
+## Rolled loot is spread around its socket, which can push it into a tilted crate lid beside it (the wreck's
+## second cargo crate swallowed a ration bar: visible, never pickable). Once the colliders are live, lift each
+## placed pickup onto the support just above its origin (at most 12 cm, so nothing hops onto a shelf).
+func _settle_loot() -> void:
+	if not is_inside_tree():
+		return
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	if not is_inside_tree():
+		return
+	var space := get_world_3d().direct_space_state
+	for n in _loot_nodes:
+		if not is_instance_valid(n) or (n as Node).is_queued_for_deletion():
+			continue
+		var p := n as ItemPickup
+		var o := p.global_position
+		var q := PhysicsRayQueryParameters3D.create(o + Vector3.UP * 0.12, o + Vector3.DOWN * 0.02, 1 | (1 << 6))
+		q.exclude = [p.get_rid()]
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty() and (hit["position"] as Vector3).y > o.y + 0.005:
+			p.global_position = Vector3(o.x, (hit["position"] as Vector3).y + 0.005, o.z)
 
 
 func loot_nodes() -> Array[Node]:
