@@ -465,8 +465,9 @@ static func caps(text: String, size := FS_CAPTION, color := TEXT_DIM, spacing :=
 ## HUD text over the world: soft dark outline keeps it legible on sunlit snow.
 static func hud_label(text: String, size := FS_SMALL, color := TEXT, weight := "Medium") -> Label:
 	var l := label(text, size, color, weight)
-	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.42))
-	l.add_theme_constant_override("outline_size", 5)
+	# a firm dark halo: HUD text floats over whiteouts and sunlit snow (invisible over dark scenes)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.72))
+	l.add_theme_constant_override("outline_size", 6)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 

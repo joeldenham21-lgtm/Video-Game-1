@@ -146,7 +146,7 @@ func _text(t: String, pos: Vector2, fs: int, col: Color, f: Font, align: int) ->
 		p.x -= ts.x * 0.5
 	elif align == 2:
 		p.x -= ts.x
-	draw_string_outline(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.45 * col.a))
+	draw_string_outline(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 5, Color(0, 0, 0, 0.68 * col.a))
 	draw_string(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
 
 

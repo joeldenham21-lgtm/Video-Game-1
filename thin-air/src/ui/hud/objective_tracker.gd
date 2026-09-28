@@ -20,7 +20,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	alignment = BoxContainer.ALIGNMENT_BEGIN
 	_header = UITheme.caps("Objectives", 13, UITheme.TEXT_DIM, 3)
-	_header.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.35))
+	_header.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.65))
 	_header.add_theme_constant_override("outline_size", 4)
 	_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(_header)
@@ -97,7 +97,7 @@ func _add_row(id: StringName, text: String, animate: bool) -> void:
 	if animate:
 		cap = UITheme.caps("New objective", 12, UITheme.ACCENT, 3)
 		cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		cap.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.35))
+		cap.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.65))
 		cap.add_theme_constant_override("outline_size", 4)
 		root.add_child(cap)
 	var row := UITheme.hbox(10)
