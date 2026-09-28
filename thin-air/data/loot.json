@@ -84,7 +84,7 @@
   },
   "owens_bivouac": {
    "Loot_Pack": [{"item": "ration_bar", "count": 2}, {"table": "alpine_supplies", "rolls": 1}],
-   "Loot_Tent": [{"item": "work_gloves"}],
+   "Loot_Tent": [{"item": "work_gloves", "offset": [0.35, 0.0, 1.75]}],
    "Loot_Stove": [{"item": "coffee"}]
   },
   "glacier_camp": {
