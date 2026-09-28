@@ -405,6 +405,7 @@ func _campfire() -> void:
 			break
 		await _frames(2)
 	check((fire as Campfire).state == Campfire.FireState.BURNING, "laying sticks and holding interact lights the fire")
+	_log("matches left %d, wind %.1f m/s" % [_inv().count(&"matches"), (Climate.get_wind_at(pl.global_position) as Vector3).length()])
 	await _until(func() -> bool: return Story.is_objective_done(&"build_campfire"), 3.0)
 	check(Story.is_objective_done(&"build_campfire"), "build_campfire completes")
 
@@ -587,6 +588,9 @@ func _death_and_continue(snap: Dictionary, cause: StringName) -> void:
 		var p := pl.global_position + Vector3(0, 0, 0)
 		pl.teleport(Vector3(p.x + 20.0, TerrainData.get_height(p.x + 20.0, p.z) + 45.0, p.z), 0.0)
 	else:
+		# freezing to death with the pack open: the inventory must get out of the way of the death screen
+		await _tap(&"inventory")
+		check(InventoryScreen.get_instance() != null and InventoryScreen.get_instance().is_open, "cold: inventory open before dying")
 		pl.vitals.warmth = 0.0
 		pl.vitals.apply_damage(500.0, &"cold")
 	var ok := await _until(func() -> bool: return pl.vitals.is_dead(), 20.0)
@@ -600,6 +604,10 @@ func _death_and_continue(snap: Dictionary, cause: StringName) -> void:
 	check(ds._title.text.begins_with(String(DeathScreen.CAUSES.get(cause, "You died"))), "%s: headline names the cause (%s)" % [cause, ds._title.text])
 	check(Input.mouse_mode == Input.MOUSE_MODE_VISIBLE or DisplayServer.get_name() == "headless", "%s: mouse visible on the death screen" % cause)
 	check(not _hud().can_open_screen(), "%s: pause/inventory can't open over the death screen" % cause)
+	var inv_scr := InventoryScreen.get_instance()
+	check(inv_scr == null or not inv_scr.is_open, "%s: no inventory left open under the death screen" % cause)
+	await _tap(&"inventory")
+	check(inv_scr == null or not inv_scr.is_open, "%s: the inventory can't be opened while dead" % cause)
 	await _key_event(&"pause")
 	check(_hud().pause_menu == null or not (_hud().pause_menu as PauseMenu).is_open, "%s: Esc doesn't open the pause menu over the death screen" % cause)
 	ds._buttons[0].pressed.emit()
