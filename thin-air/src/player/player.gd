@@ -1004,7 +1004,7 @@ func _physics_swim(delta: float) -> void:
 	var drain := 0.7
 	if moving:
 		drain = 6.5 if fast else 2.8
-	vitals.drain_stamina(drain * delta)
+	vitals.drain_stamina(drain * delta * PlayerMotion.load_stamina_factor(get_carried_weight(), inventory.max_weight))
 	# Climb out onto steep banks with the ice axe.
 	if _jump_buffer > 0.0 and try_start_climb():
 		return
@@ -1101,6 +1101,7 @@ func _physics_climb(delta: float) -> void:
 	var drain := 5.5 if moved > 0.002 else 1.8
 	if _crampons:
 		drain *= 0.62
+	drain *= PlayerMotion.load_stamina_factor(get_carried_weight(), inventory.max_weight)
 	if not vitals.drain_stamina(drain * delta):
 		Game.notify("Too exhausted to hold on", &"warning")
 		_detach()
@@ -1400,7 +1401,7 @@ func _update_exertion(delta: float) -> void:
 	_exertion_target = clampf(maxf(e, _work_exertion), 0.0, 1.0)
 	recent_exertion = lerpf(recent_exertion, _exertion_target, 1.0 - exp(-delta / 1.8))
 	if is_sprinting and ground_speed > 2.5:
-		vitals.drain_stamina(11.0 * delta)
+		vitals.drain_stamina(11.0 * delta * PlayerMotion.load_stamina_factor(get_carried_weight(), inventory.max_weight))
 		if not vitals.can_exert():
 			is_sprinting = false
 			_sprint_latched = false
