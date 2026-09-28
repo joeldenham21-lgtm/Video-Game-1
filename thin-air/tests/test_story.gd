@@ -278,6 +278,14 @@ func _test_structures() -> void:
 		n_log_sockets += (sites[id] as PoiSite).get_sockets("Log_").size()
 	var logs := get_tree().get_nodes_in_group(&"story_log")
 	check(logs.size() == n_log_sockets and n_log_sockets >= 20, "a readable log at every Log_ socket (%d/%d)" % [logs.size(), n_log_sockets])
+	# nothing the player must pick up or read is buried under the heightfield (the Otter's nose is in the snow:
+	# the flare gun and Dale's logbook sockets sit a few cm below the pad, so the interaction ray hit terrain)
+	var buried: Array[String] = []
+	for n in Array(st.call(&"loot_nodes")) + logs:
+		var g: Vector3 = (n as Node3D).global_position
+		if g.y > Story.INTERIOR_MAX_Y and g.y < TerrainData.get_height(g.x, g.z) + 0.02:
+			buried.append("%s %.2f m under" % [n.name, TerrainData.get_height(g.x, g.z) - g.y])
+	check(buried.is_empty(), "no story loot or log under the terrain %s" % str(buried))
 	var uses := get_tree().get_nodes_in_group(&"story_use")
 	check(uses.size() == Story.graph.uses.size(), "every story interactable is placed (%d/%d)" % [uses.size(), Story.graph.uses.size()])
 	var scans := 0
