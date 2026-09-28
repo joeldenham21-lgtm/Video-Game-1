@@ -1,8 +1,8 @@
 extends Node3D
-## Forest-floor loot (child "Loot" of Vegetation): a few dry sticks under the trees and loose stones on rocky
-## ground, placed deterministically per 64 m scatter cell and spawned as static ItemPickups (the items stream's
-## scenes/items/pickup.tscn, `freeze = true`) only within RANGE of the player. Each spot has a stable
-## `persist_id`, so ItemsRoot remembers what was picked up and it stays gone after loading. Disabled when the
+## Forest-floor loot (child "Loot" of Vegetation): a few dry sticks under the trees, loose stones on rocky
+## ground and the odd hedgehog mushroom in the forest, placed deterministically per 64 m scatter cell and
+## spawned as static ItemPickups (the items stream's scenes/items/pickup.tscn, `freeze = true`) only within
+## RANGE of the player. Each spot has a stable `persist_id`, so ItemsRoot remembers what was picked up and it stays gone after loading. Disabled when the
 ## pickup scene does not exist.
 
 const PICKUP_SCENE := "res://scenes/items/pickup.tscn"
@@ -38,12 +38,20 @@ static func cell_spots(ctx: VegScatter.Context, cx: int, cz: int) -> Array:
 	rng.seed = VegScatter._hash(cx, cz, 7771)
 	var n_sticks := int(round(mid.a * 5.0))
 	var n_stones := int(round(clampf(mid.g * 1.5 + mid.b * 0.3, 0.0, 1.0) * 3.0))
+	# Hedgehog mushrooms under the forest canopy (late-autumn flush): about one in three forest cells.
+	# Own roll, placed after the sticks/stones, so their keys and positions stay what they were.
+	var n_mush := 0
+	var mrng := RandomNumberGenerator.new()
+	mrng.seed = VegScatter._hash(cx, cz, 7772)
+	var mush_roll := mrng.randf()
+	if mid.a > 0.35 and mid.r < 0.4 and mush_roll < mid.a * 0.45:
+		n_mush = 1 + int(mush_roll < mid.a * 0.12)
 	var k := 0
-	for i in n_sticks + n_stones:
+	for i in n_sticks + n_stones + n_mush:
 		var x := o.x + rng.randf() * VegScatter.CELL
 		var z := o.y + rng.randf() * VegScatter.CELL
 		var yaw := rng.randf() * TAU
-		var item: StringName = &"stick" if i < n_sticks else &"stone"
+		var item: StringName = &"stick" if i < n_sticks else (&"stone" if i < n_sticks + n_stones else &"mushroom")
 		k += 1
 		if not t.in_bounds(x, z, 2.0) or float(t.get_slope_deg(x, z)) > 32.0:
 			continue
@@ -51,7 +59,7 @@ static func cell_spots(ctx: VegScatter.Context, cx: int, cz: int) -> Array:
 		if VegScatter.in_water(ctx, x, z, y, 0.5) or VegScatter.excluded(ctx, x, z, 1.0):
 			continue
 		var m: Color = t.get_masks(x, z)
-		if m.r > 0.6 or (item == &"stick" and m.a < 0.25):
+		if m.r > 0.6 or (item != &"stone" and m.a < 0.25) or (item == &"mushroom" and m.r > 0.35):
 			continue
 		out.append(["veg_loot_%d_%d" % [VegScatter.cell_index(cx, cz), k], item, Vector3(x, y + 0.04, z), yaw])
 	return out
