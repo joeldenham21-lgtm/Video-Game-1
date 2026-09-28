@@ -34,6 +34,8 @@ const LOG_SPACING := 13.0
 const EXCL_REACH := 6.0
 ## Width of the soft ground-cover / shrub fade beyond a POI pad's flat radius (pad_keep()).
 const PAD_FADE := 14.0
+## Clear ground around a terrain cut-out (layout "holes": mine adit, ice cave mouth) beyond its radius (m).
+const PORTAL_CLEAR := 8.0
 
 const MAX_SLOPE := {Cat.TREE: 38.0, Cat.SAPLING: 38.0, Cat.SHRUB: 40.0, Cat.DEADWOOD: 30.0, Cat.ROCK_BIG: 48.0,
 	Cat.ROCK_SMALL: 44.0}
@@ -137,6 +139,12 @@ static func make_context(lib: VegLibrary, terrain: Object, density_mul := 1.0) -
 			var fr := float(p.get("flat_radius", p.get("radius", 0.0)))
 			if fr > 0.0:
 				ctx.pads.append(Vector3(float(p.get("x", 0.0)), float(p.get("z", 0.0)), fr))
+	# Portal cut-outs (Ashford Mine adit, ice cave mouth) lie outside their POI's flat pad: without this a scatter
+	# boulder sat in the timbered adit mouth. Keep the opening and the apron in front of it clear.
+	for h in layout.get("holes", []):
+		if h is Dictionary:
+			ctx.pads.append(Vector3(float(h.get("x", 0.0)), float(h.get("z", 0.0)),
+				float(h.get("radius", 2.0)) + PORTAL_CLEAR))
 	for t in layout.get("trails", []):
 		var pts := PackedVector3Array()
 		var width := 2.0

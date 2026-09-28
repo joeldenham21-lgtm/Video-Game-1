@@ -35,9 +35,10 @@ func run() -> void:
 	_test_library()
 	_test_scatter_determinism()
 	_test_scatter_rules()
+	_test_portal_exclusion()
 	_test_grass_cells()
 	var veg := await _make_vegetation()
-	_test_lod_settings(veg)
+	await _test_lod_settings(veg)
 	await _test_colliders(veg)
 	await _test_harvest_tree(veg)
 	_test_small_harvest(veg)
@@ -120,6 +121,24 @@ func _test_scatter_determinism() -> void:
 		if VegScatter.id_cell(a.ids[i]) != VegScatter.cell_index(24, 25) or (a.ids[i] & 4095) != i:
 			ids_ok = false
 	check(ids_ok, "instance ids encode (cell << 12 | local index)")
+
+
+## Portal cut-outs (layout "holes") are excluded like pads: a boulder once sat in the Ashford Mine adit mouth.
+func _test_portal_exclusion() -> void:
+	var lay: Dictionary = terrain.layout.duplicate(true)
+	lay["holes"] = [{"id": "test_adit", "x": -200.0, "z": -200.0, "radius": 2.2}]
+	var saved: Dictionary = terrain.layout
+	terrain.layout = lay
+	var ctx := VegScatter.make_context(VegLibrary.get_shared(), terrain, 1.0)
+	terrain.layout = saved
+	check(VegScatter.excluded(ctx, -200.0 + 2.2 + VegScatter.PORTAL_CLEAR - 0.5, -200.0, 0.0),
+		"scatter keeps the apron of a portal cut-out clear")
+	check(not VegScatter.excluded(ctx, -200.0 + 2.2 + VegScatter.PORTAL_CLEAR + 7.0, -200.0, 0.0),
+		"scatter resumes beyond the portal apron")
+	if TerrainData.is_loaded():
+		var real := VegScatter.make_context(VegLibrary.get_shared(), TerrainData, 1.0)
+		for h in TerrainData.layout.get("holes", []):
+			check(VegScatter.excluded(real, float(h["x"]), float(h["z"]), 0.0), "no scatter in the %s mouth" % h["id"])
 
 
 func _test_scatter_rules() -> void:
