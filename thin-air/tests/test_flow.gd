@@ -573,11 +573,14 @@ func _quit_to_menu_from_pause() -> void:
 		if c is ConfirmDialog:
 			dlg = c
 	check(dlg != null, "quit asks for confirmation")
+	Audio.play_voice(&"prologue")      # a long recording (radio line, crew log) still playing when the player quits
+	check(Audio.voice.current == &"prologue", "a recording is playing when quitting")
 	if dlg:
 		dlg.confirmed.emit()
 	var ok := await _until(func() -> bool: return _menu() != null and Game.world == null, 20.0)
 	check(ok and Game.state == Game.State.MENU and not get_tree().paused, "quit returns to the main menu, unpaused")
 	check(Input.mouse_mode == Input.MOUSE_MODE_VISIBLE, "mouse visible in the menu")
+	check(not Audio.voice.is_playing(), "the world's voice recording stops at the main menu")
 	await _frames(5)
 	check(_menu() != null and _menu().buttons.size() > 0 and _menu().buttons[0].name == "Continue", "menu offers Continue")
 
@@ -651,10 +654,13 @@ func _death_and_continue(snap: Dictionary, cause: StringName) -> void:
 	check(inv_scr == null or not inv_scr.is_open, "%s: the inventory can't be opened while dead" % cause)
 	await _key_event(&"pause")
 	check(_hud().pause_menu == null or not (_hud().pause_menu as PauseMenu).is_open, "%s: Esc doesn't open the pause menu over the death screen" % cause)
+	Audio.play_voice(&"prologue")
+	check(Audio.voice.current == &"prologue", "%s: a recording is playing on the death screen" % cause)
 	ds._buttons[0].pressed.emit()
 	var old_id := pl.get_instance_id()
 	ok = await _until(func() -> bool: return Game.world != null and Game.player != null and Game.player.get_instance_id() != old_id and Game.state != Game.State.LOADING, 120.0)
 	check(ok, "%s: Continue from last save reloads" % cause)
+	check(Audio.voice.current != &"prologue", "%s: no voice carried over into the reloaded world" % cause)
 	await _frames(10)
 	_compare(snap, "after %s death" % cause)
 

@@ -123,6 +123,7 @@ func continue_game(slot := 0) -> void:
 
 func quit_to_menu() -> void:
 	get_tree().paused = false
+	_stop_world_audio()
 	player = null
 	world = null
 	_set_state(State.MENU)
@@ -215,8 +216,16 @@ func _boot_quit() -> void:
 	get_tree().quit(0 if n_err + n_script == 0 else 1)
 
 
+## The voice (radio lines, crew recordings, the prologue) lives on the Audio autoload, not in the world: stop
+## it when the world is torn down, or a recording kept playing over the main menu / into the reloaded world.
+func _stop_world_audio() -> void:
+	if Audio.has_method(&"stop_voice"):
+		Audio.stop_voice()
+
+
 func _load_world() -> void:
 	get_tree().paused = false
+	_stop_world_audio()
 	_build_t0 = Time.get_ticks_usec()
 	loading_progress = 0.0
 	loading_stage = ""
