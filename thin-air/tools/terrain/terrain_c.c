@@ -807,6 +807,102 @@ int route_turn(const float *h, int nx, int ny, float cell, int si, int sj, int t
 	return len;
 }
 
+/* Trail router: least-cost path over (cell x heading x leg-run) states. Like route_turn(), but
+ *  - turning costs turn_w per radian of heading change (scaled by turnf[] at the turning cell, so turns are cheaper
+ *    on gentle ground: switchbacks land on benches and ridge noses), independent of step length, so a hairpin costs
+ *    the same whether it is taken in one step or eased over several;
+ *  - a sharp turn (> 30 deg, i.e. anything beyond the neighbouring heading) needs a leg of at least min_leg cells
+ *    since the previous sharp turn: switchback legs are never shorter than min_leg * cell, so stacked zig-zags of
+ *    metre-scale legs are impossible.
+ * Returns the path length (cells from start to goal), 0 if not found. */
+int route_trail(const float *h, int nx, int ny, float cell, int si, int sj, int ti, int tj, float gmax, float wg,
+				float over, float turn_w, int min_leg, const float *penalty, const float *turnf, int start_dir,
+				int start_b, int i0, int j0, int i1, int j1, int32_t *path_i, int32_t *path_j, int maxlen) {
+	int W = i1 - i0 + 1, Hh = j1 - j0 + 1, M = W * Hh;
+	int NB = min_leg + 1;
+	long S = (long)M * 17 * NB;
+	float *dist = (float *)malloc(sizeof(float) * S);
+	int32_t *prev = (int32_t *)malloc(sizeof(int32_t) * S);
+	uint8_t *done = (uint8_t *)calloc(S, 1);
+	if (!dist || !prev || !done) { free(dist); free(prev); free(done); return -1; }
+	float dcx[16], dcy[16], ang[17][16];
+	int stepc[16];
+	for (int d = 0; d < 16; d++) {
+		float l = sqrtf((float)(RI[d] * RI[d] + RJ[d] * RJ[d]));
+		dcx[d] = RI[d] / l; dcy[d] = RJ[d] / l;
+		stepc[d] = (int)(l + 0.5f);
+	}
+	for (int a = 0; a < 16; a++)
+		for (int b = 0; b < 16; b++) {
+			float c = dcx[a] * dcx[b] + dcy[a] * dcy[b];
+			if (c > 1.0f) c = 1.0f;
+			if (c < -1.0f) c = -1.0f;
+			ang[a][b] = acosf(c);
+		}
+	for (int b = 0; b < 16; b++) ang[16][b] = 0.0f;
+	const float SHARP = 0.53f;   /* ~30 deg */
+	for (long k = 0; k < S; k++) { dist[k] = 3.0e38f; prev[k] = -1; }
+	Heap hp = {0};
+	int sc = (sj - j0) * W + (si - i0), tcell = (tj - j0) * W + (ti - i0);
+	/* start heading / leg run carried over from the previous waypoint segment (no free hairpin at a via point) */
+	long s = (start_dir >= 0 && start_dir < 16) ? ((long)sc * 17 + start_dir) * NB + (start_b < min_leg ? start_b : min_leg)
+											  : ((long)sc * 17 + 16) * NB + min_leg;
+	dist[s] = 0;
+	hpush(&hp, 0, (int32_t)s);
+	long goal = -1;
+	while (hp.n > 0) {
+		HItem it = hpop(&hp);
+		long st = it.i;
+		if (done[st]) continue;
+		done[st] = 1;
+		int b = (int)(st % NB);
+		long cd = st / NB;
+		int c = (int)(cd / 17), din = (int)(cd % 17);
+		if (c == tcell) { goal = st; break; }
+		int ci = c % W + i0, cj = c / W + j0;
+		float hc = h[(size_t)cj * nx + ci];
+		float tf = turnf ? turnf[(size_t)cj * nx + ci] : 1.0f;
+		for (int d = 0; d < 16; d++) {
+			float a = ang[din][d];
+			int sharp = a > SHARP;
+			if (din < 16 && sharp && b < min_leg) continue;
+			if (a > 2.9f) continue;                      /* no reversal onto the previous cell */
+			int ni = ci + RI[d], nj = cj + RJ[d];
+			if (ni < i0 || nj < j0 || ni > i1 || nj > j1) continue;
+			int n = (nj - j0) * W + (ni - i0);
+			int nb = sharp && din < 16 ? 0 : b + stepc[d];
+			if (nb > min_leg) nb = min_leg;
+			long ns = ((long)n * 17 + d) * NB + nb;
+			if (done[ns]) continue;
+			float L = cell * sqrtf((float)(RI[d] * RI[d] + RJ[d] * RJ[d]));
+			float hn = h[(size_t)nj * nx + ni];
+			float g = fabsf(hn - hc) / L;
+			float q = g / gmax;
+			float cst = L * (1.0f + wg * q * q + (penalty ? penalty[(size_t)nj * nx + ni] : 0.0f));
+			if (g > gmax) cst += L * over * (g - gmax) / gmax;
+			cst += turn_w * a * tf;
+			float nd = dist[st] + cst;
+			if (nd < dist[ns]) { dist[ns] = nd; prev[ns] = (int32_t)st; hpush(&hp, nd, (int32_t)ns); }
+		}
+	}
+	int len = 0;
+	if (goal >= 0) {
+		long st = goal;
+		while (st >= 0 && len < maxlen) {
+			int c = (int)(st / NB / 17);
+			path_i[len] = c % W + i0; path_j[len] = c / W + j0; len++;
+			if (st == s) break;
+			st = prev[st];
+		}
+		for (int a = 0, b = len - 1; a < b; a++, b--) {
+			int32_t t1 = path_i[a]; path_i[a] = path_i[b]; path_i[b] = t1;
+			int32_t t2 = path_j[a]; path_j[a] = path_j[b]; path_j[b] = t2;
+		}
+	}
+	free(hp.a); free(dist); free(prev); free(done);
+	return len;
+}
+
 /* ------------------------------------------------------------------ preview ray tracer */
 /* Perspective render of a heightfield (world x = x0 + i*dx, z = x0 + j*dx) for generator QA.
  * cam: x,y,z,yaw,pitch(deg; yaw 0 looks -z/north, 90 looks -x/west), fov_deg (vertical). sun: unit vec to sun.

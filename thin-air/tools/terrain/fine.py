@@ -607,123 +607,293 @@ class Fine:
 
 	# ------------------------------------------------------------------ 7. trails
 	def trails(self):
-		# route on a 3 m grid for speed
-		h3 = self.h[::2, ::2]
+		"""Trails as real mountain paths. Routing (3 m grid, tlib.route_trail) runs over the smoothed landform (the
+		metre-scale relief is carved away anyway; over the icefall the serac field is averaged out): grade cost toward
+		the leg's max grade, a bench-difficulty cost on steep hillsides and cliffs, turning paid per radian and
+		cheaper on gentle ground (hairpins land on benches and ridge noses), and switchback legs never shorter than
+		the trail's min_leg. Each trail is then carved as a bench (_carve_trail). Ridge legs (summit) are straight
+		lines between their via points with a designed ramp profile; they are carved after the POI pads
+		(ridge_trails) so the station pad's blend ring cannot steepen their foot."""
+		self.trail_paths = []
+		self._ridge_trails = []
+		for order, T in enumerate(D.TRAILS):
+			if any(leg.get("ridge") for leg in T["legs"][1:]):
+				P = self._trail_points(T, None, None, None, None, None)
+				self._carve_trail(T, P, order)
+				self.trail_paths.append((T, P))
+		ice_f = self.masks["ice"]
+		hb = blur(self.h, 3.0)
+		hr = hb + (blur(self.h, 7.0) - hb) * ice_f
+		h3 = hr[::2, ::2].astype(np.float32)
 		n3 = h3.shape[0]
-		pen = np.zeros_like(h3, dtype=np.float32)
 		water = self.masks["water"][::2, ::2] > 0.5
 		river = self.masks.get("river", np.zeros((N, N), np.float32))[::2, ::2] > 0.5
-		ice = self.masks["ice"][::2, ::2] > 0.5
-		s3 = slope_deg(blur(h3, 1.0), 3.0)
-		pen += np.where(water, 400.0, 0.0) + np.where(river, 25.0, 0.0)
-		pen += np.clip((s3 - 38.0) / 10.0, 0, 3) * 2.5          # hard to bench-cut across cliffs
-		golden_pts = []
-		for T in D.TRAILS:
+		ice = ice_f[::2, ::2] > 0.5
+		s3 = slope_deg(h3, 3.0)
+		pen = np.where(water, 400.0, 0.0) + np.where(river, 25.0, 0.0)
+		# a bench on a steep hillside means big cuts; faces over ~40 deg are avoided outright
+		pen = pen + np.clip((s3 - 24.0) / 14.0, 0, 1) * 1.2 + np.clip((s3 - 38.0) / 8.0, 0, 3) * 4.0
+		turnf = (0.35 + np.clip((s3 - 6.0) / 24.0, 0, 1) * 1.65).astype(np.float32)
+		# side trails first, golden path last: where treads meet, the golden path's bench wins
+		for order, T in sorted(enumerate(D.TRAILS), key=lambda ot: bool(ot[1].get("golden"))):
+			if any(leg.get("ridge") for leg in T["legs"][1:]):
+				continue
+			P = self._trail_points(T, h3, pen, ice, turnf, n3)
+			self._carve_trail(T, P, order)
+			self.trail_paths.append((T, P))
+
+	def _trail_points(self, T, h3, pen, ice, turnf, n3):
+		"""Route one trail (all its legs) and return the smoothed centre line [x, z, max grade, width]."""
+		if True:
 			legs = T["legs"]
 			pts_all = []
-			climb_ranges = []
+			ridge = False
 			cur = legs[0]["to"]
 			for leg in legs[1:]:
 				gmax = leg.get("max_grade_deg", T["max_grade_deg"])
 				wps = [cur] + list(leg.get("via", [])) + [leg["to"]]
 				leg_pts = []
-				p_ice = np.where(ice, 0.0 if (leg.get("climb") or T["id"] in ("glacier_route", "summit_ridge")) else 30.0, 0.0)
+				p_ice = np.where(ice, 0.0 if T["id"] in ("glacier_route", "summit_ridge") else 30.0, 0.0)
+				min_leg = int(math.ceil(leg.get("min_leg", T.get("min_leg", 24.0)) / 3.0))
+				sdir, sb = -1, 0
+				used = np.zeros_like(h3, dtype=bool)
 				for a, b in zip(wps[:-1], wps[1:]):
 					ia, ja = int(round((a[0] - X0) / 3.0)), int(round((a[1] - X0) / 3.0))
 					ib, jb = int(round((b[0] - X0) / 3.0)), int(round((b[1] - X0) / 3.0))
 					if leg.get("ridge"):
-						I = np.linspace(ia, ib, max(2, int(np.hypot(ib - ia, jb - ja)) + 1)).round().astype(int)
-						J = np.linspace(ja, jb, len(I)).round().astype(int)
+						ridge = True
+						I = J = None
 					else:
-						I, J = tlib.route_turn(h3, 3.0, (ia, ja), (ib, jb), gmax * 0.9, wg=1.5, over=600.0, turn_w=2.5,
-											   penalty=pen + p_ice.astype(np.float32), margin=110)
-					seg = np.stack([X0 + I * 3.0, X0 + J * 3.0], axis=1).astype(np.float64)
+						# keep off this leg's earlier segments (no out-and-back spikes at a via point)
+						near_prev = ndimage.binary_dilation(used, iterations=4) if used.any() else used
+						if near_prev.any():
+							yy, xx = np.ogrid[:n3, :n3]
+							near_prev = near_prev & ((yy - ja) ** 2 + (xx - ia) ** 2 > 36)
+						# switchback legs must not run side by side closer than a bench allows: re-route with a
+						# penalty on the later leg wherever the path comes back within ~8 m of itself
+						extra = np.zeros_like(h3)
+						best = None
+						for _it in range(7):
+							I, J = tlib.route_trail(h3, 3.0, (ia, ja), (ib, jb), gmax * 0.9, wg=1.5, over=600.0,
+													turn_w=T.get("turn_w", 14.0), min_leg=min_leg,
+													penalty=(pen + p_ice + near_prev * 3.0 + extra).astype(np.float32),
+													turnf=turnf, margin=70, start_dir=sdir, start_b=sb)
+							bad = _self_conflicts(I, J)
+							if best is None or bad.sum() < best[2].sum():
+								best = (I, J, bad)
+							if not bad.any():
+								break
+							m = np.zeros_like(h3, dtype=bool)
+							m[J[bad], I[bad]] = True
+							extra = extra + ndimage.binary_dilation(m, iterations=3) * 8.0
+						I, J = best[0], best[1]
+						sdir, sb = tlib.route_end_state(I, J, min_leg)
+						used[J, I] = True
+					if I is None:
+						seg = np.array([a, b], dtype=np.float64)
+					else:
+						seg = np.stack([X0 + I * 3.0, X0 + J * 3.0], axis=1).astype(np.float64)
 					if len(leg_pts):
 						seg = seg[1:]
 					leg_pts.extend(seg.tolist())
 				if pts_all:
 					leg_pts = leg_pts[1:]
-				is_climb = 1.0 if (leg.get("climb") or T.get("climb")) else 0.0
-				pts_all.extend([[p[0], p[1], is_climb] for p in leg_pts])
+				w = leg.get("width", T["width"])
+				pts_all.extend([[p[0], p[1], gmax, w] for p in leg_pts])
 				cur = leg["to"]
 			P = np.array(pts_all)
-			P = _chaikin(P, 3)
-			self._carve_trail(T, P)
-			golden_pts.append((T, P))
-		self.trail_paths = golden_pts
+			if ridge:
+				return dense(P, 0.75)                     # smooth spline through the via points
+			return _smooth_path(np.column_stack([_chaikin(P[:, :2], 3), _chaikin(P[:, 2:], 3)]))
 
-	def _carve_trail(self, T, P):
-		P = _lin(P, 1.5)
-		climb = P[:, 2] > 0.5
+	def ridge_trails(self):
+		self.trails_out.sort(key=lambda t: t.pop("_order", 0) if "_order" in t else 0)
+
+	def _ridge_profile(self, T, P, S, y):
+		"""Designed tread profile of a ridge trail: the start pad's height out to ramp_start metres, then an even
+		ramp to the end POI (end_y, reached ramp_end metres before the end), broken by an optional short climb step
+		(a >= 60 deg face of step_h metres with level landings; flagged climb). Returns (ys, climb flags)."""
+		R = T["ramp"]
+		s0 = R.get("start", 50.0)
+		s1 = S[-1] - R.get("end", 4.0)
+		y0 = float(np.interp(s0, S, y))
+		y1 = float(R["end_y"])
+		st_h = float(R.get("step_h", 0.0))
+		land = float(R.get("landing", 2.5))
+		ys = np.where(S <= s0, y, 0.0)
+		climb = np.zeros(len(S), bool)
+		if st_h > 0:
+			k = int(np.argmin(np.hypot(P[:, 0] - R["step_at"][0], P[:, 1] - R["step_at"][1])))
+			ss = S[k]
+			run = (s1 - s0) - 2 * land - 1.2
+			g = (y1 - y0 - st_h) / run
+			ya = y0 + g * (ss - land - s0)                 # foot of the step
+			prof = np.where(S < ss - land, y0 + g * (S - s0),
+				   np.where(S < ss, ya,
+				   np.where(S < ss + 1.2, ya + st_h * (S - ss) / 1.2,
+				   np.where(S < ss + 1.2 + land, ya + st_h, ya + st_h + g * (S - ss - 1.2 - land)))))
+			climb = (S > ss - 3.0) & (S < ss + 1.2 + 1.0)
+		else:
+			g = (y1 - y0) / (s1 - s0)
+			prof = y0 + g * (S - s0)
+		ys = np.where(S <= s0, y, np.where(S >= s1, y1, prof))
+		self.log("   %s: ridge ramp %.1f deg over %.0f m%s" % (T["id"], math.degrees(math.atan(g)), s1 - s0,
+				 (", climb step %.1f m" % st_h) if st_h > 0 else ""))
+		return ys, climb
+
+	def _carve_trail(self, T, P, order=0):
+		"""Bench carve. The tread (width per point, level across) follows a smoothed, grade-limited profile; the
+		cells within the tread + 0.35 m (so every 1.5 m heightfield triangle the walker stands on lies on the level
+		tread) are set to it. Beyond it cut and fill slopes are cones from the tread: they start as a rounded toe
+		(~18 deg) and steepen within ~1.8 m to an angle ~16 deg (cut) / ~9 deg (fill) above the natural hillside's,
+		so they always meet the hillside again within a few metres (computed as a chamfer envelope over all tread
+		cells, so neighbouring switchback legs never fight). Ridge trails use their designed profile and build up
+		an arete (fill flanks) where the ground is lower."""
+		P = _lin(P, 0.75)
+		gm = np.tan(np.radians(P[:, 2]))
+		wid = P[:, 3]
 		P = P[:, :2]
-		y = self.sample(P[:, 0], P[:, 1], blur(self.h, 1.5))
-		# keep the path over water at the water surface (fords)
-		k = max(3, int(12 / 1.5)) | 1
-		ys = ndimage.uniform_filter1d(y, k, mode="nearest")
-		# grade limit (forward/backward) so the tread never exceeds the trail's max grade
-		g_walk = math.tan(math.radians(T["max_grade_deg"] + 3.0))
-		g_climb = math.tan(math.radians(max([T["max_grade_deg"]] + [l.get("max_grade_deg", 0) for l in T["legs"]])))
-		gm = np.where(climb, g_climb, g_walk)
 		ds = np.hypot(np.diff(P[:, 0]), np.diff(P[:, 1]))
-		for _ in range(4):
-			for i in range(1, len(ys)):
-				g = gm[i] * ds[i - 1]
-				ys[i] = min(max(ys[i], ys[i - 1] - g), ys[i - 1] + g)
-			for i in range(len(ys) - 2, -1, -1):
-				g = gm[i] * ds[i]
-				ys[i] = min(max(ys[i], ys[i + 1] - g), ys[i + 1] + g)
-		# fords: where the path crosses a stream the tread comes down to just above the water, approached at the
-		# walking grade from both sides (banks are cut into a ramp instead of leaving a 5 m step)
-		rlm = getattr(self, "river_level", None)
-		if rlm is not None:
-			ii = np.clip(np.round((P[:, 0] - X0) / DX).astype(int), 0, N - 1)
-			jj = np.clip(np.round((P[:, 1] - X0) / DX).astype(int), 0, N - 1)
-			f = rlm[jj, ii].astype(np.float64) + 0.3
-			f = np.where(np.isnan(f), np.inf, f)
-			if np.isfinite(f).any():
-				cap = f.copy()
-				for i in range(1, len(cap)):
-					cap[i] = min(cap[i], cap[i - 1] + gm[i] * 0.8 * ds[i - 1])
-				for i in range(len(cap) - 2, -1, -1):
-					cap[i] = min(cap[i], cap[i + 1] + gm[i] * 0.8 * ds[i])
-				ys = np.minimum(ys, cap)
+		S = np.concatenate([[0.0], np.cumsum(ds)])
+		y = self.sample(P[:, 0], P[:, 1], blur(self.h, 2.0))
+		ridge = "ramp" in T
+		if not ridge:
+			# switchback turns are level landings, a little wider than the tread (the two legs meet on one
+			# platform instead of stepping past each other on the inside of the turn)
+			hd = np.unwrap(np.arctan2(np.gradient(P[:, 1]), np.gradient(P[:, 0])))
+			k6 = max(1, int(6.0 / 0.75))
+			turn = np.zeros(len(P))
+			turn[k6:-k6] = np.abs(hd[2 * k6:] - hd[:-2 * k6])
+			apex = ndimage.maximum_filter1d((turn > math.radians(100.0)).astype(float), 2 * k6 + 1)
+			apex = ndimage.uniform_filter1d(apex, k6, mode="nearest")
+			gm = gm * (1 - apex) + np.minimum(gm, math.tan(math.radians(4.0))) * apex
+			wid = wid + 2.0 * apex
+		if ridge:
+			ys, climb = self._ridge_profile(T, P, S, y)
+		else:
+			climb = np.zeros(len(P), bool)
+			k = max(3, int(15 / 0.75)) | 1
+			ys = ndimage.uniform_filter1d(ndimage.uniform_filter1d(y, k, mode="nearest"), k, mode="nearest")
+			ys = _grade_limit(ys, gm, ds)
+			# fords: where the path crosses a stream the tread comes down to just above the water, approached at
+			# the walking grade from both sides
+			rlm = getattr(self, "river_level", None)
+			if rlm is not None:
+				ii = np.clip(np.round((P[:, 0] - X0) / DX).astype(int), 0, N - 1)
+				jj = np.clip(np.round((P[:, 1] - X0) / DX).astype(int), 0, N - 1)
+				f = rlm[jj, ii].astype(np.float64) + 0.3
+				f = np.where(np.isnan(f), np.inf, f)
+				if np.isfinite(f).any():
+					# the tread meets the water at the crossing from both sides (a perched creek is forded at its
+					# level, not tunnelled under): floor and cap cones at 0.8 x the walking grade
+					flo = np.where(np.isfinite(f), f, -np.inf)
+					for i in range(1, len(flo)):
+						flo[i] = max(flo[i], flo[i - 1] - gm[i] * 0.8 * ds[i - 1])
+					for i in range(len(flo) - 2, -1, -1):
+						flo[i] = max(flo[i], flo[i + 1] - gm[i] * 0.8 * ds[i])
+					ys = np.maximum(ys, flo)
+					cap = f.copy()
+					for i in range(1, len(cap)):
+						cap[i] = min(cap[i], cap[i - 1] + gm[i] * 0.8 * ds[i - 1])
+					for i in range(len(cap) - 2, -1, -1):
+						cap[i] = min(cap[i], cap[i + 1] + gm[i] * 0.8 * ds[i])
+					ys = np.minimum(ys, cap)
+			# ease the grade limiter's kinks (never above the limit: re-limit after)
+			ys = _grade_limit(ndimage.uniform_filter1d(ys, 7, mode="nearest"), gm, ds)
 		Q = np.column_stack([P, ys])
-		F = Frame(Q, 12.0)
+		reach = 220.0 if ridge else 40.0
+		F = Frame(Q, reach)
 		sl = F.sl
-		half = T["width"] * 0.5
+		half = F.interp(wid) * 0.5
+		core = half + 0.35
 		yt = F.attr(2)
 		h = self.h[sl].astype(np.float64)
 		d = F.d
+		# beyond the path ends the tread does not continue (the POI pads take over there)
+		endcap = np.where(F.k >= F.last - 1, np.maximum(F.along, 0.0), 0.0) + \
+			np.where(F.k <= 1, np.maximum(-F.along, 0.0), 0.0)
 		river = self.masks.get("river", np.zeros((N, N), np.float32))[sl] > 0.5
 		water = self.masks["water"][sl] > 0.5
-		shoulder = 5.0 if not T.get("climb") else 3.0
-		w = 1 - smoothstep(half, half + shoulder, d)
-		w = np.where(river | water, 0.0, w)
-		# cut/fill slopes: pull the terrain toward the tread level with a cross-slope limit. The tread never
-		# cuts more than max_cut into the ground nor fills more than max_fill (a trail is a bench, not a trench):
-		# where the graded profile would need more, the tread follows the ground (the router avoids those).
-		max_cut, max_fill = (1.5, 1.0) if T.get("climb") else (8.0, 5.0)
-		yt = np.clip(yt, h - max_cut, h + max_fill)
-		cut = yt + np.maximum(d - half, 0) * 1.1
-		fill = yt - np.maximum(d - half, 0) * 0.9
-		target = np.clip(h, fill, cut)
-		target = np.where(d <= half, yt, target)
-		h = h + (target - h) * np.clip(w * 1.6, 0, 1)
-		self.h[sl] = h.astype(np.float32)
+		rl_sl = getattr(self, "river_level", None)
+		rl_sl = rl_sl[sl] if rl_sl is not None else np.full(d.shape, np.nan, np.float32)
+		water = water & ~np.isfinite(rl_sl)                   # lake / tarn water; a stream's water is forded
+		river = river | (self.masks["water"][sl] > 0.5)
+		intread = (d <= core) & (endcap < 0.5) & ~water
+		e = np.maximum(d - core, 0.0)
+		sn = slope_deg(blur(self.h[sl], 2.0), DX)
+		jit = self.noise(1 / 9.0, 2, seed=171)[sl] * 6.0
+		t18 = math.tan(math.radians(18.0))
+		if ridge:
+			a_cut = np.clip(sn + 16.0 + jit, 45.0, 72.0)
+			a_fill = np.clip(52.0 + jit * 1.2, 44.0, 62.0)
+		else:
+			a_cut = np.clip(sn + 16.0 + jit, 40.0, 72.0)
+			a_fill = np.clip(sn + 9.0 + jit, 34.0, 66.0)
+		tc, tf = np.tan(np.radians(a_cut)), np.tan(np.radians(a_fill))
+		# toe: the slope beside the tread starts at ~18 deg and steepens to the cut / fill angle within 1.8 m
+		u = np.clip(e / 1.8, 0.0, 1.0)
+		Se = np.where(e < 1.8, 1.8 * (u ** 3 - 0.5 * u ** 4), 0.9 + (e - 1.8))
+		cut = yt + e * t18 + (tc - t18) * Se
+		fill = yt - e * t18 - (tf - t18) * Se
+		# neighbouring legs (switchbacks) and the far side of hairpins: reconcile each envelope with every other
+		# tread's (a cone at the full cut / fill angle), so no leg's bench digs into or buries the next one
+		cut = np.where(intread, yt, cut)
+		fill = np.where(intread, yt, fill)
+		cut = _cone_env(cut, tc * DX, "min", 12)
+		fill = _cone_env(fill, tf * DX, "max", 12)
+		# the cut / fill only reach a band beside the tread (daylighting within a few metres on a hillside the
+		# router chose; the ridge's arete flanks spread further), so a cone never shaves a distant cliff
+		band_c = (8.0, 14.0)
+		band_f = (150.0, 210.0) if ridge else (8.0, 14.0)
+		w_c = 1 - smoothstep(band_c[0], band_c[1], e)
+		w_f = 1 - smoothstep(band_f[0], band_f[1], e)
+		target = h + np.maximum(fill - h, 0.0) * w_f
+		target = target - np.maximum(target - cut, 0.0) * w_c
+		target = np.where(intread, yt, target)
+		# fords: the stream bed is never filled, but its banks are cut down to the tread
+		# a shallow riffle under the tread: the bed there sits ~0.35 m under the water, never deeper
+		rl = getattr(self, "river_level", None)
+		rlv = rl[sl].astype(np.float64) - 0.35 if rl is not None else np.full_like(h, -np.inf)
+		rlv = np.where(np.isnan(rlv), -np.inf, rlv)
+		ford = np.minimum(np.maximum(np.minimum(h, yt), rlv), np.maximum(yt, rlv))
+		ford = np.where(np.isfinite(rlv), ford, yt)          # banks (river mask, no water) take the tread
+		target = np.where(river, np.where(intread, ford, h), target)
+		target = np.where(water, h, target)
+		# an earlier trail's tread stays as it is outside this trail's own tread
+		prev = self.masks.get("trail")
+		if prev is not None:
+			target = np.where((prev[sl] > 0.5) & ~intread, h, target)
+		# slightly broken cut/fill faces (no machined planes), never inside the tread
+		rough = (self.noise(1 / 3.0, 2, seed=172)[sl] * 0.25) * smoothstep(0.3, 1.5, e) * (np.abs(target - h) > 0.05)
+		new = target + rough * (~intread)
+		dd = (new - h)[d < core + 16.0]
+		self.log("   %s: bench cut max %.1f m, fill max %.1f m" % (T["id"], float(-dd.min()), float(dd.max())))
+		if ridge:
+			# the arete built over the neve head is rock and snow, not glacier ice
+			up = np.clip(new - h, 0.0, None)
+			for mk in ("ice", "crevasse"):
+				if mk in self.masks:
+					self.masks[mk][sl] *= (1 - smoothstep(0.5, 3.0, up)).astype(np.float32)
+		self.h[sl] = new.astype(np.float32)
+		tz = self.masks.setdefault("trail_zone", np.zeros((N, N), np.float32))
+		tz[sl] = np.maximum(tz[sl], ((1 - smoothstep(core + 2.0, core + 8.0, d)) * (endcap < 0.5)).astype(np.float32))
 		tm = self.masks.setdefault("trail", np.zeros((N, N), np.float32))
-		tread = (1 - smoothstep(half * 0.6, half + 0.8, d)) * (~(river | water))
+		tread = (1 - smoothstep(half - 0.2, half + 0.5, d)) * (endcap < 0.5) * (~(river | water))
 		tm[sl] = np.maximum(tm[sl], tread.astype(np.float32))
-		# layout: resample every ~8 m
+		if T.get("snow"):
+			sm = self.masks.setdefault("trail_snow", np.zeros((N, N), np.float32))
+			sm[sl] = np.maximum(sm[sl], (1 - smoothstep(half + 1.0, half + 4.0, d)).astype(np.float32))
+		# layout: resample every ~3 m (and at every climb step edge)
 		keep = [0]
 		acc = 0.0
 		for i in range(1, len(Q)):
 			acc += ds[i - 1]
-			if acc >= 3.0 or i == len(Q) - 1:
+			if acc >= 3.0 or i == len(Q) - 1 or climb[i] != climb[i - 1]:
 				keep.append(i)
 				acc = 0.0
 		self.trails_out.append(dict(id=T["id"], name=T["name"], golden=T.get("golden", False),
-									width=T["width"], climb=bool(T.get("climb", False)),
-									max_grade_deg=T["max_grade_deg"],
+									width=T["width"], climb=bool(climb.any()),
+									max_grade_deg=T.get("layout_grade_deg", T["max_grade_deg"]), _order=order,
 									points=[[round(float(Q[i, 0]), 1), round(float(Q[i, 2]), 2),
 											 round(float(Q[i, 1]), 1), int(climb[i])] for i in keep]))
 
@@ -751,6 +921,10 @@ class Fine:
 			m = rrw < r + R
 			w = np.clip(1 - smoothstep(r, r + R, rrw), 0, 1)
 			w = w * self._river_clear
+			# benches already carved stay as they are in the blend ring (the pad itself is always flat)
+			tz = self.masks.get("trail_zone")
+			if tz is not None:
+				w = np.where(rrw < r, w, w * (1 - tz))
 			h = self.h.astype(np.float64)
 			self.h = np.where(m, h + (y - h) * w, h).astype(np.float32)
 			pm = self.masks.setdefault("pad", np.zeros((N, N), np.float32))
@@ -805,6 +979,79 @@ class Fine:
 		near = (~inside) & (d < 25) & (d > 0) & ~river
 		h = np.where(near, np.maximum(h, lvl + 0.12 + 0.02 * d), h)
 		self.h = h.astype(np.float32)
+
+
+def _self_conflicts(I, J, gap=14, rad=3.7):
+	"""Route cells (3 m grid) that come back within rad cells of an earlier part of the path more than gap cells
+	of path before (stacked, side-by-side switchback legs). Returns a bool array over the path (the later cells)."""
+	P = np.stack([I, J], axis=1).astype(np.float64)
+	n = len(P)
+	bad = np.zeros(n, bool)
+	if n <= gap:
+		return bad
+	from scipy.spatial import cKDTree
+	tree = cKDTree(P)
+	for k, nb in enumerate(tree.query_ball_point(P, rad)):
+		if any(k - q > gap for q in nb):
+			bad[k] = True
+	return bad
+
+
+def _smooth_path(P, step=1.5, sigma=2.0):
+	"""Resample a routed (3 m grid) path every `step` m and Gaussian-smooth it (sigma in samples), ends fixed:
+	no grid staircase left in the tread (a level-across bench needs a smooth centre line)."""
+	seg = np.hypot(np.diff(P[:, 0]), np.diff(P[:, 1]))
+	S = np.concatenate([[0.0], np.cumsum(seg)])
+	s = np.linspace(0.0, S[-1], max(2, int(S[-1] / step) + 1))
+	Q = np.column_stack([np.interp(s, S, P[:, c]) for c in range(P.shape[1])])
+	if len(Q) > 8:
+		for c in (0, 1):
+			q = ndimage.gaussian_filter1d(Q[:, c], sigma, mode="nearest")
+			w = np.clip(np.minimum(np.arange(len(Q)), np.arange(len(Q))[::-1]) / 6.0, 0.0, 1.0)
+			Q[:, c] = Q[:, c] * (1 - w) + q * w
+	return Q
+
+
+def _grade_limit(ys, gm, ds, it=4):
+	"""Forward/backward clamp so the profile never climbs or drops faster than gm (tan, per point)."""
+	ys = np.array(ys, dtype=np.float64)
+	for _ in range(it):
+		for i in range(1, len(ys)):
+			g = gm[i] * ds[i - 1]
+			ys[i] = min(max(ys[i], ys[i - 1] - g), ys[i - 1] + g)
+		for i in range(len(ys) - 2, -1, -1):
+			g = gm[i] * ds[i]
+			ys[i] = min(max(ys[i], ys[i + 1] - g), ys[i + 1] + g)
+	return ys
+
+
+_CONE_OFFS = [(0, 1, 1.0), (1, 0, 1.0), (0, -1, 1.0), (-1, 0, 1.0), (1, 1, 1.41421), (1, -1, 1.41421),
+			  (-1, 1, 1.41421), (-1, -1, 1.41421), (1, 2, 2.23607), (2, 1, 2.23607), (-1, 2, 2.23607),
+			  (2, -1, 2.23607), (1, -2, 2.23607), (-2, 1, 2.23607), (-1, -2, 2.23607), (-2, -1, 2.23607)]
+
+
+def _cone_env(src, step, mode, iters):
+	"""Chamfer (16-neighbour) cone envelope from the defined cells of src (NaN = free): mode "min" gives
+	min over sources of (y + slope * distance) (cut limit), "max" gives max of (y - slope * distance) (fill limit).
+	step = rise per cell of horizontal distance at the receiving cell (array)."""
+	big = 1e9 if mode == "min" else -1e9
+	env = np.where(np.isnan(src), big, src)
+	H, W = env.shape
+	for _ in range(iters):
+		new = env.copy()
+		for dj, di, L in _CONE_OFFS:
+			sh = np.full_like(env, big)
+			ys0, ys1 = max(dj, 0), H + min(dj, 0)
+			xs0, xs1 = max(di, 0), W + min(di, 0)
+			sh[ys0:ys1, xs0:xs1] = env[ys0 - dj:ys1 - dj, xs0 - di:xs1 - di]
+			if mode == "min":
+				np.minimum(new, sh + step * L, out=new)
+			else:
+				np.maximum(new, sh - step * L, out=new)
+		if np.array_equal(new, env):
+			break
+		env = new
+	return env
 
 
 def pava_decreasing(y):

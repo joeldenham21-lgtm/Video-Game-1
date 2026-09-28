@@ -214,32 +214,41 @@ RIVERS = [
 # Waypoints (x, z). A least-cost router with a grade limit fills in switchbacks between waypoints; "climb"
 # legs allow steeper grades (crampons / ice axe) and are the only places the slope test is relaxed.
 TRAILS = [
-	dict(id="valley_trail", name="Valley Trail", width=1.6, max_grade_deg=16.0, golden=True,
+	# width = bench (tread) width, level across; max_grade_deg = tread grade limit (footpaths <= ~22 deg); min_leg =
+	# shortest switchback leg (m) the router may build; per leg: max_grade_deg, width, min_leg override the trail's.
+	dict(id="valley_trail", name="Valley Trail", width=2.4, max_grade_deg=16.0, golden=True, min_leg=24.0,
 		 legs=[dict(to=(-520, 820), via=[]),
 			   dict(to=(-60, 860), via=[(-300, 845)]),
 			   dict(to=(282, 842), via=[(120, 850)], ford=True),
 			   dict(to=(420, 520), via=[(385, 780), (428, 650)])]),
-	dict(id="ashford_road", name="Ashford Mine Road", width=2.6, max_grade_deg=17.0, golden=True,
+	# the old mine road: a wide bench, long traverses and few hairpins up the Ashford flank
+	dict(id="ashford_road", name="Ashford Mine Road", width=3.4, max_grade_deg=17.0, golden=True, min_leg=50.0,
+		 turn_w=18.0,
 		 legs=[dict(to=(420, 520), via=[]),
-			   dict(to=(820, -80), via=[(590, 430), (690, 270), (760, 140), (800, 20)])]),
-	dict(id="burke_route", name="Burke's Route", width=1.3, max_grade_deg=24.0, golden=True,
+			   dict(to=(820, -80), via=[(590, 430)])]),
+	dict(id="burke_route", name="Burke's Route", width=2.8, max_grade_deg=22.0, golden=True, min_leg=30.0,
 		 legs=[dict(to=(820, -80), via=[]),
 			   dict(to=(380, -520), via=[(720, -300), (560, -420)])]),
-	dict(id="glacier_route", name="Glacier Route", width=1.2, max_grade_deg=27.0, golden=True,
+	# the icefall leg is one designated snow ramp through the seracs (<= 30 deg, crampons), wider than the path
+	dict(id="glacier_route", name="Glacier Route", width=2.8, max_grade_deg=22.0, golden=True, min_leg=30.0,
 		 legs=[dict(to=(380, -520), via=[]),
-			   dict(to=(168, -668), via=[(300, -570)]),
-			   dict(to=(-128, -878), via=[(90, -640), (-60, -770)], climb=True, max_grade_deg=44.0),
-			   dict(to=(-360, -980), via=[(-200, -990), (-300, -1030)], max_grade_deg=29.0)]),
-	dict(id="summit_ridge", name="West Ridge", width=1.2, max_grade_deg=42.0, golden=True, climb=True,
+			   dict(to=(168, -668), via=[]),
+			   dict(to=(-128, -878), via=[(90, -640), (-60, -770)], max_grade_deg=30.0, width=4.0, min_leg=20.0),
+			   dict(to=(-360, -980), via=[(-220, -930), (-300, -965)], max_grade_deg=25.0)]),
+	# the West Ridge: a snow arete (built up to the designed crest over the neve head) at an even grade walkable
+	# with crampons (~44 deg firm snow, no step: the way back down must not need a drop)
+	dict(id="summit_ridge", name="West Ridge", width=5.0, max_grade_deg=44.0, golden=True, snow=True,
+		 ramp=dict(start=47.0, end=7.0, end_y=3452.0),
 		 legs=[dict(to=(-360, -980), via=[]),
-			   dict(to=(120, -1260), via=[(-250, -1070), (-120, -1160), (20, -1225)], ridge=True)]),
-	dict(id="lookout_trail", name="Lookout Trail", width=1.2, max_grade_deg=20.0, golden=False,
+			   dict(to=(120, -1260), via=[(-330, -1050), (-250, -1100), (-150, -1150), (-60, -1195), (30, -1235)],
+					ridge=True)]),
+	dict(id="lookout_trail", name="Lookout Trail", width=1.8, max_grade_deg=20.0, golden=False, min_leg=20.0,
 		 legs=[dict(to=(-520, 820), via=[]),
 			   dict(to=(-900, 260), via=[(-620, 600), (-760, 420)])]),
-	dict(id="trapline", name="Trapline", width=1.0, max_grade_deg=22.0, golden=False,
+	dict(id="trapline", name="Trapline", width=1.4, max_grade_deg=22.0, golden=False, min_leg=18.0,
 		 legs=[dict(to=(-900, 260), via=[]),
 			   dict(to=(-743, -287), via=[(-760, 100), (-700, -80)])]),
-	dict(id="ice_cave_spur", name="Snout Path", width=1.0, max_grade_deg=26.0, golden=False,
+	dict(id="ice_cave_spur", name="Snout Path", width=1.8, max_grade_deg=24.0, golden=False, min_leg=18.0,
 		 legs=[dict(to=(380, -520), via=[]),
 			   dict(to=(178, -452), via=[(280, -470)])]),
 ]

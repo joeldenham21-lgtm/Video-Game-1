@@ -96,6 +96,7 @@ def compute_masks(F, log):
 	wet0 = F.masks["wet"]
 	gravel0 = F.masks.get("gravel", np.zeros_like(h))
 	trail = F.masks.get("trail", np.zeros_like(h))
+	trail_snow = F.masks.get("trail_snow", np.zeros_like(h))   # snow routes (summit arete)
 	pad = F.masks.get("pad", np.zeros_like(h))
 	moraine = F.masks["moraine"]
 	cliffband = F.masks.get("cliffband", np.zeros_like(h))
@@ -126,7 +127,7 @@ def compute_masks(F, log):
 	forest = f_alt * f_low * f_slope * patch
 	forest *= (1 - chute) * (1 - clear * 0.95) * (1 - np.clip(gravel0 * 1.5, 0, 1)) * (1 - water)
 	forest *= (1 - np.clip(wet0 * 1.3, 0, 1)) * (1 - ice) * (1 - moraine) * (1 - near_water)
-	forest *= (1 - np.clip(trail * 0.6 + pad, 0, 1))
+	forest *= (1 - np.clip(trail * 1.2 + pad, 0, 1))
 	forest = np.clip(blur(forest, 1.2) * 1.15, 0, 1)
 
 	# ---- rock (G)
@@ -134,7 +135,7 @@ def compute_masks(F, log):
 	ridge = np.clip(-curv, 0, 1) * smoothstep(2200.0, 2700.0, h) * smoothstep(22.0, 36.0, slope)
 	rock = rock + ridge * 0.5 + smoothstep(2450.0, 2800.0, h) * smoothstep(28.0, 40.0, slope) * 0.4
 	rock = rock * (1 - ice) * (1 - water) * (1 - np.clip(deposit * 1.5, 0, 1) * 0.7)
-	rock = np.clip(rock, 0, 1)
+	rock = np.clip(rock * (1 - trail * 0.85), 0, 1)                         # the tread is trodden dirt / gravel
 
 	# ---- snow (R): late October, snowline ~1,800 m, lower on shady north aspects, wind scoured ridges
 	line = D.SNOWLINE + 60.0 * nz3 - 150.0 * aspect_n + 30.0 * nz1
@@ -166,6 +167,9 @@ def compute_masks(F, log):
 	snow = np.where(ice > 0.5, np.maximum(snow, np.interp(h, [2400, 2600, 2800], [0.55, 0.8, 1.0])), snow)
 	snow = snow * (1 - water) * (1 - F.masks.get("crevasse", np.zeros_like(h)) * 0.8)
 	snow = np.clip(blur(snow, 0.8) + (nz2 * 0.12) * s_alt, 0, 1)
+	# paths are trodden out of the snow (the tread shows and sounds as dirt / gravel), except the snow routes
+	snow = snow * (1 - 0.8 * np.clip(trail * 1.2, 0, 1) * (1 - trail_snow))
+	snow = np.maximum(snow, trail_snow * 0.95 * (1 - water))
 
 	# ---- grass / meadow (B)
 	g_alt = 1 - smoothstep(2380.0, 2560.0, h)
@@ -173,14 +177,14 @@ def compute_masks(F, log):
 	grass = g_alt * g_slope * (1 - forest) * (1 - rock) * (1 - water)
 	grass = grass * (1 - np.clip(gravel0 * 1.4, 0, 1)) * (1 - moraine * 0.8) * (1 - ice)
 	grass = np.maximum(grass, chute * g_alt * 0.8)
-	grass = np.clip(grass, 0, 1)
+	grass = np.clip(grass * (1 - trail), 0, 1)
 
 	# ---- scree (masks2 R): talus below cliffs, deposits, moraines, high debris slopes
 	cliffs_near = blur(np.maximum(rock * smoothstep(40.0, 55.0, slope), cliffband), 6.0)
 	scree = cliffs_near * smoothstep(24.0, 31.0, slope) * (1 - smoothstep(42.0, 50.0, slope)) * 1.6
 	scree = scree + deposit * 0.8 + moraine * 0.9 + smoothstep(2300.0, 2600.0, h) * (1 - forest) * 0.35 * (1 - rock)
 	scree = np.clip(scree * (1 - ice) * (1 - water) * (1 - forest * 0.9), 0, 1)
-	scree = scree * (1 - smoothstep(44.0, 56.0, slope))          # talus lies below its angle of repose
+	scree = scree * (1 - smoothstep(44.0, 56.0, slope)) * (1 - trail)   # talus lies below its angle of repose
 
 	# ---- gravel (G), wetness (A)
 	gravel = np.clip(gravel0 + moraine * 0.35 * (h < 2500), 0, 1) * (1 - ice)

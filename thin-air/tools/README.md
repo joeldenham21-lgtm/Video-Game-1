@@ -137,9 +137,17 @@ Stages (`--stage X` resumes from a cached stage; `--preview DIR` writes hillshad
    gullies/ribs/hummocks and incised couloirs that cut through the strata, the Corrigan Glacier (smooth ice with convex tongue, serac-chaos icefall, shallow crevasses, lateral
    moraines, steep snout), 1.6 M droplet hydraulic erosion + 36 deg thermal talus on soft ground (pads protected).
 4. **fine2**: Loon Lake basin + shore, tarns, snout moraines, rivers (downstream-monotone isotonic water profile,
-   channel + limited banks; braided gravel plain), POI pads (walkable blend rings), trails (least-cost switchback
-   router with a turning penalty `route_turn`, grade-limited tread, bench cuts, fords graded to the water), summit
-   cap (Mount Corrigan is the highest point).
+   channel + limited banks; braided gravel plain), POI pads (walkable blend rings), trails, summit cap (Mount
+   Corrigan is the highest point). Trails (`design.TRAILS`: bench width, max grade, `min_leg` per trail/leg) are
+   routed on a 3 m grid over the smoothed landform by C `route_trail` (states = cell x heading x leg run: turning
+   paid per radian and cheaper on gentle ground, sharp turns only after `min_leg` metres, heading carried across
+   via points, re-routed while legs come back within ~11 m of themselves), then carved as benches: a level tread
+   (+0.35 m so every 1.5 m collision triangle under the walker is level) on a smoothed, grade-limited profile with
+   level, wider landings at hairpins; a rounded toe into cut/fill cones steeper than the hillside, reconciled
+   across neighbouring legs, limited to a band beside the tread; fords meet the water from both sides over a
+   shallow riffle. The West Ridge (`ramp`) is an even ~44 deg snow arete built up to the designed crest over the
+   neve head (carved first, so the other trails route around it). `trail_qa.py` reports, per golden trail, the
+   steepest collision triangle vs the surface slide limit, the bench cross-slope, grades and switchback geometry.
 5. **out**: masks (snow by altitude/aspect/wind/curvature; on steep faces snow only lodges in couloir floors and
    concave gullies and in broken ledge patches - never in even bands along the strata; rock; meadow; forest with
    treeline, avalanche chutes and clearings; scree below its repose angle; gravel; glacier ice; wetness), world
