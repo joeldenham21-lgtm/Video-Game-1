@@ -631,6 +631,7 @@ class Fine:
 		ice = ice_f[::2, ::2] > 0.5
 		s3 = slope_deg(h3, 3.0)
 		pen = np.where(water, 400.0, 0.0) + np.where(river, 25.0, 0.0)
+		self._river3 = river
 		# a bench on a steep hillside means big cuts; faces over ~40 deg are avoided outright
 		pen = pen + np.clip((s3 - 24.0) / 14.0, 0, 1) * 1.2 + np.clip((s3 - 38.0) / 8.0, 0, 3) * 4.0
 		turnf = (0.35 + np.clip((s3 - 6.0) / 24.0, 0, 1) * 1.65).astype(np.float32)
@@ -653,7 +654,20 @@ class Fine:
 				gmax = leg.get("max_grade_deg", T["max_grade_deg"])
 				wps = [cur] + list(leg.get("via", [])) + [leg["to"]]
 				leg_pts = []
+				if leg.get("road"):
+					# a designed road (design.ROADS, graded into the macro terrain): its centre line as built
+					road = next(r for r in D.ROADS if r["id"] == leg["road"])
+					seg = D.road_polyline(road, 3.0)[:, :2]
+					if pts_all:
+						seg = seg[1:]
+					w = leg.get("width", T["width"])
+					pts_all.extend([[p[0], p[1], gmax, w] for p in seg.tolist()])
+					cur = leg["to"]
+					continue
 				p_ice = np.where(ice, 0.0 if T["id"] in ("glacier_route", "summit_ridge") else 30.0, 0.0)
+				# (dilated: a diagonal router step must not hop over a narrow channel for free)
+				p_riv = (ndimage.binary_dilation(self._river3, iterations=2) * (T.get("river_pen", 25.0) - 25.0)
+						 if h3 is not None and T.get("river_pen") else 0.0)
 				min_leg = int(math.ceil(leg.get("min_leg", T.get("min_leg", 24.0)) / 3.0))
 				sdir, sb = -1, 0
 				used = np.zeros_like(h3, dtype=bool)
@@ -676,7 +690,7 @@ class Fine:
 						for _it in range(7):
 							I, J = tlib.route_trail(h3, 3.0, (ia, ja), (ib, jb), gmax * 0.9, wg=1.5, over=600.0,
 													turn_w=T.get("turn_w", 14.0), min_leg=min_leg,
-													penalty=(pen + p_ice + near_prev * 3.0 + extra).astype(np.float32),
+													penalty=(pen + p_ice + near_prev * 3.0 + extra + p_riv).astype(np.float32),
 													turnf=turnf, margin=70, start_dir=sdir, start_b=sb)
 							bad = _self_conflicts(I, J)
 							if best is None or bad.sum() < best[2].sum():
@@ -775,31 +789,22 @@ class Fine:
 			k = max(3, int(15 / 0.75)) | 1
 			ys = ndimage.uniform_filter1d(ndimage.uniform_filter1d(y, k, mode="nearest"), k, mode="nearest")
 			ys = _grade_limit(ys, gm, ds)
-			# fords: where the path crosses a stream the tread comes down to just above the water, approached at
-			# the walking grade from both sides
-			rlm = getattr(self, "river_level", None)
-			if rlm is not None:
-				ii = np.clip(np.round((P[:, 0] - X0) / DX).astype(int), 0, N - 1)
-				jj = np.clip(np.round((P[:, 1] - X0) / DX).astype(int), 0, N - 1)
-				f = rlm[jj, ii].astype(np.float64) + 0.3
-				f = np.where(np.isnan(f), np.inf, f)
-				if np.isfinite(f).any():
-					# the tread meets the water at the crossing from both sides (a perched creek is forded at its
-					# level, not tunnelled under): floor and cap cones at 0.8 x the walking grade
-					flo = np.where(np.isfinite(f), f, -np.inf)
-					for i in range(1, len(flo)):
-						flo[i] = max(flo[i], flo[i - 1] - gm[i] * 0.8 * ds[i - 1])
-					for i in range(len(flo) - 2, -1, -1):
-						flo[i] = max(flo[i], flo[i + 1] - gm[i] * 0.8 * ds[i])
-					ys = np.maximum(ys, flo)
-					cap = f.copy()
-					for i in range(1, len(cap)):
-						cap[i] = min(cap[i], cap[i - 1] + gm[i] * 0.8 * ds[i - 1])
-					for i in range(len(cap) - 2, -1, -1):
-						cap[i] = min(cap[i], cap[i + 1] + gm[i] * 0.8 * ds[i])
-					ys = np.minimum(ys, cap)
+			# fords: where the path crosses a stream the tread meets the water: each crossing (a run of samples in the
+			# channel) is one level ford just above the water, approached from both sides at <= 0.9 x the walking
+			# grade (a perched creek is forded at its level, never tunnelled under nor stepped up onto)
+			fset = self._ford_levels(P)
+			if fset is not None:
+				flo, cap = _ford_cones(fset, gm * 0.9, ds)
+				ys = np.minimum(np.maximum(ys, flo), cap)
 			# ease the grade limiter's kinks (never above the limit: re-limit after)
 			ys = _grade_limit(ndimage.uniform_filter1d(ys, 7, mode="nearest"), gm, ds)
+			if fset is not None:
+				ys = _grade_limit(np.minimum(np.maximum(ys, flo), cap), gm, ds)
+				bad = np.isfinite(fset) & (np.abs(ys - fset) > 0.15)
+				if bad.any():
+					self.log("   %s: WARNING %d ford samples off the water (worst %.1f m at %s)" % (
+						T["id"], int(bad.sum()), float(np.abs(ys - fset)[bad].max()),
+						str(P[np.argmax(np.where(bad, np.abs(ys - fset), 0))].round(0))))
 		Q = np.column_stack([P, ys])
 		reach = 220.0 if ridge else 40.0
 		F = Frame(Q, reach)
@@ -821,7 +826,7 @@ class Fine:
 		intread = (d <= core) & (endcap < 0.5) & ~water
 		e = np.maximum(d - core, 0.0)
 		sn = slope_deg(blur(self.h[sl], 2.0), DX)
-		jit = self.noise(1 / 9.0, 2, seed=171)[sl] * 6.0
+		jit = self.noise(1 / 26.0, 2, seed=171)[sl] * 6.0
 		t18 = math.tan(math.radians(18.0))
 		if ridge:
 			a_cut = np.clip(sn + 16.0 + jit, 45.0, 72.0)
@@ -851,12 +856,23 @@ class Fine:
 		target = target - np.maximum(target - cut, 0.0) * w_c
 		target = np.where(intread, yt, target)
 		# fords: the stream bed is never filled, but its banks are cut down to the tread
-		# a shallow riffle under the tread: the bed there sits ~0.35 m under the water, never deeper
+		# a shallow riffle under the tread: the bed there sits ~0.25 m under the water (0.45 m under the tread)
 		rl = getattr(self, "river_level", None)
-		rlv = rl[sl].astype(np.float64) - 0.35 if rl is not None else np.full_like(h, -np.inf)
+		rlv = rl[sl].astype(np.float64) - 0.25 if rl is not None else np.full_like(h, -np.inf)
 		rlv = np.where(np.isnan(rlv), -np.inf, rlv)
 		ford = np.minimum(np.maximum(np.minimum(h, yt), rlv), np.maximum(yt, rlv))
 		ford = np.where(np.isfinite(rlv), ford, yt)          # banks (river mask, no water) take the tread
+		# a level ford (tread at its water + 0.2): the channel under the tread is one level riffle even where the
+		# creek is steep (a short pool; the water profile is levelled to match in _level_ford)
+		pool = intread & river & np.isfinite(rlv) & (np.abs(yt - 0.2 - (rlv + 0.25)) < 3.0) & (F.k >= 0)
+		if not ridge and getattr(self, "_crossings", None):
+			near_x = np.zeros_like(pool)
+			for kc in self._crossings:
+				near_x |= np.abs(F.s - S[kc]) < 8.0
+			pool &= near_x
+		else:
+			pool &= False
+		ford = np.where(pool, yt - 0.45, ford)
 		target = np.where(river, np.where(intread, ford, h), target)
 		target = np.where(water, h, target)
 		# an earlier trail's tread stays as it is outside this trail's own tread
@@ -864,7 +880,8 @@ class Fine:
 		if prev is not None:
 			target = np.where((prev[sl] > 0.5) & ~intread, h, target)
 		# slightly broken cut/fill faces (no machined planes), never inside the tread
-		rough = (self.noise(1 / 3.0, 2, seed=172)[sl] * 0.25) * smoothstep(0.3, 1.5, e) * (np.abs(target - h) > 0.05)
+		rough = ((self.noise(1 / 12.0, 2, seed=172)[sl] * 0.45 + self.noise(1 / 4.5, 2, seed=173)[sl] * 0.08) *
+				 smoothstep(0.3, 1.5, e) * smoothstep(0.05, 0.6, np.abs(target - h)))
 		new = target + rough * (~intread)
 		dd = (new - h)[d < core + 16.0]
 		self.log("   %s: bench cut max %.1f m, fill max %.1f m" % (T["id"], float(-dd.min()), float(dd.max())))
@@ -875,6 +892,12 @@ class Fine:
 				if mk in self.masks:
 					self.masks[mk][sl] *= (1 - smoothstep(0.5, 3.0, up)).astype(np.float32)
 		self.h[sl] = new.astype(np.float32)
+		if pool.any():
+			rl[sl] = np.where(pool, yt - 0.2, rl[sl]).astype(np.float32)
+		if not ridge:
+			for kc in getattr(self, "_crossings", []):
+				self._level_ford(P[kc, 0], P[kc, 1], float(ys[kc]) - 0.2, float(wid[kc]) * 0.5 + 0.05)
+			self._crossings = []
 		tz = self.masks.setdefault("trail_zone", np.zeros((N, N), np.float32))
 		tz[sl] = np.maximum(tz[sl], ((1 - smoothstep(core + 2.0, core + 8.0, d)) * (endcap < 0.5)).astype(np.float32))
 		tm = self.masks.setdefault("trail", np.zeros((N, N), np.float32))
@@ -896,6 +919,73 @@ class Fine:
 									max_grade_deg=T.get("layout_grade_deg", T["max_grade_deg"]), _order=order,
 									points=[[round(float(Q[i, 0]), 1), round(float(Q[i, 2]), 2),
 											 round(float(Q[i, 1]), 1), int(climb[i])] for i in keep]))
+
+	def _ford_levels(self, P):
+		"""Per path sample: the ford tread height (water + 0.2 m) where the path is in a stream channel, NaN
+		elsewhere. A crossing (a run of channel samples, gaps <= 2 samples bridged) is one level ford at its median
+		water level; a run whose water level varies by more than 0.6 m (running along a steep creek) follows the
+		water sample by sample."""
+		rlm = getattr(self, "river_level", None)
+		if rlm is None:
+			return None
+		ii = np.clip(np.round((P[:, 0] - X0) / DX).astype(int), 0, N - 1)
+		jj = np.clip(np.round((P[:, 1] - X0) / DX).astype(int), 0, N - 1)
+		lv = rlm[jj, ii].astype(np.float64)
+		chan = (self.masks.get("river", np.zeros((N, N), np.float32))[jj, ii] > 0.5) & np.isfinite(lv)
+		if not chan.any():
+			return None
+		runs, nr = ndimage.label(ndimage.binary_closing(chan, iterations=2) | chan)
+		fset = np.full(len(P), np.nan)
+		self._crossings = []
+		for r in range(1, nr + 1):
+			idx = np.nonzero((runs == r) & chan)[0]
+			if len(idx) == 0:
+				continue
+			w = lv[idx]
+			if (idx[-1] - idx[0]) * 0.75 <= 12.0:
+				# a crossing: one level ford (on a steep creek the channel is levelled into a short pool under the
+				# tread, see _level_ford)
+				fset[idx[0]:idx[-1] + 1] = float(np.median(w)) + 0.2
+				self._crossings.append(int(idx[(len(idx) - 1) // 2]))
+			else:
+				fset[idx] = w + 0.2
+		return fset
+
+	def _level_ford(self, x, z, level, b):
+		"""The stream a trail fords at (x, z) runs level (water `level`) for +-b metres along its course there: the
+		layout profile gets two points at that level at the pool's ends (upstream points never below it, downstream
+		never above it, so it stays downstream-monotone)."""
+		best = None
+		for R in self.rivers_out:
+			pts = np.array(R["points"], dtype=np.float64)
+			if len(pts) < 2:
+				continue
+			a, c = pts[:-1][:, [0, 2]], pts[1:][:, [0, 2]]
+			ab = c - a
+			t = np.clip(((x - a[:, 0]) * ab[:, 0] + (z - a[:, 1]) * ab[:, 1]) / np.maximum((ab ** 2).sum(1), 1e-9), 0, 1)
+			q = a + ab * t[:, None]
+			d = np.hypot(q[:, 0] - x, q[:, 1] - z)
+			k = int(np.argmin(d))
+			if best is None or d[k] < best[0]:
+				best = (float(d[k]), R, pts, k, float(t[k]))
+		if best is None or best[0] > 8.0:
+			return
+		_, R, pts, k, t = best
+		seg = np.hypot(*np.diff(pts[:, [0, 2]], axis=0).T)
+		S = np.concatenate([[0.0], np.cumsum(seg)])
+		sc = S[k] + t * seg[k]
+		out = []
+		for s_new in (sc - b, sc + b):
+			if 0.0 < s_new < S[-1]:
+				out.append([float(np.interp(s_new, S, pts[:, c])) for c in range(4)] + [s_new])
+		keep = [list(p) + [s] for p, s in zip(pts.tolist(), S) if abs(s - sc) > b]
+		allp = sorted(keep + out, key=lambda p: p[-1])
+		res = []
+		for p in allp:
+			s = p[-1]
+			y = level if abs(s - sc) <= b + 1e-6 else (max(p[1], level) if s < sc else min(p[1], level))
+			res.append([round(p[0], 1), round(y, 2), round(p[2], 1), round(p[3], 1)])
+		R["points"] = res
 
 	# ------------------------------------------------------------------ 8. pads
 	def pads(self):
@@ -979,6 +1069,20 @@ class Fine:
 		near = (~inside) & (d < 25) & (d > 0) & ~river
 		h = np.where(near, np.maximum(h, lvl + 0.12 + 0.02 * d), h)
 		self.h = h.astype(np.float32)
+
+
+def _ford_cones(fset, g, ds):
+	"""Floor and cap of a tread profile through fixed ford heights (NaN = free): the profile must leave / reach
+	each ford at no more than grade g (tan, per sample) - max / min over fords of fset -+ g * distance."""
+	flo = np.where(np.isfinite(fset), fset, -np.inf)
+	cap = np.where(np.isfinite(fset), fset, np.inf)
+	for i in range(1, len(fset)):
+		flo[i] = max(flo[i], flo[i - 1] - g[i] * ds[i - 1])
+		cap[i] = min(cap[i], cap[i - 1] + g[i] * ds[i - 1])
+	for i in range(len(fset) - 2, -1, -1):
+		flo[i] = max(flo[i], flo[i + 1] - g[i] * ds[i])
+		cap[i] = min(cap[i], cap[i + 1] + g[i] * ds[i])
+	return flo, cap
 
 
 def _self_conflicts(I, J, gap=14, rad=3.7):

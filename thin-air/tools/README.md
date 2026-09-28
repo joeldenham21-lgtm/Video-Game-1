@@ -129,7 +129,10 @@ Stages (`--stage X` resumes from a cached stage; `--preview DIR` writes hillshad
    erosion noise (C `erosion_noise`, dendritic gullies/spurs), benches above the cliff base (60-260 m bands on a
    folded structural surface - the dip swings up to ~10 deg over 0.5-2 km - broken wherever a big fall-line gully
    runs, then couloirs re-cut through them, so no bench runs level across a whole face), footslope fillets, graded
-   RAMP corridors. Matched to FAR at its border.
+   RAMP corridors, designed ROADS (the Ashford ore road: corner points with tread heights, rounded into
+   hairpins, graded in as a ~12 m shelf with 46 / 38 deg cut / fill cones from the nearest tread point, streams and
+   their banks left alone; heights near its pad offset by the pad's error the fine POI correction removes).
+   Matched to FAR at its border.
 3. **fine** (1.5 m, the 2049^2 map): POI altitude corrections, Mount Corrigan's summit pyramid (sharp aretes along
    the designed W/N/E summit crests, ~56 deg faces between them that only carve rock away, radial couloirs, a blocky
    summit block; blended out by 430 m, the col/station untouched), folded strata (thin-bedded runs and massive
@@ -144,8 +147,12 @@ Stages (`--stage X` resumes from a cached stage; `--preview DIR` writes hillshad
    via points, re-routed while legs come back within ~11 m of themselves), then carved as benches: a level tread
    (+0.35 m so every 1.5 m collision triangle under the walker is level) on a smoothed, grade-limited profile with
    level, wider landings at hairpins; a rounded toe into cut/fill cones steeper than the hillside, reconciled
-   across neighbouring legs, limited to a band beside the tread; fords meet the water from both sides over a
-   shallow riffle. The West Ridge (`ramp`) is an even ~44 deg snow arete built up to the designed crest over the
+   across neighbouring legs, limited to a band beside the tread; fords: each crossing (a run of
+   samples in a stream channel) is one level tread 0.2 m above its median water level, approached from both sides
+   at <= 0.9 x the walking grade, over a riffle 0.25 m under the water (banks take the tread); the router pays
+   `river_pen` per (dilated) stream cell so a trail fords a steep creek once, square. Legs with `road=<id>` follow
+   a designed road's centre line instead of the router. Cut / fill faces beside the tread are broken at 5-12 m
+   (angle jitter ~26 m), not saw-toothed. The West Ridge (`ramp`) is an even ~44 deg snow arete built up to the designed crest over the
    neve head (carved first, so the other trails route around it). `trail_qa.py` reports, per golden trail, the
    steepest collision triangle vs the surface slide limit, the bench cross-slope, grades and switchback geometry.
 5. **out**: masks (snow by altitude/aspect/wind/curvature; on steep faces snow only lodges in couloir floors and
