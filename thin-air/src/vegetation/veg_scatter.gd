@@ -473,6 +473,8 @@ static func _grid(ctx: Context, out: CellData, rng: RandomNumberGenerator, place
 			var kind := -1
 			var scl := 1.0
 			var ccat := cat
+			var is_log := false
+			var log_half := 0.0
 			match cat:
 				Cat.TREE:
 					var res := _pick_tree(ctx, t, x, z, y, r_pick, r_size)
@@ -496,8 +498,11 @@ static func _grid(ctx: Context, out: CellData, rng: RandomNumberGenerator, place
 					var lst: Array = ctx.stumps if use_stump else ctx.logs
 					if lst.is_empty():
 						continue
-					kind = int(lst[int(r_size * 7919.0) % lst.size()]["index"])
+					var entry: Dictionary = lst[int(r_size * 7919.0) % lst.size()]
+					kind = int(entry["index"])
 					scl = lerpf(0.8, 1.15, r_size)
+					is_log = not use_stump
+					log_half = float(entry["radius"]) * scl
 			if kind < 0:
 				continue
 			var fr: float = foot * scl
@@ -521,11 +526,29 @@ static func _grid(ctx: Context, out: CellData, rng: RandomNumberGenerator, place
 				ground -= 0.05 + 0.02 * slope    # sink a little on slopes: the root flare hides the gap
 			elif ccat == Cat.ROCK_BIG:
 				ground -= 0.25 * scl
+			var yaw := r_yaw * TAU
+			if is_log and slope > 3.0:
+				# a fallen log (6-9 m, drawn level, length along its local X) rests across the slope like a real
+				# one that rolled to a stop: random yaws left 2 of 3 logs with an end hovering 0.3-2.8 m off a
+				# slope. Contour direction +-12 deg, either way round; sunk a little for the downhill side.
+				var gx: float = t.get_height(x + 1.0, z) - t.get_height(x - 1.0, z)
+				var gz: float = t.get_height(x, z + 1.0) - t.get_height(x, z - 1.0)
+				var contour := atan2(-gx, -gz) + (PI if fmod(r_yaw * 7.31, 1.0) < 0.5 else 0.0)
+				# the jittered contour, the exact contour or the old random yaw: whichever leaves the ends closest to
+				# the ground (ridges and gullies bend the contour under a 9 m log)
+				var best := INF
+				for cand: float in [contour + (r_yaw - 0.5) * deg_to_rad(24.0), contour, yaw]:
+					var ax := Vector2(cos(cand), -sin(cand)) * log_half
+					var gap := maxf(y - float(t.get_height(x + ax.x, z + ax.y)), y - float(t.get_height(x - ax.x, z - ax.y)))
+					if gap < best - 0.05:
+						best = gap
+						yaw = cand
+				ground -= 0.003 * slope
 			out.kinds.append(kind)
 			out.cats.append(ccat)
 			out.ids.append(make_id(out.cx, out.cz, out.kinds.size() - 1))
 			out.pos.append(Vector3(x, ground, z))
-			out.yaw.append(r_yaw * TAU)
+			out.yaw.append(yaw)
 			out.scale.append(scl)
 			out.rank.append(r_rank)
 

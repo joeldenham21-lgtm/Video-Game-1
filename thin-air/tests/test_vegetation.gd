@@ -36,6 +36,7 @@ func run() -> void:
 	_test_scatter_determinism()
 	_test_scatter_rules()
 	_test_portal_exclusion()
+	_test_log_ends_grounded()
 	_test_grass_cells()
 	var veg := await _make_vegetation()
 	await _test_lod_settings(veg)
@@ -139,6 +140,30 @@ func _test_portal_exclusion() -> void:
 		var real := VegScatter.make_context(VegLibrary.get_shared(), TerrainData, 1.0)
 		for h in TerrainData.layout.get("holes", []):
 			check(VegScatter.excluded(real, float(h["x"]), float(h["z"]), 0.0), "no scatter in the %s mouth" % h["id"])
+
+
+## Fallen logs (6-9 m, drawn level) lie across slopes: with random yaws 2 of 3 had an end hovering 0.3-2.8 m.
+func _test_log_ends_grounded() -> void:
+	var ctx := _ctx()
+	var lib := VegLibrary.get_shared()
+	var n := 0
+	var high := 0
+	for c in _cells_in_window():
+		var cd := VegScatter.generate_cell(ctx, c.x, c.y)
+		for i in cd.size():
+			if int(cd.cats[i]) != Cat.DEADWOOD:
+				continue
+			var half := float(lib.info(lib.kind_names[cd.kinds[i]]).get("length", 0.0)) * cd.scale[i] * 0.5
+			if half <= 0.25:
+				continue
+			var p := cd.pos[i]
+			var ax := Vector3(cos(cd.yaw[i]), 0.0, -sin(cd.yaw[i])) * half
+			var gap := maxf(p.y - terrain.get_height(p.x + ax.x, p.z + ax.z), p.y - terrain.get_height(p.x - ax.x, p.z - ax.z))
+			n += 1
+			if gap > 0.3:
+				high += 1
+	check(n > 20, "window has fallen logs (%d)" % n)
+	check(high * 10 < n, "fallen logs rest on the ground: %d of %d have an end > 0.3 m up" % [high, n])
 
 
 func _test_scatter_rules() -> void:
