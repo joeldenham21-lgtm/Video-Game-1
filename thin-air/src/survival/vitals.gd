@@ -23,7 +23,8 @@ const TUNING := {
 	&"ml_per_water_point": 25.0,       # 100 water = 2.5 L (used when an item gives water in mL)
 	# Warmth: drifts toward a target implied by felt temperature.
 	&"comfort_c": 20.0,                # felt °C at which warmth target = 100
-	&"freezing_c": -20.0,              # felt °C at which warmth target = 0
+	&"freezing_c": -15.0,              # felt °C at which warmth target = 0 (soaked in a field jacket on a snowy
+	                                   # night, felt ≈ −13 °C: hypothermic by midnight without a fire)
 	&"cooling_rate": 0.0055,           # fraction of the gap closed per second when cooling
 	&"warming_rate": 0.016,            # … when warming
 	&"wet_cooling_mult": 2.1,
@@ -415,8 +416,12 @@ func effective_felt_temp() -> float:
 
 func _simulate_warmth(gdt: float, _rdt: float) -> void:
 	var felt := effective_felt_temp()
-	var target := warmth_target(felt)
 	var cold_mult := _diff(&"cold")
+	var target := warmth_target(felt)
+	if target < 100.0:
+		# Difficulty scales how deep the cold bites, not only how fast: otherwise every difficulty ends a long
+		# exposure (a whole night) at the same warmth and Explorer's "gentler cold" vanished after ~10 minutes.
+		target = 100.0 - (100.0 - target) * cold_mult
 	var rate: float
 	if target < warmth:
 		rate = float(TUNING[&"cooling_rate"]) * cold_mult

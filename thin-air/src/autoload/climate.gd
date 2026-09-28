@@ -585,6 +585,14 @@ static func _inside_shape(shape: Shape3D, p: Vector3) -> float:
 ## Felt temperature (°C). `insulation` = clothing warmth (°C equivalent, Player.get_insulation()).
 ## `windproof` 0..1 (defaults to the player's clothing when < 0).
 func get_felt_temperature(pos: Vector3, insulation: float, wet: bool, windproof: float = -1.0) -> float:
+	return felt_temperature(pos, insulation, 1.0 if wet else 0.0, windproof)
+
+
+## Felt temperature with graded wetness 0..1 (Vitals' "wet" effect strength): damp clothes lose part of their
+## insulation, soaked ones most of it. The Player uses this so the first flakes on a waterproof parka don't
+## already halve its warmth (as the boolean `wet` of get_felt_temperature() did).
+func felt_temperature(pos: Vector3, insulation: float, wetness: float, windproof: float = -1.0) -> float:
+	var wet_k := clampf(wetness, 0.0, 1.0)
 	var air := get_air_temperature(pos)
 	var wind := get_wind_at(pos).length()          # already reduced by shelter/forest
 	var shelter := get_shelter_at(pos)
@@ -595,10 +603,8 @@ func get_felt_temperature(pos: Vector3, insulation: float, wet: bool, windproof:
 	var chill := (wind_chill(air, wind * 3.6) - air) * (1.0 - windproof)
 	var heat := get_heat_at(pos) * (1.0 + 0.4 * shelter)
 	var bonus := SHELTER_BONUS_C * shelter
-	var ins := insulation * (0.45 if wet else 1.0)
-	var wet_pen := 0.0
-	if wet:
-		wet_pen = (4.0 + 0.35 * wind) * (1.0 - 0.5 * shelter)
+	var ins := insulation * lerpf(1.0, 0.45, wet_k)
+	var wet_pen := (4.0 + 0.35 * wind) * (1.0 - 0.5 * shelter) * wet_k
 	# Calm sunshine warms you noticeably even on a freezing day.
 	var sun := get_sun_direction()
 	var solar := 0.0

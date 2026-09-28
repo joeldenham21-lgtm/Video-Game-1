@@ -1343,10 +1343,10 @@ const CORE_HEIGHT := 1.0
 
 func _sample_climate(dt: float) -> void:
 	var pos := global_position + Vector3(0.0, CORE_HEIGHT, 0.0)
-	var wet := vitals.has_effect(&"wet")
+	var wet := vitals.get_effect_strength(&"wet") if vitals.has_effect(&"wet") else 0.0
 	vitals.env_altitude = global_position.y
 	vitals.env_air_temp = Climate.get_air_temperature(pos)
-	_felt = Climate.get_felt_temperature(pos, _insulation, wet)
+	_felt = Climate.felt_temperature(pos, _insulation, wet)
 	vitals.env_felt_temp = _felt
 	vitals.env_heat = Climate.get_heat_at(pos)
 	is_sheltered = Climate.get_shelter_at(pos)
