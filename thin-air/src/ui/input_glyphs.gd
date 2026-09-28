@@ -32,6 +32,8 @@ const TOUCH_ICONS := {
 }
 
 static var device: StringName = &""
+## True while Game dispatches a synthetic key (Android back → Esc); such keys don't switch the device.
+static var synthetic_keys := false
 static var _bus: InputGlyphs = null
 
 
@@ -65,7 +67,8 @@ static func track(event: InputEvent) -> void:
 	elif event is InputEventScreenTouch or event is InputEventScreenDrag:
 		set_device(TOUCH)
 	elif event is InputEventKey:
-		if (event as InputEventKey).pressed:
+		# the Android back gesture arrives as a synthetic Esc (Game._notification): not a keyboard
+		if (event as InputEventKey).pressed and not synthetic_keys:
 			set_device(KEYBOARD)
 	elif event is InputEventMouseButton:
 		# emulated mouse from touch has device == -1 (InputEvent.DEVICE_ID_EMULATION)

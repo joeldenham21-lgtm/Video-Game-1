@@ -73,6 +73,22 @@ func _ready() -> void:
 	OS.add_logger(errors)
 
 
+## Android back gesture / button (project setting quit_on_go_back=false, so it no longer kills the game with
+## unsaved progress): behaves like Esc — closes the open dialog or screen, leaves build mode, or opens the
+## pause menu in play. InputGlyphs ignores the synthetic key, so the touch layout stays.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		InputGlyphs.synthetic_keys = true
+		for pressed in [true, false]:
+			var e := InputEventKey.new()
+			e.keycode = KEY_ESCAPE
+			e.physical_keycode = KEY_ESCAPE
+			e.pressed = pressed
+			Input.parse_input_event(e)
+			Input.flush_buffered_events()
+		InputGlyphs.synthetic_keys = false
+
+
 ## True when launched with --autostart (the main menu starts a new game at once).
 func boot_autostart() -> bool:
 	return boot_args.has("autostart")

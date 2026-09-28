@@ -14,6 +14,7 @@ func run() -> void:
 	await _test_touch_subtitles_clear_of_thumb_cluster()
 	_test_desktop_on_phone_preset()
 	_test_auto_detect()
+	await _test_android_back_and_suspend()
 	Settings.values = prev_values
 	Settings.preset = prev_preset
 
@@ -138,6 +139,46 @@ func _test_auto_detect() -> void:
 	for c in cases:
 		var got: StringName = Settings.preset_for_gpu(String(c[0]), bool(c[1]))
 		check(got == c[2], "auto-detect %s -> %s (got %s)" % [c[0], c[2], got])
+
+
+## Android: the back gesture no longer quits the game (quit_on_go_back=false); it acts like Esc — opens the
+## pause menu in play and closes it again — without flipping the touch layout to keyboard glyphs. Leaving the
+## app pauses the game.
+func _test_android_back_and_suspend() -> void:
+	check(ProjectSettings.get_setting("application/config/quit_on_go_back", true) == false, "back gesture doesn't quit the app")
+	InputGlyphs.device = InputGlyphs.TOUCH
+	var prev_state := Game.state
+	Game.state = Game.State.PLAYING
+	var body := Node3D.new()
+	add_child(body)
+	Game.player = body
+	var hud := (load("res://scenes/ui/hud.tscn") as PackedScene).instantiate() as HUD
+	add_child(hud)
+	for i in 3:
+		await get_tree().process_frame
+	check(hud.can_open_screen(), "HUD ready to open screens")
+	Game.notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
+	Input.flush_buffered_events()
+	await get_tree().process_frame
+	check(get_tree().paused and hud.pause_menu != null, "back gesture in play opens the pause menu")
+	check(InputGlyphs.current() == InputGlyphs.TOUCH, "back gesture keeps the touch layout")
+	await get_tree().process_frame
+	Game.notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
+	Input.flush_buffered_events()
+	for i in 2:
+		await get_tree().process_frame
+	check(not get_tree().paused, "back gesture again resumes")
+	for i in 3:
+		await get_tree().process_frame
+	hud.on_app_suspended()
+	check(get_tree().paused, "leaving the app pauses the game")
+	get_tree().paused = false
+	hud.queue_free()
+	body.queue_free()
+	Game.player = null
+	Game.state = prev_state
+	InputGlyphs.device = InputGlyphs.KEYBOARD
+	await get_tree().process_frame
 
 
 func _screen_touch(index: int, pos: Vector2, pressed: bool, _tc: TouchControls = null) -> void:

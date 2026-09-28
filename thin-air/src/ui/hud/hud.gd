@@ -445,6 +445,22 @@ func _ensure_touch_controls() -> void:
 
 # ============================================================================================== input
 
+## Phones: leaving the app (home, app switch, a call) pauses the game and autosaves where saving is allowed —
+## Android may kill a backgrounded game, and the mountain shouldn't keep running when the player returns.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_PAUSED or (what == NOTIFICATION_APPLICATION_FOCUS_OUT and Settings.is_handheld()):
+		on_app_suspended()
+
+
+func on_app_suspended() -> void:
+	if touch_controls and is_instance_valid(touch_controls) and touch_controls.has_method("release_all"):
+		touch_controls.call("release_all")          # a finger held on the stick when the app left
+	if Game.state == Game.State.PLAYING and PauseMenu.can_save():
+		Save.save_game(0)
+	if can_open_screen():
+		open_pause()
+
+
 func can_open_screen() -> bool:
 	return Game.state == Game.State.PLAYING and not get_tree().paused and _screens.is_empty() \
 		and not _dead and not _cinematic and Engine.get_process_frames() - _screen_closed_frame > 1 \
