@@ -261,7 +261,7 @@ func set_selected(id: StringName) -> void:
 	_selected = id
 	_hint.visible = id != &""
 	if _touch:
-		_touch.visible = id != &"" and Settings.is_mobile()
+		_touch.visible = id != &"" and InputGlyphs.current() == InputGlyphs.TOUCH
 	if id != &"":
 		_hint_title.text = BuildCatalog.display_name(id)
 
@@ -270,7 +270,7 @@ func _input(event: InputEvent) -> void:
 	# remember the last device for the control hints
 	if event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) > 0.4):
 		_pad = true
-	elif event is InputEventKey or event is InputEventMouseButton:
+	elif event is InputEventKey or event is InputEventMouseButton or event is InputEventScreenTouch:
 		_pad = false
 
 
@@ -366,10 +366,10 @@ func update_hint(p: Dictionary) -> void:
 
 
 func _keys_text() -> String:
-	if Settings.is_mobile():
-		return "Place a blueprint, then fill it with materials"
 	if _pad:
 		return "RT place   LB/RB rotate   LT exit   D-pad up menu"
+	if InputGlyphs.current() == InputGlyphs.TOUCH:
+		return "Place a blueprint, then fill it with materials"
 	return "LMB place   Q/R or wheel rotate   RMB exit   B menu"
 
 
@@ -454,11 +454,14 @@ func _place_hint() -> void:
 
 
 func _process(_delta: float) -> void:
+	# a pad picked up on the phone hides the touch block (and brings it back on the next touch)
+	if _touch:
+		_touch.visible = _selected != &"" and InputGlyphs.current() == InputGlyphs.TOUCH
 	if _touch and _touch.visible:
 		_place_touch_box()
 	if _hint and _hint.visible:
 		_place_hint()
 	if _hammer_btn:
-		var want := Settings.is_mobile() and not picker_open and _selected == &"" and Game.is_playing() \
+		var want := InputGlyphs.current() == InputGlyphs.TOUCH and not picker_open and _selected == &"" and Game.is_playing() \
 			and get_tree().get_first_node_in_group(&"touch_controls") == null
 		_hammer_btn.visible = want

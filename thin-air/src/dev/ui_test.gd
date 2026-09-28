@@ -257,7 +257,8 @@ func _setup_state(state: String) -> void:
 			ov.call(&"caption", "Aldous Range, northern British Columbia", 30.0)
 		"dialog":
 			hud.open_pause()
-			ConfirmDialog.ask(hud.pause_menu if hud.pause_menu else hud, "Quit to main menu?", "Progress since your last save will be lost.", "Quit", "Keep playing")
+			var host: Node = hud.pause_menu.get("root") if hud.pause_menu else hud.root
+			ConfirmDialog.ask(host, "Quit to main menu?", "Progress since your last save will be lost.", "Quit", "Keep playing")
 	for k in ["hud", "hud_fx", "hud_frost", "hud_touch", "glyphs_pad"]:
 		if state == k:
 			hud.vitals.force_all = state == "hud_fx"
