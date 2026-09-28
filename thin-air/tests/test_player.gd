@@ -12,6 +12,7 @@ func run() -> void:
 	await get_tree().physics_frame
 	await _api(course)
 	_viewmodel_long_frames(course.player)
+	_camera_long_frames(course.player)
 	await _interact_assist(course)
 	await course.run_trials(self)
 	var p := course.player
@@ -196,3 +197,29 @@ func _viewmodel_long_frames(p: Player) -> void:
 	check(ok, "viewmodel springs stay finite through 60 frames of 0.3 s (%s %s)" % [sw.position, sw.rotation_degrees])
 	for i in 120:
 		vm.call(&"_update_motion", 1.0 / 60.0)
+
+
+## Same for the camera rig's landing-dip spring: a landing followed by long frames (the prologue plays at 20x
+## time scale in test_flow; a loading hitch, throttling) drove _dip_vel to inf and the camera transform to NaN
+## ("!v.is_finite()" at instance_set_transform thousands of times, fauna spawning read a NaN camera).
+func _camera_long_frames(p: Player) -> void:
+	var h := p.head
+	if h == null or h.camera == null:
+		return
+	h.reset_smoothing()
+	h.land(0.16)                  # the settle after Story places the player at the wreck
+	for i in 240:
+		h.update_rig(0.45, Vector3.ZERO)
+	var dv := float(h.get(&"_dip_vel"))
+	var ok := h.transform.is_finite() and h.shake.transform.is_finite() and h.camera.global_transform.is_finite() \
+			and is_finite(dv) and absf(dv) < 20.0 and absf(float(h.get(&"_dip"))) <= 0.35
+	check(ok, "camera landing dip stays finite through 240 frames of 0.45 s (dip %s vel %s)" % [h.get(&"_dip"), dv])
+	# the dip still reads at normal frame rates: a hard landing dips the eye and springs back within a second
+	h.reset_smoothing()
+	h.land(9.0)
+	var lowest := 0.0
+	for i in 60:
+		h.update_rig(1.0 / 60.0, Vector3.ZERO)
+		lowest = minf(lowest, float(h.get(&"_dip")))
+	check(lowest < -0.015 and absf(float(h.get(&"_dip"))) < 0.002, "landing dips the eye (%.3f m) and recovers (%.4f m)" % [lowest, h.get(&"_dip")])
+	h.reset_smoothing()

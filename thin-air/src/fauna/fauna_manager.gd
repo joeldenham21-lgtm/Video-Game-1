@@ -468,6 +468,10 @@ func _find_spawn(def: SpeciesDef, center: Vector3, rmin: float, rmax: float) -> 
 	if def == null:
 		return Vector3.INF
 	var cam := _cam
+	# a camera with a broken (non-finite) transform can't say what is in view: skip the in-view test rather
+	# than normalize NaNs 12 times a spawn tick
+	if cam and (not is_instance_valid(cam) or not cam.is_inside_tree() or not cam.global_transform.is_finite()):
+		cam = null
 	for i in 12:
 		var a := _rng.randf() * TAU
 		var r := _rng.randf_range(rmin, rmax)

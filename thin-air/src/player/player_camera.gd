@@ -132,10 +132,7 @@ func update_rig(delta: float, interp_offset: Vector3) -> void:
 		return
 	_eye = lerpf(_eye, eye_target, 1.0 - exp(-9.0 * delta))
 	# --- Landing dip spring + stair smoothing ------------------------------------------------
-	var acc := -140.0 * _dip - 17.0 * _dip_vel
-	_dip_vel += acc * delta
-	_dip += _dip_vel * delta
-	_dip = clampf(_dip, -0.35, 0.12)
+	_step_dip(delta)
 	_step_offset = lerpf(_step_offset, 0.0, 1.0 - exp(-11.0 * delta))
 	position = Vector3(interp_offset.x, _eye + _dip + _step_offset + interp_offset.y, interp_offset.z)
 	# --- Stride-locked head bob -------------------------------------------------------------
@@ -204,3 +201,25 @@ func update_rig(delta: float, interp_offset: Vector3) -> void:
 
 func get_fov() -> float:
 	return _fov
+
+
+## The landing dip is a stiff (k 140, c 17) explicit spring: integrated with one long step (> ~0.12 s — a
+## loading hitch, heavy throttling, or a time-scaled cutscene) it diverges, _dip_vel runs off to inf, then NaN,
+## and the whole camera transform turns non-finite for the rest of the session ("!v.is_finite()" every frame,
+## fauna spawn tests on the camera fail). Integrate in steps of at most 1/60 s, like the viewmodel springs,
+## and stop the velocity at the clamp so the spring can't wind up against it.
+func _step_dip(delta: float) -> void:
+	if _dip == 0.0 and _dip_vel == 0.0:
+		return
+	var steps := clampi(ceili(delta * 60.0), 1, 8)
+	var dt := minf(delta, 8.0 / 60.0) / float(steps)
+	for _i in steps:
+		_dip_vel += (-140.0 * _dip - 17.0 * _dip_vel) * dt
+		_dip += _dip_vel * dt
+		if _dip < -0.35 or _dip > 0.12:
+			_dip = clampf(_dip, -0.35, 0.12)
+			_dip_vel = 0.0
+	# settled: snap to rest instead of creeping through denormals forever
+	if absf(_dip) < 1e-5 and absf(_dip_vel) < 1e-4:
+		_dip = 0.0
+		_dip_vel = 0.0
