@@ -77,17 +77,17 @@ shape = SubResource("Box_4")
 transform = Transform3D(0.70711, 0, 0.70711, 0, 1, 0, -0.70711, 0, 0.70711, 3, 0, 4.5)
 
 [node name="Log_burke_02" type="Marker3D" parent="Sockets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.3, 0.3, 1)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.3, 0.223, 1)
 metadata/log_id = &"log_burke_02"
 
 [node name="Loot_Pack" type="Marker3D" parent="Sockets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.8, 0.4, -1.6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.8, 0.359, -1.6)
 
 [node name="Loot_Tent" type="Marker3D" parent="Sockets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, -0.3)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.031, -0.3)
 
 [node name="Loot_Stove" type="Marker3D" parent="Sockets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.3, 1.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.254, 1.2)
 
 [node name="Use_Tent" type="Marker3D" parent="Sockets"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0.55)
