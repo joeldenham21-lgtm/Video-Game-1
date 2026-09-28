@@ -21,6 +21,7 @@ func _init() -> void:
 	var ps := ProjectSettings
 	# --- Autoloads (order matters)
 	var autoloads := [
+		["Content", "src/autoload/content.gd"],   # first: mounts the Lite build's downloaded pack before the rest load
 		["Events", "src/autoload/events.gd"], ["Settings", "src/autoload/settings.gd"],
 		["ItemDB", "src/autoload/item_db.gd"], ["TerrainData", "src/autoload/terrain_data.gd"],
 		["Climate", "src/autoload/climate.gd"], ["Game", "src/autoload/game.gd"],

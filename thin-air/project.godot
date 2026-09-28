@@ -26,6 +26,7 @@ general/3d_panning_strength=0.75
 
 [autoload]
 
+Content="*res://src/autoload/content.gd"
 Events="*res://src/autoload/events.gd"
 Settings="*res://src/autoload/settings.gd"
 ItemDB="*res://src/autoload/item_db.gd"

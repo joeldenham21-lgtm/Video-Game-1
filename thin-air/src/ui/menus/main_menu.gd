@@ -30,6 +30,10 @@ var _busy := false
 
 
 func _ready() -> void:
+	if Content.needs_download():
+		# Lite build, first launch: fetch the game's media before anything here tries to load it
+		get_tree().change_scene_to_file.call_deferred(Content.DOWNLOAD_SCENE)
+		return
 	Game.state = Game.State.MENU
 	get_tree().paused = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

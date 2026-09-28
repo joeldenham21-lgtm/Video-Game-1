@@ -70,7 +70,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_buses()
 	catalog.load_catalog()
-	catalog.warm_up()
+	if not Content.needs_download():
+		catalog.warm_up()        # the Lite build's first launch warms up after the download (Content.finish)
 	_root3d = Node3D.new()
 	_root3d.name = "Pool3D"
 	_root3d.top_level = true

@@ -130,6 +130,40 @@ jobs:
           tar czf ../dist/ThinAir-Linux-x64.tar.gz -C build/linux .
           ls -la ../dist
 
+      - name: Android Lite (small APK + downloadable content pack)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd thin-air
+          # The Lite APK (< 30 MB) downloads the game's media on first launch from a release of its own,
+          # keyed by a hash of the media, so a pack is only built and published when the media change and
+          # every Lite APK ever published keeps finding its pack. See src/autoload/content.gd.
+          id=$(python3 tools/release/content_manifest.py id --godot "$(godot --version)")
+          tag="thin-air-content-$id"
+          mkdir -p build/content build/android-lite
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "content pack $id already published"
+          else
+            timeout 2400 godot --headless --export-pack "Android" build/content/ThinAir-content.pck 2>&1 | tail -3
+            test -s build/content/ThinAir-content.pck
+            python3 tools/release/content_manifest.py info build/content/ThinAir-content.pck --id "$id" > build/content/content.json
+            gh release create "$tag" build/content/ThinAir-content.pck build/content/content.json \
+              --prerelease --latest=false --target "$GITHUB_SHA" --title "THIN AIR content $id" \
+              --notes "Game media for THIN AIR's small Android app (ThinAir-Android-Lite.apk downloads this automatically on first launch). Nothing to install by hand." \
+              || { echo "::warning::another run published $tag first; using its pack"; rm -f build/content/content.json; }
+            rm -f build/content/ThinAir-content.pck
+          fi
+          # always describe the pack that is actually hosted
+          test -s build/content/content.json || gh release download "$tag" -p content.json -D build/content --clobber
+          python3 tools/release/content_manifest.py write build/content/content.json --repo "$GITHUB_REPOSITORY" --tag "$tag"
+          timeout 2400 godot --headless --export-release "Android Lite" build/android-lite/ThinAir-Lite.apk 2>&1 | tail -3
+          size=$(stat -c %s build/android-lite/ThinAir-Lite.apk)
+          echo "Lite APK: $size bytes"
+          test "$size" -lt 31457280 || echo "::warning::Lite APK is over 30 MiB ($size bytes)"
+          cp build/android-lite/ThinAir-Lite.apk ../dist/ThinAir-Android-Lite.apk
+          ls -la ../dist
+
       - uses: actions/upload-artifact@v4
         with:
           name: thin-air-builds
@@ -146,7 +180,7 @@ jobs:
           short=${GITHUB_SHA::7}
           notes="Automated build of THIN AIR from \`$GITHUB_REF_NAME\` @ $short (tests: $TESTS_OUTCOME).
 
-          - **Android (Galaxy S25 Ultra):** download \`ThinAir-Android-arm64.apk\` on the phone, allow installs from your browser, install. If an older build is installed and the update is refused, uninstall it first.
+          - **Android (Galaxy S25 Ultra):** \`ThinAir-Android-Lite.apk\` (under 30 MB) is the easy one: install it and it downloads the rest of the game (about 390 MB) itself on first launch. \`ThinAir-Android-arm64.apk\` is the same game with everything inside (no download on first launch). Allow installs from your browser or file manager when asked. If an older build is installed and the update is refused, uninstall it first.
           - **Windows (MSI Cyborg):** download \`ThinAir-Windows-x64.zip\`, extract, run \`ThinAir.exe\` (keep the .pck next to it). SmartScreen: More info → Run anyway.
           - **Linux:** extract and run \`ThinAir.x86_64\`."
           gh release delete "$tag" -y --cleanup-tag || true

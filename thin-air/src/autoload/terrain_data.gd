@@ -60,6 +60,9 @@ var _holes: Array[Dictionary] = []
 
 
 func _ready() -> void:
+	if Content.needs_download():
+		_make_flat()      # the Lite build's first launch: Content.finish() loads the real data after the download
+		return
 	load_data()
 
 

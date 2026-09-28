@@ -76,6 +76,17 @@ Player collides with 1, 3, 7, 10 (and 4 for heavy props). Interaction ray hits 1
 
 ## 3. Autoloads (order matters) — `src/autoload/*.gd`
 
+### `Content` (content.gd) — first-launch media download for the small Android build; FIRST autoload
+```gdscript
+var available: bool                 # media present (always true unless the build has the `content_download` feature)
+func needs_download() -> bool       # Lite build before its pack is downloaded + mounted; main menu then opens
+                                    # scenes/ui/content_download.tscn instead of itself
+func download() -> void             # start / resume (ranged chunks); signals progress(done, total), failed(msg), verified()
+func finish() -> bool               # mount the pack, reload TerrainData + audio warm-up
+```
+Code that runs before the main menu (autoload `_ready`s) must not rely on media existing: guard with
+`ResourceLoader.exists()` or skip the work while `Content.needs_download()` (TerrainData, Audio do).
+
 ### `Events` (events.gd) — global signal bus, no logic
 ```gdscript
 signal notification(text: String, kind: StringName)        # kinds: &"info", &"item", &"warning", &"objective", &"discovery", &"blueprint"

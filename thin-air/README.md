@@ -18,7 +18,7 @@ Every push to this branch builds the game and publishes it on the repository's
 
 | Device | Download | Install |
 |---|---|---|
-| **Samsung Galaxy S25 Ultra** | `ThinAir-Android-arm64.apk` | Open the release page on the phone, download the APK, allow your browser to install unknown apps, open it. Play in landscape, headphones recommended. If an older preview is installed and the update is refused, uninstall it first (preview builds are signed with a throwaway key). |
+| **Samsung Galaxy S25 Ultra** | `ThinAir-Android-Lite.apk` (under 30 MB) | Install it and open it: on first launch it downloads the rest of the game (about 390 MB, once — Wi-Fi recommended; an interrupted download resumes). Allow your browser or file manager to install unknown apps when Android asks; if Samsung's *Auto Blocker* refuses, turn it off in *Settings → Security and privacy → Auto Blocker*, install, and turn it back on. Play in landscape, headphones recommended. `ThinAir-Android-arm64.apk` is the same game with everything inside (no first-launch download). If an older preview is installed and the update is refused, uninstall it first (preview builds are signed with a throwaway key). |
 | **MSI Cyborg 15 (Windows)** | `ThinAir-Windows-x64.zip` | Extract anywhere, run `ThinAir.exe` (keep `ThinAir.pck` next to it). SmartScreen: *More info → Run anyway*. The game auto-detects the RTX GPU and picks the *High* preset. |
 | Linux | `ThinAir-Linux-x64.tar.gz` | Extract, run `ThinAir.x86_64`. |
 
@@ -93,5 +93,11 @@ godot --headless --path thin-air res://tests/test_runner.tscn -- --test=res://te
 godot --headless --path thin-air --export-release "Windows Desktop" build/windows/ThinAir.exe
 godot --headless --path thin-air --export-release "Android" build/android/ThinAir.apk   # needs a keystore, see .github/workflows/thin-air.yml
 ```
+
+The small Android build (`Android Lite` preset, feature tag `content_download`) leaves the heavy media out and
+fetches them as one pack on first launch (`src/autoload/content.gd`). CI publishes each distinct pack on its own
+release (`thin-air-content-<hash of the media>`) and writes `data/content_manifest.json` into the Lite APK; see
+`tools/release/content_manifest.py`. To try the download flow on desktop, export the `Linux Lite` preset and a
+`Linux` pack, then serve it with `tools/release/content_server.py` and launch with `-- --content-manifest=<json>`.
 
 The CI workflow in `.github/workflows/thin-air.yml` shows the complete build.
