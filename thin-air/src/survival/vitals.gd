@@ -40,6 +40,9 @@ const TUNING := {
 	&"o2_drain_per_km": 0.42,          # /s at rest per 1,000 m above the ceiling… (scaled by exertion)
 	&"o2_exertion_mult": 3.0,
 	&"o2_recover": 1.6,                # /s below the ceiling
+	&"o2_compensation": 0.3,           # /s per 100 SpO2 lost: breathing harder pulls SpO2 back up, so each
+	                                   # altitude + effort has an equilibrium (col walking ≈ 55, summit → 0)
+	&"o2_rest_compensation": 1.3,      # … stronger when standing still / sitting
 	&"o2_mask_restore": 2.4,           # /s with mask + bottle
 	&"hypoxic_threshold": 40.0,
 	&"hypoxia_damage": 0.7,            # hp/s below 15
@@ -471,10 +474,13 @@ func _simulate_oxygen(dt: float) -> void:
 	if env_altitude > ceiling:
 		var km := (env_altitude - ceiling) / 1000.0
 		var drain := float(TUNING[&"o2_drain_per_km"]) * km * (1.0 + float(TUNING[&"o2_exertion_mult"]) * env_exertion)
-		# Resting lets SpO2 recover a little even up high (acclimatisation, slow breathing).
-		if env_exertion < 0.05 and oxygen < 55.0:
-			drain -= 0.25
-		oxygen = clampf(oxygen - drain * _diff(&"o2") * dt, 0.0, 100.0)
+		# The body compensates (faster, deeper breathing) in proportion to the deficit, more so at rest: SpO2
+		# settles where drain and compensation balance instead of always running down to a blackout. Without
+		# this, just walking about Kestrel Station (2,950 m) was fatal within ~13 real minutes.
+		var comp := float(TUNING[&"o2_compensation"]) * (100.0 - oxygen) / 100.0
+		if env_exertion < 0.05:
+			comp *= float(TUNING[&"o2_rest_compensation"])
+		oxygen = clampf(oxygen - (drain * _diff(&"o2") - comp) * dt, 0.0, 100.0)
 	else:
 		var rec := float(TUNING[&"o2_recover"]) * (1.4 if env_exertion < 0.1 else 1.0)
 		oxygen = minf(oxygen + rec * dt, 100.0)

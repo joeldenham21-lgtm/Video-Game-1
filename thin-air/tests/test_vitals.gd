@@ -179,6 +179,30 @@ func _oxygen() -> void:
 	low.env_exertion = 1.0
 	_run(low, 60.0)
 	check(low.oxygen > 99.0, "no drain below 2,800 m")
+	# Kestrel Station (col, 2,950 m) is the Act 5 hub: walking about for a whole game day must not be fatal,
+	# while the summit (3,452 m) without bottled oxygen is (regression: the col used to kill in ~13 minutes).
+	var col := _make()
+	col.env_altitude = 2951.0
+	col.env_exertion = 0.38
+	for _i in 12:
+		col.food = 100.0; col.water = 100.0       # a fed, watered day: only oxygen is under test
+		_run(col, 200.0, 2.0)
+	check(not col.dead and col.oxygen > 40.0 and col.health > 99.0, "walking at the col settles above hypoxic (%.1f)" % col.oxygen)
+	col.env_exertion = 0.9
+	_run(col, 300.0)
+	check(col.oxygen < 40.0 and col.health > 99.0, "sprinting at the col: hypoxic but not injured (%.1f)" % col.oxygen)
+	var top := _make()
+	top.env_altitude = 3452.0
+	top.env_exertion = 0.5
+	_run(top, 600.0)
+	check(top.dead and top.death_cause == &"hypoxia", "summit push without O2 is fatal (%s)" % top.death_cause)
+	var top_o2 := _make()
+	top_o2.env_altitude = 3452.0
+	top_o2.env_exertion = 0.5
+	top_o2.env_o2_supply = true
+	_run(top_o2, 600.0)
+	check(not top_o2.dead and top_o2.oxygen > 95.0, "…and fine with mask + bottle (%.1f)" % top_o2.oxygen)
+	col.queue_free(); top.queue_free(); top_o2.queue_free()
 	# Breath hold.
 	var d := _make()
 	d.env_head_underwater = true
