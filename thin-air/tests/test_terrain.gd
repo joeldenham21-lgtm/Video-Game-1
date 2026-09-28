@@ -135,7 +135,10 @@ func _pois() -> void:
 
 
 ## The golden path (valley -> lake -> mine -> treeline -> icefall -> col -> summit) is walkable: along every
-## golden trail the ground grade over 3 m stays <= 35 deg, except legs flagged as climbs (icefall, summit ridge).
+## golden trail the ground grade over 3 m stays within the trail's design grade (footpaths <= 35 deg incl. fords and
+## short pitches; the snow arete of the West Ridge <= 48 deg, the crampon limit on snow) and the tread is a bench:
+## level across (the ground 1.2 m either side of the centre line within 20 deg for 95 % of the path). Points
+## flagged climb (a short ice-axe step) are exempt.
 func _golden_path() -> void:
 	var trails: Array = TerrainData.get_trails()
 	check(trails.size() >= 5, "trails in layout (%d)" % trails.size())
@@ -146,11 +149,13 @@ func _golden_path() -> void:
 			continue
 		golden_ids[tr["id"]] = true
 		var pts: Array = tr.get("points", [])
+		var limit := maxf(35.0, float(tr.get("max_grade_deg", 20.0)) + 4.0)
 		var worst := 0.0
 		var worst_at := Vector2.ZERO
 		var over := 0
 		var total := 0
 		var climb_worst := 0.0
+		var cross: Array[float] = []
 		for k in range(pts.size() - 1):
 			var a: Array = pts[k]
 			var b: Array = pts[k + 1]
@@ -159,6 +164,10 @@ func _golden_path() -> void:
 			var pb := Vector2(float(b[0]), float(b[2]))
 			var L := pa.distance_to(pb)
 			var steps := maxi(1, int(L / 3.0))
+			if L > 0.5 and not climb:
+				var nrm := (pb - pa).normalized().orthogonal() * 1.2
+				var dy := absf(TerrainData.get_height(pa.x + nrm.x, pa.y + nrm.y) - TerrainData.get_height(pa.x - nrm.x, pa.y - nrm.y))
+				cross.append(rad_to_deg(atan(dy / 2.4)))
 			for s in steps:
 				var q0 := pa.lerp(pb, float(s) / steps)
 				var q1 := pa.lerp(pb, float(s + 1) / steps)
@@ -173,7 +182,7 @@ func _golden_path() -> void:
 				if g > worst:
 					worst = g
 					worst_at = q0
-				if g > 35.0:
+				if g > limit:
 					over += 1
 		for pid in POI_IDS:
 			var pp: Vector3 = TerrainData.get_poi(pid)["position"]
@@ -181,10 +190,13 @@ func _golden_path() -> void:
 				if Vector2(float(e[0]), float(e[2])).distance_to(Vector2(pp.x, pp.z)) < 30.0:
 					reached[pid] = true
 					break
-		# ~35 deg: a couple of steps down into a ford / onto a pad edge may reach 40 deg, nothing steeper
-		check(worst <= 40.0 and over <= maxi(2, total / 200),
-			"trail %s walkable: worst grade %.1f deg at %s (%d/%d steps > 35), climb legs max %.1f" % [
-			tr["id"], worst, str(worst_at), over, total, climb_worst])
+		# a couple of steps down into a ford / onto a pad edge may reach limit + 5 deg, nothing steeper
+		check(worst <= limit + 5.0 and over <= maxi(2, total / 200),
+			"trail %s walkable: worst grade %.1f deg at %s (%d/%d steps > %.0f), climb steps max %.1f" % [
+			tr["id"], worst, str(worst_at), over, total, limit, climb_worst])
+		cross.sort()
+		var p95: float = cross[int(cross.size() * 0.95)] if not cross.is_empty() else 0.0
+		check(p95 <= 20.0, "trail %s tread is a bench: cross-slope p95 %.1f deg (<= 20)" % [tr["id"], p95])
 	for pid2 in [&"crash_site", &"ranger_cabin", &"ashford_mine", &"owens_bivouac", &"glacier_camp", &"kestrel_station",
 			&"summit"]:
 		check(reached.has(pid2), "golden trails reach %s" % pid2)

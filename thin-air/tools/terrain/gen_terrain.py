@@ -319,6 +319,7 @@ def stage_fine2(args):
 	log("FINE2: trails")
 	F.trails()
 	F.pads()
+	F.ridge_trails()
 	F.water_recheck()
 	F.log = None
 	with open(os.path.join(CACHE, "fine_b.pkl"), "wb") as f:

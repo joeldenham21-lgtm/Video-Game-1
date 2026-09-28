@@ -131,6 +131,14 @@ func _walk(id: String, rev: bool, from: int) -> void:
 	var log_t := 0.0
 	var tag := "%s%s" % [id, ":rev" if rev else ""]
 	var to := int(args.get("to", "100000"))
+	# the trail ends at the POI anchor, often inside a building: arriving on the destination's flat pad (at pad
+	# height, not on a switchback below it) counts as arrived
+	var end_p := P[P.size() - 1]
+	var arrive_r := 7.0
+	for poi in TerrainData.all_pois():
+		var pp: Vector3 = poi["position"]
+		if Vector2(pp.x - end_p.x, pp.z - end_p.z).length() < 12.0:
+			arrive_r = maxf(arrive_r, minf(float(poi.get("flat_radius", 0.0)) * 0.8, 30.0))
 	while idx < mini(P.size() - 1, to):
 		await get_tree().physics_frame
 		var dt := get_physics_process_delta_time()
@@ -148,7 +156,8 @@ func _walk(id: String, rev: bool, from: int) -> void:
 			best = idx
 			best_t = t
 		var tgt := P[mini(idx + 1, P.size() - 1)]
-		if idx >= P.size() - 4 and Vector2(P[P.size() - 1].x - pos.x, P[P.size() - 1].z - pos.z).length() < 7.0:
+		var d_end := Vector2(end_p.x - pos.x, end_p.z - pos.z).length()
+		if (idx >= P.size() - 4 and d_end < 7.0) or (d_end < arrive_r and absf(pos.y - end_p.y) < 2.5):
 			break
 		var dx := tgt.x - pos.x
 		var dz := tgt.z - pos.z

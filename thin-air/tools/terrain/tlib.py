@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ctypes as C
+import math
 import os
 import subprocess
 
@@ -55,6 +56,10 @@ def lib():
 								C.c_float, C.c_float, C.c_float, C.c_void_p, C.c_int, C.c_int, C.c_int, C.c_int, i32p, i32p,
 								C.c_int]
 	_lib.route_turn.restype = C.c_int
+	_lib.route_trail.argtypes = [f32p, C.c_int, C.c_int, C.c_float, C.c_int, C.c_int, C.c_int, C.c_int, C.c_float,
+								 C.c_float, C.c_float, C.c_float, C.c_int, C.c_void_p, C.c_void_p, C.c_int, C.c_int,
+								 C.c_int, C.c_int, C.c_int, C.c_int, i32p, i32p, C.c_int]
+	_lib.route_trail.restype = C.c_int
 	_lib.lic_fall.argtypes = [f32p, f32p, C.c_int, C.c_int, C.c_int, f32p]
 	_lib.horizon_ao.argtypes = [f32p, C.c_int, C.c_int, C.c_float, C.c_int, C.c_float, C.c_float, f32p]
 	_lib.horizon_dir.argtypes = [f32p, C.c_int, C.c_int, C.c_float, C.c_float, C.c_float, C.c_float, C.c_float,
@@ -226,6 +231,48 @@ def route_turn(h, cell, start, goal, gmax_deg, wg=2.0, over=60.0, turn_w=2.0, pe
 	n = lib().route_turn(h, nx, ny, cell, int(start[0]), int(start[1]), int(goal[0]), int(goal[1]),
 						 float(np.tan(np.radians(gmax_deg))), wg, over, turn_w, _ptr(pen), i0, j0, i1, j1, pi, pj, maxlen)
 	return pi[:n].copy(), pj[:n].copy()
+
+
+def route_trail(h, cell, start, goal, gmax_deg, wg=1.5, over=600.0, turn_w=12.0, min_leg=10, penalty=None,
+				turnf=None, margin=70, start_dir=-1, start_b=0):
+	"""Switchback router (terrain_c.route_trail): turning costs turn_w per radian (x turnf at the turn), sharp turns
+	need a leg of >= min_leg cells since the last one. Returns (I, J) int arrays."""
+	h = _f32(h)
+	ny, nx = h.shape
+	i0 = max(0, min(start[0], goal[0]) - margin)
+	j0 = max(0, min(start[1], goal[1]) - margin)
+	i1 = min(nx - 1, max(start[0], goal[0]) + margin)
+	j1 = min(ny - 1, max(start[1], goal[1]) + margin)
+	maxlen = (i1 - i0 + 1) * (j1 - j0 + 1)
+	pi = np.zeros(maxlen, np.int32)
+	pj = np.zeros(maxlen, np.int32)
+	pen = None if penalty is None else _f32(penalty)
+	tf = None if turnf is None else _f32(turnf)
+	n = lib().route_trail(h, nx, ny, cell, int(start[0]), int(start[1]), int(goal[0]), int(goal[1]),
+						  float(np.tan(np.radians(gmax_deg))), wg, over, turn_w, int(min_leg), _ptr(pen), _ptr(tf),
+						  int(start_dir), int(start_b), i0, j0, i1, j1, pi, pj, maxlen)
+	if n < 0:
+		raise MemoryError("route_trail: state space too large")
+	return pi[:n].copy(), pj[:n].copy()
+
+
+ROUTE_DIRS = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1), (2, 1), (2, -1), (-2, 1), (-2, -1),
+			  (1, 2), (1, -2), (-1, 2), (-1, -2)]
+
+
+def route_end_state(I, J, min_leg):
+	"""(heading index, leg run in cells since the last sharp turn) at the end of a route_trail path."""
+	if len(I) < 2:
+		return -1, 0
+	steps = [(int(I[k + 1] - I[k]), int(J[k + 1] - J[k])) for k in range(len(I) - 1)]
+	d_last = ROUTE_DIRS.index(steps[-1]) if steps[-1] in ROUTE_DIRS else -1
+	run = 0
+	for k in range(len(steps) - 1, 0, -1):
+		a, b = np.array(steps[k], float), np.array(steps[k - 1], float)
+		run += int(round(np.hypot(*a)))
+		if np.dot(a, b) / (np.hypot(*a) * np.hypot(*b)) < math.cos(0.53) or run >= min_leg:
+			break
+	return d_last, min(run, min_leg)
 
 
 def lic_fall(h, src, L=24):
