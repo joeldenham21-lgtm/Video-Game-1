@@ -50,8 +50,9 @@ func _run() -> void:
 			_falls.append("%.0f dmg at %s" % [amount, _fmt(player.global_position)]))
 	# --gear=0 bare (acts 1-3), --gear=axe (Owen's ice axe, no crampons yet), default: axe + crampons + warm kit
 	if args.get("gear", "1") != "0":
-		var kit: Array[StringName] = [&"ice_axe"] if args.get("gear", "1") == "axe" else \
-			[&"ice_axe", &"crampons", &"parka", &"wool_hat", &"insulated_pants"]
+		var kit: Array[StringName] = [&"ice_axe"]
+		if args.get("gear", "1") != "axe":
+			kit.append_array([&"crampons", &"parka", &"wool_hat", &"insulated_pants"] as Array[StringName])
 		for id: StringName in kit:
 			player.inventory.add(id, 1)
 			if id != &"ice_axe":
