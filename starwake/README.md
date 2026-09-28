@@ -1,5 +1,7 @@
 # STARWAKE
 
+![STARWAKE](poster.jpg)
+
 An original science-fiction short film, about 10 minutes long, in 2.39:1 widescreen at 1920×804 and 24 fps. It was made in homage to Steven Spielberg's films: the sense of wonder, a child's eye, the absent father, and the reaction shot before the reveal. The score follows the leitmotif tradition of John Williams, the grade takes after Janusz Kamiński's backlit photography, and the sound design draws on Ben Burtt's organic signature sounds.
 
 A pilot of the empire that devours stars is sent to find its next meal: a young blue sun and the living ocean-moon that sings to it. What she finds there is the only thing that can undo her own world's death.
@@ -39,7 +41,7 @@ python audio/hum.py         # hum the star song
 python audio/music.py       # perform the score
 python audio/sfx.py         # sound design
 python audio/mix.py         # final mix + subtitles
-python render/queue.py      # render all 45 shots (a few hours on 4 CPU cores)
+python render/queue.py      # render all 54 shots (a few hours on 4 CPU cores)
 python assemble.py          # conform, master, and encode
 ```
 

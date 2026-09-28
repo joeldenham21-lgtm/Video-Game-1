@@ -83,11 +83,15 @@ vec3 skyCol(vec3 rd){
     vec3 a2 = normalize(vec3(-.42, .3, -1.));
     vec3 a1 = normalize(mix(a0, a2, .5) + vec3(.15, .12, 0));
     float best = 1e9, bs = 0.;
-    for (int i = 0; i <= 80; i++){
-      float k = float(i)/80.;
+    vec3 prev = a0;
+    for (int i = 1; i <= 40; i++){
+      float k = float(i)/40.;
       vec3 pc = normalize(mix(mix(a0, a1, k), mix(a1, a2, k), k));
-      float dd = acos(clamp(dot(rd, pc), -1., 1.));
-      if (dd < best){ best = dd; bs = k; }
+      vec3 ba = pc - prev, pa = rd - prev;
+      float hh = clamp(dot(pa, ba)/dot(ba, ba), 0., 1.);
+      float dd = length(pa - ba*hh);
+      if (dd < best){ best = dd; bs = (float(i - 1) + hh)/40.; }
+      prev = pc;
     }
     float w = mix(.004, .0012, bs);
     float n = .6 + .8*vnoise(vec3(bs*40. - uGlobalT*3., 0, 0));
