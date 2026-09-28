@@ -44,6 +44,7 @@ func run() -> void:
 	await _death_and_continue(snap, &"fall")
 	await _new_game_is_clean()
 	await _difficulty_survives_relaunch()
+	await _corrupt_save_continue()
 	var errs := Game.errors.errors + Game.errors.script_errors - _errs0
 	check(errs == 0, "no engine/script errors through the whole first hour (%d: %s)" % [errs, str(Game.errors.first)])
 	_restore_save()
@@ -594,6 +595,12 @@ func _compare(snap: Dictionary, tag: String, pos_tol := 1.5) -> void:
 	var pl: Player = Game.player as Player
 	check(Game.state == Game.State.PLAYING and pl.is_input_enabled() and not pl.vitals.is_dead(), "%s: playing with control (state %d)" % [tag, Game.state])
 	check(pl.vitals.difficulty == Game.difficulty, "%s: vitals run on the save's difficulty (%s / %s)" % [tag, pl.vitals.difficulty, Game.difficulty])
+	var open_story := 0
+	for o in Story.objectives:
+		if not bool(o["done"]):
+			open_story += 1
+	var hud := _hud()
+	check(hud != null and hud.objectives.open_count() == open_story, "%s: HUD objective tracker in sync (%d / %d open)" % [tag, hud.objectives.open_count() if hud else -1, open_story])
 	var respawned: Array[String] = []
 	var st: Node = get_tree().get_first_node_in_group(&"poi_structures")
 	for n in st.call(&"loot_nodes"):
@@ -769,3 +776,27 @@ func _first_night() -> void:
 	check(not pl.vitals.is_dead() and Game.state == Game.State.PLAYING, "survived into the night at the cabin (hp %.0f)" % pl.vitals.health)
 	var errs := Game.errors.errors + Game.errors.script_errors - errs0
 	check(errs == 0, "no engine/script errors through the evening (%d: %s)" % [errs, str(Game.errors.first)])
+
+
+
+## A save that can't be read: Continue falls back to a fresh game, with nothing left over from the session.
+func _corrupt_save_continue() -> void:
+	Game.set_flag(&"qa_sentinel", true)
+	Game.playtime = 5000.0
+	await _key_event(&"pause")
+	var pm: PauseMenu = _hud().pause_menu as PauseMenu
+	pm._ask_quit()
+	await _frames(2)
+	for c in pm.root.get_children():
+		if c is ConfirmDialog:
+			(c as ConfirmDialog).confirmed.emit()
+	await _until(func() -> bool: return _menu() != null and Game.world == null, 20.0)
+	await _frames(5)
+	var f := FileAccess.open("user://save_0.json", FileAccess.WRITE)
+	f.store_string("{\"version\": 1, \"game\": ")
+	f.close()
+	_menu()._continue()
+	var ok := await _until(func() -> bool: return Game.world != null and Game.player != null and Game.state != Game.State.LOADING, 120.0)
+	check(ok and Game.state == Game.State.CINEMATIC, "unreadable save: Continue starts a fresh game with the prologue (state %d)" % Game.state)
+	check(not Game.flags.has(&"qa_sentinel") and Game.playtime < 60.0, "unreadable save: no flags/playtime left over from the session")
+	await _prologue_skip()

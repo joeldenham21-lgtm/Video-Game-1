@@ -110,6 +110,12 @@ func new_game() -> void:
 
 
 func continue_game(slot := 0) -> void:
+	if not Save.is_readable(slot):
+		# a missing/corrupt save starts a fresh game (difficulty, flags and playtime reset before the world
+		# builds, so nothing from the session in memory leaks into it)
+		push_warning("Game: save %d unreadable, starting a new game" % slot)
+		new_game()
+		return
 	is_new_game = false
 	_pending_load_slot = slot
 	_load_world()
@@ -175,6 +181,8 @@ func on_world_built() -> void:
 		if not ok:
 			push_warning("Game: load failed, starting fresh")
 			is_new_game = true
+			flags.clear()
+			playtime = 0.0
 	_set_state(State.PLAYING)
 	world_ready.emit()
 	Events.game_started.emit(is_new_game)

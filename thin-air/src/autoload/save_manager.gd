@@ -74,8 +74,16 @@ func _read(slot: int) -> Dictionary:
 	var f := FileAccess.open(_path(slot), FileAccess.READ)
 	if f == null:
 		return {}
-	var parsed: Variant = JSON.parse_string(f.get_as_text())
-	return parsed if parsed is Dictionary else {}
+	var json := JSON.new()
+	if json.parse(f.get_as_text()) != OK:
+		push_warning("Save: %s is unreadable (%s at line %d)" % [_path(slot), json.get_error_message(), json.get_error_line()])
+		return {}
+	return json.data if json.data is Dictionary else {}
+
+
+## True when the slot holds a save that parses (Continue falls back to a new game otherwise).
+func is_readable(slot := 0) -> bool:
+	return not _read(slot).is_empty()
 
 
 func _make_info() -> Dictionary:
