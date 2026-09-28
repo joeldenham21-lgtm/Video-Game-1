@@ -98,6 +98,14 @@ func _api(course: PlayerTestCourse) -> void:
 	check(p.get_active_item() == &"", "selecting the active slot again empties the hands")
 	# Persistence roundtrip.
 	p.equip(&"knife")
+	# A long frame (load / shader-compile hitch) must not blow the viewmodel springs up to inf/NaN.
+	var vm := p.viewmodel
+	vm.call(&"land", 12.0)
+	for _i in 6:
+		vm.call(&"_process", 0.45)
+	var sx: Transform3D = (vm.get(&"sway_node") as Node3D).transform
+	check(sx.origin.is_finite() and sx.origin.length() < 0.5 and sx.basis.x.is_finite() and sx.basis.y.is_finite(),
+		"viewmodel springs stay stable through 0.45 s frames (%s)" % str(sx.origin))
 	p.vitals.food = 42.0
 	p.vitals.add_effect(&"wet", 100.0, 0.5)
 	p.teleport(Vector3(3.0, PlayerTestCourse.Y0 + 0.05, -1.0), 37.0)

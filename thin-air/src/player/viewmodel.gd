@@ -208,9 +208,12 @@ func _update_motion(delta: float) -> void:
 	ld.x = clampf(ld.x, -12.0, 12.0)
 	ld.y = clampf(ld.y, -12.0, 12.0)
 	_sway_vel += Vector2(-ld.x, -ld.y) * 16.0 * sw
+	# The stiff springs below are explicit (semi-implicit Euler): a long frame (a shader-compile or load hitch,
+	# > ~0.12 s) would make them diverge to inf/NaN and the tool would vanish for good. Cap their step.
+	var sd := minf(delta, 1.0 / 30.0)
 	var acc := -_sway * 110.0 - _sway_vel * 15.0
-	_sway_vel += acc * delta
-	_sway += _sway_vel * delta
+	_sway_vel += acc * sd
+	_sway += _sway_vel * sd
 	_sway = _sway.clamp(Vector2(-7.0, -7.0), Vector2(7.0, 7.0))
 	# Inertia: the tool lags behind acceleration of the body.
 	var lv := player.get_local_velocity()
@@ -219,17 +222,17 @@ func _update_motion(delta: float) -> void:
 	accel = accel.limit_length(25.0)
 	_lag_vel += -accel * 0.0009
 	var lacc := -_lag * 140.0 - _lag_vel * 18.0
-	_lag_vel += lacc * delta
-	_lag += _lag_vel * delta
+	_lag_vel += lacc * sd
+	_lag += _lag_vel * sd
 	_lag = _lag.limit_length(0.03)
 	# Landing kick.
 	var la := -_land * 160.0 - _land_vel * 16.0
-	_land_vel += la * delta
-	_land += _land_vel * delta
+	_land_vel += la * sd
+	_land += _land_vel * sd
 	# Hit kick (rotational).
 	var ka := -_kick * 120.0 - _kick_vel * 14.0
-	_kick_vel += ka * delta
-	_kick += _kick_vel * delta
+	_kick_vel += ka * sd
+	_kick += _kick_vel * sd
 	# Stride bob (figure-eight), idle breathing.
 	var grounded := player.is_grounded()
 	var target_amp := clampf(player.ground_speed / PlayerMotion.SPRINT_SPEED, 0.0, 1.3) if grounded else 0.0
