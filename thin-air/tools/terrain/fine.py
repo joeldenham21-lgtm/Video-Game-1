@@ -673,7 +673,7 @@ class Fine:
 						# penalty on the later leg wherever the path comes back within ~8 m of itself
 						extra = np.zeros_like(h3)
 						best = None
-						for _it in range(4):
+						for _it in range(7):
 							I, J = tlib.route_trail(h3, 3.0, (ia, ja), (ib, jb), gmax * 0.9, wg=1.5, over=600.0,
 													turn_w=T.get("turn_w", 14.0), min_leg=min_leg,
 													penalty=(pen + p_ice + near_prev * 3.0 + extra).astype(np.float32),
@@ -685,7 +685,7 @@ class Fine:
 								break
 							m = np.zeros_like(h3, dtype=bool)
 							m[J[bad], I[bad]] = True
-							extra = extra + ndimage.binary_dilation(m, iterations=2) * 4.0
+							extra = extra + ndimage.binary_dilation(m, iterations=3) * 8.0
 						I, J = best[0], best[1]
 						sdir, sb = tlib.route_end_state(I, J, min_leg)
 						used[J, I] = True
@@ -784,6 +784,14 @@ class Fine:
 				f = rlm[jj, ii].astype(np.float64) + 0.3
 				f = np.where(np.isnan(f), np.inf, f)
 				if np.isfinite(f).any():
+					# the tread meets the water at the crossing from both sides (a perched creek is forded at its
+					# level, not tunnelled under): floor and cap cones at 0.8 x the walking grade
+					flo = np.where(np.isfinite(f), f, -np.inf)
+					for i in range(1, len(flo)):
+						flo[i] = max(flo[i], flo[i - 1] - gm[i] * 0.8 * ds[i - 1])
+					for i in range(len(flo) - 2, -1, -1):
+						flo[i] = max(flo[i], flo[i + 1] - gm[i] * 0.8 * ds[i])
+					ys = np.maximum(ys, flo)
 					cap = f.copy()
 					for i in range(1, len(cap)):
 						cap[i] = min(cap[i], cap[i - 1] + gm[i] * 0.8 * ds[i - 1])
@@ -806,6 +814,10 @@ class Fine:
 			np.where(F.k <= 1, np.maximum(-F.along, 0.0), 0.0)
 		river = self.masks.get("river", np.zeros((N, N), np.float32))[sl] > 0.5
 		water = self.masks["water"][sl] > 0.5
+		rl_sl = getattr(self, "river_level", None)
+		rl_sl = rl_sl[sl] if rl_sl is not None else np.full(d.shape, np.nan, np.float32)
+		water = water & ~np.isfinite(rl_sl)                   # lake / tarn water; a stream's water is forded
+		river = river | (self.masks["water"][sl] > 0.5)
 		intread = (d <= core) & (endcap < 0.5) & ~water
 		e = np.maximum(d - core, 0.0)
 		sn = slope_deg(blur(self.h[sl], 2.0), DX)
@@ -839,7 +851,13 @@ class Fine:
 		target = target - np.maximum(target - cut, 0.0) * w_c
 		target = np.where(intread, yt, target)
 		# fords: the stream bed is never filled, but its banks are cut down to the tread
-		target = np.where(river, np.where(intread, np.minimum(h, yt), h), target)
+		# a shallow riffle under the tread: the bed there sits ~0.35 m under the water, never deeper
+		rl = getattr(self, "river_level", None)
+		rlv = rl[sl].astype(np.float64) - 0.35 if rl is not None else np.full_like(h, -np.inf)
+		rlv = np.where(np.isnan(rlv), -np.inf, rlv)
+		ford = np.minimum(np.maximum(np.minimum(h, yt), rlv), np.maximum(yt, rlv))
+		ford = np.where(np.isfinite(rlv), ford, yt)          # banks (river mask, no water) take the tread
+		target = np.where(river, np.where(intread, ford, h), target)
 		target = np.where(water, h, target)
 		# an earlier trail's tread stays as it is outside this trail's own tread
 		prev = self.masks.get("trail")
@@ -963,7 +981,7 @@ class Fine:
 		self.h = h.astype(np.float32)
 
 
-def _self_conflicts(I, J, gap=14, rad=2.7):
+def _self_conflicts(I, J, gap=14, rad=3.7):
 	"""Route cells (3 m grid) that come back within rad cells of an earlier part of the path more than gap cells
 	of path before (stacked, side-by-side switchback legs). Returns a bool array over the path (the later cells)."""
 	P = np.stack([I, J], axis=1).astype(np.float64)

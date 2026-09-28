@@ -222,7 +222,7 @@ TRAILS = [
 			   dict(to=(282, 842), via=[(120, 850)], ford=True),
 			   dict(to=(420, 520), via=[(385, 780), (428, 650)])]),
 	# the old mine road: a wide bench, long traverses and few hairpins up the Ashford flank
-	dict(id="ashford_road", name="Ashford Mine Road", width=3.4, max_grade_deg=17.0, golden=True, min_leg=40.0,
+	dict(id="ashford_road", name="Ashford Mine Road", width=3.4, max_grade_deg=17.0, golden=True, min_leg=50.0,
 		 turn_w=18.0,
 		 legs=[dict(to=(420, 520), via=[]),
 			   dict(to=(820, -80), via=[(590, 430)])]),
@@ -238,7 +238,7 @@ TRAILS = [
 	# the West Ridge: a snow arete (built up to the designed crest over the neve head) at an even grade walkable
 	# with crampons (~44 deg firm snow, no step: the way back down must not need a drop)
 	dict(id="summit_ridge", name="West Ridge", width=5.0, max_grade_deg=44.0, golden=True, snow=True,
-		 ramp=dict(start=47.0, end=3.5, end_y=3452.0),
+		 ramp=dict(start=47.0, end=7.0, end_y=3452.0),
 		 legs=[dict(to=(-360, -980), via=[]),
 			   dict(to=(120, -1260), via=[(-330, -1050), (-250, -1100), (-150, -1150), (-60, -1195), (30, -1235)],
 					ridge=True)]),
