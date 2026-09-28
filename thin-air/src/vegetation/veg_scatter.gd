@@ -34,6 +34,8 @@ const LOG_SPACING := 13.0
 const EXCL_REACH := 6.0
 ## Width of the soft ground-cover / shrub fade beyond a POI pad's flat radius (pad_keep()).
 const PAD_FADE := 14.0
+## Clear ground around a terrain cut-out (layout "holes": mine adit, ice cave mouth) beyond its radius (m).
+const PORTAL_CLEAR := 8.0
 
 const MAX_SLOPE := {Cat.TREE: 38.0, Cat.SAPLING: 38.0, Cat.SHRUB: 40.0, Cat.DEADWOOD: 30.0, Cat.ROCK_BIG: 48.0,
 	Cat.ROCK_SMALL: 44.0}
@@ -137,6 +139,12 @@ static func make_context(lib: VegLibrary, terrain: Object, density_mul := 1.0) -
 			var fr := float(p.get("flat_radius", p.get("radius", 0.0)))
 			if fr > 0.0:
 				ctx.pads.append(Vector3(float(p.get("x", 0.0)), float(p.get("z", 0.0)), fr))
+	# Portal cut-outs (Ashford Mine adit, ice cave mouth) lie outside their POI's flat pad: without this a scatter
+	# boulder sat in the timbered adit mouth. Keep the opening and the apron in front of it clear.
+	for h in layout.get("holes", []):
+		if h is Dictionary:
+			ctx.pads.append(Vector3(float(h.get("x", 0.0)), float(h.get("z", 0.0)),
+				float(h.get("radius", 2.0)) + PORTAL_CLEAR))
 	for t in layout.get("trails", []):
 		var pts := PackedVector3Array()
 		var width := 2.0
@@ -465,6 +473,9 @@ static func _grid(ctx: Context, out: CellData, rng: RandomNumberGenerator, place
 			var kind := -1
 			var scl := 1.0
 			var ccat := cat
+			var is_log := false
+			var log_half := 0.0
+			var rock_r := 0.0
 			match cat:
 				Cat.TREE:
 					var res := _pick_tree(ctx, t, x, z, y, r_pick, r_size)
@@ -476,6 +487,7 @@ static func _grid(ctx: Context, out: CellData, rng: RandomNumberGenerator, place
 					var e: Dictionary = ctx.rock_big[int(r_pick * ctx.rock_big.size()) % ctx.rock_big.size()]
 					kind = int(e["index"])
 					scl = lerpf(0.7, 1.3, r_size)
+					rock_r = float(e["radius"]) * scl
 				Cat.ROCK_SMALL:
 					var e2: Dictionary = ctx.rock_small[int(r_pick * ctx.rock_small.size()) % ctx.rock_small.size()]
 					kind = int(e2["index"])
@@ -488,8 +500,11 @@ static func _grid(ctx: Context, out: CellData, rng: RandomNumberGenerator, place
 					var lst: Array = ctx.stumps if use_stump else ctx.logs
 					if lst.is_empty():
 						continue
-					kind = int(lst[int(r_size * 7919.0) % lst.size()]["index"])
+					var entry: Dictionary = lst[int(r_size * 7919.0) % lst.size()]
+					kind = int(entry["index"])
 					scl = lerpf(0.8, 1.15, r_size)
+					is_log = not use_stump
+					log_half = float(entry["radius"]) * scl
 			if kind < 0:
 				continue
 			var fr: float = foot * scl
@@ -513,11 +528,32 @@ static func _grid(ctx: Context, out: CellData, rng: RandomNumberGenerator, place
 				ground -= 0.05 + 0.02 * slope    # sink a little on slopes: the root flare hides the gap
 			elif ccat == Cat.ROCK_BIG:
 				ground -= 0.25 * scl
+				# drawn level (yaw only): on a slope the downhill side of a boulder / outcrop / talus patch hung in
+				# the air (a third of them > 0.3 m on the real map). Sink it until the ground meets it ~55 % out.
+				ground -= maxf(0.0, 0.55 * rock_r * tan(deg_to_rad(minf(slope, 50.0))) - 0.2 * scl)
+			var yaw := r_yaw * TAU
+			if is_log and slope > 3.0:
+				# a fallen log (6-9 m, drawn level, length along its local X) rests across the slope like a real
+				# one that rolled to a stop: random yaws left 2 of 3 logs with an end hovering 0.3-2.8 m off a
+				# slope. Contour direction +-12 deg, either way round; sunk a little for the downhill side.
+				var gx: float = t.get_height(x + 1.0, z) - t.get_height(x - 1.0, z)
+				var gz: float = t.get_height(x, z + 1.0) - t.get_height(x, z - 1.0)
+				var contour := atan2(-gx, -gz) + (PI if fmod(r_yaw * 7.31, 1.0) < 0.5 else 0.0)
+				# the jittered contour, the exact contour or the old random yaw: whichever leaves the ends closest to
+				# the ground (ridges and gullies bend the contour under a 9 m log)
+				var best := INF
+				for cand: float in [contour + (r_yaw - 0.5) * deg_to_rad(24.0), contour, yaw]:
+					var ax := Vector2(cos(cand), -sin(cand)) * log_half
+					var gap := maxf(y - float(t.get_height(x + ax.x, z + ax.y)), y - float(t.get_height(x - ax.x, z - ax.y)))
+					if gap < best - 0.05:
+						best = gap
+						yaw = cand
+				ground -= 0.003 * slope
 			out.kinds.append(kind)
 			out.cats.append(ccat)
 			out.ids.append(make_id(out.cx, out.cz, out.kinds.size() - 1))
 			out.pos.append(Vector3(x, ground, z))
-			out.yaw.append(r_yaw * TAU)
+			out.yaw.append(yaw)
 			out.scale.append(scl)
 			out.rank.append(r_rank)
 

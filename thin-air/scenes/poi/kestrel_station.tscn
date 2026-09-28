@@ -1134,15 +1134,15 @@ transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -8.9, 2.78, -2.1)
 metadata/log_id = &"log_hale_01"
 
 [node name="Log_reyes_01" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 10.55, 1.17, 14.8)
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 10.55, 1.15, 14.8)
 metadata/log_id = &"log_reyes_01"
 
 [node name="Log_park_01" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 1.25, 3.05, -4.6)
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 1.25, 1.85, -4.6)
 metadata/log_id = &"log_park_01"
 
 [node name="Log_voss_01" type="Marker3D" parent="Sockets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.1, 2.61, -1.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.1, 2.59, -1.2)
 metadata/log_id = &"log_voss_01"
 
 [node name="Log_hale_02" type="Marker3D" parent="Sockets"]
@@ -1154,7 +1154,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 2.77, -3.4)
 metadata/log_id = &"log_voss_02"
 
 [node name="Log_reyes_02" type="Marker3D" parent="Sockets"]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 8.4, 1.55, 13.15)
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 8.4, 0.0, 13.15)
 metadata/log_id = &"log_reyes_02"
 
 [node name="Log_station_whiteboard" type="Marker3D" parent="Sockets"]
@@ -1162,7 +1162,7 @@ transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 1.95, 3.35, 0.6)
 metadata/log_id = &"station_whiteboard"
 
 [node name="Log_station_fuel_log" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 10.5, 1.17, 15.4)
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 10.5, 1.15, 15.4)
 metadata/log_id = &"station_fuel_log"
 
 [node name="Log_relay_diagnostics" type="Marker3D" parent="Sockets"]
@@ -1173,19 +1173,19 @@ metadata/log_id = &"relay_diagnostics"
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -10.5, 2.87, -5)
 
 [node name="Loot_BatteryPack" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 10.6, 0.95, 17.6)
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 10.6, 0.881, 17.6)
 
 [node name="Loot_Galley" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -1.72, 2.8, 2.6)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -1.72, 2.845, 2.6)
 
 [node name="Loot_BootRoom" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -1.75, 2.85, 4.8)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -1.75, 2.57, 4.8)
 
 [node name="Loot_Keycard" type="Marker3D" parent="Sockets"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3, 2.62, -4.95)
 
 [node name="Loot_Lab" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -12.2, 2.8, 3.2)
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -12.2, 2.77, 3.2)
 
 [node name="Spot_Heli" type="Marker3D" parent="Sockets"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23, 0.37, 17)

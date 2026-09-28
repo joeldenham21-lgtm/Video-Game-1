@@ -76,7 +76,28 @@ func run() -> void:
 					"%s sits on the terrain" % id)
 			else:
 				check(xf.origin.y < TerrainData.min_height - 100.0, "%s interior is below the terrain" % id)
+			_check_socket_support(ps, id, xf)
 	await get_tree().process_frame
+
+
+## Loot and crew logs rest on something (the location's meshes or the terrain at its world placement): sockets
+## authored at guessed heights left items hovering up to 1.5 m in the air (src/dev/settle_sockets.gd fixes them).
+func _check_socket_support(ps: PackedScene, id: StringName, xf: Transform3D) -> void:
+	var site := ps.instantiate() as Node3D
+	add_child(site)
+	site.global_transform = xf
+	var d := SocketSupport.build_space(site)
+	var bad: Array[String] = []
+	var n := 0
+	for m in SocketSupport.loose_sockets(site):
+		n += 1
+		var y := SocketSupport.support_y(d, m.global_position)
+		if y == -INF or absf(m.global_position.y - y) > 0.03:
+			bad.append("%s %.2f" % [m.name, m.global_position.y - y])
+	SocketSupport.free_space(d)
+	site.queue_free()
+	if n > 0:
+		check(bad.is_empty(), "%s loot/log sockets rest on a surface (%d) %s" % [id, n, bad])
 
 
 func _check_collision(site: Node3D, id: StringName) -> void:

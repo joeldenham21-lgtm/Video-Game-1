@@ -229,38 +229,38 @@ transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -1.9
 transform = Transform3D(-0.46947, 0, -0.88295, 0, 1, 0, 0.88295, 0, -0.46947, -2.29209, 0.7344, -3.10698)
 
 [node name="Log_dale_logbook" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -2.22384, -0.09694, -2.19336)
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -2.22384, -0.146, -2.19336)
 metadata/log_id = &"dale_logbook"
 
 [node name="Loot_FirstAid" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -0.48436, 0.65029, -2.8003)
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -0.48436, 0.682, -2.8003)
 
 [node name="Loot_SurvivalManual" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -1.31853, 0.12156, -2.96768)
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -1.31853, 0.081, -2.96768)
 
 [node name="Loot_FlareGun" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -1.90881, -0.07054, -3.43035)
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -1.90881, -0.172, -3.43035)
 
 [node name="Loot_EmergencyBlanket" type="Marker3D" parent="Sockets"]
 transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -0.27184, 0.15784, -1.41844)
 
 [node name="Loot_Hatchet" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -0.89238, 0.21249, -2.92859)
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -0.89238, 0.248, -2.92859)
 
 [node name="Loot_Scanner" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, 0.80995, 0.09978, -1.30909)
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, 0.80995, 0.07, -1.30909)
 
 [node name="Loot_Cargo_1" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -0.5104, 0.33466, -2.49079)
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -0.5104, 0.26, -2.49079)
 
 [node name="Loot_Cargo_2" type="Marker3D" parent="Sockets"]
-transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, 0.49637, 0.26613, -2.02526)
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, 0.49637, 0.092, -2.02526)
 
 [node name="Loot_Backpack" type="Marker3D" parent="Sockets"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.4946, 0.2, 3.70191)
 
 [node name="Loot_Crate_Trail" type="Marker3D" parent="Sockets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.16422, 0.5, -1.76696)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.16422, 0.285, -1.76696)
 
 [node name="Scan_Engine" type="Marker3D" parent="Sockets"]
 transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, -3.26613, 0.50276, -3.52531)

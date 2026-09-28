@@ -271,17 +271,17 @@ transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -33.6, 0.35389, -6)
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -43.95, 1.45389, -6)
 
 [node name="Log_miner_diary_1" type="Marker3D" parent="Sockets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.30915, 0.1, 14.30905)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.30915, 0.0, 14.30905)
 metadata/log_id = &"miner_diary_1"
 
 [node name="Loot_Bunkhouse" type="Marker3D" parent="Sockets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.5, 14.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.0, 14.5)
 
 [node name="Loot_Hoist" type="Marker3D" parent="Sockets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 0.3, 13.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 0.0, 13.2)
 
 [node name="Loot_OreCar" type="Marker3D" parent="Sockets"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -27.6, 2.1, -6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -27.6, 2.147, -6)
 
 [node name="Scan_Headframe" type="Marker3D" parent="Sockets"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1.5, 10.2)
