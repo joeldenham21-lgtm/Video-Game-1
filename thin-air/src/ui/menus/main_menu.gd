@@ -180,7 +180,7 @@ func _build_new_game() -> void:
 		var n := UITheme.label(String(d[1]), UITheme.FS_H3, UITheme.TEXT, "Medium")
 		n.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		top.add_child(n)
-		var tag := UITheme.caps(String(d[3]), 12, UITheme.TEXT_DIM, 2)
+		var tag := UITheme.caps(String(d[3]), 14, UITheme.TEXT_DIM, 2)
 		tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		top.add_child(tag)
@@ -214,9 +214,10 @@ func _style_cards() -> void:
 		var b := _cards[i]
 		b.set_pressed_no_signal(on)
 		for st in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
-			var sb := UITheme.panel(Color(1, 1, 1, 0.07 if on else 0.03), 6, UITheme.ACCENT if on else UITheme.LINE_STRONG, 2 if on else 1, 0)
+			# a dark glass backing: the description is dim text and the vista behind it can be bright snow
+			var sb := UITheme.panel(Color(0.03, 0.035, 0.045, 0.74 if on else 0.62), 6, UITheme.ACCENT if on else UITheme.LINE_STRONG, 2 if on else 1, 0)
 			if st == "hover" and not on:
-				sb.bg_color = Color(1, 1, 1, 0.06)
+				sb.bg_color = Color(0.05, 0.055, 0.065, 0.7)
 			if st == "focus":
 				sb = UITheme.focus_box(6)
 			b.add_theme_stylebox_override(st, sb)
