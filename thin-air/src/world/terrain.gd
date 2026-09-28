@@ -544,7 +544,7 @@ func _sync_fog() -> void:
 # =========================================================================================== collision
 func _build_collision() -> void:
 	var t0 := Time.get_ticks_msec()
-	_body = StaticBody3D.new()
+	_body = GroundGather.new()   # the heightfield is also an interactable: scoop snow, fill bottles
 	_body.name = "TerrainBody"
 	_body.collision_layer = 1
 	_body.collision_mask = 0

@@ -27,6 +27,18 @@ const SHRUBS := {
 	"alder": {"interact": [&"stick", 1, 2, 2, "Break off branches", 1.0], "chop": [&"stick", 2, 3, 3]},
 	"juniper": {"interact": [&"stick", 1, 1, 1, "Break off dry twigs", 1.0], "chop": [&"stick", 1, 2, 2]},
 }
+## Standing conifers (hold interact, once per tree): scrape pitch from an old bark wound, strip a handful of
+## needles and pull Usnea lichen off the lower limbs. species -> [[item, min, max, chance], ...]. The only
+## world source of resin (torches, bow, arrows), spruce needles (pine tea) and Usnea (poultice, tinder).
+const CONIFER_YIELDS := {
+	"spruce": [[&"resin", 1, 2, 1.0], [&"pine_needles", 2, 4, 1.0], [&"usnea", 1, 3, 0.6]],
+	"fir": [[&"resin", 1, 2, 0.85], [&"pine_needles", 2, 4, 1.0], [&"usnea", 1, 3, 0.55]],
+	"lodgepole": [[&"resin", 1, 2, 0.9], [&"pine_needles", 2, 3, 1.0], [&"usnea", 1, 2, 0.35]],
+	"whitebark": [[&"resin", 1, 1, 0.7], [&"pine_needles", 1, 3, 1.0], [&"usnea", 1, 2, 0.25]],
+	"larch": [[&"resin", 1, 1, 0.6], [&"usnea", 1, 2, 0.45]],
+}
+const CONIFER_PROMPT := "Scrape resin, strip needles and lichen"
+const CONIFER_HOLD := 1.6
 const BOULDER_YIELDS := 6
 const BOULDER_SEG := 30.0
 const FLINT_CHANCE := 0.18
@@ -562,6 +574,9 @@ func interact_prompt(id: int, _player: Node) -> String:
 		Cat.DEADWOOD:
 			if float(e["info"].get("length", 0.0)) > 0.0 and int(u.x) < 2:
 				return "Gather dry twigs"
+		Cat.TREE:
+			if int(u.x) < 1 and not trees.has(id) and CONIFER_YIELDS.has(String(e["info"].get("species", ""))):
+				return CONIFER_PROMPT
 	return ""
 
 
@@ -575,6 +590,8 @@ func interact_hold_time(id: int) -> float:
 			return float(def["interact"][5])
 	if int(e["cat"]) == Cat.DEADWOOD:
 		return 0.8
+	if int(e["cat"]) == Cat.TREE:
+		return CONIFER_HOLD
 	return 0.0
 
 
@@ -606,6 +623,14 @@ func interact_instance(id: int, player: Node) -> void:
 			give(&"stick", r3.randi_range(1, 2), at, player)
 			if r3.randf() < 0.35:
 				give(&"tinder", 1, at, player)
+		Cat.TREE:
+			u.x += 1.0
+			uses[id] = u
+			var r4 := _rng(id, 400)
+			for y: Array in CONIFER_YIELDS[String(e["info"].get("species", ""))]:
+				if r4.randf() < float(y[3]):
+					give(y[0], r4.randi_range(int(y[1]), int(y[2])), at + Vector3.UP * 0.8, player)
+			Audio.play_sfx(&"pickup", at, -6.0)
 
 
 # ---------------------------------------------------------------------------------------------- items

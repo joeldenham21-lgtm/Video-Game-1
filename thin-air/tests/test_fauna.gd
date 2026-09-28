@@ -237,7 +237,11 @@ func _test_damage_death_harvest() -> void:
 	_harvested.clear()
 	for i in 12:
 		a.harvest_hit(&"knife", 1.0, a.global_position + Vector3.UP * 0.3, Vector3.UP, target)
-	check(_harvested.size() == 6, "harvest: 6 items from a wolf (%d)" % _harvested.size())
+	var wolf_loot := 0
+	for k in a.def.loot:
+		wolf_loot += int(a.def.loot[k])
+	check(_harvested.size() == wolf_loot and wolf_loot >= 6 and _harvested.has(&"sinew"),
+		"harvest: all %d items from a wolf, sinew included (%d)" % [wolf_loot, _harvested.size()])
 	check(_harvested.count(&"meat_raw") == 3 and _harvested.count(&"hide_raw") == 1 and _harvested.count(&"bone") == 2,
 		"harvest: meat x3, hide, bone x2")
 	check(a.butchered, "harvest: carcass butchered")

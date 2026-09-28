@@ -43,6 +43,9 @@ func _motion_math() -> void:
 	check(PlayerMotion.snow_speed_factor(PlayerMotion.snow_depth(1.0, 2600.0)) < 0.6, "deep alpine snow roughly halves speed")
 	check(PlayerMotion.snow_depth(1.0, 1450.0) < 0.3, "valley snow is shallow")
 	check(PlayerMotion.weight_speed_factor(30.0, 30.0) == 1.0 and PlayerMotion.weight_speed_factor(45.0, 30.0) < 0.5, "overweight slows")
+	check(PlayerMotion.load_stamina_factor(0.0, 30.0) == 1.0 and PlayerMotion.load_stamina_factor(15.0, 30.0) < 1.2
+		and PlayerMotion.load_stamina_factor(30.0, 30.0) > 1.5 and PlayerMotion.load_stamina_factor(37.5, 30.0) > 1.9,
+		"a heavy pack makes sprinting / climbing / swimming cost more stamina")
 	check(PlayerMotion.wading_factor(0.2) == 1.0 and PlayerMotion.wading_factor(1.2) < 0.5, "wading slows")
 	var v := PlayerMotion.approach(Vector3.ZERO, Vector3(0, 0, -3.2), 10.0, 12.5, 0.1)
 	check(is_equal_approx(v.length(), 1.0), "acceleration limits velocity change (%.2f)" % v.length())

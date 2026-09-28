@@ -129,6 +129,15 @@ static func weight_speed_factor(weight: float, max_weight: float) -> float:
 	return clampf(1.0 - over * 1.25, 0.35, 1.0)
 
 
+## Stamina cost multiplier for sprinting, climbing and swimming with a load: ×1.15 at half the comfortable
+## load, ×1.6 at full, ×1.94 at the 125 % sprint cap (a heavy pack used to cost nothing extra).
+static func load_stamina_factor(weight: float, max_weight: float) -> float:
+	if max_weight <= 0.0:
+		return 1.0
+	var f := clampf(weight / max_weight, 0.0, 1.5)
+	return 1.0 + 0.6 * f * f
+
+
 ## Speed factor for walking up/down a slope. `uphill` = dot(move dir, horizontal uphill dir) in −1..1.
 static func slope_speed_factor(slope_deg: float, uphill: float) -> float:
 	if slope_deg < 4.0:

@@ -38,6 +38,7 @@ func run() -> void:
 	_injuries()
 	_difficulty()
 	_consumption()
+	await _night_one()
 	_items_schema()
 	_persistence()
 	ItemDB.items.erase(&"_t_ration")
@@ -179,6 +180,30 @@ func _oxygen() -> void:
 	low.env_exertion = 1.0
 	_run(low, 60.0)
 	check(low.oxygen > 99.0, "no drain below 2,800 m")
+	# Kestrel Station (col, 2,950 m) is the Act 5 hub: walking about for a whole game day must not be fatal,
+	# while the summit (3,452 m) without bottled oxygen is (regression: the col used to kill in ~13 minutes).
+	var col := _make()
+	col.env_altitude = 2951.0
+	col.env_exertion = 0.38
+	for _i in 12:
+		col.food = 100.0; col.water = 100.0       # a fed, watered day: only oxygen is under test
+		_run(col, 200.0, 2.0)
+	check(not col.dead and col.oxygen > 40.0 and col.health > 99.0, "walking at the col settles above hypoxic (%.1f)" % col.oxygen)
+	col.env_exertion = 0.9
+	_run(col, 300.0)
+	check(col.oxygen < 40.0 and col.health > 99.0, "sprinting at the col: hypoxic but not injured (%.1f)" % col.oxygen)
+	var top := _make()
+	top.env_altitude = 3452.0
+	top.env_exertion = 0.5
+	_run(top, 600.0)
+	check(top.dead and top.death_cause == &"hypoxia", "summit push without O2 is fatal (%s)" % top.death_cause)
+	var top_o2 := _make()
+	top_o2.env_altitude = 3452.0
+	top_o2.env_exertion = 0.5
+	top_o2.env_o2_supply = true
+	_run(top_o2, 600.0)
+	check(not top_o2.dead and top_o2.oxygen > 95.0, "…and fine with mask + bottle (%.1f)" % top_o2.oxygen)
+	col.queue_free(); top.queue_free(); top_o2.queue_free()
 	# Breath hold.
 	var d := _make()
 	d.env_head_underwater = true
@@ -253,6 +278,82 @@ func _difficulty() -> void:
 	check(wo.warmth < sv.warmth, "whiteout: harsher cold")
 	for n in [ex, wo, sv]:
 		n.queue_free()
+
+
+class _Fire extends Node3D:
+	var heat_radius := 4.0
+	var heat_celsius := 25.0        # campfire at full blaze (src/items/stations/campfire.gd)
+	func is_heat_active() -> bool:
+		return true
+
+
+## Night 1 at the crash site in the starting clothes (field jacket, hiking pants, boots), snowing, 17:18 →
+## 08:18, real Climate + terrain: without a fire hypothermia sets in before midnight and kills by dawn; a
+## campfire 1.5 m away keeps you warm; Explorer's gentler cold is survivable. (Regression: warmth used to
+## level off just above the hypothermia threshold, so night 1 was harmless, and every difficulty ended the
+## night at the same warmth.) Also: a dusting of snow must not halve a parka's insulation.
+func _night_one() -> void:
+	if not TerrainData.is_loaded():
+		check(true, "night one skipped (no terrain data)")
+		return
+	var saved := [Climate.hours, Climate.weather, Climate.day]
+	Climate._set_weather_immediate(&"snow")
+	Climate.day = 1
+	var crash: Vector3 = TerrainData.get_poi(&"crash_site")["position"]
+	crash.y = TerrainData.get_height(crash.x, crash.z) + 1.0
+	var eq := {&"body": &"field_jacket", &"legs": &"hiking_pants", &"feet": &"boots"}
+	var tot := ItemActions.clothing_totals(eq)
+	var out := {}
+	for case in ["nofire", "fire", "explorer"]:
+		var v := _make(&"explorer" if case == "explorer" else &"survivor")
+		var fire: _Fire = null
+		if case == "fire":
+			fire = _Fire.new()
+			add_child(fire)
+			fire.global_position = crash + Vector3(1.5, 0.0, 0.0)
+			fire.add_to_group(&"heat_source")
+		Climate._refresh_groups()
+		var hps := v._hours_per_second()
+		var hypo_at := -1.0
+		var min_w := 100.0
+		var t := 0.0
+		while t < 15.0 / hps and not v.dead:
+			Climate.hours = fposmod(17.3 + t * hps, 24.0)
+			var wet := v.get_effect_strength(&"wet") if v.has_effect(&"wet") else 0.0
+			v.env_air_temp = Climate.get_air_temperature(crash)
+			v.env_felt_temp = Climate.felt_temperature(crash, float(tot["insulation"]), wet, float(tot["windproof"]))
+			v.env_heat = Climate.get_heat_at(crash)
+			v.env_insulation = float(tot["insulation"])
+			v.env_waterproof = float(tot["waterproof"])
+			v.env_precipitation = Climate.precipitation
+			v.env_exertion = 0.1
+			v.food = 80.0; v.water = 80.0
+			v.simulate(2.0)
+			t += 2.0
+			min_w = minf(min_w, v.warmth)
+			if hypo_at < 0.0 and v.warmth < 15.0:
+				hypo_at = Climate.hours
+		out[case] = [v.dead, v.health, min_w, hypo_at]
+		if fire:
+			fire.queue_free()
+		v.queue_free()
+		await get_tree().process_frame
+	Climate._refresh_groups()
+	var nf: Array = out["nofire"]
+	check(nf[0] or nf[1] < 40.0, "night 1, snow, no fire: deadly by dawn (dead %s, hp %.0f)" % [nf[0], nf[1]])
+	check(nf[3] > 20.0 or (nf[3] >= 0.0 and nf[3] < 1.0), "…but hypothermia only sets in after dark, leaving time to make fire (%.1f h)" % nf[3])
+	var f: Array = out["fire"]
+	check(not f[0] and f[1] > 99.0 and f[2] > 60.0, "night 1 by a campfire: warm all night (min warmth %.0f)" % f[2])
+	var ex: Array = out["explorer"]
+	check(not ex[0] and ex[2] > 30.0, "Explorer: the same night without fire is cold but survivable (min warmth %.0f)" % ex[2])
+	var damp := Climate.felt_temperature(crash, 22.5, 0.1, 0.8)
+	var soaked := Climate.felt_temperature(crash, 22.5, 1.0, 0.8)
+	var dry := Climate.felt_temperature(crash, 22.5, 0.0, 0.8)
+	check(dry - damp < 2.5 and damp - soaked > 10.0, "wetness is graded: damp %.1f, soaked %.1f, dry %.1f °C" % [damp, soaked, dry])
+	check(is_equal_approx(Climate.get_felt_temperature(crash, 22.5, true, 0.8), soaked), "get_felt_temperature(wet=true) = fully soaked")
+	Climate.hours = saved[0]
+	Climate._set_weather_immediate(saved[1])
+	Climate.day = saved[2]
 
 
 func _consumption() -> void:

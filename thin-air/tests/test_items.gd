@@ -44,6 +44,9 @@ func run() -> void:
 	_connect_events()
 	_test_data()
 	_test_crafting()
+	_test_obtainable()
+	_test_ground_gather()
+	_test_wear_stacking()
 	_test_blueprints()
 	_test_craft_job()
 	_test_actions()
@@ -255,6 +258,160 @@ func _test_crafting() -> void:
 		has_hand = has_hand or String(r["station"]) == "hand"
 		has_fire = has_fire or String(r["station"]) == "campfire"
 	check(has_hand and has_fire, "recipes_for(campfire) = campfire + hand recipes")
+
+
+## Every recipe must be craftable from things the world actually provides (fixed + rolled loot, story gives,
+## carcasses, vegetation, forest-floor loot, ground gathering, containers, the starting kit, other recipes).
+## Regression: resin, sinew, feathers, Usnea, needles, mushrooms, snow, creek water and the canteen once had no
+## source at all (no torches, no hide clothing, no water on Survivor).
+func _obtainable_sources() -> Dictionary:
+	var have := {}
+	var LT: GDScript = load("res://src/story/loot_tables.gd")
+	for id: String in LT.all_items():
+		have[id] = "loot"
+	var dir := DirAccess.open("res://src/fauna/species")
+	for f in dir.get_files():
+		if f.ends_with(".tres"):
+			var sp: Resource = load("res://src/fauna/species/" + f)
+			for id in (sp.get("loot") as Dictionary):
+				have[String(id)] = "carcass"
+	for g: Dictionary in VegHarvest.SHRUBS.values():
+		have[String(g["interact"][0])] = "shrub"
+		have[String(g["chop"][0])] = "shrub"
+	for ys: Array in VegHarvest.CONIFER_YIELDS.values():
+		for y: Array in ys:
+			have[String(y[0])] = "conifer"
+	for id in ["stick", "bark", "log", "stone", "flint", "tinder", "mushroom", "snow", "water_unsafe",
+			"field_jacket", "hiking_pants", "boots"]:
+		have[id] = "world"      # felling/deadwood/rocks, forest-floor loot, GroundGather, starting kit
+	var story: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://data/story.json"))
+	var stack: Array = [story]
+	while not stack.is_empty():
+		var v: Variant = stack.pop_back()
+		if v is Dictionary:
+			if (v as Dictionary).get("give") is Dictionary:
+				for id in (v as Dictionary)["give"]:
+					have[String(id)] = "story"
+			stack.append_array((v as Dictionary).values())
+		elif v is Array:
+			stack.append_array(v)
+	var changed := true
+	while changed:
+		changed = false
+		for id: StringName in ItemDB.all_items():
+			var cont := String(ItemDB.get_item(id).get("container", ""))
+			if cont != "" and have.has(String(id)) and not have.has(cont):
+				have[cont] = "container"
+				changed = true
+		for r: Dictionary in ItemDB.recipes:
+			var res := String(r.get("result", ""))
+			if have.has(res) or not _recipe_ok(r, have).is_empty():
+				continue
+			have[res] = "craft"
+			changed = true
+	return have
+
+
+func _recipe_ok(r: Dictionary, have: Dictionary) -> Array[String]:
+	var miss: Array[String] = []
+	for id in (r.get("ingredients", {}) as Dictionary):
+		if not have.has(String(id)):
+			miss.append(String(id))
+	for t in r.get("tools", []):
+		var ok := false
+		for id: String in have:
+			if Crafting.tool_matches(StringName(id), StringName(t)):
+				ok = true
+				break
+		if not ok:
+			miss.append("tool:" + String(t))
+	return miss
+
+
+func _test_obtainable() -> void:
+	var have := _obtainable_sources()
+	var bad: Array[String] = []
+	for r: Dictionary in ItemDB.recipes:
+		if String(r.get("result", "")) == "fish_cooked":
+			continue            # no fishing yet: the trout recipe is dormant
+		var miss := _recipe_ok(r, have)
+		if not miss.is_empty():
+			bad.append("%s%s" % [r.get("id", "?"), miss])
+	check(bad.is_empty(), "every recipe is craftable from obtainable ingredients and tools %s" % [bad])
+	var need: Array[String] = []
+	for id in ["torch", "bow", "arrow", "hide_coat", "fur_mitts", "herbal_poultice", "pine_tea", "water_boiled",
+			"canteen", "cooking_pot", "crampons", "spear"]:
+		if not have.has(id):
+			need.append(id)
+	check(need.is_empty(), "survival essentials are obtainable (torch, bow + arrows, hide clothing, water) %s" % [need])
+
+
+## Regression: stacks share one durability, so a nearly burnt torch / nearly empty O2 bottle merged into a
+## fresh stack (pickup, drag, sort) came back full; sorting also washed a canteen's "unsafe" flag away.
+func _test_wear_stacking() -> void:
+	var inv := Inventory.new(8, 30.0)
+	inv.add(&"torch", 2)
+	check(inv.add(&"torch", 1, 0.05) == 0, "worn torch picked up")
+	var worn := -1
+	for i in inv.size():
+		var st := inv.get_slot(i)
+		if not st.is_empty() and st["id"] == &"torch" and float(st["durability"]) < 0.5:
+			worn = i
+	check(worn >= 0 and inv.count(&"torch") == 3 and int(inv.get_slot(worn)["count"]) == 1,
+		"a worn torch keeps its own slot instead of joining (and refilling from) the fresh stack")
+	var fresh := inv.find(&"torch")
+	inv.move(worn, fresh, 1)      # whole stack onto a differently worn one: swaps places, never merges
+	check(inv.count(&"torch") == 3 and float(inv.get_slot(fresh)["durability"]) < 0.5
+		and int(inv.get_slot(fresh)["count"]) == 1 and float(inv.get_slot(worn)["durability"]) > 0.99,
+		"dragging the worn torch onto the fresh stack swaps instead of merging")
+	inv.sort()
+	var wears: Array[float] = []
+	for i in inv.size():
+		var st := inv.get_slot(i)
+		if not st.is_empty() and st["id"] == &"torch":
+			wears.append(float(st["durability"]))
+	check(wears.size() == 2 and wears.min() < 0.5 and inv.count(&"torch") == 3, "sort keeps worn and fresh torches apart %s" % [wears])
+	var o2 := Inventory.new(4, 30.0)
+	o2.add(&"o2_bottle", 1)
+	o2.add(&"o2_bottle", 1, 0.1)
+	var gas := 0.0
+	for i in o2.size():
+		if not o2.is_slot_empty(i):
+			gas += float(o2.get_slot(i)["durability"]) * int(o2.get_slot(i)["count"])
+	check(is_equal_approx(gas, 1.1), "an almost empty O2 bottle stays almost empty next to a full one (%.2f)" % gas)
+	var c := Inventory.new(4, 30.0)
+	c.add_stack({"id": &"canteen", "count": 1, "durability": 0.5, "unsafe": true})
+	c.sort()
+	check(bool(c.get_slot(c.find(&"canteen")).get("unsafe", false)), "sort keeps the canteen's untreated water flag")
+	var r := Inventory.new(4, 30.0)
+	r.add(&"stick", 3)
+	r.add(&"stick", 4)
+	check(r.free_slots() == 3 and r.count(&"stick") == 7, "ordinary resources still stack")
+
+
+func _test_ground_gather() -> void:
+	var inv := Inventory.new(24, 30.0)
+	check(GroundGather.gather(&"snow", inv) == &"snow" and inv.count(&"snow") == GroundGather.SNOW_PER_SCOOP,
+		"scooping snow gives %d snow" % GroundGather.SNOW_PER_SCOOP)
+	check(GroundGather.gather(&"water", inv) == &"" and inv.count(&"water_unsafe") == 0, "no bottle, no water")
+	inv.add(&"bottle_empty", 2)
+	check(GroundGather.gather(&"water", inv) == &"water_unsafe" and inv.count(&"water_unsafe") == 1
+		and inv.count(&"bottle_empty") == 1, "filling a bottle at the creek: empty bottle -> untreated water")
+	check(GroundGather.gather(&"", inv) == &"", "bare ground gives nothing")
+	if TerrainData.is_loaded():
+		var snowy := 0
+		var wet := 0
+		for p in TerrainData.all_pois():
+			var pos: Vector3 = p["position"]
+			if GroundGather.kind_at(Vector3(pos.x, TerrainData.get_height(pos.x, pos.z), pos.z)) == &"snow":
+				snowy += 1
+		var lake: Dictionary = (TerrainData.layout.get("lakes", []) as Array)[0]
+		var lx := float(lake["x"])
+		var lz := float(lake["z"])
+		if GroundGather.kind_at(Vector3(lx, TerrainData.get_height(lx, lz), lz)) == &"water":
+			wet += 1
+		check(snowy >= 2, "snow can be scooped at the high POIs (%d)" % snowy)
+		check(wet == 1, "a lake bed under water offers water")
 
 
 func _test_blueprints() -> void:
