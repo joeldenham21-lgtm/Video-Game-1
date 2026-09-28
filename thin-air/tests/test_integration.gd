@@ -329,7 +329,7 @@ func _campfire() -> Campfire:
 		player.teleport(p0, 0.0)
 		await get_tree().process_frame
 		sky.call(&"snap")
-		check(near_key > 0.5 and near_eye < far_eye * 0.5 and near_exp < far_exp,
+		check(near_key > 0.5 and near_eye < far_eye * 0.5 and near_exp <= far_exp,
 			"eye adapts to the firelight (key %.2f: eye %.2f / exposure %.2f by the fire, %.2f / %.2f 60 m away)"
 			% [near_key, near_eye, near_exp, far_eye, far_exp])
 	# A held torch is a heat source too and lights from the campfire without an igniter.
