@@ -24,6 +24,7 @@ func run() -> void:
 		_restore_save()
 		return
 	await _gather_and_craft()
+	await _ground_water()
 	var fire := await _campfire()
 	await _shelter()
 	await _cook_and_eat(fire)
@@ -180,6 +181,68 @@ func _spawn_world() -> void:
 
 # =============================================================================================== core loop
 
+## The terrain is an interactable (GroundGather): look down at snow -> "Scoop snow"; at a lake shore with an
+## empty bottle -> "Fill a bottle". Regression: there was no way at all to get snow or creek water.
+func _aim_at_ground(pos: Vector3, yaw: float, pitch: float) -> String:
+	player.teleport(Vector3(pos.x, TerrainData.get_height(pos.x, pos.z) + 0.05, pos.z), yaw)
+	for _i in 4:
+		await get_tree().physics_frame
+	player.set_look(yaw, pitch)
+	for _i in 6:
+		await get_tree().physics_frame
+	await _wait(0.25)
+	return player.interactor.prompt if player.interactor.target is GroundGather else "<%s>" % str(player.interactor.target)
+
+
+func _ground_water() -> void:
+	if not TerrainData.is_loaded():
+		check(true, "ground gathering skipped (no terrain)")
+		return
+	var inv := player.inventory
+	var home := player.global_position
+	var look := Vector2(player.get_yaw_deg(), player.get_pitch_deg())
+	var st: Vector3 = TerrainData.get_poi(&"kestrel_station")["position"]
+	var snow_at := Vector3(st.x + 40.0, 0.0, st.z + 40.0)
+	for k in 24:
+		var q := Vector3(st.x + 30.0 + 7.0 * k, 0.0, st.z + 25.0)
+		if GroundGather.kind_at(Vector3(q.x, TerrainData.get_height(q.x, q.z), q.z)) == &"snow" \
+				and TerrainData.get_slope_deg(q.x, q.z) < 20.0:
+			snow_at = q
+			break
+	var prompt := await _aim_at_ground(snow_at, 0.0, -80.0)
+	check(prompt == "Scoop snow", "looking down at snow offers 'Scoop snow' (%s)" % prompt)
+	var n0 := inv.count(&"snow")
+	if player.interactor.target is GroundGather:
+		player.interactor.target.interact(player)
+	check(inv.count(&"snow") == n0 + GroundGather.SNOW_PER_SCOOP, "scooped snow into the pack (%d)" % inv.count(&"snow"))
+	var lake: Dictionary = (TerrainData.layout.get("lakes", []) as Array)[0]
+	var c := Vector3(float(lake["x"]), float(lake["level"]), float(lake["z"]))
+	var shore := c
+	for k in 3200:
+		var q := c + Vector3(0.0, 0.0, 0.25 * k)
+		if TerrainData.get_water_level(q.x, q.z) < -1e20 and TerrainData.get_height(q.x, q.z) > c.y + 0.1:
+			shore = q + Vector3(0.0, 0.0, 0.3)
+			break
+	inv.add(&"bottle_empty", 1)
+	var wprompt := ""
+	var seen: Array[String] = []
+	for pitch in [-40.0, -50.0, -60.0, -70.0, -80.0]:     # yaw 0 faces −Z: back toward the lake centre
+		wprompt = await _aim_at_ground(shore, 0.0, pitch)
+		seen.append("%d°:%s" % [int(pitch), wprompt])
+		if wprompt == "Fill a bottle (untreated water)":
+			break
+	print("lake shore ", shore, " ", seen)
+	check(wprompt == "Fill a bottle (untreated water)", "at the lake shore with a bottle: 'Fill a bottle' (%s)" % wprompt)
+	if player.interactor.target is GroundGather:
+		player.interactor.target.interact(player)
+	check(inv.count(&"water_unsafe") == 1 and inv.count(&"bottle_empty") == 0, "filled the bottle with creek water")
+	for id: StringName in [&"snow", &"water_unsafe", &"bottle_empty"]:
+		inv.remove(id, inv.count(id))
+	player.set_look(look.x, look.y)
+	player.teleport(home, 0.0)
+	for _i in 6:
+		await get_tree().physics_frame
+
 func _gather_and_craft() -> void:
 	var inv := player.inventory
 	# Gathering: pickups in the world go into the pack; a picked-up tool lands on the hotbar.
@@ -228,13 +291,24 @@ func _campfire() -> Campfire:
 			break
 		fire.interact(player)
 	check(fire.is_burning(), "fire lit with matches (%d left)" % inv.count(&"matches"))
-	# Warmth: cold body next to the fire warms up; Climate heat reaches the player's core.
+	# Warmth: cold body next to the fire warms up; Climate heat reaches the player's core. Dressed as a new game
+	# starts (Story's starting kit): with freezing_c at −15 °C a naked body at −10 °C air by a still-young fire
+	# only holds its own, which is fair.
+	var dressed: Array[StringName] = []
+	for id: StringName in [&"field_jacket", &"hiking_pants", &"boots"]:
+		if not player.equipment.values().has(id) and inv.add(id, 1) == 0 and player.equip(id):
+			dressed.append(id)
 	player.vitals.warmth = 40.0
 	var w0 := player.vitals.warmth
 	await _wait(4.0)      # the fire ramps up from a flicker (intensity 0.12 → ~0.7 over ~2 s)
 	var heat := Climate.get_heat_at(player.global_position + Vector3(0.0, Player.CORE_HEIGHT, 0.0))
 	check(heat > 5.0 and player.vitals.env_heat > 5.0, "fire heat reaches the player (%.1f °C)" % heat)
 	check(player.vitals.warmth > w0 + 0.5, "warmth rises by the fire (%.1f → %.1f)" % [w0, player.vitals.warmth])
+	for id in dressed:      # back to the test's bare state for the checks below
+		var slot := player.find_equipped(id)
+		if slot != &"":
+			player.unequip(slot)
+		inv.remove(id, inv.count(id))
 	# Away from the fire it's cold.
 	var far := Climate.get_heat_at(Vector3(30.0, 1451.0, 30.0))
 	check(far == 0.0, "no fire heat 30 m away")

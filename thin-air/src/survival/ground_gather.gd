@@ -27,11 +27,41 @@ static func kind_at(p: Vector3) -> StringName:
 	return &""
 
 
+## The terrain body in the world (the interaction ray falls back to it over deep water, see water_on_ray()).
+static var instance: GroundGather = null
+
+
+func _enter_tree() -> void:
+	instance = self
+
+
+func _exit_tree() -> void:
+	if instance == self:
+		instance = null
+
+
+## First point of the segment from → to that is at or under a lake / river surface, or Vector3.INF. Water
+## surfaces have no collider on the interaction layers and a lake bed drops out of arm's reach a step from
+## the shore, so the interaction ray uses this when it hits nothing.
+static func water_on_ray(from: Vector3, to: Vector3) -> Vector3:
+	if not TerrainData.is_loaded():
+		return Vector3.INF
+	for i in range(1, 13):
+		var p := from.lerp(to, float(i) / 12.0)
+		var wl := TerrainData.get_water_level(p.x, p.z)
+		if wl > -1e20 and p.y <= wl + 0.05:
+			return p
+	return Vector3.INF
+
+
 static func _aim(player: Node) -> Vector3:
 	var ray: Variant = player.get("interactor") if player else null
-	if ray is RayCast3D and (ray as RayCast3D).is_colliding():
-		return (ray as RayCast3D).get_collision_point()
-	return Vector3.INF
+	if not (ray is RayCast3D):
+		return Vector3.INF
+	var r := ray as RayCast3D
+	if r.is_colliding():
+		return r.get_collision_point()
+	return water_on_ray(r.global_position, r.to_global(r.target_position))
 
 
 static func _inventory(player: Node) -> Inventory:

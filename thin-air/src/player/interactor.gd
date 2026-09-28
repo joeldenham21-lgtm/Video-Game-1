@@ -39,6 +39,9 @@ func _ready() -> void:
 ## Called by the Player every physics tick.
 func tick(delta: float, input_enabled: bool) -> void:
 	var col: Object = get_collider() if is_colliding() else null
+	if col == null and GroundGather.instance != null \
+			and GroundGather.water_on_ray(global_position, to_global(target_position)) != Vector3.INF:
+		col = GroundGather.instance      # open water within reach (no collider): fill a bottle
 	if col != _last_collider:
 		_last_collider = col
 		target = _resolve(col)
