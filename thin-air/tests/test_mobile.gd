@@ -11,6 +11,7 @@ func run() -> void:
 	Settings.apply_preset(&"mobile_high", false)
 	await _test_phone_scaled_layers()
 	await _test_build_touch_block_clear_of_thumb_cluster()
+	await _test_touch_subtitles_clear_of_thumb_cluster()
 	Settings.values = prev_values
 	Settings.preset = prev_preset
 
@@ -79,6 +80,29 @@ func _test_build_touch_block_clear_of_thumb_cluster() -> void:
 	check(clear, "touch build buttons don't cover the thumb cluster and stay on screen")
 	ui.queue_free()
 	tc.queue_free()
+	InputGlyphs.device = InputGlyphs.KEYBOARD
+	await get_tree().process_frame
+
+
+## A long radio line in the touch layout wraps before it reaches the jump button (it used to run under the
+## jump / use buttons, which cover the text).
+func _test_touch_subtitles_clear_of_thumb_cluster() -> void:
+	InputGlyphs.device = InputGlyphs.TOUCH
+	var hud := (load("res://scenes/ui/hud.tscn") as PackedScene).instantiate() as HUD
+	add_child(hud)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(hud.touch_mode and hud.touch_controls != null, "HUD in touch mode with touch controls")
+	hud.subtitles.show_line("Mara Voss", "If anyone can hear this, this is Kestrel Station. Please respond, the generator is down and I'm running out of fuel.", 10.0)
+	hud.fade_in(0.0)
+	for i in 3:
+		await get_tree().process_frame
+	var tc := hud.touch_controls as TouchControls
+	var txf := tc.root.get_global_transform_with_canvas()
+	var jump_left := (txf * tc.button_center(&"jump")).x - tc.button_radius(&"jump") * txf.x.length()
+	var r := hud.subtitles.get_global_rect()
+	check(hud.subtitles.visible and r.end.x < jump_left, "touch subtitles end left of the jump button (%.0f < %.0f)" % [r.end.x, jump_left])
+	hud.queue_free()
 	InputGlyphs.device = InputGlyphs.KEYBOARD
 	await get_tree().process_frame
 

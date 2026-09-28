@@ -5,6 +5,16 @@ extends PanelContainer
 
 const MAX_W := 1100.0
 
+## Widest line (HUD units); the touch layout narrows it so lines never run under the thumb cluster.
+var max_width := MAX_W:
+	set(v):
+		if absf(v - max_width) < 0.5:
+			return
+		max_width = v
+		if _text:
+			_text.custom_minimum_size.x = minf(_line_w, max_width)
+			size = Vector2.ZERO
+var _line_w := MAX_W
 var _speaker: Label
 var _text: Label
 var _t := 0.0
@@ -52,7 +62,8 @@ func show_line(speaker: String, text: String, duration: float) -> void:
 	_text.text = text
 	var f := _text.get_theme_font("font")
 	var w := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 27).x if f else MAX_W
-	_text.custom_minimum_size.x = minf(w + 4.0, MAX_W)
+	_line_w = minf(w + 4.0, MAX_W)
+	_text.custom_minimum_size.x = minf(_line_w, max_width)
 	_t = maxf(duration, 1.2 + text.length() * 0.05) + 0.4
 	visible = true
 	modulate.a = 1.0
