@@ -101,6 +101,8 @@ func is_playing() -> bool:
 
 
 func new_game() -> void:
+	if state == State.LOADING:
+		return      # already loading (a double-pressed button): a second scene change would kill the first build
 	is_new_game = true
 	flags.clear()
 	playtime = 0.0
@@ -110,6 +112,8 @@ func new_game() -> void:
 
 
 func continue_game(slot := 0) -> void:
+	if state == State.LOADING:
+		return
 	if not Save.is_readable(slot):
 		# a missing/corrupt save starts a fresh game (difficulty, flags and playtime reset before the world
 		# builds, so nothing from the session in memory leaks into it)

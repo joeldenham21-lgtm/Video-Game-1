@@ -656,11 +656,16 @@ func _death_and_continue(snap: Dictionary, cause: StringName) -> void:
 	check(_hud().pause_menu == null or not (_hud().pause_menu as PauseMenu).is_open, "%s: Esc doesn't open the pause menu over the death screen" % cause)
 	Audio.play_voice(&"prologue")
 	check(Audio.voice.current == &"prologue", "%s: a recording is playing on the death screen" % cause)
+	var e0 := Game.errors.errors + Game.errors.script_errors
 	ds._buttons[0].pressed.emit()
+	await _frames(1)
+	if is_instance_valid(ds):
+		ds._buttons[0].pressed.emit()      # double click / double tap on Continue
 	var old_id := pl.get_instance_id()
 	ok = await _until(func() -> bool: return Game.world != null and Game.player != null and Game.player.get_instance_id() != old_id and Game.state != Game.State.LOADING, 120.0)
 	check(ok, "%s: Continue from last save reloads" % cause)
 	check(Audio.voice.current != &"prologue", "%s: no voice carried over into the reloaded world" % cause)
+	check(Game.errors.errors + Game.errors.script_errors == e0, "%s: a double-pressed Continue loads once, without errors" % cause)
 	await _frames(10)
 	_compare(snap, "after %s death" % cause)
 
