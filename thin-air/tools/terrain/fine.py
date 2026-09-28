@@ -864,7 +864,7 @@ class Fine:
 		ford = np.where(np.isfinite(rlv), ford, yt)          # banks (river mask, no water) take the tread
 		# a level ford (tread at its water + 0.2): the channel under the tread is one level riffle even where the
 		# creek is steep (a short pool; the water profile is levelled to match in _level_ford)
-		pool = intread & river & np.isfinite(rlv) & (np.abs(yt - 0.2 - (rlv + 0.25)) < 3.0) & (F.k >= 0)
+		pool = intread & river & np.isfinite(rlv) & (np.abs(yt - 0.2 - (rlv + 0.25)) < 3.0)
 		if not ridge and getattr(self, "_crossings", None):
 			near_x = np.zeros_like(pool)
 			for kc in self._crossings:
