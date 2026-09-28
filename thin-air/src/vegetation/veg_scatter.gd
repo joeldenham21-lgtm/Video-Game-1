@@ -475,6 +475,7 @@ static func _grid(ctx: Context, out: CellData, rng: RandomNumberGenerator, place
 			var ccat := cat
 			var is_log := false
 			var log_half := 0.0
+			var rock_r := 0.0
 			match cat:
 				Cat.TREE:
 					var res := _pick_tree(ctx, t, x, z, y, r_pick, r_size)
@@ -486,6 +487,7 @@ static func _grid(ctx: Context, out: CellData, rng: RandomNumberGenerator, place
 					var e: Dictionary = ctx.rock_big[int(r_pick * ctx.rock_big.size()) % ctx.rock_big.size()]
 					kind = int(e["index"])
 					scl = lerpf(0.7, 1.3, r_size)
+					rock_r = float(e["radius"]) * scl
 				Cat.ROCK_SMALL:
 					var e2: Dictionary = ctx.rock_small[int(r_pick * ctx.rock_small.size()) % ctx.rock_small.size()]
 					kind = int(e2["index"])
@@ -526,6 +528,9 @@ static func _grid(ctx: Context, out: CellData, rng: RandomNumberGenerator, place
 				ground -= 0.05 + 0.02 * slope    # sink a little on slopes: the root flare hides the gap
 			elif ccat == Cat.ROCK_BIG:
 				ground -= 0.25 * scl
+				# drawn level (yaw only): on a slope the downhill side of a boulder / outcrop / talus patch hung in
+				# the air (a third of them > 0.3 m on the real map). Sink it until the ground meets it ~55 % out.
+				ground -= maxf(0.0, 0.55 * rock_r * tan(deg_to_rad(minf(slope, 50.0))) - 0.2 * scl)
 			var yaw := r_yaw * TAU
 			if is_log and slope > 3.0:
 				# a fallen log (6-9 m, drawn level, length along its local X) rests across the slope like a real

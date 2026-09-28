@@ -164,6 +164,24 @@ func _test_log_ends_grounded() -> void:
 				high += 1
 	check(n > 20, "window has fallen logs (%d)" % n)
 	check(high * 10 < n, "fallen logs rest on the ground: %d of %d have an end > 0.3 m up" % [high, n])
+	# boulders / outcrops / talus patches (drawn level) are sunk on slopes: the ground reaches them ~55 % out
+	var rocks := 0
+	var hover := 0
+	for c in _cells_in_window():
+		var cd := VegScatter.generate_cell(ctx, c.x, c.y)
+		for i in cd.size():
+			if int(cd.cats[i]) != Cat.ROCK_BIG:
+				continue
+			var r := float(lib.info(lib.kind_names[cd.kinds[i]]).get("radius", 1.0)) * cd.scale[i] * 0.55
+			var p := cd.pos[i]
+			var g := 0.0
+			for k in 8:
+				var a := TAU * k / 8.0
+				g = maxf(g, p.y - terrain.get_height(p.x + cos(a) * r, p.z + sin(a) * r))
+			rocks += 1
+			if g > 0.5:
+				hover += 1
+	check(rocks > 20 and hover * 20 < rocks, "big rocks sit in slopes: %d of %d hang > 0.5 m over the ground" % [hover, rocks])
 
 
 func _test_scatter_rules() -> void:
