@@ -47,7 +47,7 @@ func add(id: StringName, amount := 1, durability := 1.0) -> int:
 		for s in slots:
 			if left <= 0:
 				break
-			if not s.is_empty() and s["id"] == id and s["count"] < limit:
+			if not s.is_empty() and s["id"] == id and s["count"] < limit and same_wear(s, durability):
 				var n := mini(limit - int(s["count"]), left)
 				s["count"] = int(s["count"]) + n
 				left -= n
@@ -61,6 +61,12 @@ func add(id: StringName, amount := 1, durability := 1.0) -> int:
 	if left != amount:
 		changed.emit()
 	return left
+
+
+## Stacks share one durability (a torch's burn left, an O2 bottle's gas): only equally worn items merge, or a
+## nearly spent torch / O2 bottle dropped and picked up again would be refilled by the fresh stack it joined.
+static func same_wear(stack: Dictionary, durability: float) -> bool:
+	return absf(float(stack.get("durability", 1.0)) - durability) < 0.0005
 
 
 func can_add(id: StringName, amount := 1) -> bool:
@@ -282,7 +288,7 @@ func move(from: int, to: int, amount := -1) -> bool:
 			src["count"] = int(src["count"]) - n
 		changed.emit()
 		return true
-	if dst["id"] == src["id"]:
+	if dst["id"] == src["id"] and same_wear(dst, float(src.get("durability", 1.0))):
 		var room := stack_limit(src["id"]) - int(dst["count"])
 		var k := mini(room, n)
 		if k <= 0:
@@ -344,12 +350,16 @@ func sort() -> void:
 		for m in merged:
 			if left <= 0:
 				break
-			if m["id"] == s["id"] and int(m["count"]) < limit:
+			if m["id"] == s["id"] and int(m["count"]) < limit and same_wear(m, float(s.get("durability", 1.0))) \
+					and m.size() == 3 and s.size() == 3:
 				var k := mini(limit - int(m["count"]), left)
 				m["count"] = int(m["count"]) + k
 				left -= k
 		if left > 0:
-			merged.append({"id": s["id"], "count": left, "durability": s.get("durability", 1.0)})
+			var st := s.duplicate()      # keeps per-stack extras (a canteen's "unsafe" water)
+			st["count"] = left
+			st["durability"] = s.get("durability", 1.0)
+			merged.append(st)
 	merged.sort_custom(_sort_less)
 	for i in slots.size():
 		slots[i] = merged[i] if i < merged.size() else {}

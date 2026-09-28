@@ -46,6 +46,7 @@ func run() -> void:
 	_test_crafting()
 	_test_obtainable()
 	_test_ground_gather()
+	_test_wear_stacking()
 	_test_blueprints()
 	_test_craft_job()
 	_test_actions()
@@ -343,6 +344,49 @@ func _test_obtainable() -> void:
 		if not have.has(id):
 			need.append(id)
 	check(need.is_empty(), "survival essentials are obtainable (torch, bow + arrows, hide clothing, water) %s" % [need])
+
+
+## Regression: stacks share one durability, so a nearly burnt torch / nearly empty O2 bottle merged into a
+## fresh stack (pickup, drag, sort) came back full; sorting also washed a canteen's "unsafe" flag away.
+func _test_wear_stacking() -> void:
+	var inv := Inventory.new(8, 30.0)
+	inv.add(&"torch", 2)
+	check(inv.add(&"torch", 1, 0.05) == 0, "worn torch picked up")
+	var worn := -1
+	for i in inv.size():
+		var st := inv.get_slot(i)
+		if not st.is_empty() and st["id"] == &"torch" and float(st["durability"]) < 0.5:
+			worn = i
+	check(worn >= 0 and inv.count(&"torch") == 3 and int(inv.get_slot(worn)["count"]) == 1,
+		"a worn torch keeps its own slot instead of joining (and refilling from) the fresh stack")
+	var fresh := inv.find(&"torch")
+	inv.move(worn, fresh, 1)      # whole stack onto a differently worn one: swaps places, never merges
+	check(inv.count(&"torch") == 3 and float(inv.get_slot(fresh)["durability"]) < 0.5
+		and int(inv.get_slot(fresh)["count"]) == 1 and float(inv.get_slot(worn)["durability"]) > 0.99,
+		"dragging the worn torch onto the fresh stack swaps instead of merging")
+	inv.sort()
+	var wears: Array[float] = []
+	for i in inv.size():
+		var st := inv.get_slot(i)
+		if not st.is_empty() and st["id"] == &"torch":
+			wears.append(float(st["durability"]))
+	check(wears.size() == 2 and wears.min() < 0.5 and inv.count(&"torch") == 3, "sort keeps worn and fresh torches apart %s" % [wears])
+	var o2 := Inventory.new(4, 30.0)
+	o2.add(&"o2_bottle", 1)
+	o2.add(&"o2_bottle", 1, 0.1)
+	var gas := 0.0
+	for i in o2.size():
+		if not o2.is_slot_empty(i):
+			gas += float(o2.get_slot(i)["durability"]) * int(o2.get_slot(i)["count"])
+	check(is_equal_approx(gas, 1.1), "an almost empty O2 bottle stays almost empty next to a full one (%.2f)" % gas)
+	var c := Inventory.new(4, 30.0)
+	c.add_stack({"id": &"canteen", "count": 1, "durability": 0.5, "unsafe": true})
+	c.sort()
+	check(bool(c.get_slot(c.find(&"canteen")).get("unsafe", false)), "sort keeps the canteen's untreated water flag")
+	var r := Inventory.new(4, 30.0)
+	r.add(&"stick", 3)
+	r.add(&"stick", 4)
+	check(r.free_slots() == 3 and r.count(&"stick") == 7, "ordinary resources still stack")
 
 
 func _test_ground_gather() -> void:
