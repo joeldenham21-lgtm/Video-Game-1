@@ -43,7 +43,7 @@ static func bus() -> InputGlyphs:
 
 static func current() -> StringName:
 	if device == &"":
-		device = TOUCH if Settings.is_mobile() else KEYBOARD
+		device = TOUCH if Settings.is_handheld() else KEYBOARD
 	return device
 
 

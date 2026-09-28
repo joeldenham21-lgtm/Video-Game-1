@@ -125,6 +125,12 @@ func is_mobile() -> bool:
 		or String(preset).begins_with("mobile")
 
 
+## The device itself is a phone/tablet (touch-first input, no mouse to capture). Unlike is_mobile(), a
+## desktop running a "Phone" quality preset is not handheld: it keeps mouse capture and keyboard glyphs.
+func is_handheld() -> bool:
+	return OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios")
+
+
 func is_forward_plus() -> bool:
 	return RenderingServer.get_current_rendering_method() == "forward_plus"
 

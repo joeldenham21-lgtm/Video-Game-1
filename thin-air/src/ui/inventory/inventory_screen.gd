@@ -219,7 +219,7 @@ func close() -> void:
 	station_node = null
 	Audio.play_ui(&"inventory_close")
 	Events.ui_screen_closed.emit(SCREEN)
-	if _prev_mouse_mode == Input.MOUSE_MODE_CAPTURED and not Settings.is_mobile():
+	if _prev_mouse_mode == Input.MOUSE_MODE_CAPTURED and not Settings.is_handheld():
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_animate_out()
 

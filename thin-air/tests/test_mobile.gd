@@ -12,6 +12,7 @@ func run() -> void:
 	await _test_phone_scaled_layers()
 	await _test_build_touch_block_clear_of_thumb_cluster()
 	await _test_touch_subtitles_clear_of_thumb_cluster()
+	_test_desktop_on_phone_preset()
 	Settings.values = prev_values
 	Settings.preset = prev_preset
 
@@ -105,6 +106,18 @@ func _test_touch_subtitles_clear_of_thumb_cluster() -> void:
 	hud.queue_free()
 	InputGlyphs.device = InputGlyphs.KEYBOARD
 	await get_tree().process_frame
+
+
+## A desktop (this test machine) running a "Phone" quality preset still captures the mouse for mouse look and
+## starts with keyboard glyphs; only a handheld device goes touch-first.
+func _test_desktop_on_phone_preset() -> void:
+	check(Settings.is_mobile(), "phone preset selects the cheap render paths (is_mobile)")
+	check(not Settings.is_handheld(), "a desktop is not handheld, whatever the preset")
+	check(Player.wants_mouse_capture(), "desktop on a phone preset still captures the mouse for mouse look")
+	var prev := InputGlyphs.device
+	InputGlyphs.device = &""
+	check(InputGlyphs.current() == InputGlyphs.KEYBOARD, "desktop on a phone preset starts with keyboard/mouse glyphs")
+	InputGlyphs.device = prev
 
 
 func _screen_touch(index: int, pos: Vector2, pressed: bool, _tc: TouchControls = null) -> void:

@@ -204,7 +204,7 @@ func _ready() -> void:
 	_phys_prev = global_position
 	_phys_curr = global_position
 	Game.register_player(self)
-	if not Settings.is_mobile() and not DisplayServer.get_name().begins_with("headless"):
+	if wants_mouse_capture() and not DisplayServer.get_name().begins_with("headless"):
 		_capture_mouse(true)
 
 
@@ -519,7 +519,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventKey or event is InputEventMouseButton:
 		_pad_active = false
 	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
-		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and _ui_screens.is_empty() and not Settings.is_mobile():
+		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED and _ui_screens.is_empty() and wants_mouse_capture():
 			_capture_mouse(true)
 			get_viewport().set_input_as_handled()
 			return
@@ -1604,8 +1604,14 @@ func _ensure_walk_action() -> void:
 	InputMap.action_add_event(&"walk", ev)
 
 
+## Mouse look needs a captured mouse on any non-handheld device, whatever the quality preset (a desktop on
+## the "Phone" presets used to never capture, leaving the mouse unable to look around).
+static func wants_mouse_capture() -> bool:
+	return not Settings.is_handheld()
+
+
 func _capture_mouse(on: bool) -> void:
-	if Settings.is_mobile():
+	if not wants_mouse_capture():
 		return
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if on else Input.MOUSE_MODE_VISIBLE
 
