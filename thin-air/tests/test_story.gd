@@ -216,6 +216,14 @@ func _test_loot() -> void:
 					bad.append(String(e["item"]))
 				fixed[String(e["item"])] = true
 	check(missing.is_empty(), "loot sockets exist in their location scenes %s" % [missing])
+	# the first fire: a match is spent per strike and fails ~25-60% of the time in the dusk wind, and there is
+	# no other igniter before Act 2 — a single match from the cargo hold soft-locked 'Get warm' on a miss
+	var matches := 0
+	for socket: String in LT.site_sockets(&"crash_site"):
+		for e in LT.roll(&"crash_site", socket):
+			if e["item"] == &"matches":
+				matches += int(e["count"])
+	check(matches >= 8, "the wreck holds a box of matches, not one (%d)" % matches)
 	check(bad.is_empty() and not dupkey, "loot rolls are deterministic with unique persist ids")
 	var q: Array[String] = []
 	for id in ["first_aid_kit", "flare_gun", "survival_manual", "emergency_blanket", "hatchet", "backpack_torn", "survey_scanner",
