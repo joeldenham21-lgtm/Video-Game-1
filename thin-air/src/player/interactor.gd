@@ -8,6 +8,10 @@ extends RayCast3D
 const REACH := 2.6
 const MASK := 1 | (1 << 3) | (1 << 4) | (1 << 6) | (1 << 9)
 const PROMPT_REFRESH := 0.1
+## Loot or a story socket inside a coarse collision box (a shelf, a tent, an ore car, a crate) stops the ray on the
+## box: look for an interactable just behind the point it hit (items 4 + interact 5 layers).
+const ASSIST_RADIUS := 0.3
+const ASSIST_MASK := (1 << 3) | (1 << 4)
 
 var player: Node = null
 ## The resolved interactable node (or null).
@@ -25,6 +29,7 @@ var _last_collider: Object = null
 var _shown_prompt := ""
 var _shown_hold := 0.0
 var _holding := false
+var _assist_q: PhysicsShapeQueryParameters3D = null
 
 
 func _ready() -> void:
@@ -50,6 +55,11 @@ func tick(delta: float, input_enabled: bool) -> void:
 	_refresh -= delta
 	if _refresh <= 0.0:
 		_refresh = PROMPT_REFRESH
+		if col != null and _resolve(col) == null:
+			var a := _assist()
+			if a != target:
+				target = a
+				_cancel_hold()
 		_update_prompt()
 	var can := active and input_enabled and not suppressed and target != null and prompt != ""
 	_show(prompt if can else "", hold_time if can else 0.0)
@@ -123,6 +133,32 @@ func _show(text: String, hold: float) -> void:
 func clear() -> void:
 	_cancel_hold()
 	_show("", 0.0)
+
+
+func _assist() -> Node:
+	if not is_inside_tree() or not is_colliding():
+		return null
+	if _assist_q == null:
+		var sh := SphereShape3D.new()
+		sh.radius = ASSIST_RADIUS
+		_assist_q = PhysicsShapeQueryParameters3D.new()
+		_assist_q.shape = sh
+		_assist_q.collision_mask = ASSIST_MASK
+		_assist_q.collide_with_areas = true
+	var dir := (global_transform.basis * target_position).normalized()
+	var at := get_collision_point() + dir * ASSIST_RADIUS * 0.8
+	_assist_q.transform = Transform3D(Basis(), at)
+	var best: Node = null
+	var bd := INF
+	for h in get_world_3d().direct_space_state.intersect_shape(_assist_q, 8):
+		var n := _resolve(h.get("collider"))
+		if n == null or not (n is Node3D) or String(n.get_interact_prompt(player)) == "":
+			continue
+		var d := (n as Node3D).global_position.distance_squared_to(at)
+		if d < bd:
+			bd = d
+			best = n
+	return best
 
 
 static func _resolve(col: Object) -> Node:

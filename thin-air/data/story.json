@@ -487,7 +487,7 @@
   {
    "id": "make_crampons",
    "act": 4,
-   "text": "Make crampons at a workbench from Owen's pattern (scrap steel, rope, hide)",
+   "text": "Make crampons at a workbench (Build menu): 4 scrap steel, 2 rope, 1 cured hide, Owen's hammer",
    "requires": [
     "take_gear"
    ],
@@ -497,7 +497,7 @@
    },
    "hint": {
     "voice": "hint_scanner",
-    "text": "Owen left scrap steel and rope in the depot. A workbench needs logs; cured hide comes from a hunt or the trapper's cabin.",
+    "text": "Build a workbench (2 logs, 6 sticks, 2 rope). The bench and the crampons each take two rope: twist more from willow fibre or inner bark. Owen's hammer lies in the powder store; the depot has the steel and a cured hide.",
     "after": 900
    }
   },
@@ -714,7 +714,7 @@
   {
    "id": "summit",
    "act": 6,
-   "text": "Climb the east ridge to the summit relay",
+   "text": "Climb the ridge east of the station to the summit relay (O2 mask on)",
    "poi": "summit",
    "requires": [
     "relay_parts",
@@ -761,7 +761,7 @@
    "autosave": true,
    "hint": {
     "voice": "hint_oxygen",
-    "text": "Wear the oxygen mask and carry the charged cylinders. The route follows the east ridge.",
+    "text": "Wear the oxygen mask and carry the charged cylinders. The route leaves the station eastward and follows the ridge crest up to the summit.",
     "after": 900
    }
   },
@@ -1564,6 +1564,7 @@
   },
   "summit_relay/Spot_HaleBody": {
    "prompt": "Kneel by Elias Hale",
+   "logs": ["hale_notebook", "log_hale_03"],
    "hold": 1.0,
    "size": [
     1.6,

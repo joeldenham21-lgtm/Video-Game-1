@@ -12,6 +12,7 @@ func run() -> void:
 	await get_tree().physics_frame
 	await _api(course)
 	_viewmodel_long_frames(course.player)
+	await _interact_assist(course)
 	await course.run_trials(self)
 	var p := course.player
 	print("PERF player _physics_process avg=%.3f ms peak=%.3f ms" % [p.perf_physics_us / 1000.0, p.perf_physics_peak_us / 1000.0])
@@ -61,6 +62,38 @@ static func _clothing(id: StringName, key: String) -> float:
 	return float((ItemDB.get_item(id).get("clothing", {}) as Dictionary).get(key, 0.0))
 
 
+## Loot sitting inside a coarse collision box (a shelf, a tent) must still be pickable: the interaction ray stops
+## on the box, the interactor looks just behind the hit point.
+func _interact_assist(course: PlayerTestCourse) -> void:
+	var p := course.player
+	var home := p.global_position
+	p.teleport(Vector3(-30.0, PlayerTestCourse.Y0 + 0.05, 30.0), 0.0)
+	p.set_look(0.0, 0.0)
+	await get_tree().physics_frame
+	var eye := p.get_eye_position()
+	var box := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(1.2, 0.9, 0.6)
+	cs.shape = bs
+	box.add_child(cs)
+	course.add_child(box)
+	box.global_position = eye + Vector3(0.0, -0.1, -1.6)
+	var pk := (load("res://scenes/items/pickup.tscn") as PackedScene).instantiate() as ItemPickup
+	pk.item_id = &"wool_hat"
+	pk.freeze = true
+	course.add_child(pk)
+	pk.global_position = box.global_position + Vector3(0.0, 0.1, 0.1)
+	for _i in 12:
+		await get_tree().physics_frame
+	check(p.interactor.target == pk, "loot inside a shelf's collision box can still be targeted (%s)" % str(p.interactor.target))
+	check(p.interactor.prompt != "", "…and shows its pickup prompt")
+	box.queue_free()
+	pk.queue_free()
+	p.teleport(home, 0.0)
+	await get_tree().physics_frame
+
+
 func _api(course: PlayerTestCourse) -> void:
 	var p := course.player
 	check(p is CharacterBody3D and p.get_script().get_global_name() == &"Player", "Player is a CharacterBody3D with class_name Player")
@@ -102,6 +135,14 @@ func _api(course: PlayerTestCourse) -> void:
 	check(p.get_active_item() == &"", "selecting the active slot again empties the hands")
 	# Persistence roundtrip.
 	p.equip(&"knife")
+	# A long frame (load / shader-compile hitch) must not blow the viewmodel springs up to inf/NaN.
+	var vm := p.viewmodel
+	vm.call(&"land", 12.0)
+	for _i in 6:
+		vm.call(&"_process", 0.45)
+	var sx: Transform3D = (vm.get(&"sway_node") as Node3D).transform
+	check(sx.origin.is_finite() and sx.origin.length() < 0.5 and sx.basis.x.is_finite() and sx.basis.y.is_finite(),
+		"viewmodel springs stay stable through 0.45 s frames (%s)" % str(sx.origin))
 	p.vitals.food = 42.0
 	p.vitals.add_effect(&"wet", 100.0, 0.5)
 	p.teleport(Vector3(3.0, PlayerTestCourse.Y0 + 0.05, -1.0), 37.0)

@@ -369,6 +369,10 @@ func _test_playthrough() -> void:
 	check(all_done, "every objective was completed on the way")
 	check(acts_seen.size() >= 6, "acts 1-6 were played (%s)" % [acts_seen.keys()])
 	check(Story.found_logs.has(&"log_voss_03") and Story.found_logs.has(&"log_voss_04"), "Mara hands over her recordings")
+	# Hale's notebook and dictaphone lie inside the "Kneel by Elias Hale" box (the ray can't reach the props):
+	# using his body hands them over
+	Story.use_socket(&"summit_relay", &"Spot_HaleBody", pl)
+	check(Story.found_logs.has(&"log_hale_03") and Story.found_logs.has(&"hale_notebook"), "kneeling by Hale finds his last log and notebook")
 	check(bool(Game.get_flag(&"generator_running", false)) and bool(Game.get_flag(&"relay_repaired", false)), "generator restarted and relay repaired")
 	check(bool(Game.get_flag(&"has_radio", false)) and Story.beats_done.has("wreck_beacon"), "radio beats fired")
 	var s := Story.save_state()

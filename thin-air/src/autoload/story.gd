@@ -348,6 +348,9 @@ func use_socket(site: StringName, socket: StringName, player: Node = null) -> Di
 	if first or bool(u.get("repeat_give", false)):
 		for id in give:
 			_give(StringName(id), int(give[id]))
+	# logs lying inside the interactable (Hale's notebook in his lap, his dictaphone): found when it is used
+	for l in u.get("logs", []):
+		find_log(StringName(l))
 	if u.has("flag"):
 		_set_flag(StringName(u["flag"]))
 	if u.has("blueprint_flag"):
