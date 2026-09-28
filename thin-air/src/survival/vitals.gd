@@ -129,11 +129,23 @@ func _ready() -> void:
 		difficulty = Game.difficulty
 	if not Events.settings_changed.is_connected(_on_settings_changed):
 		Events.settings_changed.connect(_on_settings_changed)
+	if not Events.game_loaded.is_connected(_on_game_loaded):
+		Events.game_loaded.connect(_on_game_loaded)
 
 
+## A running game keeps the difficulty it was started with (Game.difficulty); the settings value (the main
+## menu's last pick) only applies to dev scenes without a world. Changing any setting from the pause menu used
+## to swap a continued Explorer game onto the menu's last choice.
 func _on_settings_changed() -> void:
-	if Game.state != Game.State.PLAYING:
+	if Game.world == null and Game.state != Game.State.PLAYING:
 		difficulty = StringName(Settings.get_value(&"difficulty", difficulty))
+
+
+## Save.load_game restores Game.difficulty after this node's _ready read it (a fresh launch still has the
+## default), so a continued Whiteout/Explorer game ran on Survivor rates until now.
+func _on_game_loaded(_slot: int) -> void:
+	if Game.difficulty != &"":
+		difficulty = Game.difficulty
 
 
 func _physics_process(delta: float) -> void:

@@ -42,6 +42,7 @@ func run() -> void:
 	await _test_harvest_tree(veg)
 	_test_small_harvest(veg)
 	await _test_persistence(veg)
+	await _test_floor_loot(veg)
 	veg.queue_free()
 	await get_tree().process_frame
 
@@ -573,3 +574,46 @@ func _test_persistence(veg: Node) -> void:
 	veg2.queue_free()
 	cam2.queue_free()
 	await get_tree().process_frame
+
+
+## Forest-floor sticks/stones keep streaming after one was picked up (a freed pickup in the active map used to
+## abort VegLoot._process with a script error, so nothing spawned anywhere for the rest of the session).
+func _test_floor_loot(veg: Node) -> void:
+	var loot: Node = veg.get_node_or_null(^"Loot")
+	check(loot != null, "Vegetation has its forest-floor Loot child")
+	if loot == null or not loot.is_processing():
+		return
+	var c := _find_forest_center(veg)
+	loot.set("center_override", c)
+	await get_tree().process_frame
+	var active: Dictionary = loot.get("_active")
+	check(not active.is_empty(), "sticks/stones spawned around the forest centre (%d)" % active.size())
+	if active.is_empty():
+		return
+	var first: Node = active.values()[0]
+	first.free()                    # picked up: ItemPickup frees itself
+	var moved := c + Vector3(40.0, 0.0, 30.0)
+	moved.y = terrain.get_height(moved.x, moved.z)
+	loot.set("center_override", moved)
+	await get_tree().process_frame
+	active = loot.get("_active")
+	var near := 0
+	var stale := 0
+	for k in active:
+		var v: Variant = active[k]
+		if not is_instance_valid(v):
+			stale += 1
+		elif (v as Node3D).global_position.distance_to(moved) <= 30.0:
+			near += 1
+	var want := 0
+	var ctx: VegScatter.Context = veg.get("ctx")
+	var c0 := VegScatter.cell_of(moved.x - 28.0, moved.z - 28.0)
+	var c1 := VegScatter.cell_of(moved.x + 28.0, moved.z + 28.0)
+	for cz in range(c0.y, c1.y + 1):
+		for cx in range(c0.x, c1.x + 1):
+			for sp in loot.cell_spots(ctx, cx, cz):
+				var p: Vector3 = sp[2]
+				if Vector2(p.x - moved.x, p.z - moved.z).length() <= 28.0:
+					want += 1
+	check(stale == 0 and near == want, "after a pickup, loot keeps streaming around the player (%d/%d spawned, %d stale)" % [near, want, stale])
+	loot.set("center_override", null)

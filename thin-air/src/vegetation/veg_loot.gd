@@ -85,11 +85,13 @@ func _process(_delta: float) -> void:
 				if Vector2(p.x - c.x, p.z - c.z).length() <= RANGE:
 					want[s[0]] = s
 	for key in _active.keys():
-		var node: Node = _active[key]
-		if not is_instance_valid(node) or node.is_queued_for_deletion():
+		# Variant, not Node: a picked-up stick is already freed, and assigning a freed instance to a typed
+		# variable is a script error that aborted this whole update (no more sticks/stones spawned anywhere).
+		var node: Variant = _active[key]
+		if not is_instance_valid(node) or (node as Node).is_queued_for_deletion():
 			_active.erase(key)          # picked up (ItemsRoot remembers the key)
 		elif not want.has(key):
-			node.queue_free()
+			(node as Node).queue_free()
 			_active.erase(key)
 	for key in want:
 		if _active.has(key) or _collected(key):

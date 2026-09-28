@@ -41,7 +41,7 @@
    "Loot_EmergencyBlanket": [{"item": "emergency_blanket"}],
    "Loot_Hatchet": [{"item": "hatchet"}],
    "Loot_Scanner": [{"item": "survey_scanner"}],
-   "Loot_Cargo_1": [{"item": "matches"}, {"table": "wreck_cargo", "rolls": 1}],
+   "Loot_Cargo_1": [{"item": "matches", "count": 10}, {"table": "wreck_cargo", "rolls": 1}],
    "Loot_Cargo_2": [{"table": "wreck_cargo", "rolls": 2}],
    "Loot_Backpack": [{"item": "backpack_torn"}],
    "Loot_Crate_Trail": [{"table": "wreck_cargo", "rolls": 2}]

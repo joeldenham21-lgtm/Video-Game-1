@@ -101,6 +101,8 @@ func is_playing() -> bool:
 
 
 func new_game() -> void:
+	if state == State.LOADING:
+		return      # already loading (a double-pressed button): a second scene change would kill the first build
 	is_new_game = true
 	flags.clear()
 	playtime = 0.0
@@ -110,6 +112,14 @@ func new_game() -> void:
 
 
 func continue_game(slot := 0) -> void:
+	if state == State.LOADING:
+		return
+	if not Save.is_readable(slot):
+		# a missing/corrupt save starts a fresh game (difficulty, flags and playtime reset before the world
+		# builds, so nothing from the session in memory leaks into it)
+		push_warning("Game: save %d unreadable, starting a new game" % slot)
+		new_game()
+		return
 	is_new_game = false
 	_pending_load_slot = slot
 	_load_world()
@@ -117,6 +127,7 @@ func continue_game(slot := 0) -> void:
 
 func quit_to_menu() -> void:
 	get_tree().paused = false
+	_stop_world_audio()
 	player = null
 	world = null
 	_set_state(State.MENU)
@@ -175,6 +186,8 @@ func on_world_built() -> void:
 		if not ok:
 			push_warning("Game: load failed, starting fresh")
 			is_new_game = true
+			flags.clear()
+			playtime = 0.0
 	_set_state(State.PLAYING)
 	world_ready.emit()
 	Events.game_started.emit(is_new_game)
@@ -207,8 +220,16 @@ func _boot_quit() -> void:
 	get_tree().quit(0 if n_err + n_script == 0 else 1)
 
 
+## The voice (radio lines, crew recordings, the prologue) lives on the Audio autoload, not in the world: stop
+## it when the world is torn down, or a recording kept playing over the main menu / into the reloaded world.
+func _stop_world_audio() -> void:
+	if Audio.has_method(&"stop_voice"):
+		Audio.stop_voice()
+
+
 func _load_world() -> void:
 	get_tree().paused = false
+	_stop_world_audio()
 	_build_t0 = Time.get_ticks_usec()
 	loading_progress = 0.0
 	loading_stage = ""

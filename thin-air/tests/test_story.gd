@@ -216,6 +216,14 @@ func _test_loot() -> void:
 					bad.append(String(e["item"]))
 				fixed[String(e["item"])] = true
 	check(missing.is_empty(), "loot sockets exist in their location scenes %s" % [missing])
+	# the first fire: a match is spent per strike and fails ~25-60% of the time in the dusk wind, and there is
+	# no other igniter before Act 2 — a single match from the cargo hold soft-locked 'Get warm' on a miss
+	var matches := 0
+	for socket: String in LT.site_sockets(&"crash_site"):
+		for e in LT.roll(&"crash_site", socket):
+			if e["item"] == &"matches":
+				matches += int(e["count"])
+	check(matches >= 8, "the wreck holds a box of matches, not one (%d)" % matches)
 	check(bad.is_empty() and not dupkey, "loot rolls are deterministic with unique persist ids")
 	var q: Array[String] = []
 	for id in ["first_aid_kit", "flare_gun", "survival_manual", "emergency_blanket", "hatchet", "backpack_torn", "survey_scanner",
@@ -278,6 +286,14 @@ func _test_structures() -> void:
 		n_log_sockets += (sites[id] as PoiSite).get_sockets("Log_").size()
 	var logs := get_tree().get_nodes_in_group(&"story_log")
 	check(logs.size() == n_log_sockets and n_log_sockets >= 20, "a readable log at every Log_ socket (%d/%d)" % [logs.size(), n_log_sockets])
+	# nothing the player must pick up or read is buried under the heightfield (the Otter's nose is in the snow:
+	# the flare gun and Dale's logbook sockets sit a few cm below the pad, so the interaction ray hit terrain)
+	var buried: Array[String] = []
+	for n in Array(st.call(&"loot_nodes")) + logs:
+		var g: Vector3 = (n as Node3D).global_position
+		if g.y > Story.INTERIOR_MAX_Y and g.y < TerrainData.get_height(g.x, g.z) + 0.02:
+			buried.append("%s %.2f m under" % [n.name, TerrainData.get_height(g.x, g.z) - g.y])
+	check(buried.is_empty(), "no story loot or log under the terrain %s" % str(buried))
 	var uses := get_tree().get_nodes_in_group(&"story_use")
 	check(uses.size() == Story.graph.uses.size(), "every story interactable is placed (%d/%d)" % [uses.size(), Story.graph.uses.size()])
 	var scans := 0

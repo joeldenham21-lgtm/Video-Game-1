@@ -157,7 +157,13 @@ func _ready() -> void:
 			_other_screens[sc] = true)
 	Events.ui_screen_closed.connect(func(sc: StringName) -> void: _other_screens.erase(sc))
 	Events.game_loaded.connect(_on_game_loaded)
+	Events.player_died.connect(_on_player_died)
 	_layout()
+
+
+## Dying with the pack open: get out of the way of the death screen (and don't re-capture the mouse on it).
+func _on_player_died(_cause: StringName) -> void:
+	close()
 
 
 # =============================================================================================== open / close
@@ -219,7 +225,8 @@ func close() -> void:
 	station_node = null
 	Audio.play_ui(&"inventory_close")
 	Events.ui_screen_closed.emit(SCREEN)
-	if _prev_mouse_mode == Input.MOUSE_MODE_CAPTURED and not Settings.is_mobile():
+	# only back into mouse-look while actually playing (not on the death screen / in a cinematic)
+	if _prev_mouse_mode == Input.MOUSE_MODE_CAPTURED and not Settings.is_mobile() and Game.state == Game.State.PLAYING:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_animate_out()
 

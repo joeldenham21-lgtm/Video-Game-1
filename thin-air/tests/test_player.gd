@@ -11,6 +11,7 @@ func run() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	await _api(course)
+	_viewmodel_long_frames(course.player)
 	await course.run_trials(self)
 	var p := course.player
 	print("PERF player _physics_process avg=%.3f ms peak=%.3f ms" % [p.perf_physics_us / 1000.0, p.perf_physics_peak_us / 1000.0])
@@ -129,3 +130,25 @@ func _api(course: PlayerTestCourse) -> void:
 	p.respawn(Vector3(0.0, PlayerTestCourse.Y0 + 0.05, 0.0))
 	check(not p.is_dead() and p.vitals.health == 100.0, "respawn restores the player")
 	await get_tree().physics_frame
+
+
+
+## Long frames (a loading hitch, heavy throttling: < 8 fps) must not blow the viewmodel's spring sway up to
+## inf/NaN (the hands vanished for the session and "!v.is_finite()" spammed every frame).
+func _viewmodel_long_frames(p: Player) -> void:
+	var vm: Node = p.viewmodel
+	if vm == null or not vm.has_method(&"_update_motion"):
+		return
+	vm.set(&"_sway_vel", Vector2(40.0, -30.0))
+	vm.set(&"_land_vel", 0.5)
+	vm.set(&"_kick_vel", Vector3(20.0, 5.0, 0.0))
+	for i in 60:
+		p.look_delta = Vector2(9.0, -6.0) if i % 2 == 0 else Vector2(-9.0, 6.0)
+		vm.call(&"_update_motion", 0.3)
+	p.look_delta = Vector2.ZERO
+	var sw: Node3D = vm.get(&"sway_node")
+	var ok := sw.position.is_finite() and sw.rotation_degrees.is_finite() and absf(float(vm.get(&"_land"))) < 1.0 \
+		and (vm.get(&"_kick") as Vector3).length() < 90.0
+	check(ok, "viewmodel springs stay finite through 60 frames of 0.3 s (%s %s)" % [sw.position, sw.rotation_degrees])
+	for i in 120:
+		vm.call(&"_update_motion", 1.0 / 60.0)

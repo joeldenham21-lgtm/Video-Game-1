@@ -19,6 +19,7 @@ extends Node3D
 ## set_relay_online, spawn_helicopter, apply_story_state, loot_nodes.
 
 const INTERIOR_Y := 800.0
+const INTERIOR_MAX_Y := 1100.0
 const PICKUP_SCENE := "res://scenes/items/pickup.tscn"
 const FABRICATOR_SCENE := "res://scenes/items/fabricator.tscn"
 const HEAT_SCRIPT := "res://scenes/poi/poi_heat.gd"
@@ -102,6 +103,11 @@ func _ready() -> void:
 			Story.story_event.connect(_on_story_event)
 		Events.game_loaded.connect(func(_s: int) -> void: apply_story_state.call_deferred())
 		apply_story_state.call_deferred()
+		# colliders are only live once the world is enabled (the progressive build keeps it disabled)
+		if Game.state == Game.State.LOADING:
+			Game.world_ready.connect(_settle_loot, CONNECT_ONE_SHOT)
+		else:
+			_settle_loot.call_deferred()
 
 
 func get_site(id: StringName) -> Node3D:
@@ -201,9 +207,32 @@ func _spawn_loot(e: Dictionary, parent: Node3D) -> ItemPickup:
 	p.name = String(e["persist_id"]).replace(":", "_")
 	var xf: Transform3D = e["xf"]
 	parent.add_child(p)
-	p.global_transform = Transform3D(xf.basis.orthonormalized(), xf * (e["offset"] as Vector3))
+	p.global_transform = Transform3D(xf.basis.orthonormalized(), above_ground(xf * (e["offset"] as Vector3)))
 	_loot_nodes.append(p)
 	return p
+
+
+## Rolled loot is spread around its socket, which can push it into a tilted crate lid beside it (the wreck's
+## second cargo crate swallowed a ration bar: visible, never pickable). Once the colliders are live, lift each
+## placed pickup onto the support just above its origin (at most 12 cm, so nothing hops onto a shelf).
+func _settle_loot() -> void:
+	if not is_inside_tree():
+		return
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	if not is_inside_tree():
+		return
+	var space := get_world_3d().direct_space_state
+	for n in _loot_nodes:
+		if not is_instance_valid(n) or (n as Node).is_queued_for_deletion():
+			continue
+		var p := n as ItemPickup
+		var o := p.global_position
+		var q := PhysicsRayQueryParameters3D.create(o + Vector3.UP * 0.12, o + Vector3.DOWN * 0.02, 1 | (1 << 6))
+		q.exclude = [p.get_rid()]
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty() and (hit["position"] as Vector3).y > o.y + 0.005:
+			p.global_position = Vector3(o.x, (hit["position"] as Vector3).y + 0.005, o.z)
 
 
 func loot_nodes() -> Array[Node]:
@@ -236,7 +265,18 @@ func _place_logs(_id: StringName, site: Node3D) -> void:
 		var n := LOG_SCRIPT.new() as StaticBody3D
 		n.call(&"setup", lid, Story.get_log(lid))
 		site.add_child(n)
-		n.global_transform = (m as Node3D).global_transform
+		var mx := (m as Node3D).global_transform
+		n.global_transform = Transform3D(mx.basis, above_ground(mx.origin))
+
+
+## Story pickups and logs must never sit under the heightfield: the Otter's nose is buried in the snow, so
+## sockets authored on its cockpit floor (flare gun, Dale's logbook) end up a few cm below the flattened pad
+## and the interaction ray hits the terrain instead. Lift them onto the ground. Interiors (deep below the
+## map, y < INTERIOR_MAX_Y) are left alone.
+static func above_ground(p: Vector3, margin := 0.05) -> Vector3:
+	if p.y < INTERIOR_MAX_Y or not TerrainData.is_loaded():
+		return p
+	return Vector3(p.x, maxf(p.y, TerrainData.get_height(p.x, p.z) + margin), p.z)
 
 
 func _place_uses(id: StringName, site: Node3D) -> void:
