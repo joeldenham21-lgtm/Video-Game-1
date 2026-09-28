@@ -30,6 +30,7 @@ int chN = 0; vec3 chPos[6]; float chYaw[6]; int chKind[6]; vec4 chPose[6]; float
 float podFall = -1.; float newStars = 0.; float pillar = 0.; vec3 pillarPos = vec3(0);
 float rain = 0.; float boltT = -1.; vec3 boltTop, boltBot; float hit = 0.; float starRibbon = 0.;
 vec3 podStart, podEnd;
+float hideRoot = 0.;
 
 mat3 basisZ(vec3 fwd, vec3 up){ vec3 z = normalize(fwd); vec3 x = normalize(cross(up, z)); return mat3(x, cross(z, x), z); }
 
@@ -144,21 +145,21 @@ void setup(float t){
   }
   if (V == 7){ // S22: face to face
     chN = 2;
-    chKind[0] = 0; chPos[0] = vec3(-1.05, -.12, -22.); chYaw[0] = -1.5708; chPose[0] = vec4(0, 0, .42, 0);
-    chKind[1] = 1; chPos[1] = vec3(1.05, -.12, -22.); chYaw[1] = 1.5708; chPose[1] = vec4(0, 0, -.28 + .05*sin(t*.5), 0);
-    camPos = vec3(-.2 + .3*u, 1.5, -15.2 + .6*u); camTar = vec3(0, 1.75, -22.); camFov = 1.75;
+    chKind[0] = 0; chPos[0] = vec3(-1.05, -.12, -22.); chYaw[0] = 1.5708; chPose[0] = vec4(0, 0, .42, 0);
+    chKind[1] = 1; chPos[1] = vec3(1.05, -.12, -22.); chYaw[1] = -1.5708; chPose[1] = vec4(0, 0, -.28 + .05*sin(t*.5), 0);
+    camPos = vec3(-.2 + .3*u, 1.55, -17. - .5*u); camTar = vec3(0, 1.8, -22.); camFov = 1.75;
   }
   if (V == 8){ // S24: walking beneath the roots
     chN = 2;
     float x = -7. + 13.*u;
-    chKind[0] = 0; chPos[0] = vec3(x, -.12, -21.4); chYaw[0] = -1.5708; chPose[0] = vec4(t*4.6, 1., .25, 0);
-    chKind[1] = 1; chPos[1] = vec3(x + 1.3, -.12, -22.3); chYaw[1] = -1.5708; chPose[1] = vec4(t*3.4 + 1., 1., -.1, 0);
+    chKind[0] = 0; chPos[0] = vec3(x, -.12, -21.4); chYaw[0] = 1.5708; chPose[0] = vec4(t*4.6, 1., .25, 0);
+    chKind[1] = 1; chPos[1] = vec3(x + 1.3, -.12, -22.3); chYaw[1] = 1.5708; chPose[1] = vec4(t*3.4 + 1., 1., -.1, 0);
     camPos = vec3(x - 1.5, 1.6, -13.5); camTar = vec3(x + .6, 1.9, -22.); camFov = 1.7;
   }
   if (V == 9){ // S25: looking out over the living sea
     chN = 2;
-    chKind[0] = 0; chPos[0] = vec3(-.55, -.12, -24.); chYaw[0] = 0.; chPose[0] = vec4(0, 0, .12, 0);
-    chKind[1] = 1; chPos[1] = vec3(.75, -.12, -24.4); chYaw[1] = 0.; chPose[1] = vec4(0, 0, -.05, 0);
+    chKind[0] = 0; chPos[0] = vec3(-.55, -.12, -24.); chYaw[0] = 3.14159; chPose[0] = vec4(0, 0, .12, 0);
+    chKind[1] = 1; chPos[1] = vec3(.75, -.12, -24.4); chYaw[1] = 3.14159; chPose[1] = vec4(0, 0, -.05, 0);
     camPos = vec3(.2 - .4*u, 1.3, -17.5 - .8*u); camTar = vec3(.1, 2.6, -80.); camFov = 1.7;
   }
   if (V == 10){ // S32: the sky burns; the Aurai sing
@@ -204,21 +205,61 @@ void setup(float t){
     }
     camPos = vec3(8., 2.2, -8.) + shake(t, .05 + .15*go); camTar = mix(vec3(0, 6., -40.), fPos, .6*smoothstep(5., 9., t)); camFov = 1.5;
   }
-  if (V == 12){ // S43: dawn; the returned stars; something falls
+  if (V == 12){ // S43: dawn; the returned stars; Nim sees it first
     sunDir = normalize(vec3(.4, .03 + .05*u, -1.)); sunCol = vec3(1., .7, .45); sunI = .9;
     skyTop = vec3(.05, .08, .22); skyHor = vec3(.95, .6, .45);
     night = .45; newStars = 1.; bio = .6; treeGlow = .7;
     fogD = .0006; fogCol = vec3(.5, .45, .5);
     ggDir = normalize(vec3(-.55, .25, -1.)); ggSize = .18;
     rootsOn = 1.; rootOrigin = vec3(0);
-    chN = 1; chKind[0] = 1; chPos[0] = vec3(.8, -.12, -24.); chYaw[0] = 0.;
-    chPose[0] = vec4(0, 0, .2 - .12*smoothstep(14., 17., t), 0);
-    chYaw[0] = .45*smoothstep(15., 17.5, t);
-    podFall = remap(t, 10., 15.);
+    chN = 2;
+    chKind[0] = 1; chPos[0] = vec3(.8, -.12, -24.);
+    chYaw[0] = 3.14159 - .9*smoothstep(19.8, 22., t);
+    chPose[0] = vec4(0, 0, .18 - .12*smoothstep(19.5, 21.5, t), 0);
+    chKind[1] = 2; chPos[1] = vec3(-.45, -.12, -23.5);
+    chYaw[1] = 3.14159 + .25*smoothstep(13., 14., t);
+    chPose[1] = vec4(0, 0, .55*smoothstep(12.8, 13.6, t), .85*smoothstep(13.3, 13.9, t)*(1. - smoothstep(18.5, 19.5, t)));
+    chGlow[1] = 1. + .8*smoothstep(19.8, 20.3, t)*(1. - smoothstep(21.5, 23., t));
+    podFall = remap(t, 13., 18.);
     podStart = vec3(420., 700., -2400.); podEnd = vec3(-150., 0., -900.);
-    splash = t > 15. ? t - 15. : -1.; splashPos = podEnd;
+    splash = t > 18. ? t - 18. : -1.; splashPos = podEnd;
     camPos = vec3(2.6 - .8*u, 1.4, -15. - 3.5*u); camTar = vec3(-.4, 3.5, -80.); camFov = 1.7;
   }
+  if (V >= 13 && V <= 14){
+    sunI = 0.; night = 1.; bio = 1.; cloudSea = 0.; treeGlow = 1.;
+    skyTop = vec3(.005, .01, .03); skyHor = vec3(.02, .05, .09);
+    fogD = .0012; fogCol = vec3(.02, .08, .11);
+    ggDir = normalize(vec3(.3, .32, -1.)); ggSize = .16;
+    rootsOn = 1.; rootOrigin = vec3(0);
+    wreckOn = 1.; wreckPos = vec3(-7.5, .6, -22.); wreckRot = basisZ(vec3(.6, -.25, -1.), vec3(.4, 1, .1)); fScale = 12.; fSmoke = 1.;
+    sporeAmt = 1.;
+  }
+  if (V == 13){ // H3: Ilune hums the song Asha's father taught her
+    chN = 2;
+    chKind[0] = 0; chPos[0] = vec3(.95, -.12, -21.);
+    chYaw[0] = -1.5708 + .9*smoothstep(7.4, 9.0, t)*(1. - smoothstep(15.5, 17.5, t));
+    chPose[0] = vec4(0, 0, .3 - .3*smoothstep(7.4, 9., t) + .3*smoothstep(15.5, 17., t), 0);
+    chKind[1] = 1; chPos[1] = vec3(-.95, -.12, -21.3); chYaw[1] = 1.5708;
+    chPose[1] = vec4(0, 0, -.2 + .5*smoothstep(9.5, 11., t)*(1. - smoothstep(14.5, 16., t)), 0);
+    chGlow[1] = 1. + .9*smoothstep(.6, 1.5, t)*(1. - smoothstep(6.5, 8., t));
+    camPos = vec3(.3 + .1*u, 1.6, -17.6 - .9*u); camTar = vec3(0, 1.85, -21.2); camFov = 1.8;
+  }
+  if (V == 14){ // C1: something small peeks out
+    chN = 2;
+    vec2 F = normalize(vec2(-2.5, -6.1)), Rt = vec2(-F.y, F.x);
+    vec3 fw = vec3(F.x, 0, F.y), rt = vec3(Rt.x, 0, Rt.y);
+    rt = -rt;
+    chKind[0] = 0; chPos[0] = vec3(.9, -.12, -20.78);
+    float peek = smoothstep(.5, 1.3, t)*1.45 + smoothstep(3.3, 5.3, t)*1.2;
+    vec3 hide = vec3(-1.6, -.12, -24.5) + fw*1.3;
+    chKind[1] = 2; chPos[1] = hide + rt*peek;
+    chYaw[0] = atan(chPos[1].x - chPos[0].x, chPos[1].z - chPos[0].z); chPose[0] = vec4(0, 0, .04*sin(t*.7) - .1, 0);
+    chYaw[1] = atan(chPos[0].x - chPos[1].x, chPos[0].z - chPos[1].z);
+    chPose[1] = vec4(t*4.2, step(3.3, t)*(1. - smoothstep(5., 5.4, t)), .18*sin(t*1.6) + .1, .35*smoothstep(6.0, 6.6, t)*(1. - smoothstep(8., 8.8, t)));
+    chGlow[1] = .5 + .7*smoothstep(.4, 2., t);
+    hideRoot = 1.;
+    camPos = vec3(.9 + .08*u, 1.0, -18.4 - .5*u); camTar = vec3(-1.6, .75, -24.5); camFov = 1.75;
+}
 }
 
 // ---------------------------------------------------------------- sky
@@ -382,6 +423,13 @@ float roots(vec3 p){
     float arch = length(tt) - m*(1. + .25*sin(atan(lp.y, lp.x)*3. + fi));
     d = smin(d, arch, 2.);
   }
+  if (hideRoot > .5){
+    vec3 hq = q - vec3(-1.6, 0, -24.5);
+    hq.x += .25*sin(hq.y*.35);
+    float col = sdCapsule2(hq, vec3(0, -1.5, 0), vec3(.8, 16., -.6), 1.25, .55);
+    col = smin(col, sdCapsule2(hq, vec3(0, -1., 0), vec3(-1.6, -.3, .9), .7, .3), .6);
+    d = smin(d, col, .8);
+  }
   // bark relief
   d += .35*(vnoise(q*.4) - .5) + .12*(vnoise(q*1.6) - .5);
   return d;
@@ -400,6 +448,7 @@ float figure(vec3 p, int i){
   q.xz = rot(chYaw[i])*q.xz;
   float bs = length(q - vec3(0, 1.3, 0)) - 1.7;
   if (bs > .3) return bs;
+  if (chKind[i] == 2) return sdAurai(q/.5, chPose[i], float(i) + 7.)*.5;   // Nim, an Aurai child
   return chKind[i] == 0 ? sdAsha(q, chPose[i]) : sdAurai(q, chPose[i], float(i));
 }
 float mapW(vec3 p){
@@ -510,6 +559,7 @@ vec3 shadeSolid(vec3 p, vec3 rd, vec3 n, float m, float id, float t){
     int i = int(id);
     vec3 q = p - chPos[i];
     q.xz = rot(chYaw[i])*q.xz;
+    if (chKind[i] == 2) q /= .5;
     float part = gFigPart;
     vec3 alb = m == 4. ? vec3(.07, .07, .08) : vec3(.05, .06, .1);
     if (m == 4. && part > 2.5) alb = vec3(.08, .05, .03);
@@ -517,7 +567,7 @@ vec3 shadeSolid(vec3 p, vec3 rd, vec3 n, float m, float id, float t){
     col = alb*(dif*Lc*1.3 + amb*.6) + up*alb*6.;
     col += (m == 5. ? bioColor(.3) : vec3(.5, .6, .8))*fres*(.08 + .25*night);
     if (m == 5.) col += bioColor(fract(float(i)*.37))*auraiMarks(q, float(i))*1.4*chGlow[i]*(part < 2.5 || part > 2.9 ? 1. : .35);
-    if (m == 5. && part > 2.5) col += bioColor(.1)*smoothstep(-.1, -.4, q.y - 2.3)*2.*chGlow[i];
+    if (m == 5. && part > 2.5) col += bioColor(.1)*smoothstep(-.2, -.45, q.y - 2.3)*.5*chGlow[i];
   }
   return col;
 }

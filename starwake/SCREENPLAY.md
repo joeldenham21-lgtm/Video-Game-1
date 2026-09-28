@@ -1,22 +1,27 @@
 # STARWAKE
 
 *An original short film.*
-*Running time: 8 minutes 24 seconds · 2.39:1 · Stereo*
+*Running time: 10 minutes · 2.39:1 · Stereo*
+
+*Made in homage to Steven Spielberg's films. It has the wonder, the absent father, the child's eye, and the reaction before the reveal.*
 
 ---
 
-**LOGLINE** — A pilot of the empire that devours stars is sent to find its next meal: a young blue sun and the living ocean-moon that sings to it. What she finds there is the only thing that can undo her own world's death.
+**LOGLINE:** A pilot of the empire that devours stars is sent to find its next meal. She finds a living world that still remembers the song her father taught her the night her own sun was taken.
 
 ---
 
 ## CHARACTERS
 
-- **ILUNE** — an elder Singer of the Aurai, the luminous people of Veyra. Our narrator.
-- **COMMANDER ASHA VENN** — vanguard pilot of the Hollow Throne. Born on Kessar, a world whose sun the Throne consumed when she was seven.
-- **GRAND ADMIRAL VARRO KADE** — master of the Starmaw.
-- **LIEUTENANT JAX ORREN** — Asha's wingman and oldest friend.
-- **SABLE** — Asha's ship intelligence.
-- **HARVEST OFFICER** — a voice of the fleet.
+- **ILUNE** is an elder Singer of the Aurai, the luminous people of Veyra, and our narrator.
+- **COMMANDER ASHA VENN** is a vanguard pilot of the Hollow Throne. She was seven when the Throne took her world's sun.
+- **HER FATHER** is the man on the rooftop.
+- **NIM** is an Aurai child who can only say words it has heard.
+- **GRAND ADMIRAL VARRO KADE** is master of the Starmaw. He took Asha in after Kessar went dark.
+- **LIEUTENANT JAX ORREN** is Asha's wingman and oldest friend.
+- **SABLE** is Asha's ship intelligence.
+
+**THE STAR SONG** is four notes: F♯, A, E, D. A father hums them to his daughter. Everything in the film grows out of them.
 
 ---
 
@@ -26,50 +31,81 @@
 
 **EXT. DEEP SPACE — A SPIRAL GALAXY**
 
-Silence, then a low swell of strings. A galaxy turns in the dark, arms of blue light around a golden core.
+A galaxy turns in the dark. Far away, a French horn plays four notes.
 
 > **ILUNE (V.O.)**
 > Every star is a song.
 >
 > Some are sung for ten billion years. When the first lights woke, the dark was not empty. It was listening.
 
-**EXT. THE GALACTIC DISC — CONTINUOUS**
+**EXT. THE GALACTIC DISC**
 
-We skim low over the disc, through lanes of dust, toward the burning heart.
+We skim low over the disc, through lanes of dust.
 
 > **ILUNE (V.O.)**
 > Then came the Hollow Throne. It did not conquer worlds. It devoured the suns they turned around.
 
-**EXT. KESSAR'S SUN — THE STARMAW**
+**EXT. A RED GIANT — THE STARMAW**
 
-A red giant, its surface boiling. Beside it hangs **THE STARMAW** — a colossal ring of black iron, its maw an iris of blades, eight great talons reaching forward. A ribbon of plasma is being dragged out of the star and into the machine's burning core.
+**THE STARMAW** hangs beside a red giant: a colossal black ring with an iris of blades and eight talons. A ribbon of the star's fire is being dragged into its burning core.
 
-The Throne's motif, low brass in 5/4, grinds beneath it.
+**EXT. KESSAR — A ROOFTOP — DUSK**
 
-**CLOSE ON THE MAW** — plasma pouring into the core like a river into a drain.
+*Caption: KESSAR*
 
-**EXT. ORBIT OF KESSAR — LATER**
+An old city of stone towers and domes stretches away, its windows warm. The red giant fills half the sky. A thin thread of light rises from its edge, up into the sky, to a tiny black ring.
 
-The ringed world of Kessar in the foreground. Behind it, the star gutters, reddens, shrinks — and collapses. A last ember ring. Then nothing. Across Kessar, the oceans turn to ice.
+On a rooftop stand a man and a small girl in silhouette. **ASHA**, seven years old, stands on a step to see over the parapet.
+
+> **YOUNG ASHA**
+> Papa? Why is the sun getting thin?
+
+**CLOSER.** Her father stands beside her. The light is red on their edges.
+
+> **FATHER**
+> Someone's taking it, Ash.
+>
+> **YOUNG ASHA**
+> Will they give it back?
+>
+> **FATHER**
+> *(beat)*
+> Here. Hum with me. My mother told me, if you sing to a star, it remembers you.
+
+He hums four notes. After a moment she joins in, small and unsure. **The star song.**
+
+**THE SUN GOES OUT.**
+
+The thread thickens. The giant reddens, shrinks, and collapses: a flash, then nothing. Across the city the windows fail. Stars come out in a sky that should be day. It begins to snow.
+
+The child keeps humming, alone now.
+
+> **FATHER**
+> *(whisper)*
+> Keep singing.
+
+**EXT. ORBIT OF KESSAR**
+
+The world turns to ice.
 
 > **ILUNE (V.O.)**
 > One by one, the songs fell silent. And the cold spread between the stars.
 
-**EXT. THE GALAXY — WIDE**
+**EXT. THE GALAXY**
 
-Whole regions of the galaxy wink out, star by star, each with a small red flare.
+Whole regions of the galaxy wink out.
 
-A single point of light. It blooms, flares —
+A point of light blooms into a star:
 
-**TITLE: STARWAKE**
+**STARWAKE**
 
 ---
 
 ## ACT ONE — THE HOLLOW FLEET
 
-**EXT. DEAD KESSAR SYSTEM**
+*Caption: TWENTY YEARS LATER*
 
-Dagger-shaped warships drop out of warp one after another, lining up before the Starmaw.
+Warships drop out of warp before the Starmaw.
 
 > **HARVEST OFFICER (RADIO)**
 > Harvest of Kessar complete. Stellar yield, ninety eight percent. The Starmaw is fed.
@@ -77,16 +113,12 @@ Dagger-shaped warships drop out of warp one after another, lining up before the 
 > **KADE (RADIO)**
 > The Throne endures. Chart the next light.
 
-**EXT. ABOVE FROZEN KESSAR**
-
-A lone interceptor glides over the ice. Above it, the black disc of a dead sun.
+A lone interceptor passes over frozen Kessar. An oboe plays the star song, and it does not resolve.
 
 > **ASHA (V.O.)**
-> I was seven when they took our sun. I don't remember the fire. I remember the cold. And how quiet the sky became.
+> I was seven when they took our sun. My father told me to sing to it. So I sang. It never came back. Neither did he.
 
-**INT. ASHA'S COCKPIT**
-
-Frost creeps across the canopy. The HUD reads: KESSAR · STELLAR OUTPUT 0.00%.
+**INT. COCKPIT.** Frost creeps over the canopy.
 
 > **KADE (RADIO)**
 > Commander Venn.
@@ -96,9 +128,7 @@ Frost creeps across the canopy. The HUD reads: KESSAR · STELLAR OUTPUT 0.00%.
 >
 > **KADE (RADIO)**
 > Our scouts have found a young star in the Veil Reach. Blue. Unclaimed. And a world beside it that... glows.
-
-**EXT. SPACE — TRACKING WITH THE INTERCEPTOR**
-
+>
 > **ASHA**
 > Glows, sir?
 >
@@ -107,16 +137,12 @@ Frost creeps across the canopy. The HUD reads: KESSAR · STELLAR OUTPUT 0.00%.
 >
 > **ASHA**
 > Understood.
-
-**EXT. SPACE — THREE INTERCEPTORS IN FORMATION**
-
+>
 > **JAX (RADIO)**
 > Six hours to scout a whole star system. He must be feeling generous.
 >
 > **ASHA**
 > Stay on my wing, Jax. Jumping in three. Two.
-
-Engines flare white. The ships stretch into lines of light — and are gone.
 
 **WARP.**
 
@@ -124,68 +150,51 @@ Engines flare white. The ships stretch into lines of light — and are gone.
 
 ## ACT TWO — THE VEIL REACH
 
-**EXT. THE VEIL REACH**
+**INT. COCKPIT — EXTREME CLOSE ON ASHA'S VISOR**
 
-A flash — and a nebula of blue and violet fills the universe. A young blue star, **ESSARA**. And beside it **VEYRA**, an ocean-moon laced with rivers of living light.
+We see her face before we see what she sees. Blue-violet light washes over her. In the curve of her visor a world is reflected, laced with rivers of light.
 
 > **JAX (RADIO)**
 > Asha... are you seeing this?
->
+
+**EXT. THE VEIL REACH — THE REVEAL**
+
+A harp glissando, then choir. There is a nebula, a young blue star, **ESSARA**, and the ocean-moon **VEYRA**, glowing.
+
 > **ASHA**
 > I'm seeing it.
 
-**EXT. VEYRA — THE NIGHT SIDE**
-
-The rivers of light pulse like a heartbeat.
-
-> **ASHA**
-> Sable. Scan the surface.
->
-> **SABLE**
-> The biosphere is storing stellar energy. Estimated reserve: eleven thousand years of starlight.
->
-> **JAX (RADIO)**
-> Kade is going to love this place.
->
-> **ASHA**
-> Yeah.
-
-**EXT. VEYRA — HIGH ATMOSPHERE**
-
-> **ASHA**
-> Taking her down. I want to see it with my own eyes.
-
-Her interceptor dives, wrapped in fire.
+*(Sable reports that the biosphere is storing starlight: eleven thousand years of it. Jax jokes that Kade is going to love this place. Asha says nothing, then only: "Yeah." She takes her ship down.)*
 
 **EXT. ABOVE THE CLOUD SEA — DUSK**
 
-A sea of cloud to the horizon, gold on top and violet beneath. Rising out of it are the **LANTERNTREES**: colossal trees three kilometres tall, their canopies hung with glowing lanterns. A ringed gas giant fills the sky. The main theme swells in full orchestra.
+Lanterntrees three kilometres tall rise out of a sea of gold cloud, and a ringed gas giant fills the sky. The main theme plays in full for the first time: the star song, a heroic leap, then the star song home.
 
 **EXT. THE STORM**
 
-Lightning walks between the trees. A bolt strikes the interceptor.
-
-> **SABLE**
-> Warning. Electromagnetic surge. Primary systems failing.
->
-> **ASHA**
-> Jax, I'm hit! I'm going down!
->
-> **JAX (RADIO)**
-> Asha! Pull up! Pull up!
-
-**EXT. THE GLOWING SEA — NIGHT**
-
-The interceptor falls out of the storm and hits the sea. Silence.
+Lightning strikes her ship. It falls into the glowing sea.
 
 **EXT. THE ROOT CATHEDRAL — NIGHT**
 
-Shallow water glows wherever it is touched. Root arches the size of cathedrals rise overhead. Spores drift upward like lanterns. The wreck smokes. Asha stands alone in the water.
+Asha stands alone in water that glows where she touches it.
 
 > **ASHA**
 > Hello?
 
-Among the roots, lights begin to wake: tall figures, their bodies traced with living light. **The Aurai.** One walks toward her. **ILUNE.**
+Behind a hanging root, a small light peeks out. It is **NIM**, an Aurai child. It answers in *her* voice:
+
+> **NIM**
+> Hello?
+
+Asha almost laughs.
+
+> **ASHA**
+> Hi.
+>
+> **NIM**
+> Hi.
+
+Tall figures of light wake among the roots. Ilune walks toward her.
 
 > **ILUNE**
 > You fell from the sky, carrying the cold of a dead sun.
@@ -198,56 +207,32 @@ Among the roots, lights begin to wake: tall figures, their bodies traced with li
 >
 > **ASHA**
 > Then you know what I am.
-
-**EXTREME CLOSE UP — ILUNE'S EYE**
-
-A star-shaped pupil in an iris like a small galaxy.
-
-> **ILUNE**
+>
+> **ILUNE** *(extreme close up: her eye)*
 > I know what you were, before they made you this.
 
-**EXT. BENEATH THE ROOTS — WALKING**
+Then Ilune **hums**. It is four notes: the star song.
 
-> **ILUNE**
-> The great trees drink the light of Essara, and keep it. And every night, the whole world sings it back to her. She is not our sun, Asha Venn. She is our mother.
-
-**EXT. THE EDGE OF THE LIVING SEA**
-
-They look out over an ocean of light.
+Asha goes very still.
 
 > **ASHA**
-> They're coming for her. A ship called the Starmaw. It will drain her until she's dark. And I was sent to show them the way.
+> Where did you hear that?
 >
 > **ILUNE**
-> Then why do you weep?
->
-> *(beat)*
->
-> Come. There is something you must hear.
+> In the light of your sun. It is still crossing the dark, Asha Venn. Twenty years of light, and a song inside it. A father, and a child.
+
+*(They walk beneath the roots. Ilune explains that the trees keep Essara's light and the world sings it back to her: "She is not our sun. She is our mother." Asha confesses that she led the Starmaw here. "Then why do you weep?")*
 
 **INT. THE HEART OF THE GREAT TREE**
-
-A hollow chamber of braided roots. At its centre floats the **HEARTSEED**, a crystal full of slow light.
 
 > **ILUNE**
 > Touch the Heartseed. Listen.
 
-Asha's gloved hand reaches out. Light floods through her.
-
-**INT. THE STARMAW'S CORE — VISION**
-
-A vast cage, and inside it a thousand captive suns, swirling and flickering.
-
-> **ILUNE (V.O.)**
-> The suns they take do not die. They are caged. Still singing. Still screaming.
-
-One of them, red-gold and small, drifts forward and presses against the bars toward her.
+**VISION.** Inside the Starmaw, a thousand stolen suns are caged, still singing, still screaming. One small red-gold sun presses against the bars toward her.
 
 > **ASHA**
 > Kessar. That's my sun. That's my sun.
-
-**INT. THE HEART OF THE GREAT TREE**
-
+>
 > **ILUNE**
 > A song can break any cage, if it is sung close enough.
 
@@ -255,41 +240,15 @@ One of them, red-gold and small, drifts forward and presses against the bars tow
 
 ## ACT THREE — THE STARMAW
 
-**EXT. ABOVE VEYRA**
-
-The sky splits. The Starmaw arrives over the limb of the world, and warships pour out around it.
-
-> **KADE (RADIO)**
-> Commander Venn, report. Venn.
->
-> *(silence)*
->
-> Very well. Begin the harvest.
-
-**EXT. ESSARA**
-
-The maw opens. A beam lances into the blue star, and a ribbon of plasma begins to rise out of it.
-
-> **HARVEST OFFICER (RADIO)**
-> Siphon engaged. Drawing stellar mass.
-
-**EXT. VEYRA — THE BURNING SKY**
-
-The sky turns red. Along the roots the Aurai stand in a line and raise their arms. They sing, and the lanterntrees ignite.
+The Starmaw arrives. The harvest of Essara begins. The sky over Veyra turns red.
 
 > **ILUNE**
 > Sing with us.
 
-**EXT. THE SEA**
-
-The interceptor rises from the water, wreathed in the Aurai's light, with the Heartseed aboard. A pillar of light climbs from the great tree. The ship launches.
-
-**EXT. SPACE — THE ASSAULT**
-
-Asha charges the Starmaw through a storm of fire.
+The Aurai raise their arms and sing the main theme as a hymn. Asha's ship rises out of the sea wreathed in their light, carrying the Heartseed, and launches.
 
 > **KADE (RADIO)**
-> Venn. Whatever you think you are doing, stop. You are a daughter of the Throne.
+> Venn. Whatever you think you are doing, stop. I took you in when your world went dark. You are a daughter of the Throne.
 >
 > **ASHA**
 > No, Admiral. I'm a daughter of Kessar.
@@ -297,56 +256,31 @@ Asha charges the Starmaw through a storm of fire.
 > **KADE (RADIO)**
 > Then you will die like its sun. All batteries, open fire.
 
-Hunters close in behind her.
+*(The theme becomes a march. Hunters close on her. Jax dives in, "You always did fly like you had somewhere better to be. Right behind you, Ash. Go! I'll hold the door!", and the march turns major.)*
 
-> **SABLE**
-> Hull integrity forty percent. Six interceptors on our tail.
->
-> **JAX (RADIO)**
-> You always did fly like you had somewhere better to be.
-
-Jax dives out of the dark. Two hunters burst into flame.
-
-> **ASHA**
-> Jax!
->
-> **JAX (RADIO)**
-> Right behind you, Ash. Go! I'll hold the door!
-
-**INT. THE STARMAW — THE THROAT**
-
-Asha flies into the maw, down a burning throat.
-
-> **SABLE**
-> Entering the core. Temperature critical.
->
-> **KADE (RADIO)**
-> Venn! If you breach that cage, you'll kill us all!
-
-**INT. THE CORE**
-
-The cage of suns fills the dark.
+**INT. THE STARMAW'S CORE**
 
 > **ASHA**
 > No. I'm setting them free.
->
-> *(softly, to the stars)*
->
+
+**EXTREME CLOSE ON HER VISOR.** A cage of suns is reflected in the glass.
+
+> **ASHA**
+> *(barely)*
+> Remember me?
+
+She hums, trembling: the star song.
+
+With each note, one sun in the cage answers. The smallest, red-gold one burns brighter and brighter. A single tear catches the light.
+
+> **ASHA**
 > Go home.
 
-She releases the Heartseed. It strikes the cage, which cracks with light, and the cage breaks.
+She releases the Heartseed. The cage breaks. Ten thousand streams of starlight tear loose from the Starmaw and race across the galaxy. The dead regions rekindle, star by star.
 
-**EXT. SPACE — THE STARMAW**
+**EXT. KESSAR — THE SAME ROOFTOP — DAWN**
 
-Light bursts through every seam of the ring. Ten thousand streams of starlight tear loose and race out into the galaxy.
-
-**EXT. THE GALAXY**
-
-Dead regions of the galaxy begin to rekindle, star by star, in gold.
-
-**EXT. ORBIT OF KESSAR**
-
-The dead sun of Kessar flickers, then burns again. Dawn crosses the ice.
+The city is frozen, snow deep on the domes, and the rooftop is empty. The sun rises again. Light floods across the ice. On the piano, the star song plays once, simply, as a child would play it.
 
 ---
 
@@ -354,7 +288,7 @@ The dead sun of Kessar flickers, then burns again. Dawn crosses the ice.
 
 **EXT. VEYRA — DAWN**
 
-Ilune stands alone in the shallows. The sky is full of new stars.
+Ilune and Nim stand in the shallows. The sky is full of new stars.
 
 > **JAX (RADIO)**
 > Asha? Asha, come in. Asha...
@@ -362,16 +296,24 @@ Ilune stands alone in the shallows. The sky is full of new stars.
 > **ILUNE (V.O.)**
 > She gave back what was taken. Ten thousand suns, returned to the sky. And on every world where the light came home, the dark began to listen again.
 
+Nim sees it first. It raises both arms at the sky.
+
+> **NIM**
+> Look!
+
 A falling star streaks down and lands far out on the sea.
 
 > **ASHA (RADIO, FAINT)**
 > Hello?
+>
+> **NIM** *(delighted)*
+> Hello!
 
-Ilune turns her head and smiles.
+Ilune turns and smiles.
 
 > **ILUNE**
 > Welcome home, Asha Venn.
 
-**TITLE: STARWAKE — EVERY STAR IS A SONG**
+**STARWAKE — EVERY STAR IS A SONG**
 
 **FADE OUT.**

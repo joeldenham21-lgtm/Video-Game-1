@@ -3,6 +3,7 @@
 // pose: x = walk phase, y = walk amount, z = look up (rad), w = arms raised (0..1)
 
 float gFigPart = 0.;   // 0 body, 1 head, 2 robe, 3 hair/fronds
+float gHairStyle = 0.; // 0 = Asha's ponytail, 1 = short (her father)
 
 vec3 limb(vec3 a, float len, float pitch, float roll){
   // direction from pitch (forward swing about X) and roll (out to the side about Z)
@@ -54,7 +55,7 @@ float sdAsha(vec3 p, vec4 pose){
   hp.yz = rot(-pose.z)*hp.yz;
   float head = sdEllipsoid(hp, vec3(.085, .11, .1));
   float hair = sdEllipsoid(hp - vec3(0, .02, -.03), vec3(.09, .1, .1));
-  hair = min(hair, sdCapsule2(hp, vec3(0, .02, -.1), vec3(0, -.12, -.14), .035, .015));
+  if (gHairStyle < .5) hair = min(hair, sdCapsule2(hp, vec3(0, .02, -.1), vec3(0, -.12, -.14), .035, .015));
   float neck = sdCapsule(p, vec3(0, 1.45, 0), vec3(0, 1.56, .01), .045);
   float hd = min(head, hair);
   if (hd < d){ gFigPart = hair < head ? 3. : 1.; }
@@ -136,7 +137,7 @@ float auraiMarks(vec3 p, float seed){
   vec3 c = floor(q);
   vec3 fr = fract(q) - .5;
   float dots = exp(-dot(fr, fr)*40.)*step(.86, hash13(c + seed));
-  float crest = smoothstep(2.35, 2.55, p.y)*.6;
+  float crest = smoothstep(2.4, 2.6, p.y)*.15;
   float pulse = .55 + .45*sin(T*2. - p.y*3. + seed*5.);
   return (lines*.8 + dots*.9 + crest)*pulse;
 }

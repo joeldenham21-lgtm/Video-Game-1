@@ -236,8 +236,9 @@ class Renderer:
             self.sky.use(5)
             self.set(p, uSky=5)
         params = self.shot.get("params", {})
-        self.set(p, uT=t, uD=float(self.shot["dur"]), uR=(float(self.SW), float(self.SH)),
-                 uF=frame, uGlobalT=float(self.shot.get("start", 0)) + t)
+        toff = float(self.shot.get("toff", 0.0))
+        self.set(p, uT=t + toff, uD=float(self.shot.get("sdur", self.shot["dur"])), uR=(float(self.SW), float(self.SH)),
+                 uF=frame, uGlobalT=float(self.shot.get("start", 0)) + t + toff)
         for k, v in params.items():
             if k in p:
                 p[k].value = tuple(v) if isinstance(v, (list, tuple)) else v

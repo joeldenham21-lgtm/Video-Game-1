@@ -55,6 +55,16 @@ def hud_text(W, H):
     return img
 
 
+def caption(text, y=0.86, size=26):
+    def make(W, H):
+        img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        s = H / 804
+        spaced(d, (W / 2, H * y), text, _font("CormorantGaramond[wght].ttf", int(size * s), 500), (235, 238, 245, 255), int(10 * s))
+        return img
+    return make
+
+
 def text_card(lines):
     def make(W, H):
         img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -72,18 +82,25 @@ def text_card(lines):
 CREDITS = [
     ("title", "STARWAKE"), ("gap", ""),
     ("head", "Written, Directed & Rendered by"), ("name", "Claude"), ("gap", ""),
+    ("small", "Made in loving homage to the films of Steven Spielberg,"),
+    ("small", "the music of John Williams, the photography of Janusz Kami\u0144ski,"),
+    ("small", "the sound of Ben Burtt, and the editing of Michael Kahn."), ("gap", ""),
     ("head", "THE CAST"), ("gap", ""),
-    ("role", "Ilune  —  voiced by Kokoro \u201cEmma\u201d"),
-    ("role", "Commander Asha Venn  —  voiced by Kokoro \u201cHeart\u201d"),
-    ("role", "Grand Admiral Varro Kade  —  voiced by Kokoro \u201cGeorge\u201d"),
-    ("role", "Lieutenant Jax Orren  —  voiced by Kokoro \u201cMichael\u201d"),
-    ("role", "Sable  —  voiced by Kokoro \u201cKore\u201d"),
-    ("role", "Harvest Officer  —  voiced by Kokoro \u201cFenrir\u201d"), ("gap", ""),
+    ("role", "Ilune  \u2014  voiced by Kokoro \u201cEmma\u201d"),
+    ("role", "Commander Asha Venn  \u2014  voiced by Kokoro \u201cHeart\u201d"),
+    ("role", "Young Asha  \u2014  voiced by Kokoro \u201cHeart\u201d"),
+    ("role", "Her Father  \u2014  voiced by Kokoro \u201cFenrir\u201d"),
+    ("role", "Nim  \u2014  who only knows the words it hears"),
+    ("role", "Grand Admiral Varro Kade  \u2014  voiced by Kokoro \u201cGeorge\u201d"),
+    ("role", "Lieutenant Jax Orren  \u2014  voiced by Kokoro \u201cMichael\u201d"),
+    ("role", "Sable  \u2014  voiced by Kokoro \u201cKore\u201d"),
+    ("role", "Harvest Officer  \u2014  voiced by Kokoro \u201cEcho\u201d"), ("gap", ""),
+    ("head", "The Star Song"), ("name", "hummed by a voice built in code"), ("gap", ""),
     ("head", "Original Score"), ("name", "composed in code, performed by FluidSynth"), ("gap", ""),
     ("head", "Visual Effects"), ("name", "every frame raymarched in GLSL on a CPU"), ("gap", ""),
     ("head", "Built with free and open tools"),
-    ("small", "Kokoro-82M text-to-speech (Apache 2.0)  ·  FluidSynth & FluidR3 GM soundfont (MIT)"),
-    ("small", "Mesa llvmpipe  ·  moderngl  ·  NumPy  ·  SciPy  ·  SoX  ·  FFmpeg"),
+    ("small", "Kokoro-82M text-to-speech (Apache 2.0)  \u00b7  FluidSynth & FluidR3 GM soundfont (MIT)"),
+    ("small", "Mesa llvmpipe  \u00b7  moderngl  \u00b7  NumPy  \u00b7  SciPy  \u00b7  SoX  \u00b7  FFmpeg"),
     ("small", "Cinzel & Cormorant Garamond typefaces (SIL Open Font License)"), ("gap", ""), ("gap", ""),
     ("name", "Every star is a song."), ("gap", ""), ("gap", ""),
 ]
@@ -146,16 +163,17 @@ shot("S04", "space.glsl", 6.0, [],
 shot("S05", "space.glsl", 11.0, [("N4", 2.0)],
      params=dict(uP0=(5, 0, 0, 0)), grade=dict(bloom=0.1, streak=0.3, streak_tint=(1.0, 0.6, 0.35)))
 shot("S08", "space.glsl", 13.0, [("H1", 3.5), ("K1", 9.2)],
-     params=dict(uP0=(6, 0, 0, 0)), grade=dict(bloom=0.1, streak=0.3))
+     params=dict(uP0=(6, 0, 0, 0)), grade=dict(bloom=0.1, streak=0.3),
+     text=dict(make=caption("TWENTY YEARS LATER"), gain=[(0, 0), (0.8, 0), (1.8, 0.9), (4.5, 0.9), (5.8, 0)]))
 
-shot("S09", "space.glsl", 11.0, [("A1", 1.5)], params=dict(uP0=(7, 0, 0, 0)), grade=dict(bloom=0.1, streak=0.3))
+shot("S09", "space.glsl", 12.0, [("A1", 1.5)], params=dict(uP0=(7, 0, 0, 0)), grade=dict(bloom=0.1, streak=0.3))
 shot("S10", "cockpit.glsl", 12.0, [("K2", 0.8), ("A2", 2.8), ("K3", 4.2)],
      text=dict(make=lambda W, H: hud_text(W, H), gain=[(0, 0.6), (12, 0.6)]),
      grade=dict(bloom=0.1, streak=0.2, vig=0.8))
 shot("S11", "space.glsl", 10.0, [("A3", 0.3), ("K4", 1.8), ("A4", 7.3)], params=dict(uP0=(8, 0, 0, 0)), grade=dict(bloom=0.1, streak=0.3))
 shot("S12", "space.glsl", 9.0, [("J1", 0.4), ("A5", 5.15)], params=dict(uP0=(9, 0, 0, 0)), grade=dict(bloom=0.1, streak=0.4))
 shot("S13", "warp.glsl", 5.0, [], grade=dict(bloom=0.14, streak=0.5), mb=3)
-shot("S14", "space.glsl", 16.0, [("J2", 7.0), ("A6", 10.0)], params=dict(uP0=(10, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.4))
+shot("S14", "space.glsl", 16.0, [("A6", 3.4)], params=dict(uP0=(10, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.4))
 shot("S15", "space.glsl", 12.0, [("A7", 0.8), ("S1", 3.0), ("J3", 9.9)], params=dict(uP0=(11, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.3))
 shot("S16", "space.glsl", 9.0, [("A8", 0.4), ("A9", 1.8)], params=dict(uP0=(12, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.4))
 shot("S30", "space.glsl", 13.0, [("K5", 5.0), ("K6", 9.5)], params=dict(uP0=(13, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.4))
@@ -178,17 +196,19 @@ shot("S28", "core.glsl", 12.0, [("I8", 1.2), ("A15", 7.6)], params=dict(uP0=(1, 
 shot("S29", "chamber.glsl", 7.0, [("I9", 1.4)], params=dict(uP0=(3, 0, 0, 0)), grade=dict(bloom=0.16, streak=0.3, streak_tint=(0.5, 1.0, 0.9)))
 shot("S32", "veyra.glsl", 12.0, [("I10", 6.0)], rscale=0.6, params=dict(uP0=(10, 0, 0, 0)), grade=dict(bloom=0.14, streak=0.3, streak_tint=(1.0, 0.6, 0.4)))
 shot("S33", "veyra.glsl", 10.0, [], rscale=0.6, params=dict(uP0=(11, 0, 0, 0)), grade=dict(bloom=0.14, streak=0.35, streak_tint=(1.0, 0.6, 0.4)))
-shot("S34", "space.glsl", 11.0, [("K7", 1.0), ("A16", 6.6)], params=dict(uP0=(15, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.4))
+shot("S34", "space.glsl", 11.5, [("K7", 0.5), ("A16", 8.4)], params=dict(uP0=(15, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.4))
 shot("S35", "space.glsl", 10.0, [("K8", 0.3), ("S3", 5.4)], params=dict(uP0=(16, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.4))
 shot("S36", "space.glsl", 8.0, [("J5", 0.2), ("A17", 3.9), ("J6", 4.9)], params=dict(uP0=(17, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.4))
 shot("S37", "core.glsl", 9.0, [("S4", 1.0), ("K9", 5.3)], params=dict(uP0=(2, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.4, streak_tint=(1.0, 0.6, 0.4), exposure=0.6, contrast=1.15), mb=2)
-shot("S38", "core.glsl", 8.0, [("A18", 0.8), ("A19", 4.3)], params=dict(uP0=(3, 0, 0, 0)), grade=dict(bloom=0.16, streak=0.4))
+shot("S38", "core.glsl", 4.0, [("A18", 0.8)], params=dict(uP0=(3, 0, 0, 0)), sdur=8.0, grade=dict(bloom=0.16, streak=0.4))
+shot("V2", "visor.glsl", 13.0, [("A22", 1.2), ("HUM3", 3.0), ("A19", 10.6)], params=dict(uP0=(2, 0, 0, 0)), grade=dict(bloom=0.16, streak=0.35, streak_tint=(1.0, 0.6, 0.4), vig=0.8))
+shot("S38b", "core.glsl", 3.7, [], params=dict(uP0=(3, 0, 0, 0)), toff=4.3, sdur=8.0, grade=dict(bloom=0.16, streak=0.4))
 shot("S39", "core.glsl", 6.0, [], params=dict(uP0=(4, 0, 0, 0)), grade=dict(bloom=0.2, streak=0.5))
 shot("S40", "space.glsl", 12.0, [], params=dict(uP0=(18, 0, 0, 0)), grade=dict(bloom=0.16, streak=0.5))
 shot("S41", "galaxy.glsl", 10.0, [], rscale=0.6, params=dict(uP0=(.12, 1, 0, 1), uP1=(0.85, 0.5, 2.6, -0.25)),
      grade=dict(bloom=0.14, streak=0.35, streak_tint=(1.0, 0.8, 0.5)))
 shot("S42", "space.glsl", 12.0, [], params=dict(uP0=(19, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.4, streak_tint=(1.0, 0.7, 0.45), exposure=0.7))
-shot("S43", "veyra.glsl", 20.0, [("J7", 0.5), ("I11", 3.6), ("A20", 15.2), ("I12", 17.0)], rscale=0.6, params=dict(uP0=(12, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.3, streak_tint=(1.0, 0.75, 0.5)))
+shot("S43", "veyra.glsl", 24.0, [("J7", 0.5), ("I11", 3.6), ("M3", 13.8), ("A20", 18.6), ("M4", 19.8), ("I12", 21.0)], rscale=0.6, params=dict(uP0=(12, 0, 0, 0)), grade=dict(bloom=0.12, streak=0.3, streak_tint=(1.0, 0.75, 0.5)))
 
 shot("S44", "title.glsl", 8.0, [], params=dict(uP0=(1, 0, 0, 0)), fade_in=0.5, fade_out=1.0,
      text=dict(make=lambda W, H: title_card(W, H, "EVERY STAR IS A SONG"), gain=[(0, 0), (2.8, 0), (4, 1.4), (8, 1.2)]),
@@ -198,11 +218,30 @@ shot("S45", "title.glsl", 48.0, [], params=dict(uP0=(1, 1, 0, 0)), fade_in=1.0, 
                scroll=[(0, 0), (41, credits_final_offset()), (48, credits_final_offset())]),
      grade=dict(bloom=0.08, streak=0.2, exposure=1.0))
 
+# ---- the Spielberg pass: a cold open on Kessar, reactions before reveals, a child, a song
+shot("K1", "kessar.glsl", 11.0, [("Y1", 5.0)], params=dict(uP0=(1, 0, 0, 0)), fade_in=1.0,
+     text=dict(make=caption("KESSAR"), gain=[(0, 0), (1.0, 0), (2.0, 0.85), (4.2, 0.85), (5.2, 0)]),
+     grade=dict(bloom=0.14, streak=0.3, streak_tint=(1.0, 0.55, 0.35)))
+shot("K2", "kessar.glsl", 17.0, [("F1", 0.6), ("Y2", 3.0), ("F2", 5.4), ("HUM1", 10.8)], params=dict(uP0=(2, 0, 0, 0)),
+     grade=dict(bloom=0.14, streak=0.3, streak_tint=(1.0, 0.55, 0.35)))
+shot("K3", "kessar.glsl", 13.0, [("HUM1b", 0.8), ("F3", 5.2)], params=dict(uP0=(3, 0, 0, 0)), fade_out=1.0,
+     grade=dict(bloom=0.14, streak=0.35, streak_tint=(1.0, 0.55, 0.35)))
+shot("V1", "visor.glsl", 6.0, [("J2", 2.2)], params=dict(uP0=(1, 0, 0, 0)), grade=dict(bloom=0.14, streak=0.3, vig=0.8))
+shot("C1", "veyra.glsl", 9.0, [("M1", 1.4), ("A11b", 4.0), ("M2", 6.2)], rscale=0.6, params=dict(uP0=(14, 0, 0, 0)), grade=dict(bloom=0.14, streak=0.25))
+shot("H3", "veyra.glsl", 18.5, [("HUM2", 0.6), ("A21", 7.4), ("I13", 9.3)], rscale=0.6, params=dict(uP0=(13, 0, 0, 0)), grade=dict(bloom=0.14, streak=0.25))
+shot("K5", "kessar.glsl", 10.0, [], params=dict(uP0=(5, 0, 0, 0)), grade=dict(bloom=0.14, streak=0.35, streak_tint=(1.0, 0.75, 0.45), exposure=0.72, contrast=1.12, sat=1.1))
+
+ORDER = ["S01", "S02", "S03", "S04", "K1", "K2", "K3", "S05", "S06", "S07",
+         "S08", "S09", "S10", "S11", "S12", "S13",
+         "V1", "S14", "S15", "S16", "S17", "S18", "S19", "S20", "C1", "S21", "S22", "S23", "H3", "S24", "S25",
+         "S26", "S27", "S28", "S29",
+         "S30", "S31", "S32", "S33", "S34", "S35", "S36", "S37", "S38", "V2", "S38b", "S39", "S40", "S41", "S42", "K5",
+         "S43", "S44", "S45"]
+
 
 def timeline_starts():
-    # shots are numbered in story order
-    order = sorted(SHOTS, key=lambda k: int(k[1:]))
-    items = [(k, SHOTS.pop(k)) for k in order]
+    assert sorted(ORDER) == sorted(SHOTS), set(ORDER) ^ set(SHOTS)
+    items = [(k, SHOTS.pop(k)) for k in ORDER]
     SHOTS.update(items)
     t = 0.0
     for sid, s in SHOTS.items():

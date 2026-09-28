@@ -12,13 +12,14 @@ from scipy import signal
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 from timeline import SHOTS, TOTAL  # noqa: E402
-from script import LINES  # noqa: E402
+from script import LINES, HUMS  # noqa: E402
 
 SR = 48000
 A = os.path.join(ROOT, "build", "audio")
 V = os.path.join(ROOT, "build", "voices")
 N = int((TOTAL + 1.0) * SR)
 TEXT = {lid: (who, txt) for lid, who, fx, txt, sp in LINES}
+TEXT.update(HUMS)
 
 
 def load(path):

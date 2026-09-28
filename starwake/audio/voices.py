@@ -105,6 +105,16 @@ def process(line_id, who, fx, raw_path):
         y = reverb(x, impulse(3.2, 0.9, seed=7, bright=0.35), 0.55)
     elif fx == "near":
         y = reverb(x, impulse(1.2, 0.28, seed=11), 0.35)
+    elif fx == "memory":
+        # close and warm, a breath of rooftop wind
+        z = signal.sosfilt(signal.butter(2, [120, 9000], "band", fs=SR, output="sos"), x)
+        y = reverb(z, impulse(1.6, 0.35, seed=17, bright=0.25), 0.3)
+    elif fx == "mimic":
+        # Nim: Asha's voice, small and bright, with the Aurai shimmer
+        d = int(0.012 * SR)
+        z = x.copy()
+        z[d:] += 0.4 * x[:-d]
+        y = reverb(z, impulse(2.4, 0.7, seed=19, bright=0.6), 0.5)
     elif fx == "ai":
         # slightly glassy: tiny comb + band shelf, short room
         d = int(0.0045 * SR)

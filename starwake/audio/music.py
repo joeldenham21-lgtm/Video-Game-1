@@ -190,12 +190,58 @@ def progression(t0, spc, names, **kw):
     return t
 
 
-THEME_A = [("D5", 2), ("A4", 1), ("B4", 1), ("A4", 3), ("F#4", 1), ("G4", 2), ("F#4", 1), ("E4", 1), ("F#4", 4)]
-THEME_B = [("D5", 2), ("E5", 1), ("F#5", 1), ("A5", 3), ("G5", 1), ("F#5", 1), ("E5", 1), ("D5", 1), ("C#5", 1), ("D5", 4)]
-THEME_LYD = [("D5", 2), ("A4", 1), ("B4", 1), ("A4", 3), ("F#4", 1), ("G#4", 2), ("F#4", 1), ("E4", 1), ("F#4", 4)]
-THEME_MIN = [("D5", 2), ("A4", 1), ("Bb4", 1), ("A4", 3), ("F4", 1), ("G4", 2), ("F4", 1), ("E4", 1), ("F4", 4)]
-LAMENT = [("A3", 2), ("G3", 1), ("F3", 1), ("E3", 2), ("D3", 2), ("F3", 1), ("E3", 1), ("D3", 1), ("C#3", 1), ("D3", 4)]
+# ---------------------------------------------------------------- themes
+# THE STAR SONG: four notes a father teaches his daughter. Everything grows from it.
+STAR = [("F#4", 1), ("A4", 1), ("E5", 2), ("D5", 4)]
+# STARWAKE: the main theme -- the star song, then a heroic leap, then the star song home.
+MAIN = [("F#4", 1), ("A4", 1), ("E5", 2),                    # the star song rises...
+        ("D5", 3), ("A4", 1/3), ("B4", 1/3), ("C#5", 1/3),   # ...lands, triplet pickup
+        ("D5", 1), ("E5", 1), ("B5", 2),                      # the leap
+        ("A5", 4),
+        ("G5", 1), ("F#5", 1), ("E5", 1), ("D5", 1),
+        ("C#5", 2), ("B4", 1/3), ("C#5", 1/3), ("D5", 1/3), ("E5", 1),
+        ("F#5", 1), ("A5", 1), ("E5", 2),                     # the star song again, an octave up
+        ("D5", 4)]
+MAIN_CH = ["Dadd9", "D", "G", "D/F#", "Em", "A", "Bm", "D"]   # one chord per bar
+MAIN_MIN = [("F4", 1), ("A4", 1), ("E5", 2), ("D5", 3), ("A4", 1/3), ("Bb4", 1/3), ("C5", 1/3),
+            ("D5", 1), ("E5", 1), ("Bb5", 2), ("A5", 4)]
 AURAI = [("F#5", 2), ("G#5", 1), ("A5", 1), ("E5", 4), ("D5", 2), ("E5", 1), ("F#5", 1), ("C#5", 4)]
+NIM = [("A5", .5), ("C#6", .5), ("E6", .5), ("D6", 1.5)]      # Nim's little giggle
+
+
+def theme(t0, bpm, vel=104, bars=8, orch="full", octave=0):
+    """The main theme with its harmony, orchestrated at one of several weights."""
+    spb = 60 / bpm
+    seq = MAIN
+    if bars < 8:
+        acc, out = 0, []
+        for nm, bt in MAIN:
+            if acc >= bars * 4 - 1e-6:
+                break
+            out.append((nm, bt))
+            acc += bt
+        seq = out
+    S.melody(STR_HI, t0, bpm, seq, vel, octave=octave)
+    if orch in ("full", "brass"):
+        S.melody(HORN, t0, bpm, seq, vel - 6, octave=octave - 1)
+    if orch == "full":
+        S.melody(SOLO, t0, bpm, seq, vel - 20, octave=octave + 1)
+        S.melody(CHOIR, t0, bpm, seq, vel - 12, octave=octave)
+    if orch == "brass":
+        S.melody(BRASS, t0, bpm, seq, vel, octave=octave - 1)
+    for i in range(bars):
+        tb = t0 + i * 4 * spb
+        lo_n, hi_n = V[MAIN_CH[i]]
+        S.chord(STR_LO, tb, 4 * spb, lo_n, vel - 14)
+        if orch == "full":
+            S.chord(BRASS, tb, 4 * spb, [p - 12 for p in hi_n], vel - 36)
+            S.chord(OOHS, tb, 4 * spb, [p - 12 for p in hi_n], vel - 30)
+            S.chord(TBN, tb, 4 * spb, lo_n[1:], vel - 40)
+        S.arp(HARP, tb, tb + 4 * spb, [p - 12 for p in lo_n] + hi_n, spb / 2, vel - 40)
+        S.note(TIMP, tb, 1.2, n("D2") if MAIN_CH[i] in ("D", "Dadd9", "D/F#") else n("A1"), vel - 20)
+        if i in (0, 4) and orch == "full":
+            S.note(DRUMS, tb, 4, 49, vel - 10)
+    return t0 + bars * 4 * spb
 
 
 def boom(t, vel=120, tam=True):
@@ -220,6 +266,11 @@ def swell_cymbal(t0, t1, v1=90):
     S.roll(DRUMS, t0, t1, 51, 20, v1, rate=0.09)
 
 
+def reset(t, chans=(STR_HI, STR_LO, CHOIR, HORN, BRASS, TBN, OOHS, SOLO, TREM, CELLO, BASS), v=110):
+    for ch in chans:
+        S.expr(ch, t - 0.05, t, v, v)
+
+
 def throne_ostinato(t0, t1, bpm, vel0, vel1, octave=0):
     eighth = 30.0 / bpm
     pat = ["D3", "D3", "D3", "Eb3", "D3", "D3", "D3", "C3", "D3", "Eb3"]
@@ -238,7 +289,7 @@ def throne_motif(t0, bpm, vel, octave=0):
     return S.melody(TBN, t0, bpm, [("D3", 2), ("Eb3", 1), ("D3", 1), ("A2", 4)], vel, octave=octave)
 
 
-# =============================================================== C1  prologue 0-23
+# =============================================================== PROLOGUE 0-23
 S.expr(STR_LO, 0, 7, 20, 100)
 S.chord(STR_LO, 0.0, 14.2, ns("D2 A2 D3"), 64)
 S.expr(STR_HI, 2.5, 9, 10, 95)
@@ -246,10 +297,8 @@ S.chord(STR_HI, 2.5, 11.7, ns("A4 E5"), 52)
 S.chord(OOHS, 4.5, 9.8, ns("D4 F#4 A4"), 52)
 for t, p in [(1.8, "A5"), (3.1, "E6"), (4.6, "F#6"), (6.0, "D6"), (7.9, "A6"), (9.4, "B5"), (11.2, "E6"), (12.8, "F#6")]:
     S.note(CELE, t, 2.5, n(p), 58)
-S.prog(HORN, 60, 0)
-S.melody(HORN, 6.4, 72, [("D4", 2), ("A3", 1), ("B3", 1), ("A3", 3.5)], 70)
+S.melody(HORN, 6.6, 66, STAR, 70, octave=-1)          # the star song, first heard, far away
 S.chord(HARP, 5.8, 3, ns("D3 A3 F#4"), 50)
-# the Hollow Throne darkens the harmony
 S.expr(STR_LO, 14, 23, 90, 115)
 for t, lo, hi, ch in [(14.0, "B1 B2", "F#4 B4", "B3 D4 F#4"), (17.0, "G1 G2", "G4 D5", "B3 D4 G4"), (20.0, "G1 G2", "G4 Bb4", "Bb3 D4 G4")]:
     S.chord(STR_LO, t, 3.1, ns(lo), 74)
@@ -258,236 +307,264 @@ for t, lo, hi, ch in [(14.0, "B1 B2", "F#4 B4", "B3 D4 F#4"), (17.0, "G1 G2", "G
 S.chord(TBN, 20.0, 3.0, ns("G2 D3"), 52)
 S.roll(TIMP, 20.6, 23.0, n("D2"), 30, 100)
 
-# =============================================================== C2  the Starmaw feeds 23-51
-throne_ostinato(23.0, 40.0, 96, 70, 102)
+# =============================================================== the Starmaw feeds 23-40
+throne_ostinato(23.0, 39.6, 96, 70, 100)
 S.note(DRUMS, 23.0, 3, 49, 90)
 boom(23.0, 110, tam=False)
 for k in range(6):
     tb = 23.0 + k * 3.125
+    if tb > 39:
+        break
     S.note(TIMP, tb, 1.2, n("D2"), 88 + k * 4)
     taiko(tb, 90 + k * 5)
     taiko(tb + 1.875, 70 + k * 5)
 throne_motif(26.1, 96, 96)
-throne_motif(32.35, 96, 112, octave=-1)
-S.melody(BRASS, 32.35, 96, [("D4", 2), ("Eb4", 1), ("D4", 1), ("A3", 4)], 92)
+throne_motif(32.35, 96, 110, octave=-1)
+S.melody(BRASS, 32.35, 96, [("D4", 2), ("Eb4", 1), ("D4", 1), ("A3", 4)], 90)
 S.chord(CHOIR, 26.0, 7.0, ns("D3 A3"), 70)
-S.chord(CHOIR, 33.0, 7.0, ns("D3 Eb3 A3"), 84)
-S.expr(HORN, 32.0, 40.0, 40, 120)
-S.chord(HORN, 32.0, 8.0, ns("D4 Eb4"), 90)
-S.expr(TREM, 34.0, 48.5, 30, 127)
-S.chord(TREM, 34.0, 14.5, ns("D5 Eb5 A5"), 88)
-# the star dies
-S.chord(BASS, 40.0, 11.0, ns("D1"), 90)
-S.chord(STR_LO, 40.0, 8.5, ns("D2 Eb2"), 80)
-for i, p in enumerate(["D5", "C5", "Bb4", "A4", "G4", "F4", "Eb4", "D4"]):
-    S.note(CHOIR, 40.0 + i * 1.05, 1.3, n(p), 70 + i * 3)
-S.roll(TIMP, 45.5, 48.5, n("D2"), 40, 115)
-S.cut(48.5)
-boom(48.5, 127)
-S.chord(BASS, 48.52, 3.0, ns("D1"), 100)
-S.chord(STR_LO, 48.52, 2.5, ns("D1 D2"), 70)
+S.chord(CHOIR, 33.0, 6.8, ns("D3 Eb3 A3"), 82)
+S.expr(TREM, 34.0, 39.6, 30, 110)
+S.chord(TREM, 34.0, 5.8, ns("D5 Eb5 A5"), 84)
+S.cut(39.9)
 
-# =============================================================== C3  the galaxy goes dark 51-59
-S.expr(OOHS, 51, 58, 90, 40)
-S.chord(OOHS, 51.0, 7.5, ns("A3 D4"), 50)
-S.chord(STR_HI, 51.5, 7.0, ns("D6 A6"), 34)
-for i, p in enumerate(["D6", "A5", "F5", "D5", "A4"]):
-    S.note(CELE, 51.5 + i * 1.3, 2.0, n(p), 50 - i * 5)
+# =============================================================== KESSAR, twenty years ago 40-81
+reset(40.0)
+S.expr(STR_LO, 40.0, 44.0, 30, 80)
+S.chord(STR_LO, 40.0, 11.2, ns("D2 A2"), 50)
+S.chord(STR_HI, 41.0, 10.0, ns("A5"), 36)
+for k in range(5):
+    S.note(HARP, 40.5 + k * 2.2, 3, n("D3"), 44)          # a distant bell, tolling
+S.note(CELE, 47.4, 2.5, n("A5"), 40)
+# the father speaks: warm, sad
+S.chord(STR_LO, 51.0, 5.0, ns("D2 A2 D3"), 50)
+S.chord(STR_HI, 51.0, 5.0, ns("F#4 A4"), 42)
+S.chord(STR_LO, 56.0, 3.0, ns("B1 F#2 B2"), 48)
+S.chord(STR_HI, 56.0, 3.0, ns("F#4 B4"), 40)
+S.chord(STR_LO, 59.0, 2.8, ns("G1 D2 G2"), 46)
+S.chord(STR_HI, 59.0, 2.8, ns("G4 B4"), 38)
+# under the humming: only a held D, so the song stands alone
+S.expr(STR_LO, 61.6, 68.0, 60, 40)
+S.chord(STR_LO, 61.6, 7.0, ns("D2 A2"), 40)
+S.chord(STR_HI, 63.5, 4.5, ns("D5"), 26)
+# the sun goes out
+S.chord(STR_LO, 68.2, 6.5, ns("D2 A2 F3"), 44)
+throne_ostinato(69.5, 74.8, 80, 30, 60, octave=-1)
+for i, p in enumerate(["A6", "F6", "D6", "A5", "F5", "D5"]):
+    S.note(CELE, 69.2 + i * 0.9, 1.6, n(p), 44 - i * 3)
+S.expr(TREM, 71.0, 75.0, 20, 115)
+S.chord(TREM, 71.0, 4.1, ns("D5 Eb5 F5"), 80)
+S.chord(CHOIR, 72.0, 3.1, ns("D4 F4 A4"), 70)
+S.cut(75.1)
+S.chord(BASS, 75.2, 5.0, ns("D1"), 70)
+S.expr(STR_HI, 75.6, 81.0, 60, 0)
+S.chord(STR_HI, 75.6, 5.4, ns("D6"), 50)              # one high thread of violin, fading into snow
 
-# =============================================================== C4  TITLE 59-69
-S.expr(TREM, 59.0, 62.2, 30, 127)
-S.chord(TREM, 59.0, 3.25, ns("A3 A4"), 90)
-S.roll(TIMP, 60.4, 62.2, n("A1"), 30, 110)
-S.expr(STR_HI, 59, 62.2, 110, 110)
-T = 62.2
+# =============================================================== the cold spreads 81-100
+reset(81.0)
+progression(81.0, 2.75, ["Dm", "Bb", "Gm", "A"], vel=62, choir=True, choir_vel=56)
+S.melody(CELLO, 81.5, 60, [("A3", 1.5), ("G3", .5), ("F3", 1), ("E3", 2), ("D3", 3)], 76)
+progression(92.0, 2.0, ["Dm", "Bb", "C", "A"], vel=52, lo=True)
+S.expr(TREM, 97.0, 100.0, 30, 127)
+S.chord(TREM, 97.0, 3.1, ns("A3 A4"), 90)
+S.roll(TIMP, 98.2, 100.0 + 3.2, n("A1"), 30, 110)
+swell_cymbal(100.0, 103.2, 110)
+
+# =============================================================== TITLE 100-110
+T = 103.2
+reset(T - 0.05)
 boom(T, 127)
 S.chord(BRASS, T, 3.4, ns("D3 A3 D4 F#4"), 112)
-S.chord(HORN, T, 3.4, ns("A3 D4 F#4"), 110)
-S.chord(STR_LO, T, 6.8, ns("D2 A2 D3"), 110)
-S.chord(CHOIR, T, 6.8, ns("D4 F#4 A4 D5"), 104)
+S.chord(STR_LO, T, 6.5, ns("D2 A2 D3"), 110)
+S.chord(CHOIR, T, 6.5, ns("D4 F#4 A4 D5"), 104)
 S.gliss(HARP, T, 0.9, ns("D3 F#3 A3 D4 F#4 A4 D5 F#5 A5 D6"), 90)
-S.melody(STR_HI, T, 72, THEME_A[:5], 108, octave=0)
-S.melody(HORN, T + 0.02, 72, THEME_A[:5], 96, octave=-1)
-S.chord(STR_HI, T + 5.0, 4.0, ns("A4 C#5 E5"), 84)
-S.chord(STR_LO, T + 6.8, 3.0, ns("A1 E2 A2"), 80)
-S.expr(STR_HI, T + 4, 69, 110, 30)
-S.expr(STR_LO, T + 4, 69, 110, 30)
-S.expr(CHOIR, T + 4, 69, 110, 20)
+S.melody(BRASS, T, 72, MAIN[:4], 118, octave=-1)
+S.melody(HORN, T, 72, MAIN[:4], 110, octave=-1)
+S.melody(STR_HI, T, 72, MAIN[:4], 106)
+S.expr(STR_HI, T + 4, 110, 110, 30)
+S.expr(STR_LO, T + 4, 110, 110, 30)
+S.expr(CHOIR, T + 4, 110, 110, 20)
 
-# =============================================================== C5  the Hollow Fleet 69-93
-for ch in (STR_HI, STR_LO, CHOIR):
-    S.expr(ch, 69.0, 69.2, 30, 105)
-throne_ostinato(69.0, 82.0, 96, 58, 74)
+# =============================================================== the Hollow Fleet 110-135
+reset(110.0)
+throne_ostinato(110.0, 123.0, 96, 56, 72)
 for k in range(4):
-    tb = 69.0 + k * 3.125
+    tb = 110.0 + k * 3.125
     S.note(TIMP, tb, 1.0, n("D2"), 70)
     taiko(tb, 72)
-for t in (70.0, 71.2, 72.3, 73.4):
+for t in (111.0, 112.2, 113.3, 114.4):
     S.chord(TBN, t, 0.5, ns("D2 Eb2"), 96)
     S.note(DRUMS, t, 1, 35, 90)
-S.chord(STR_LO, 69.0, 13.0, ns("D2 A2"), 60)
-S.chord(CHOIR, 76.0, 6.0, ns("D3 A3"), 54)
-# Asha remembers (lament)
-S.chord(STR_LO, 82.0, 11.5, ns("D2 A2 F3"), 52)
-S.chord(STR_HI, 84.0, 9.5, ns("A4 D5"), 40)
-S.melody(CELLO, 82.6, 66, LAMENT, 84)
-for t, p in [(82.0, "D4"), (85.6, "F4"), (89.3, "A4"), (91.0, "E4")]:
-    S.note(PIANO, t, 3, n(p), 48)
-S.prog(PIANO, 0, 81.9)
+S.chord(STR_LO, 110.0, 13.0, ns("D2 A2"), 58)
+# Asha remembers: the star song, on a lonely oboe
+S.prog(SOLO, 68, 122.8)
+S.chord(STR_LO, 123.0, 12.0, ns("D2 A2 F#3"), 48)
+S.chord(STR_HI, 125.0, 10.0, ns("A4 D5"), 36)
+S.melody(SOLO, 124.2, 56, STAR, 76)
+S.melody(SOLO, 131.4, 56, [("F#4", 1), ("A4", 1), ("E5", 1.5)], 62)   # it doesn't resolve
 
-# =============================================================== C6  orders, the jump 93-129
-S.expr(STR_LO, 93, 94, 60, 100)
-progression(93.0, 3.0, ["Dm", "Bb", "Gm", "A"], vel=54, hi=True)
+# =============================================================== orders, the jump 135-171
+S.prog(SOLO, 40, 134.8)
+S.expr(STR_LO, 135, 136, 60, 100)
+progression(135.0, 3.0, ["Dm", "Bb", "Gm", "A"], vel=54)
 for k in range(10):
-    S.note(TIMP, 93.4 + k * 1.2, 0.8, n("D2"), 44)
-S.chord(STR_LO, 105.0, 10.0, ns("D2 A2"), 60)
-S.chord(STR_HI, 105.0, 10.0, ns("A4 D5"), 48)
-t = 105.0
-while t < 115.0:
-    S.note(BASS, t, 0.2, n("D2"), 58)
+    S.note(TIMP, 135.4 + k * 1.2, 0.8, n("D2"), 44)
+S.chord(STR_LO, 147.0, 10.0, ns("D2 A2"), 58)
+S.chord(STR_HI, 147.0, 10.0, ns("A4 D5"), 46)
+t = 147.0
+while t < 157.0:
+    S.note(BASS, t, 0.2, n("D2"), 56)
     t += 0.25
-# build to the jump
-S.expr(BRASS, 115.0, 123.15, 30, 127)
-S.chord(BRASS, 115.0, 8.2, ns("D3 A3 D4"), 90)
-t, step = 115.0, 0.25
-while t < 123.1:
-    S.note(CELLO, t, step * 0.8, n("D3") if int((t - 115) / step) % 2 == 0 else n("A3"), 70 + (t - 115) * 5)
+S.expr(BRASS, 157.0, 165.15, 30, 127)
+S.chord(BRASS, 157.0, 8.2, ns("D3 A3 D4"), 90)
+t, step = 157.0, 0.25
+while t < 165.1:
+    S.note(CELLO, t, step * 0.8, n("D3") if int((t - 157) / step) % 2 == 0 else n("A3"), 70 + (t - 157) * 5)
     step = max(0.09, step * 0.985)
     t += step
-S.expr(TREM, 118.0, 123.15, 30, 120)
-S.chord(TREM, 118.0, 5.2, ns("A4 D5 A5"), 90)
-S.roll(TIMP, 121.0, 123.15, n("D2"), 40, 120)
-boom(123.15, 124)
-S.chord(HORN, 123.15, 1.2, ns("D4 A4"), 110)
-S.expr(TREM, 123.2, 129.0, 60, 115)
-S.chord(TREM, 123.2, 5.8, ns("D6 A6"), 70)
-S.chord(OOHS, 124.0, 5.0, ns("A4 D5"), 60)
-swell_cymbal(126.5, 129.0, 90)
+S.expr(TREM, 160.0, 165.15, 30, 120)
+S.chord(TREM, 160.0, 5.2, ns("A4 D5 A5"), 90)
+S.roll(TIMP, 163.0, 165.15, n("D2"), 40, 120)
+boom(165.15, 124)
+S.chord(HORN, 165.15, 1.2, ns("D4 A4"), 110)
+S.expr(TREM, 165.2, 171.0, 60, 115)
+S.chord(TREM, 165.2, 5.8, ns("D6 A6"), 70)
+S.chord(OOHS, 166.0, 5.0, ns("A4 D5"), 60)
 
-S.prog(PIANO, 116, 150.0)   # back to taiko for the storm and the war
-
-# =============================================================== C8  the Veil Reach 129-166
-for ch in (STR_HI, STR_LO, CHOIR, HORN):
-    S.expr(ch, 129.0, 129.3, 40, 100)
-S.gliss(HARP, 129.0, 1.3, ns("D3 E3 F#3 G#3 A3 B3 C#4 D4 E4 F#4 G#4 A4 B4 C#5 D5 E5 F#5 G#5 A5"), 88)
-S.note(DRUMS, 129.0, 3, 49, 80)
-S.chord(STR_LO, 129.0, 16.0, ns("D2 A2 D3"), 70)
-S.chord(STR_HI, 129.0, 8.0, ns("F#4 A4 C#5 G#5"), 64)
-S.chord(CHOIR, 129.5, 8.0, ns("D4 A4 E5"), 70)
-S.arp(CELE, 131.0, 166.0, ns("D5 A5 E6 G#5 F#5 A5 E6 C#6"), 60 / 66 / 2, 50)
-lyd_t = S.melody(HORN, 133.2, 66, THEME_LYD, 84, octave=-1)
-S.chord(STR_HI, 137.0, 3.64, ns("F#4 A4 C#5"), 58)
-S.chord(STR_HI, 140.6, 3.64, ns("E4 G#4 B4"), 58)
-S.chord(STR_LO, 145.0, 12.0, ns("D2 A2"), 58)
-progression(145.0, 3.0, ["Dmaj7", "Bm7", "Gmaj7", "A"], vel=52, lo=False)
-# the dive: rising
-S.expr(TREM, 157.0, 166.0, 30, 124)
+# =============================================================== her face, then the Veil Reach 171-214
+# on her face: the music holds its breath
+S.expr(TREM, 171.0, 177.0, 70, 40)
+S.chord(TREM, 171.0, 6.0, ns("E6 A6"), 60)
+S.arp(CELE, 172.0, 177.0, ns("E6 A6 E6 G#6"), 0.35, 40)
+S.chord(OOHS, 172.0, 5.0, ns("A4 E5"), 52)
+# the reveal
+T = 177.0
+reset(T - 0.05, (STR_HI, STR_LO, CHOIR, HORN))
+S.gliss(HARP, T, 1.3, ns("D3 E3 F#3 G#3 A3 B3 C#4 D4 E4 F#4 G#4 A4 B4 C#5 D5 E5 F#5 G#5 A5"), 92)
+S.note(DRUMS, T, 3, 49, 84)
+S.note(TIMP, T, 1.5, n("D2"), 90)
+S.chord(STR_LO, T, 16.0, ns("D2 A2 D3"), 74)
+S.chord(STR_HI, T, 8.0, ns("F#4 A4 C#5 G#5"), 70)
+S.chord(CHOIR, T + 0.3, 8.0, ns("D4 A4 E5"), 76)
+S.chord(BRASS, T, 4.0, ns("D3 A3 E4"), 64)
+S.arp(CELE, T + 1.0, 214.0, ns("D5 A5 E6 G#5 F#5 A5 E6 C#6"), 60 / 66 / 2, 50)
+S.melody(HORN, T + 2.0, 60, STAR + [("C#5", 2), ("E5", 2), ("D5", 4)], 88, octave=-1)
+S.chord(STR_HI, T + 8.0, 8.0, ns("E4 G#4 B4"), 58)
+progression(193.0, 3.0, ["Dmaj7", "Bm7", "Gmaj7", "A"], vel=50, lo=True)
+S.expr(TREM, 205.0, 214.0, 30, 124)
 for i, p in enumerate(ns("A3 B3 C#4 D4 E4 F#4 G#4 A4 B4 C#5 D5 E5")):
-    S.note(TREM, 157.0 + i * 0.75, 0.8, p, 80)
-S.chord(CHOIR, 158.0, 8.0, ns("D4 A4"), 62)
-S.expr(CHOIR, 158.0, 166.0, 40, 120)
-S.roll(TIMP, 163.5, 166.0, n("A1"), 30, 108)
-swell_cymbal(163.5, 166.0, 100)
+    S.note(TREM, 205.0 + i * 0.75, 0.8, p, 80)
+S.chord(CHOIR, 206.0, 8.0, ns("D4 A4"), 62)
+S.expr(CHOIR, 206.0, 214.0, 40, 120)
+S.roll(TIMP, 211.5, 214.0, n("A1"), 30, 108)
+swell_cymbal(211.5, 214.0, 100)
 
-# =============================================================== C9  the lanterntrees 166-180
-T0 = 166.0
-bpm = 80
-spb = 60 / bpm
-for ch in (STR_HI, STR_LO, CHOIR, HORN, BRASS):
-    S.expr(ch, T0 - 0.05, T0, 110, 115)
-S.note(DRUMS, T0, 4, 49, 100)
-S.note(TIMP, T0, 1.5, n("D2"), 110)
-S.melody(STR_HI, T0, bpm, THEME_A, 110, octave=0)
-S.melody(HORN, T0, bpm, THEME_A, 100, octave=-1)
-S.melody(SOLO, T0, bpm, THEME_A, 86, octave=1)
-for i, name in enumerate(["D", "F#m", "G", "D/F#"]):
-    tb = T0 + i * 4 * spb
-    lo_n, hi_n = V[name]
-    S.chord(STR_LO, tb, 4 * spb, lo_n, 96)
-    S.chord(CHOIR, tb, 4 * spb, [p - 12 for p in hi_n], 90)
-    S.chord(BRASS, tb, 4 * spb, [p - 12 for p in hi_n], 62)
-    S.arp(HARP, tb, tb + 4 * spb, [p - 12 for p in lo_n] + [p for p in hi_n], spb / 2, 64)
-    S.note(TIMP, tb, 1.2, lo_n[0] + 12 if lo_n[0] < n("D2") else lo_n[0], 84)
-S.chord(STR_HI, 178.0, 2.0, ns("A5"), 100)
-S.chord(CHOIR, 178.0, 2.0, ns("E4 A4 D5"), 88)
-S.roll(TIMP, 178.4, 180.0, n("A1"), 40, 90)
+# =============================================================== the lanterntrees 214-228
+reset(213.95, (STR_HI, STR_LO, CHOIR, HORN, BRASS, TBN, OOHS, SOLO))
+t_end = theme(214.0, 76, vel=108, bars=4, orch="full")
+S.chord(STR_HI, t_end, 228.0 - t_end, ns("A5 E6"), 90)
+S.chord(CHOIR, t_end, 228.0 - t_end, ns("E4 A4 D5"), 84)
+S.roll(TIMP, t_end, 228.0, n("A1"), 40, 92)
 
-# =============================================================== C10 the storm, the fall 180-193.5
-S.cut(180.0)
-for ch in (STR_HI, STR_LO, TREM, BRASS, TBN, CHOIR, HORN):
-    S.expr(ch, 180.0, 180.05, 100, 110)
-t = 180.0
-while t < 183.3:
-    k = int((t - 180.0) / 0.107)
+# =============================================================== the storm, the fall 228-241.5
+S.cut(228.0)
+reset(228.0, (STR_HI, STR_LO, TREM, BRASS, TBN, CHOIR, HORN, CELLO, BASS))
+t = 228.0
+while t < 231.3:
+    k = int((t - 228.0) / 0.107)
     S.note(CELLO, t, 0.09, n("D3") if k % 2 == 0 else n("D2") + 12, 88)
     S.note(BASS, t, 0.09, n("D2"), 84)
     t += 0.107
 for i, name in enumerate(["Dm", "Bb"]):
-    S.chord(BRASS, 180.0 + i * 1.71, 0.4, [p - 12 for p in V[name][1]], 108)
-    taiko(180.0 + i * 1.71, 110)
-S.chord(TREM, 180.0, 3.35, ns("D6 Eb6"), 86)
-boom(183.35, 127)
-S.chord(BRASS, 183.35, 1.0, ns("D3 Eb3 A3 Bb3"), 120)
-S.chord(HORN, 183.35, 1.0, ns("D4 Eb4 A4"), 120)
+    S.chord(BRASS, 228.0 + i * 1.71, 0.4, [p - 12 for p in V[name][1]], 108)
+    taiko(228.0 + i * 1.71, 110)
+S.chord(TREM, 228.0, 3.35, ns("D6 Eb6"), 86)
+boom(231.35, 127)
+S.chord(BRASS, 231.35, 1.0, ns("D3 Eb3 A3 Bb3"), 120)
+S.chord(HORN, 231.35, 1.0, ns("D4 Eb4 A4"), 120)
 for i in range(40):
-    S.note(TREM, 183.4 + i * 0.1, 0.12, n("D6") - i, 100 - i)
-S.roll(TIMP, 184.5, 187.5, n("D2"), 70, 110)
-S.chord(HORN, 185.0, 2.5, ns("D4 C4"), 100)
-S.expr(TREM, 187.5, 191.9, 50, 127)
-S.chord(TREM, 187.5, 4.4, ns("D4 Eb4 E4 F4 A5 Bb5"), 96)
-S.chord(CHOIR, 187.5, 4.4, ns("D4 Eb4 A4"), 90)
-S.chord(BASS, 187.5, 4.4, ns("D1"), 100)
-S.cut(191.9)
+    S.note(TREM, 231.4 + i * 0.1, 0.12, n("D6") - i, 100 - i)
+S.roll(TIMP, 232.5, 235.5, n("D2"), 70, 110)
+S.chord(HORN, 233.0, 2.5, ns("D4 C4"), 100)
+S.expr(TREM, 235.5, 239.9, 50, 127)
+S.chord(TREM, 235.5, 4.4, ns("D4 Eb4 E4 F4 A5 Bb5"), 96)
+S.chord(CHOIR, 235.5, 4.4, ns("D4 Eb4 A4"), 90)
+S.chord(BASS, 235.5, 4.4, ns("D1"), 100)
+S.cut(239.9)
 
-# =============================================================== C11 night on Veyra 193.5-258.5
+# =============================================================== night; Nim 241.5-288
 for ch in range(16):
-    S.expr(ch, 193.4, 193.5, 110, 110)
-S.expr(OOHS, 196.0, 202.0, 20, 90)
-S.chord(OOHS, 196.0, 9.0, ns("A3 E4"), 46)
-for t, p in [(197.5, "D6"), (199.8, "A5"), (202.6, "E6"), (204.4, "G#5")]:
-    S.note(HARP, t, 3, n(p), 44)
+    S.expr(ch, 241.4, 241.5, 110, 110)
+S.expr(OOHS, 244.0, 250.0, 20, 90)
+S.chord(OOHS, 244.0, 9.0, ns("A3 E4"), 44)
+for t, p in [(245.5, "D6"), (247.8, "A5"), (250.6, "E6")]:
+    S.note(HARP, t, 3, n(p), 42)
+# Nim: pizzicato curiosity, a flute that giggles
+S.prog(SOLO, 73, 253.0)
+S.prog(CELLO, 45, 253.0)
+for t, p in [(253.8, "D4"), (254.3, "A3"), (256.0, "E4"), (256.4, "C#4"), (258.4, "F#4"), (258.8, "D4"), (261.0, "A4"), (261.4, "E4")]:
+    S.note(CELLO, t, 0.3, n(p), 70)
+S.melody(SOLO, 255.8, 150, NIM, 72)
+S.melody(SOLO, 260.4, 150, NIM[:3] + [("A6", 1.5)], 76)
+S.note(CELE, 257.0, 1.5, n("E6"), 50)
+S.prog(CELLO, 42, 262.3)
 # the Aurai emerge
-S.arp(CELE, 205.5, 217.5, ns("D5 A5 E6 G#5 F#5 A5"), 0.42, 40)
-S.expr(CHOIR, 206.5, 212.5, 20, 105)
-S.chord(CHOIR, 206.5, 11.0, ns("D4 A4 E5 G#5"), 64)
-S.chord(STR_LO, 207.0, 11.0, ns("D2 A2"), 48)
-S.gliss(HARP, 211.0, 1.4, ns("D4 E4 F#4 G#4 A4 B4 C#5 D5 E5 F#5 G#5 A5"), 60)
-# face to face
-S.chord(STR_LO, 217.5, 14.0, ns("D2 A2"), 46)
-S.chord(STR_HI, 217.5, 8.0, ns("F#4 A4 E5"), 40)
-S.chord(STR_HI, 225.5, 5.5, ns("E4 G#4 B4"), 40)
-S.prog(SOLO, 73, 217.0)
-S.melody(SOLO, 225.0, 60, [("F#5", 1.5), ("G#5", .5), ("A5", 1), ("E5", 2.5)], 66)
-# the walk: a world that sings to its star
-progression(231.0, 3.25, ["D", "Bm7", "Gmaj7", "A"], vel=50, choir=True, choir_vel=44)
-S.arp(HARP, 231.0, 244.0, ns("D3 A3 F#4 A4 D5 A4 F#4 A3"), 0.4, 46)
-# Asha's confession: the lament
-S.chord(STR_LO, 244.0, 10.0, ns("D2 A2 F3"), 48)
-S.chord(STR_HI, 246.0, 8.0, ns("A4 D5"), 36)
-S.melody(CELLO, 250.8, 70, [("A3", 1.5), ("G3", .5), ("F3", 1), ("E3", 1), ("D3", 2)], 80)
-S.note(CELE, 253.4, 3, n("A5"), 56)
-S.chord(STR_HI, 254.0, 4.5, ns("F#4 A4 D5"), 44)
-S.chord(STR_LO, 254.0, 4.5, ns("D2 A2"), 46)
-S.gliss(HARP, 256.0, 1.0, ns("D4 F#4 A4 D5 F#5 A5"), 50)
+S.arp(CELE, 262.5, 274.5, ns("D5 A5 E6 G#5 F#5 A5"), 0.42, 40)
+S.expr(CHOIR, 263.5, 269.5, 20, 105)
+S.chord(CHOIR, 263.5, 11.0, ns("D4 A4 E5 G#5"), 64)
+S.chord(STR_LO, 264.0, 11.0, ns("D2 A2"), 48)
+S.gliss(HARP, 268.0, 1.4, ns("D4 E4 F#4 G#4 A4 B4 C#5 D5 E5 F#5 G#5 A5"), 60)
+S.chord(STR_LO, 274.5, 13.5, ns("D2 A2"), 44)
+S.chord(STR_HI, 274.5, 8.0, ns("F#4 A4 E5"), 38)
+S.chord(STR_HI, 282.5, 5.5, ns("E4 G#4 B4"), 38)
+S.melody(SOLO, 282.2, 60, [("F#5", 1.5), ("G#5", .5), ("A5", 1), ("E5", 2.5)], 62)
 
-# =============================================================== C13 the chamber 258.5-276.5
-S.prog(SOLO, 40, 258.0)
+# =============================================================== the song comes back 288-306.5
+S.chord(STR_HI, 288.3, 6.8, ns("D6"), 24)              # a held breath while Ilune hums
+S.expr(STR_LO, 295.4, 305.8, 30, 118)
+S.expr(STR_HI, 295.4, 305.8, 30, 118)
+S.expr(CHOIR, 297.0, 305.8, 20, 110)
+t = 295.6
+for nm, dur in [("D", 2.6), ("Bm", 2.6), ("G", 2.6), ("A", 1.6)]:
+    lo_n, hi_n = V[nm]
+    S.chord(STR_LO, t, dur * 1.02, lo_n, 70)
+    S.chord(STR_HI, t, dur * 1.02, hi_n, 64)
+    S.chord(CHOIR, t, dur * 1.02, [p - 12 for p in hi_n], 58)
+    t += dur
+S.melody(HORN, 297.4, 58, STAR, 78, octave=-1)
+S.chord(STR_HI, 304.6, 2.2, ns("F#4 A4 D5 F#5"), 90)   # "a father, and a child"
+S.chord(STR_LO, 304.6, 2.2, ns("D2 A2 D3"), 88)
+S.gliss(HARP, 304.6, 1.0, ns("D4 F#4 A4 D5 F#5 A5"), 70)
+
+# =============================================================== walk, confession 306.5-334
+reset(306.4, (STR_HI, STR_LO, CHOIR))
+progression(306.5, 3.25, ["D", "Bm7", "Gmaj7", "A"], vel=48, choir=True, choir_vel=42)
+S.arp(HARP, 306.5, 319.5, ns("D3 A3 F#4 A4 D5 A4 F#4 A3"), 0.4, 44)
+S.chord(STR_LO, 319.5, 10.0, ns("D2 A2 F3"), 46)
+S.chord(STR_HI, 321.5, 8.0, ns("A4 D5"), 34)
+S.prog(SOLO, 40, 318.0)
+S.melody(CELLO, 326.8, 70, [("A3", 1.5), ("G3", .5), ("F3", 1), ("E3", 1), ("D3", 2)], 78)
+S.note(CELE, 328.9, 3, n("A5"), 54)
+S.chord(STR_HI, 329.5, 4.5, ns("F#4 A4 D5"), 42)
+S.chord(STR_LO, 329.5, 4.5, ns("D2 A2"), 44)
+S.gliss(HARP, 331.5, 1.0, ns("D4 F#4 A4 D5 F#5 A5"), 48)
+
+# =============================================================== the chamber 334-352
 hymn = ["D", "A/C#", "Bm", "G", "D/F#", "Em", "A"]
-t = 258.5
+t = 334.0
 for i, nm in enumerate(hymn):
     lo_n, hi_n = V[nm]
     S.chord(CHOIR, t, 2.45, [p - 12 for p in hi_n], 58 + i * 4)
     S.chord(STR_LO, t, 2.45, lo_n, 50 + i * 4)
     t += 2.3
-for tt, p in [(259.5, "A6"), (261.8, "F#6"), (264.2, "E6"), (266.9, "D6"), (269.0, "A6")]:
+for tt, p in [(335.0, "A6"), (337.3, "F#6"), (339.7, "E6"), (342.4, "D6"), (344.5, "A6")]:
     S.note(CELE, tt, 2.5, n(p), 46)
-S.expr(STR_HI, 270.5, 274.9, 30, 125)
-S.chord(STR_HI, 270.5, 4.5, ns("E5 A5 C#6"), 84)
-S.expr(BRASS, 271.5, 274.9, 20, 115)
-S.chord(BRASS, 271.5, 3.4, ns("A3 E4 A4"), 80)
-S.roll(TIMP, 272.8, 274.9, n("A1"), 30, 104)
-swell_cymbal(272.5, 274.9, 90)
-T = 274.9
+S.expr(STR_HI, 346.0, 350.4, 30, 125)
+S.chord(STR_HI, 346.0, 4.5, ns("E5 A5 C#6"), 84)
+S.expr(BRASS, 347.0, 350.4, 20, 115)
+S.chord(BRASS, 347.0, 3.4, ns("A3 E4 A4"), 80)
+S.roll(TIMP, 348.3, 350.4, n("A1"), 30, 104)
+swell_cymbal(348.0, 350.4, 90)
+T = 350.4
 S.chord(STR_HI, T, 1.8, ns("D5 F#5 A5 D6"), 110)
 S.chord(CHOIR, T, 1.8, ns("D4 F#4 A4 D5"), 100)
 S.chord(STR_LO, T, 1.8, ns("D2 A2 D3"), 100)
@@ -495,240 +572,213 @@ S.gliss(HARP, T, 0.8, ns("D4 F#4 A4 D5 F#5 A5 D6 F#6"), 88)
 S.note(DRUMS, T, 3, 49, 90)
 S.note(TIMP, T, 1.5, n("D2"), 100)
 
-# =============================================================== C14 the vision 276.5-295.5
-for ch in (STR_HI, STR_LO, CHOIR, BRASS):
-    S.expr(ch, 276.4, 276.5, 110, 110)
-S.expr(TREM, 276.5, 283.5, 30, 122)
-S.chord(TREM, 276.5, 7.4, ns("D5 Eb5 E5 F5"), 90)
-S.chord(CHOIR, 277.0, 7.0, ns("D3 Eb3 Ab3"), 76)
-S.chord(BASS, 276.5, 12.0, ns("D1"), 84)
+# =============================================================== the vision 352-371
+reset(351.95, (STR_HI, STR_LO, CHOIR, BRASS))
+S.expr(TREM, 352.0, 359.0, 30, 122)
+S.chord(TREM, 352.0, 7.4, ns("D5 Eb5 E5 F5"), 90)
+S.chord(CHOIR, 352.5, 7.0, ns("D3 Eb3 Ab3"), 76)
+S.chord(BASS, 352.0, 12.0, ns("D1"), 84)
 for k in range(9):
-    S.note(TIMP, 276.8 + k * 0.8, 0.6, n("D2"), 70 + k * 4)
-S.expr(TREM, 283.6, 284.1, 122, 0)
-S.chord(STR_LO, 284.0, 4.6, ns("D2 A2 F3"), 56)
-S.melody(SOLO, 284.2, 64, [("A5", 1.5), ("G5", .5), ("F5", 1), ("E5", 1), ("D5", 1.8)], 84)
-# a song can break any cage
-S.chord(STR_LO, 288.5, 7.0, ns("D2 A2 D3"), 54)
-S.chord(STR_HI, 288.5, 7.0, ns("F#4 A4 D5"), 46)
-S.melody(HORN, 290.0, 66, [("D4", 2), ("A3", 1), ("B3", 1), ("A3", 3)], 74)
+    S.note(TIMP, 352.3 + k * 0.8, 0.6, n("D2"), 70 + k * 4)
+S.expr(TREM, 359.1, 359.6, 122, 0)
+S.chord(STR_LO, 359.5, 4.6, ns("D2 A2 F#3"), 56)
+S.melody(SOLO, 359.7, 60, STAR, 84, octave=1)          # the star song, on one violin: that's my sun
+S.chord(STR_LO, 364.0, 7.0, ns("D2 A2 D3"), 54)
+S.chord(STR_HI, 364.0, 7.0, ns("F#4 A4 D5"), 46)
+S.melody(HORN, 365.6, 66, STAR[:3], 76, octave=-1)
 
-# =============================================================== C16 the Starmaw arrives 295.5-319.5
-S.roll(TIMP, 295.5, 296.7, n("D2"), 30, 110)
-S.roll(BASS, 295.5, 296.7, n("D1"), 40, 100, rate=0.05)
-boom(296.7, 127)
-S.chord(TBN, 296.7, 3.0, ns("D2 Eb2 A2"), 124)
-S.chord(BRASS, 296.7, 3.0, ns("D3 Eb3 A3"), 118)
-S.chord(CHOIR, 296.7, 6.0, ns("D3 Eb3 A3"), 96)
-throne_ostinato(297.5, 317.0, 96, 72, 96)
-for k in range(7):
-    tb = 297.5 + k * 3.125
+# =============================================================== the Starmaw arrives 371-395
+S.roll(TIMP, 371.0, 372.2, n("D2"), 30, 110)
+S.roll(BASS, 371.0, 372.2, n("D1"), 40, 100, rate=0.05)
+boom(372.2, 127)
+S.chord(TBN, 372.2, 3.0, ns("D2 Eb2 A2"), 124)
+S.chord(BRASS, 372.2, 3.0, ns("D3 Eb3 A3"), 118)
+S.chord(CHOIR, 372.2, 6.0, ns("D3 Eb3 A3"), 96)
+throne_ostinato(373.0, 393.0, 96, 72, 96)
+for k in range(6):
+    tb = 373.0 + k * 3.125
     taiko(tb, 96)
     taiko(tb + 1.875, 76)
     S.note(TIMP, tb, 1.0, n("D2"), 84)
-throne_motif(299.0, 96, 104)
-throne_motif(305.25, 96, 112, octave=-1)
-S.melody(BRASS, 305.25, 96, [("D4", 2), ("Eb4", 1), ("D4", 1), ("A3", 4)], 96)
-S.expr(TREM, 309.0, 318.5, 30, 124)
-S.chord(TREM, 309.0, 9.5, ns("D5 Eb5 A5 Bb5"), 90)
-S.chord(CHOIR, 309.0, 9.5, ns("D4 Eb4 A4"), 80)
-S.expr(TREM, 318.5, 319.5, 124, 0)
+throne_motif(374.5, 96, 104)
+throne_motif(380.75, 96, 112, octave=-1)
+S.melody(BRASS, 380.75, 96, [("D4", 2), ("Eb4", 1), ("D4", 1), ("A3", 4)], 96)
+S.expr(TREM, 385.0, 394.0, 30, 124)
+S.chord(TREM, 385.0, 9.0, ns("D5 Eb5 A5 Bb5"), 90)
+S.chord(CHOIR, 385.0, 9.0, ns("D4 Eb4 A4"), 80)
+S.expr(TREM, 394.0, 395.0, 124, 0)
 
-# =============================================================== C17 sing with us 319.5-341.5
-for ch in (STR_HI, STR_LO, CHOIR, HORN, BRASS, OOHS):
-    S.expr(ch, 319.4, 319.5, 110, 110)
-S.expr(OOHS, 319.5, 325.5, 20, 110)
-S.chord(OOHS, 319.5, 7.0, ns("D4 A4"), 64)
-S.expr(CHOIR, 326.0, 341.0, 70, 127)
-S.melody(CHOIR, 326.0, 62, THEME_A, 96)
-S.melody(OOHS, 326.0, 62, THEME_A, 70, octave=-1)
-spb = 60 / 62
-for i, nm in enumerate(["D", "F#m", "G", "D/F#"]):
-    tb = 326.0 + i * 4 * spb
-    lo_n, hi_n = V[nm]
-    S.chord(STR_LO, tb, 4 * spb, lo_n, 64 + i * 10)
-    S.chord(STR_HI, tb, 4 * spb, hi_n, 54 + i * 10)
-    S.arp(HARP, tb, tb + 4 * spb, [p - 12 for p in lo_n] + hi_n, spb / 2, 56 + i * 6)
-S.roll(TIMP, 334.5, 337.0, n("A1"), 30, 112)
-swell_cymbal(334.5, 337.0, 100)
-T = 337.0
+# =============================================================== sing with us; the fighter rises 395-417
+reset(394.95, (STR_HI, STR_LO, CHOIR, HORN, BRASS, OOHS))
+S.expr(OOHS, 395.0, 401.0, 20, 110)
+S.chord(OOHS, 395.0, 7.0, ns("D4 A4"), 64)
+S.expr(CHOIR, 402.4, 417.0, 70, 127)
+theme(402.4, 64, vel=96, bars=4, orch="strings")
+S.melody(CHOIR, 402.4, 64, MAIN[:13], 96)
+S.roll(TIMP, 410.3, 412.5, n("A1"), 30, 112)
+swell_cymbal(410.3, 412.5, 100)
+T = 412.5
 boom(T, 120)
-S.melody(BRASS, T, 88, [("A4", 1), ("D5", 1), ("F#5", 1), ("A5", 3)], 116)
-S.melody(HORN, T, 88, [("A3", 1), ("D4", 1), ("F#4", 1), ("A4", 3)], 110)
-S.chord(STR_LO, T, 4.5, ns("D2 A2 D3"), 110)
-S.chord(STR_HI, T + 2.0, 2.5, ns("D5 F#5 A5"), 104)
-S.chord(CHOIR, T, 4.5, ns("D4 F#4 A4 D5"), 104)
+S.melody(BRASS, T, 88, [("A4", 1/3), ("B4", 1/3), ("C#5", 1/3), ("D5", 1), ("E5", 1), ("B5", 2), ("A5", 3)], 118)
+S.melody(HORN, T, 88, [("A3", 1/3), ("B3", 1/3), ("C#4", 1/3), ("D4", 1), ("E4", 1), ("B4", 2), ("A4", 3)], 110)
+S.chord(STR_LO, T, 4.5, ns("G1 D2 G2"), 110)
+S.chord(STR_LO, T + 3.0, 1.5, ns("D2 A2 D3"), 110)
+S.chord(CHOIR, T, 4.5, ns("D4 G4 B4 D5"), 104)
 
-# =============================================================== C18 battle 341.5-370.5
+# =============================================================== the march 417-446.5
 bpm = 132
 spb = 60 / bpm
 bar = 4 * spb
-bars = int((370.5 - 341.5) / bar)
-loop_min = ["Dm", "Bb", "C", "A"]
-loop_maj = ["D", "G", "A", "D"]
 ost = {"Dm": "D3 D3 F3 D3 G3 D3 F3 E3", "Bb": "Bb2 Bb2 D3 Bb2 F3 Bb2 D3 C3", "C": "C3 C3 E3 C3 G3 C3 E3 D3",
        "A": "A2 A2 C#3 A2 E3 A2 C#3 E3", "D": "D3 D3 F#3 D3 A3 D3 F#3 E3", "G": "G2 G2 B2 G2 D3 G2 B2 A2"}
-for b in range(bars + 1):
-    tb = 341.5 + b * bar
-    if tb >= 370.5:
+loop_min = ["Dm", "Bb", "C", "A"]
+loop_maj = ["D", "G", "A", "D"]
+b = 0
+while True:
+    tb = 417.0 + b * bar
+    if tb >= 446.4:
         break
-    major = tb >= 364.0
+    major = tb >= 440.6
     nm = (loop_maj if major else loop_min)[b % 4]
     for i, p in enumerate(ns(ost[nm])):
         S.note(CELLO, tb + i * spb / 2, spb / 2 * 0.8, p, 84 + (12 if i == 0 else 0))
         S.note(BASS, tb + i * spb / 2, spb / 2 * 0.8, p - 12, 80)
     lo_n, hi_n = V[nm]
-    S.chord(STR_HI, tb, bar, hi_n, 70)
-    S.chord(STR_LO, tb, bar, lo_n, 64)
-    taiko(tb, 104)
-    taiko(tb + 2 * spb, 88)
+    S.chord(STR_HI, tb, bar, hi_n, 66)
+    S.chord(STR_LO, tb, bar, lo_n, 62)
+    taiko(tb, 100)
+    taiko(tb + 2 * spb, 84)
     S.note(TIMP, tb, 0.6, n("D2") if nm in ("Dm", "D") else lo_n[0] + 12, 90)
-    S.note(DRUMS, tb + 3.5 * spb, 0.2, 38, 70)
-    S.note(DRUMS, tb + 3.75 * spb, 0.2, 38, 80)
-    if tb >= 352.5 and not major:
-        S.chord(TBN, tb, spb * 1.5, [p for p in lo_n[:2]], 96)
-S.melody(HORN, 343.3, bpm / 2, THEME_MIN, 100, octave=-1)
-S.melody(BRASS, 353.0, bpm / 2, THEME_MIN[:5], 104, octave=-1)
-S.note(DRUMS, 364.0, 3, 49, 110)
-boom(364.0, 118)
-S.melody(BRASS, 364.0, bpm / 2, THEME_A[:5], 118, octave=-1)
-S.melody(HORN, 364.0, bpm / 2, THEME_A[:5], 112, octave=-1)
-S.melody(STR_HI, 364.0, bpm / 2, THEME_A[:5], 104)
-for t in (365.1, 365.8):
+    # the snare: a march
+    for k, v in ((0, 70), (1.5, 60), (2, 74), (3, 66), (3.5, 60), (3.75, 72)):
+        S.note(DRUMS, tb + k * spb, 0.15, 38, v)
+    if tb >= 428.8 and not major:
+        S.chord(TBN, tb, spb * 1.5, lo_n[:2], 96)
+    b += 1
+# Asha's march: the theme in dotted brass rhythm, minor, defiant
+S.melody(HORN, 419.0, bpm / 2, MAIN_MIN[:8], 100, octave=-1)
+S.melody(BRASS, 429.4, bpm / 2, MAIN_MIN, 104, octave=-1)
+# Jax! the major-key fanfare
+S.note(DRUMS, 440.6, 3, 49, 112)
+boom(440.6, 118)
+S.melody(BRASS, 440.6, bpm / 2, MAIN[:11], 118, octave=-1)
+S.melody(HORN, 440.6, bpm / 2, MAIN[:11], 112, octave=-1)
+S.melody(STR_HI, 440.6, bpm / 2, MAIN[:11], 104)
+for t in (441.1, 441.8):
     S.note(DRUMS, t, 1.5, 35, 118)
     S.note(TIMP, t, 1.0, n("D2"), 110)
 
-# =============================================================== C19 into the core 370.5-387.5
-t, step = 370.5, 0.11
-while t < 379.4:
-    k = int((t - 370.5) / 0.11)
+# =============================================================== into the core 446.5-476.2
+t, step = 446.5, 0.11
+while t < 455.4:
+    k = int((t - 446.5) / 0.11)
     S.note(CELLO, t, 0.09, ns("D3 A3 F3 A3")[k % 4], 86)
     S.note(BASS, t, 0.09, n("D2"), 80)
     t += step
-S.expr(TREM, 370.5, 379.4, 40, 124)
+S.expr(TREM, 446.5, 455.4, 40, 124)
 for i, p in enumerate(ns("D4 E4 F4 G4 A4 Bb4 C5 D5 E5 F5 G5 A5")):
-    S.note(TREM, 370.5 + i * 0.74, 0.8, p, 90)
-for t in (370.5, 372.3, 374.1, 375.9, 377.7):
+    S.note(TREM, 446.5 + i * 0.74, 0.8, p, 90)
+for t in (446.5, 448.3, 450.1, 451.9, 453.7):
     S.chord(BRASS, t, 0.4, ns("D3 A3 D4"), 104)
     taiko(t, 100)
-S.cut(379.45)
-S.expr(STR_HI, 379.5, 379.6, 60, 90)
-S.chord(STR_HI, 379.5, 5.0, ns("A5 D6"), 48)
-S.chord(CHOIR, 379.8, 4.0, ns("D4 A4"), 46)
-S.note(SOLO, 383.8, 1.6, n("A5"), 60)
-S.expr(STR_HI, 384.6, 387.5, 40, 127)
-S.chord(STR_HI, 384.6, 2.95, ns("A4 D5 A5"), 90)
-S.expr(CHOIR, 384.6, 387.5, 40, 127)
-S.chord(CHOIR, 384.6, 2.95, ns("A3 D4 A4"), 88)
-S.gliss(HARP, 384.7, 1.2, ns("A3 D4 F#4 A4 D5 F#5 A5 D6"), 80)
-S.roll(TIMP, 385.9, 387.5, n("A1"), 50, 122)
-swell_cymbal(385.6, 387.5, 110)
+S.cut(455.45)
+reset(455.5, (STR_HI, STR_LO, CHOIR, OOHS, HORN, SOLO))
+S.chord(STR_HI, 455.5, 5.0, ns("A5 D6"), 44)
+# "Remember me?" -- silence -- she hums, and the caged suns answer each note
+for t_on, name, dur in ((462.5, "D", 1.0), (463.46, "F#m", 1.0), (464.42, "A", 1.7), (466.1, "D", 4.0)):
+    lo_n, hi_n = V[name]
+    S.expr(STR_HI, t_on, t_on + 0.6, 30, 80 + (30 if t_on > 466 else 0))
+    S.chord(STR_HI, t_on, dur, hi_n, 60 + (25 if t_on > 466 else 0))
+    S.chord(OOHS, t_on, dur, [p - 12 for p in hi_n], 50 + (25 if t_on > 466 else 0))
+    S.note(CELE, t_on, 2.0, hi_n[-1] + 12, 56)
+S.expr(CHOIR, 466.1, 470.0, 40, 120)
+S.chord(CHOIR, 466.1, 4.5, ns("D4 F#4 A4 D5"), 80)
+S.chord(STR_LO, 466.1, 6.0, ns("D2 A2 D3"), 80)
+S.note(SOLO, 470.2, 1.4, n("A5"), 56)
+# the Heartseed flies
+S.expr(STR_HI, 473.3, 476.2, 40, 127)
+S.chord(STR_HI, 473.3, 2.95, ns("A4 D5 A5"), 90)
+S.expr(CHOIR, 473.3, 476.2, 40, 127)
+S.chord(CHOIR, 473.3, 2.95, ns("A3 D4 A4"), 88)
+S.gliss(HARP, 473.4, 1.2, ns("A3 D4 F#4 A4 D5 F#5 A5 D6"), 80)
+S.roll(TIMP, 474.6, 476.2, n("A1"), 50, 122)
+swell_cymbal(474.3, 476.2, 110)
 
-# =============================================================== C20 STARWAKE 387.5-427.5
-for ch in (STR_HI, STR_LO, CHOIR, HORN, BRASS, TBN, OOHS, SOLO):
-    S.expr(ch, 387.45, 387.5, 110, 118)
-T = 387.5
-boom(T, 127)
-S.chord(BRASS, T, 1.0, ns("D3 A3 D4 F#4"), 120)
-bpm = 76
-spb = 60 / bpm
-T1 = 388.3
-S.melody(STR_HI, T1, bpm, THEME_A + THEME_B, 112)
-S.melody(HORN, T1, bpm, THEME_A + THEME_B, 104, octave=-1)
-S.melody(CHOIR, T1, bpm, THEME_A + THEME_B, 96)
-S.melody(SOLO, T1, bpm, THEME_A + THEME_B, 84, octave=1)
-for i, nm in enumerate(["D", "F#m", "G", "D/F#", "Bm", "G", "A", "D"]):
-    tb = T1 + i * 4 * spb
-    lo_n, hi_n = V[nm]
-    S.chord(STR_LO, tb, 4 * spb, lo_n, 104)
-    S.chord(BRASS, tb, 4 * spb, [p - 12 for p in hi_n], 76)
-    S.chord(OOHS, tb, 4 * spb, [p - 12 for p in hi_n], 78)
-    S.chord(TBN, tb, 4 * spb, lo_n[1:], 70)
-    S.arp(HARP, tb, tb + 4 * spb, [p - 12 for p in lo_n] + hi_n, spb / 2, 72)
-    S.note(TIMP, tb, 1.2, n("D2") if nm in ("D", "D/F#") else n("A1"), 92)
-    if i in (0, 4):
-        S.note(DRUMS, tb, 4, 49, 104)
-T2 = T1 + 32 * spb
-S.expr(STR_HI, T2, 427.0, 110, 40)
-S.expr(STR_LO, T2, 427.0, 110, 40)
-S.expr(CHOIR, T2, 427.0, 110, 30)
-S.chord(STR_LO, T2, 427.0 - T2, ns("D2 A2 D3"), 80)
-S.chord(STR_HI, T2, 6.0, ns("F#4 A4 D5"), 70)
-S.chord(STR_HI, T2 + 6, 427.0 - T2 - 6, ns("G4 B4 D5"), 62)
-S.chord(CHOIR, T2, 427.0 - T2, ns("D4 F#4 A4"), 70)
-S.melody(HORN, 418.0, 66, [("D4", 2), ("A3", 1), ("B3", 1), ("A3", 4)], 70)
-for t, p in [(416.5, "A6"), (419.0, "F#6"), (421.5, "D6"), (424.0, "E6")]:
+# =============================================================== STARWAKE 476.2-516.2
+reset(476.15, (STR_HI, STR_LO, CHOIR, HORN, BRASS, TBN, OOHS, SOLO))
+boom(476.2, 127)
+S.chord(BRASS, 476.2, 1.0, ns("D3 A3 D4 F#4"), 120)
+t_end = theme(477.0, 76, vel=112, bars=8, orch="full")
+# Kessar rekindles: the father's song, warm and whole
+S.expr(STR_HI, t_end, 516.0, 110, 50)
+S.expr(STR_LO, t_end, 516.0, 110, 50)
+S.chord(STR_LO, t_end, 516.0 - t_end, ns("D2 A2 D3"), 76)
+S.chord(STR_HI, t_end, 6.0, ns("F#4 A4 D5"), 66)
+S.chord(STR_HI, t_end + 6, 516.0 - t_end - 6, ns("G4 B4 D5"), 60)
+S.chord(CHOIR, t_end, 516.0 - t_end, ns("D4 F#4 A4"), 66)
+S.melody(HORN, 506.0, 60, STAR, 80, octave=-1)
+for t, p in [(505.0, "A6"), (507.5, "F#6"), (510.0, "D6"), (512.5, "E6")]:
     S.note(CELE, t, 2.5, n(p), 50)
 
-# =============================================================== C21 epilogue 427.5-447.5
-for ch in (STR_HI, STR_LO, CHOIR, HORN):
-    S.expr(ch, 427.4, 427.5, 100, 100)
-S.prog(PIANO, 0, 427.0)
-S.melody(PIANO, 427.8, 60, [("A4", 1.5), ("G4", .5), ("F4", 1), ("E4", 1.5), ("D4", 2)], 60)
-S.chord(PIANO, 427.8, 3, ns("D3 A3"), 44)
-t = progression(431.0, 2.25, ["Bb", "F", "C", "Gm"], vel=48, choir=False)
-S.chord(STR_LO, t, 3.0, ns("A1 E2 A2"), 56)
-S.chord(STR_HI, t, 3.0, ns("E4 A4 C#5"), 50)
-S.arp(HARP, 437.5, 442.5, ns("D4 F#4 A4 D5 F#5 A5"), 0.28, 50)
-for t, p in [(438.0, "A6"), (439.4, "F#6"), (440.8, "D6"), (441.9, "A5")]:
-    S.note(CELE, t, 2.0, n(p), 52)
-S.expr(STR_HI, 442.6, 445.5, 50, 115)
-S.chord(STR_HI, 442.6, 5.0, ns("F#4 A4 D5 F#5"), 76)
-S.chord(STR_LO, 442.6, 5.0, ns("D2 A2 D3"), 72)
-S.expr(CHOIR, 442.6, 445.5, 40, 110)
-S.chord(CHOIR, 442.6, 5.0, ns("D4 F#4 A4"), 70)
-S.melody(HORN, 444.9, 66, [("D4", 1.5), ("A3", .75), ("B3", .75)], 72)
+# =============================================================== the rooftop, at dawn 516.2-526.2
+reset(516.1, (STR_HI, STR_LO, CHOIR))
+S.prog(PIANO, 0, 516.0)
+S.chord(STR_LO, 516.2, 10.0, ns("D2 A2 D3"), 50)
+S.chord(STR_HI, 517.0, 9.2, ns("F#4 A4"), 42)
+S.melody(PIANO, 517.4, 58, STAR, 64, octave=1)         # the child's song, simply, once more
+S.chord(PIANO, 517.4, 4, ns("D3 A3"), 44)
+S.chord(PIANO, 521.5, 4, ns("D3 F#3 A3"), 42)
 
-# =============================================================== C22 end title & credits 447.5-503.5
-S.expr(TREM, 447.5, 450.9, 30, 127)
-S.chord(TREM, 447.5, 3.4, ns("A3 A4 A5"), 90)
-S.roll(TIMP, 448.8, 450.9, n("A1"), 30, 118)
-swell_cymbal(448.6, 450.9, 110)
-for ch in (STR_HI, STR_LO, CHOIR, HORN, BRASS, TBN, OOHS, SOLO):
-    S.expr(ch, 450.85, 450.9, 110, 118)
-T = 450.9
-boom(T, 127)
-bpm = 76
-spb = 60 / bpm
-S.melody(STR_HI, T, bpm, THEME_A + THEME_B, 110)
-S.melody(HORN, T, bpm, THEME_A + THEME_B, 104, octave=-1)
-S.melody(CHOIR, T, bpm, THEME_A + THEME_B, 90)
-for i, nm in enumerate(["D", "F#m", "G", "D/F#", "Bm", "G", "A", "D"]):
-    tb = T + i * 4 * spb
-    lo_n, hi_n = V[nm]
-    S.chord(STR_LO, tb, 4 * spb, lo_n, 100)
-    S.chord(BRASS, tb, 4 * spb, [p - 12 for p in hi_n], 72)
-    S.chord(TBN, tb, 4 * spb, lo_n[1:], 64)
-    S.arp(HARP, tb, tb + 4 * spb, [p - 12 for p in lo_n] + hi_n, spb / 2, 66)
-    S.note(TIMP, tb, 1.2, n("D2") if nm in ("D", "D/F#") else n("A1"), 88)
-    if i in (0, 4):
-        S.note(DRUMS, tb, 4, 49, 96)
-T3 = T + 32 * spb   # ~476.2: the Aurai remember
+# =============================================================== epilogue 526.2-550.2
+S.melody(PIANO, 526.5, 60, [("A4", 1.5), ("G4", .5), ("F#4", 1), ("E4", 1.5), ("D4", 2)], 56)
+t = progression(529.8, 2.25, ["Bm", "G", "D", "A"], vel=46)
+S.gliss(HARP, 540.0, 1.2, ns("D4 F#4 A4 D5 F#5 A5 D6 F#6"), 62)    # Nim: look!
+S.arp(CELE, 540.2, 544.2, ns("D6 A6 F#6 A6"), 0.25, 48)
+S.expr(STR_HI, 544.8, 547.5, 50, 115)
+S.chord(STR_HI, 544.8, 5.0, ns("F#4 A4 D5 F#5"), 76)
+S.chord(STR_LO, 544.8, 5.0, ns("D2 A2 D3"), 72)
+S.expr(CHOIR, 544.8, 547.5, 40, 110)
+S.chord(CHOIR, 544.8, 5.0, ns("D4 F#4 A4"), 70)
+S.prog(SOLO, 73, 545.5)
+S.melody(SOLO, 546.7, 150, NIM, 70)
+S.melody(HORN, 547.6, 60, STAR, 74, octave=-1)
+
+# =============================================================== end title & credits 550.2-606.2
+S.expr(TREM, 550.2, 553.6, 30, 127)
+S.chord(TREM, 550.2, 3.4, ns("A3 A4 A5"), 90)
+S.roll(TIMP, 551.5, 553.6, n("A1"), 30, 118)
+swell_cymbal(551.3, 553.6, 110)
+reset(553.55, (STR_HI, STR_LO, CHOIR, HORN, BRASS, TBN, OOHS, SOLO))
+S.prog(SOLO, 40, 553.0)
+boom(553.6, 127)
+t_end = theme(553.6, 76, vel=110, bars=8, orch="full")
+T3 = t_end
 S.prog(SOLO, 73, T3 - 0.2)
-S.arp(CELE, T3, T3 + 14, ns("D5 A5 E6 G#5 F#5 A5 E6 C#6"), 60 / 66 / 2, 46)
+S.arp(CELE, T3, T3 + 13, ns("D5 A5 E6 G#5 F#5 A5 E6 C#6"), 60 / 66 / 2, 46)
 S.melody(SOLO, T3 + 0.5, 66, AURAI, 76)
-S.chord(STR_LO, T3, 14.0, ns("D2 A2 D3"), 60)
-S.chord(STR_HI, T3, 7.0, ns("F#4 A4 C#5"), 54)
-S.chord(STR_HI, T3 + 7, 7.0, ns("E4 G#4 B4"), 54)
-S.chord(CHOIR, T3, 14.0, ns("D4 A4"), 52)
-T4 = T3 + 14.0   # ~490: last phrase, home
+S.chord(STR_LO, T3, 13.0, ns("D2 A2 D3"), 60)
+S.chord(STR_HI, T3, 6.5, ns("F#4 A4 C#5"), 54)
+S.chord(STR_HI, T3 + 6.5, 6.5, ns("E4 G#4 B4"), 54)
+S.chord(CHOIR, T3, 13.0, ns("D4 A4"), 52)
+T4 = T3 + 13.0
 S.prog(SOLO, 40, T4 - 0.2)
-S.melody(STR_HI, T4, 70, THEME_B, 100)
-S.melody(HORN, T4, 70, THEME_B, 94, octave=-1)
+S.melody(STR_HI, T4, 60, STAR, 96)
+S.melody(HORN, T4, 60, STAR, 90, octave=-1)
+S.melody(CHOIR, T4, 60, STAR, 84)
 for i, nm in enumerate(["Bm", "G", "A", "D"]):
-    tb = T4 + i * 4 * 60 / 70
+    tb = T4 + i * 2.0
     lo_n, hi_n = V[nm]
-    S.chord(STR_LO, tb, 4 * 60 / 70, lo_n, 90)
-    S.chord(CHOIR, tb, 4 * 60 / 70, [p - 12 for p in hi_n], 84)
-    S.arp(HARP, tb, tb + 4 * 60 / 70, [p - 12 for p in lo_n] + hi_n, 60 / 70 / 2, 60)
-TEND = T4 + 12 * 60 / 70
-S.chord(STR_LO, TEND, 503.4 - TEND, ns("D2 A2 D3"), 96)
-S.chord(STR_HI, TEND, 503.4 - TEND, ns("F#4 A4 D5 F#5"), 90)
-S.chord(CHOIR, TEND, 503.4 - TEND, ns("D4 F#4 A4 D5"), 86)
-S.chord(BRASS, TEND, 503.4 - TEND, ns("D3 A3 F#4"), 64)
+    S.chord(STR_LO, tb, 2.0, lo_n, 88)
+    S.arp(HARP, tb, tb + 2.0, [p - 12 for p in lo_n] + hi_n, 0.25, 58)
+TEND = T4 + 8.0
+S.chord(STR_LO, TEND, 606.0 - TEND, ns("D2 A2 D3"), 96)
+S.chord(STR_HI, TEND, 606.0 - TEND, ns("F#4 A4 D5 F#5"), 90)
+S.chord(CHOIR, TEND, 606.0 - TEND, ns("D4 F#4 A4 D5"), 86)
+S.chord(BRASS, TEND, 606.0 - TEND, ns("D3 A3 F#4"), 64)
 S.note(TIMP, TEND, 2, n("D2"), 90)
 S.note(DRUMS, TEND, 5, 49, 80)
 for ch in (STR_LO, STR_HI, CHOIR, BRASS):
-    S.expr(ch, TEND + 1, 503.4, 110, 0)
+    S.expr(ch, TEND + 1, 606.0, 110, 0)
 
 
 def hall_ir(seconds=3.4, decay=1.25, seed=3):

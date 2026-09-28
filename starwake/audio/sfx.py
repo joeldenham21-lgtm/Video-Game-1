@@ -100,6 +100,20 @@ def explosion(dur=2.5, bright=1.0):
     return y / (np.abs(y).max() + 1e-9)
 
 
+def twang(dur=0.5, a=0.62, stages=90, bright=1.0):
+    """Blaster bolt: a click smeared by dispersion, like a struck guy-wire."""
+    nn = int(dur * SR)
+    x = np.zeros(nn)
+    x[0] = 1.0
+    x[1:40] += noise(39) * 0.1
+    for _ in range(stages):
+        x = signal.lfilter([-a, 1.0], [1.0, -a], x)
+    t = np.arange(nn) / SR
+    x *= np.exp(-t * 6)
+    x = filt(x, "high", 250)
+    return x / (np.abs(x).max() + 1e-9)
+
+
 def laser(dur=0.45, f0=2600, f1=260):
     nn = int(dur * SR)
     t = np.arange(nn) / SR
@@ -297,10 +311,12 @@ def space_rumble(d):
 def maw_drone(d):
     nn = int(d * SR)
     t = np.arange(nn) / SR
+    breath = sweep_noise(d, 90, 260, bw=0.8) * (0.5 + 0.5 * np.sin(2 * np.pi * t / 6.5)) ** 3
     y = sum(signal.sawtooth(2 * np.pi * f * t + i) / (i + 1) for i, f in enumerate((36.7, 38.9, 55.0, 73.4)))
     y = filt(y, "low", 400)
     y += filt(noise(nn), "band", [60, 300]) * 0.5
     y *= 1 + 0.2 * np.sin(2 * np.pi * 0.2 * t)
+    y = y / (np.abs(y).max() + 1e-9) + breath * 0.8
     return y / (np.abs(y).max() + 1e-9)
 
 
@@ -330,6 +346,40 @@ place(st("S07") + 0.2, reverse_swell(3.0), 0.22)
 place(st("S07") + 3.2, boom(6.5, 80, 24, sub=1.0, crack=0.6), 0.5)
 place(st("S07") + 3.2, chime(6.0, 880, 1.0), 0.05)
 
+# ================================================================ KESSAR ROOFTOP
+def breathing(d, rate=3.6, depth=1.0):
+    nn = int(d * SR)
+    t = np.arange(nn) / SR
+    ph = (t % rate) / rate
+    env_b = np.where(ph < 0.4, np.sin(np.pi * ph / 0.4), 0) + 0.7 * np.where(ph > 0.5, np.sin(np.pi * np.clip((ph - 0.5) / 0.45, 0, 1)), 0)
+    x = filt(noise(nn), "band", [350, 2500]) * env_b ** 2 * depth
+    return x / (np.abs(x).max() + 1e-9)
+
+
+def trill(dur=0.5, f=2400):
+    nn = int(dur * SR)
+    t = np.arange(nn) / SR
+    fm = f * (1 + 0.15 * np.sin(2 * np.pi * 22 * t)) * np.linspace(1.0, 1.35, nn)
+    y = np.sin(2 * np.pi * np.cumsum(fm) / SR) * np.hanning(nn)
+    return y
+
+
+bed(st("K1"), st("S05"), lambda d: wind(d, 150, 900, 0.3), 0.07, fi=1.5, fo=1.0)
+bed(st("K1"), st("K3") + 7.2, lambda d: filt(noise(int(d * SR)), "band", [80, 400]) * 0.6 + hum(d, (50, 100, 150), 0.1) * 0.3, 0.05, fi=1.0, fo=0.05)
+thread = st("K1")
+place(thread, fades(hum(st("K3") + 7.0 - thread, (1760, 2640, 3520), 1.3) * 0.5, 2.0, 0.3), 0.012, pan=-0.4)
+coll = st("K3") + 7.0
+place(coll - 2.0, reverse_swell(2.0), 0.14)
+place(coll, boom(6.0, 50, 20, sub=1.0, crack=0.2), 0.45)
+place(coll + 0.1, sweep_noise(2.5, 900, 60, bw=0.6), 0.08)          # the city's power dies
+bed(st("K3") + 7.5, st("S05"), lambda d: filt(noise(int(d * SR)), "high", 5000) * 0.1, 0.03, fi=1.5, fo=0.8)
+# the rooftop at dawn, twenty years on: wind, ice ticking in the sun
+bed(st("K5"), st("S43"), lambda d: wind(d, 200, 1100, 0.2), 0.05, fi=1.0, fo=1.0)
+ticks = (rng.random(int(10 * SR)) > 0.9994) * noise(int(10 * SR))
+place(st("K5"), filt(ticks, "band", [2500, 9000]), 0.25)
+for k in range(8):
+    place(st("K5") + 1.0 + k * 1.1, chime(2.5, float(rng.choice([2349, 2637, 3136, 3520]))), 0.006, pan=float(rng.uniform(-0.8, 0.8)))
+
 # ================================================================ ACT ONE
 bed(st("S08"), st("S10"), space_rumble, 0.10, fi=1, fo=1)
 bed(st("S08"), st("S09") + 3, maw_drone, 0.07, fi=1, fo=3)
@@ -354,6 +404,15 @@ place(st("S12") + 8.15, boom(4.0, 120, 30, sub=0.8, crack=1.0), 0.45)
 place(st("S12") + 7.6, sweep_noise(1.2, 300, 6000, bw=0.5, peak=0.9), 0.2)
 bed(st("S13"), st("S14"), lambda d: sweep_noise(d, 400, 900, bw=1.0) + filt(brown(int(d * SR)), "low", 90), 0.18, fi=0.05, fo=0.2)
 place(st("S13") + 4.6, sweep_noise(1.0, 5000, 200, bw=0.6, peak=0.25), 0.2)
+
+# ================================================================ HER FACE (V1 / V2)
+bed(st("V1"), st("S14"), lambda d: breathing(d, 3.4) + hum(d, (92, 184), 0.2) * 0.3, 0.06, fi=0.2, fo=0.8)
+place(st("V1"), sweep_noise(1.5, 5000, 300, bw=0.6, peak=0.2), 0.12)
+place(st("V1") + 0.5, beep(1400, 0.08, 2), 0.03, pan=0.3)
+bed(st("V2"), st("S38b"), lambda d: breathing(d, 2.6, 1.0) * 0.8 + heartbeat(d, 72) * 0.5, 0.08, fi=0.3, fo=0.5)
+for t_on, f in ((3.0, 740), (3.96, 880), (4.92, 1318.5), (6.6, 1174.7)):
+    place(st("V2") + t_on, chime(4.0, f, 0.5), 0.03)          # the caged suns answer
+    place(st("V2") + t_on, chime(4.0, f / 2, 0.3), 0.02)
 
 # ================================================================ ACT TWO
 place(st("S14"), boom(3.0, 70, 30, sub=0.5, crack=0.3), 0.18)
@@ -393,6 +452,11 @@ place(crash, boom(3.0, 60, 30, sub=0.8, crack=0.4), 0.35)
 # night on Veyra
 bed(st("S20"), st("S26"), night_bed, 0.10, fi=2.5, fo=1.0)
 bed(st("S20"), st("S23"), lambda d: filt((rng.random(int(d * SR)) > 0.9994) * noise(int(d * SR)), "high", 2000) * 3 + filt(noise(int(d * SR)), "band", [200, 900]) * 0.05, 0.04, fi=1, fo=1, pan=-0.4)
+# Nim
+for tt in np.arange(st("C1") + 0.5, st("C1") + 1.4, 0.3).tolist() + np.arange(st("C1") + 3.3, st("C1") + 5.3, 0.33).tolist():
+    place(tt, splash(0.3, 0.1) * env(int(0.3 * SR), 0.004, 0.08), 0.02, pan=-0.3)
+place(st("C1") + 6.9, trill(0.45, 2600), 0.02, pan=-0.3)
+place(st("S43") + 20.6, trill(0.5, 2800), 0.02, pan=-0.2)
 for k in range(5):
     tg = st("S21") + 1.0 + k * 0.7 + 1.0
     place(tg, chime(4.0, float([987.8, 1174.7, 1318.5, 1480, 1661.2][k]), 0.6), 0.03, pan=-0.6 + k * 0.3)
@@ -451,7 +515,7 @@ bed(st("S34"), st("S35"), maw_drone, 0.08, fi=0.5, fo=0.5)
 for sid, dur, rate in (("S34", 11.0, 0.32), ("S35", 10.0, 0.28), ("S36", 8.0, 0.5)):
     tt = st(sid) + 0.2
     while tt < st(sid) + dur - 0.3:
-        place(tt, laser(0.45, float(rng.uniform(1800, 3200)), float(rng.uniform(180, 400))), 0.06, pan=float(rng.uniform(-0.9, 0.9)))
+        place(tt, twang(0.5, float(rng.uniform(0.55, 0.7)), int(rng.integers(70, 110))), 0.08, pan=float(rng.uniform(-0.9, 0.9)))
         tt += rate * float(rng.uniform(0.6, 1.4))
 for k in range(7):
     place(st("S34") + 0.5 + k * 1.6, explosion(2.0, 0.8), 0.10, pan=float(rng.uniform(-0.7, 0.7)))
@@ -459,7 +523,7 @@ place(st("S35") + 5.6, explosion(2.5, 1.2), 0.35, pan=-0.3)
 place(st("S35") + 8.2, explosion(2.0, 1.0), 0.18, pan=-0.6)
 place(st("S36") + 0.3, fades(engine(2.5, 70, 0.8, doppler=lambda t: 1.25 - 0.4 * t / 2.5), 0.1, 0.8), 0.16, pan=-0.8, pan_to=0.2)
 for k in range(6):
-    place(st("S36") + 1.6 + k * 0.25, laser(0.35, 1400, 300), 0.10, pan=-0.2)
+    place(st("S36") + 1.6 + k * 0.25, twang(0.45, 0.66, 80), 0.12, pan=-0.2)
 place(st("S36") + 2.6, explosion(2.5, 1.2), 0.38, pan=-0.3)
 place(st("S36") + 3.3, explosion(2.5, 1.2), 0.38, pan=0.3)
 # the throat
@@ -469,7 +533,7 @@ while tt < st("S38") - 0.2:
     place(tt, sweep_noise(0.35, 2500, 400, bw=0.5, peak=0.15), 0.05, pan=float(rng.uniform(-0.8, 0.8)))
     tt += 0.2
 bed(st("S38"), st("S39"), lambda d: hum(d, (36.7, 55, 73.4, 110), 0.3), 0.12, fi=0.5, fo=0.1)
-launch_seed = st("S38") + 5.1
+launch_seed = st("S38b") + 0.8
 place(launch_seed, sweep_noise(1.4, 400, 5000, bw=0.5, peak=1.0), 0.18)
 for f in (880, 1318.5, 1760):
     place(launch_seed, chime(2.0, f), 0.05)
