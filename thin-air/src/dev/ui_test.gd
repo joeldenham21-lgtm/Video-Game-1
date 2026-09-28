@@ -4,7 +4,9 @@ extends Node
 ##     --quit-after 40 --resolution 1280x720 res://scenes/dev/ui_test.tscn -- --state=hud_fx
 ## States: hud (calm HUD with toasts/objective/prompt/subtitle), hud_fx (cold + hypoxia + wet + low health +
 ##   hit), hud_frost, hud_touch (phone layout + touch controls), pause, settings[=tab], journal[=tab], map,
-##   death, menu (main menu), menu_new (difficulty select), loading, credits, glyphs_pad (pad glyph prompts).
+##   death, menu (main menu), menu_new (difficulty select), loading, credits, glyphs_pad (pad glyph prompts),
+##   inventory[=inventory|equipment|crafting], build_picker, build_place (touch placement buttons over the HUD),
+##   sleep (bed dialog), cinematic (act card + caption; --black: prologue subtitle over black), dialog.
 ## Options: --touch (force touch device) --pad (force pad glyphs) --backdrop=world|vista|none --hours=H
 ##   --save=<abs.png|jpg> (capture the viewport at --at=N frames then quit) --build-theme (write theme.tres, quit)
 ##   --scale=S (touch_ui_scale)
@@ -225,6 +227,37 @@ func _setup_state(state: String) -> void:
 		"death":
 			v.health = 0.0
 			Events.player_died.emit(&"cold")
+		"inventory":
+			var inv_scr := (load("res://scenes/ui/inventory_screen.tscn") as PackedScene).instantiate() as InventoryScreen
+			add_child(inv_scr)
+			var tabs := {"inventory": InventoryScreen.Tab.INVENTORY, "equipment": InventoryScreen.Tab.EQUIPMENT,
+				"crafting": InventoryScreen.Tab.CRAFTING}
+			inv_scr.open.call_deferred(tabs.get(String(args.get("tab", "inventory")), InventoryScreen.Tab.INVENTORY))
+		"build_picker", "build_place":
+			mock.inventory.add(&"log", 6)
+			mock.inventory.add(&"hammer", 1)
+			Game.set_flag(&"blueprints", ["stone_axe", "torch", "campfire", "spear", "log_foundation", "log_wall", "lean_to"])
+			var bm: BuildMode = (load("res://src/building/build_mode.gd") as GDScript).new()
+			bm.player = mock
+			add_child(bm)
+			if state == "build_picker":
+				bm.open_picker.call_deferred()
+			else:
+				bm.select.call_deferred(&"campfire")
+		"sleep":
+			BuildSleep.open_for(null, mock)
+		"cinematic":
+			var ov: CanvasLayer = (load("res://src/story/cinematic_overlay.gd") as GDScript).new()
+			add_child(ov)
+			if args.has("black"):
+				ov.call(&"show_black")
+			ov.call(&"set_skip_visible", true)
+			Events.subtitle.emit("Dale Morrow", "Terrace Dispatch, Otter Charlie-Foxtrot-Kilo-Lima, we've got carb ice, engine's running rough.", 30.0)
+			ov.call(&"chapter", "The Crash", 30.0)
+			ov.call(&"caption", "Aldous Range, northern British Columbia", 30.0)
+		"dialog":
+			hud.open_pause()
+			ConfirmDialog.ask(hud.pause_menu if hud.pause_menu else hud, "Quit to main menu?", "Progress since your last save will be lost.", "Quit", "Keep playing")
 	for k in ["hud", "hud_fx", "hud_frost", "hud_touch", "glyphs_pad"]:
 		if state == k:
 			hud.vitals.force_all = state == "hud_fx"
