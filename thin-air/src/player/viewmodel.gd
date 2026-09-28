@@ -208,28 +208,34 @@ func _update_motion(delta: float) -> void:
 	ld.x = clampf(ld.x, -12.0, 12.0)
 	ld.y = clampf(ld.y, -12.0, 12.0)
 	_sway_vel += Vector2(-ld.x, -ld.y) * 16.0 * sw
-	var acc := -_sway * 110.0 - _sway_vel * 15.0
-	_sway_vel += acc * delta
-	_sway += _sway_vel * delta
-	_sway = _sway.clamp(Vector2(-7.0, -7.0), Vector2(7.0, 7.0))
 	# Inertia: the tool lags behind acceleration of the body.
 	var lv := player.get_local_velocity()
 	var accel := (lv - _prev_vel) / maxf(delta, 1e-4)
 	_prev_vel = lv
 	accel = accel.limit_length(25.0)
 	_lag_vel += -accel * 0.0009
-	var lacc := -_lag * 140.0 - _lag_vel * 18.0
-	_lag_vel += lacc * delta
-	_lag += _lag_vel * delta
+	# The springs are stiff (k up to 160) and explicit: integrate them in steps of at most 1/60 s. One long
+	# frame after another (below ~8 fps: a loading hitch, heavy throttling) used to blow them up to inf/NaN,
+	# which hid the hands for the rest of the session and spammed "!v.is_finite()" every frame.
+	var steps := clampi(ceili(delta * 60.0), 1, 8)
+	var dt := minf(delta, 8.0 / 60.0) / float(steps)
+	for _i in steps:
+		var acc := -_sway * 110.0 - _sway_vel * 15.0
+		_sway_vel += acc * dt
+		_sway += _sway_vel * dt
+		var lacc := -_lag * 140.0 - _lag_vel * 18.0
+		_lag_vel += lacc * dt
+		_lag += _lag_vel * dt
+		# Landing kick.
+		var la := -_land * 160.0 - _land_vel * 16.0
+		_land_vel += la * dt
+		_land += _land_vel * dt
+		# Hit kick (rotational).
+		var ka := -_kick * 120.0 - _kick_vel * 14.0
+		_kick_vel += ka * dt
+		_kick += _kick_vel * dt
+	_sway = _sway.clamp(Vector2(-7.0, -7.0), Vector2(7.0, 7.0))
 	_lag = _lag.limit_length(0.03)
-	# Landing kick.
-	var la := -_land * 160.0 - _land_vel * 16.0
-	_land_vel += la * delta
-	_land += _land_vel * delta
-	# Hit kick (rotational).
-	var ka := -_kick * 120.0 - _kick_vel * 14.0
-	_kick_vel += ka * delta
-	_kick += _kick_vel * delta
 	# Stride bob (figure-eight), idle breathing.
 	var grounded := player.is_grounded()
 	var target_amp := clampf(player.ground_speed / PlayerMotion.SPRINT_SPEED, 0.0, 1.3) if grounded else 0.0

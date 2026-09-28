@@ -32,6 +32,8 @@ func run() -> void:
 	await _read_manual()
 	await _campfire()
 	await _radio()
+	await _to_ranger_cabin()
+	await _first_night()
 	await _pause_and_settings()
 	var snap := await _save_from_pause()
 	await _quit_to_menu_from_pause()
@@ -126,6 +128,27 @@ func _prologue_skip() -> void:
 	check(pl.is_input_enabled(), "after the prologue: player input enabled")
 	check(Story.has_objective(&"gather_firewood") and Story.has_objective(&"salvage_wreck"), "Act 1 objectives given")
 	_log("hours %.2f weather %s locked %s act %d" % [Climate.hours, Climate.weather, Climate.locked, Story.act])
+
+
+## The whole prologue, no skip (sped up): the crash, the caption, then control at the wreck.
+func _prologue_full() -> void:
+	check(Game.state == Game.State.CINEMATIC, "prologue (no skip): CINEMATIC")
+	var pl: Player = Game.player as Player
+	var h0 := Climate.hours
+	Engine.time_scale = 40.0
+	var ok := await _until(func() -> bool: return Story.events.has("woke"), 60.0)
+	Engine.time_scale = 1.0
+	check(ok, "the prologue plays to the end and wakes the player")
+	ok = await _until(func() -> bool: return Game.state == Game.State.PLAYING, 10.0)
+	check(ok and pl.is_input_enabled(), "after the full prologue: PLAYING with control")
+	check(absf(Climate.hours - h0) < 0.05 and not Climate.locked, "the clock was frozen during the prologue and runs again (%.2f → %.2f)" % [h0, Climate.hours])
+	var ov: CanvasLayer = Story._overlay
+	check(ov != null and not bool(ov.get(&"_skip_visible")), "skip hint hidden after the prologue")
+	await _seconds(6.0)
+	check(ov != null and (ov.get(&"black") as ColorRect).color.a < 0.05, "faded in from black (%.2f)" % ((ov.get(&"black") as ColorRect).color.a if ov else -1.0))
+	check(Story.has_objective(&"gather_firewood") and Story.has_objective(&"salvage_wreck"), "Act 1 objectives after the full prologue")
+	var hud := _hud()
+	check(hud != null and not hud._cinematic, "HUD out of cinematic mode")
 
 
 # ============================================================================================ acting in the world
@@ -646,7 +669,7 @@ func _new_game_is_clean() -> void:
 	check(Game.difficulty == &"explorer", "second run on Explorer")
 	var pl: Player = Game.player as Player
 	check(pl.vitals.difficulty == &"explorer", "vitals on Explorer (%s)" % pl.vitals.difficulty)
-	await _prologue_skip()
+	await _prologue_full()
 	var inv := _snapshot()["inv"] as Dictionary
 	check(not inv.has("stick") and not inv.has("flare_gun") and not inv.has("hatchet"), "fresh pack %s" % str(inv))
 	check(Story.found_logs.is_empty() and not Story.is_objective_done(&"gather_firewood") and not Story.has_objective(&"find_ranger_cabin"), "story reset")
@@ -695,3 +718,43 @@ func _difficulty_survives_relaunch() -> void:
 	check(pl.vitals.difficulty == &"explorer", "changing a setting while paused keeps the game's difficulty (%s)" % pl.vitals.difficulty)
 	await _key_event(&"pause")
 	Settings.set_value(&"difficulty", &"survivor", false)
+
+
+
+## Reaching the ranger cabin finishes Act 1: act 2 starts and the story autosaves.
+func _to_ranger_cabin() -> void:
+	var pl: Player = Game.player as Player
+	var poi: Dictionary = TerrainData.get_poi(&"ranger_cabin")
+	var c: Vector3 = poi["position"]
+	var at := c + Vector3(-12.0, 0.0, 14.0)
+	var toasts: Array[String] = []
+	var cb := func(t: String, _k: StringName) -> void: toasts.append(t)
+	Events.notification.connect(cb)
+	pl.teleport(Vector3(at.x, TerrainData.get_height(at.x, at.z) + 0.1, at.z), 0.0)
+	var ok := await _until(func() -> bool: return Story.is_objective_done(&"find_ranger_cabin"), 8.0)
+	check(ok and Story.act == 2, "reaching the ranger cabin completes Act 1 (act %d)" % Story.act)
+	await _frames(5)
+	Events.notification.disconnect(cb)
+	var saved: Dictionary = Save._read(0)
+	check(Save.has_save(0) and int((saved.get("story", {}) as Dictionary).get("act", 0)) == 2, "autosave at the Act 2 checkpoint")
+	check(toasts.has("Progress saved"), "'Progress saved' toast %s" % str(toasts))
+
+
+## The first night falls: darkness, the night score, the clock and weather keep running, nothing errors.
+func _first_night() -> void:
+	var errs0 := Game.errors.errors + Game.errors.script_errors
+	var d0 := Climate.day
+	Climate.advance_time(fposmod(22.5 - Climate.hours, 24.0))
+	await _seconds(2.0)
+	check(Climate.hours > 22.0 or Climate.hours < 1.0, "night: %s" % Climate.get_time_string())
+	check(Climate.get_daylight() < 0.1, "night is dark (daylight %.2f)" % Climate.get_daylight())
+	var mus: Variant = Audio.music.get(&"state") if Audio.music else null
+	_log("music state at night: %s" % str(mus))
+	Engine.time_scale = 30.0
+	await _until(func() -> bool: return Climate.day > d0 and Climate.hours > 0.5, 60.0)
+	Engine.time_scale = 1.0
+	check(Climate.day == d0 + 1, "midnight rolls over to day %d" % Climate.day)
+	var pl: Player = Game.player as Player
+	check(not pl.vitals.is_dead() and Game.state == Game.State.PLAYING, "survived into the night at the cabin (hp %.0f)" % pl.vitals.health)
+	var errs := Game.errors.errors + Game.errors.script_errors - errs0
+	check(errs == 0, "no engine/script errors through the evening (%d: %s)" % [errs, str(Game.errors.first)])
