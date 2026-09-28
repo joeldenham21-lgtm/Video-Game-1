@@ -13,6 +13,7 @@ func run() -> void:
 	await _test_build_touch_block_clear_of_thumb_cluster()
 	await _test_touch_subtitles_clear_of_thumb_cluster()
 	_test_desktop_on_phone_preset()
+	_test_auto_detect()
 	Settings.values = prev_values
 	Settings.preset = prev_preset
 
@@ -118,6 +119,25 @@ func _test_desktop_on_phone_preset() -> void:
 	InputGlyphs.device = &""
 	check(InputGlyphs.current() == InputGlyphs.KEYBOARD, "desktop on a phone preset starts with keyboard/mouse glyphs")
 	InputGlyphs.device = prev
+
+
+## Settings auto-detect: S25 Ultra (Adreno 830) → mobile_high, MSI Cyborg 15 (RTX 4050/4060 laptop) → high.
+func _test_auto_detect() -> void:
+	var cases := [
+		["Adreno (TM) 830", true, &"mobile_high"],                  # S25 Ultra, Vulkan
+		["Qualcomm(R) Adreno(TM) 830 GPU", true, &"mobile_high"],   # other driver spelling
+		["Adreno (TM) 750", true, &"mobile_high"],                  # S24 Ultra
+		["Adreno (TM) 619", true, &"mobile_low"],
+		["Mali-G57 MC2", true, &"mobile_low"],
+		["Mali-G720-Immortalis MC12", true, &"mobile_high"],
+		["NVIDIA GeForce RTX 4060 Laptop GPU", false, &"high"],     # MSI Cyborg 15 A13V
+		["NVIDIA GeForce RTX 4050 Laptop GPU/PCIe/SSE2", false, &"high"],
+		["Intel(R) Iris(R) Xe Graphics", false, &"low"],
+		["llvmpipe (LLVM 15.0.7, 256 bits)", false, &"medium"],
+	]
+	for c in cases:
+		var got: StringName = Settings.preset_for_gpu(String(c[0]), bool(c[1]))
+		check(got == c[2], "auto-detect %s -> %s (got %s)" % [c[0], c[2], got])
 
 
 func _screen_touch(index: int, pos: Vector2, pressed: bool, _tc: TouchControls = null) -> void:
