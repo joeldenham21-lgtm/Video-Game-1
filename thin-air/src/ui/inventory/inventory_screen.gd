@@ -225,8 +225,8 @@ func close() -> void:
 	station_node = null
 	Audio.play_ui(&"inventory_close")
 	Events.ui_screen_closed.emit(SCREEN)
-	# only back into mouse-look while actually playing (not on the death screen / in a cinematic)
-	if _prev_mouse_mode == Input.MOUSE_MODE_CAPTURED and not Settings.is_mobile() and Game.state == Game.State.PLAYING:
+	# only back into mouse-look while actually playing (not on the death screen / in a cinematic), never on handhelds
+	if _prev_mouse_mode == Input.MOUSE_MODE_CAPTURED and not Settings.is_handheld() and Game.state == Game.State.PLAYING:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_animate_out()
 

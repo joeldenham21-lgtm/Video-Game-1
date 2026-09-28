@@ -21,6 +21,7 @@ var hours := 8
 var _panel: PanelContainer
 var _hours_label: Label
 var _fade: ColorRect
+var _root: Control
 var _busy := false
 
 
@@ -134,14 +135,21 @@ func _exit_tree() -> void:
 
 
 func _build_ui() -> void:
+	# scaled like the other screens (UITheme.fit_root) so the dialog is readable and tappable on a phone
+	_root = Control.new()
+	_root.name = "Root"
+	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_root)
+	UITheme.fit_root(_root, 1000.0, 560.0)
+	get_viewport().size_changed.connect(func() -> void: UITheme.fit_root(_root, 1000.0, 560.0))
 	_fade = ColorRect.new()
 	_fade.color = Color(0, 0, 0, 0)
 	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_fade)
+	_root.add_child(_fade)
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
+	_root.add_child(center)
 	_panel = PanelContainer.new()
 	_panel.add_theme_stylebox_override(&"panel", InvStyle.panel(InvStyle.BG, 8, InvStyle.LINE, 1, 22))
 	center.add_child(_panel)
@@ -192,16 +200,19 @@ func _build_ui() -> void:
 	dawn.text = "Until dawn"
 	InvStyle.style_button(dawn, "secondary", 18)
 	dawn.pressed.connect(func() -> void: _set_hours(roundi(hours_until_dawn())))
+	dawn.custom_minimum_size = Vector2(120, 52)
 	btns.add_child(dawn)
 	var cancel := Button.new()
 	cancel.text = "Cancel"
 	InvStyle.style_button(cancel, "secondary", 18)
 	cancel.pressed.connect(_close)
+	cancel.custom_minimum_size = Vector2(120, 52)
 	btns.add_child(cancel)
 	var ok := Button.new()
 	ok.text = "Sleep"
 	InvStyle.style_button(ok, "primary", 18)
 	ok.pressed.connect(_confirm)
+	ok.custom_minimum_size = Vector2(120, 52)
 	btns.add_child(ok)
 	_set_hours(hours)
 	ok.grab_focus.call_deferred()

@@ -59,6 +59,10 @@ var _photo_hidden := false
 var _screens := {}
 
 
+func _enter_tree() -> void:
+	add_to_group(&"touch_controls")      # BuildModeUI hides its own hammer button and fits around the cluster
+
+
 func _ready() -> void:
 	layer = 30
 	process_mode = Node.PROCESS_MODE_ALWAYS

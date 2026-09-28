@@ -16,6 +16,12 @@ const CATEGORIES := [
 var mode: BuildMode = null
 var picker_open := false
 
+## Everything lives under one root scaled like the other screens (UITheme.fit_root): readable on a phone.
+var _root: Control
+var _margin: MarginContainer
+var _scroll: ScrollContainer
+var _touch_box: VBoxContainer
+
 var _picker: Control
 var _tabs: HBoxContainer
 var _grid: GridContainer
@@ -36,9 +42,25 @@ var _pad := false
 func _ready() -> void:
 	layer = 30
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_root = Control.new()
+	_root.name = "Root"
+	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_root)
 	_build_picker()
 	_build_hint()
 	_build_touch()
+	get_viewport().size_changed.connect(_layout)
+	Events.settings_changed.connect(_layout)
+	_layout()
+
+
+func _layout() -> void:
+	UITheme.fit_root(_root, 1180.0, 620.0)
+	# short (phone) canvases: tighter margins and a shorter card list so the picker never overflows
+	var short := _root.size.y < 760.0
+	_margin.add_theme_constant_override("margin_top", 24 if short else 70)
+	_margin.add_theme_constant_override("margin_bottom", 24 if short else 90)
+	_scroll.custom_minimum_size.y = clampf(_root.size.y - (48.0 if short else 160.0) - 230.0, 160.0, 420.0)
 
 
 # ---------------------------------------------------------------------------------------------- picker
@@ -47,12 +69,13 @@ func _build_picker() -> void:
 	_picker = Control.new()
 	_picker.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_picker.visible = false
-	add_child(_picker)
+	_root.add_child(_picker)
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.35)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_picker.add_child(dim)
 	var margin := MarginContainer.new()
+	_margin = margin
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "right"]:
 		margin.add_theme_constant_override("margin_" + side, 60)
@@ -94,6 +117,7 @@ func _build_picker() -> void:
 		b.set_meta(&"cat", String(c[0]))
 		_tabs.add_child(b)
 	var scroll := ScrollContainer.new()
+	_scroll = scroll
 	scroll.custom_minimum_size = Vector2(0, 420)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(scroll)
@@ -237,7 +261,7 @@ func set_selected(id: StringName) -> void:
 	_selected = id
 	_hint.visible = id != &""
 	if _touch:
-		_touch.visible = id != &"" and Settings.is_mobile()
+		_touch.visible = id != &"" and InputGlyphs.current() == InputGlyphs.TOUCH
 	if id != &"":
 		_hint_title.text = BuildCatalog.display_name(id)
 
@@ -246,7 +270,7 @@ func _input(event: InputEvent) -> void:
 	# remember the last device for the control hints
 	if event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) > 0.4):
 		_pad = true
-	elif event is InputEventKey or event is InputEventMouseButton:
+	elif event is InputEventKey or event is InputEventMouseButton or event is InputEventScreenTouch:
 		_pad = false
 
 
@@ -281,7 +305,7 @@ func _build_hint() -> void:
 	_hint.offset_bottom = -64
 	_hint.visible = false
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_hint)
+	_root.add_child(_hint)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override(&"separation", 4)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -322,7 +346,7 @@ func _build_hint() -> void:
 	_reason.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.7))
 	_reason.add_theme_constant_override(&"outline_size", 4)
 	_reason.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_reason)
+	_root.add_child(_reason)
 
 
 func update_hint(p: Dictionary) -> void:
@@ -342,10 +366,10 @@ func update_hint(p: Dictionary) -> void:
 
 
 func _keys_text() -> String:
-	if Settings.is_mobile():
-		return "Place a blueprint, then fill it with materials"
 	if _pad:
 		return "RT place   LB/RB rotate   LT exit   D-pad up menu"
+	if InputGlyphs.current() == InputGlyphs.TOUCH:
+		return "Place a blueprint, then fill it with materials"
 	return "LMB place   Q/R or wheel rotate   RMB exit   B menu"
 
 
@@ -356,47 +380,88 @@ func _build_touch() -> void:
 	_touch.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_touch.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_touch.visible = false
-	add_child(_touch)
-	var box := VBoxContainer.new()
-	box.anchor_left = 1.0
-	box.anchor_right = 1.0
-	box.anchor_top = 0.5
-	box.anchor_bottom = 0.5
-	box.offset_left = -190
-	box.offset_right = -24
-	box.offset_top = -170
-	box.offset_bottom = 170
-	box.add_theme_constant_override(&"separation", 10)
-	_touch.add_child(box)
-	var ui_scale := float(Settings.get_value(&"touch_ui_scale", 1.0))
-	for spec in [["Place", "primary", func() -> void: mode.place()],
-			["⟲  Rotate", "secondary", func() -> void: mode.rotate_by(-1)],
-			["Rotate  ⟳", "secondary", func() -> void: mode.rotate_by(1)],
-			["Menu", "secondary", func() -> void: mode.open_picker()],
-			["Exit", "secondary", func() -> void: mode.exit()]]:
-		var b := Button.new()
-		b.text = String(spec[0])
-		InvStyle.style_button(b, String(spec[1]), int(20 * ui_scale))
-		b.custom_minimum_size = Vector2(160, 60) * ui_scale
-		b.pressed.connect(spec[2])
-		box.add_child(b)
+	_root.add_child(_touch)
+	# Rotate ⟲ ⟳ / Place / Menu Exit — a compact block that fits the pocket left of the touch controls' aim
+	# button and above their crouch button (see _place_touch_box), so it never covers the thumb cluster.
+	_touch_box = VBoxContainer.new()
+	_touch_box.add_theme_constant_override(&"separation", 8)
+	_touch.add_child(_touch_box)
+	var rows: Array = [
+		[["⟲", "secondary", func() -> void: mode.rotate_by(-1)], ["⟳", "secondary", func() -> void: mode.rotate_by(1)]],
+		[["Place", "primary", func() -> void: mode.place()]],
+		[["Menu", "secondary", func() -> void: mode.open_picker()], ["Exit", "secondary", func() -> void: mode.exit()]],
+	]
+	for row in rows:
+		var h := HBoxContainer.new()
+		h.add_theme_constant_override(&"separation", 8)
+		_touch_box.add_child(h)
+		for spec in row:
+			var b := Button.new()
+			b.text = String(spec[0])
+			b.name = String(spec[0]) if String(spec[0]).is_valid_identifier() else ("RotateLeft" if spec[0] == "⟲" else "RotateRight")
+			InvStyle.style_button(b, String(spec[1]), 26 if String(spec[0]).length() == 1 else 19)
+			b.custom_minimum_size = Vector2(76.0 if row.size() > 1 else 160.0, 60.0)
+			b.focus_mode = Control.FOCUS_NONE
+			b.pressed.connect(spec[2])
+			h.add_child(b)
 	# A hammer button while not building, unless the HUD's touch controls provide one.
 	_hammer_btn = Button.new()
 	_hammer_btn.text = "Build"
-	InvStyle.style_button(_hammer_btn, "secondary", int(18 * ui_scale))
+	InvStyle.style_button(_hammer_btn, "secondary", 18)
 	_hammer_btn.anchor_left = 1.0
 	_hammer_btn.anchor_right = 1.0
-	_hammer_btn.offset_left = -130 * ui_scale
+	_hammer_btn.offset_left = -130
 	_hammer_btn.offset_right = -20
 	_hammer_btn.offset_top = 150
-	_hammer_btn.offset_bottom = 150 + 56 * ui_scale
+	_hammer_btn.offset_bottom = 206
 	_hammer_btn.pressed.connect(func() -> void: mode.open_picker())
 	_hammer_btn.visible = false
-	add_child(_hammer_btn)
+	_root.add_child(_hammer_btn)
+
+
+## Canvas point → _root units.
+func _to_root(p: Vector2) -> Vector2:
+	return _root.get_global_transform_with_canvas().affine_inverse() * p
+
+
+## Puts the touch block in the free pocket of the TouchControls thumb cluster (left of aim, above crouch);
+## without touch controls it sits at the right edge, vertically centred.
+func _place_touch_box() -> void:
+	var sz := _touch_box.get_combined_minimum_size()
+	_touch_box.size = sz
+	var pos := Vector2(_root.size.x - sz.x - 24.0, (_root.size.y - sz.y) * 0.5)
+	var tc := get_tree().get_first_node_in_group(&"touch_controls") as TouchControls
+	if tc and tc.active and tc.root:
+		var xf := tc.root.get_global_transform_with_canvas()
+		var k := xf.x.length() / maxf(0.001, _root.get_global_transform_with_canvas().x.length())
+		var aim := _to_root(xf * tc.button_center(&"aim"))
+		var crouch := _to_root(xf * tc.button_center(&"crouch"))
+		var right := aim.x - tc.button_radius(&"aim") * k - 14.0
+		var bottom := crouch.y - tc.button_radius(&"crouch") * k - 14.0
+		pos = Vector2(right - sz.x, bottom - sz.y)
+		pos.y = maxf(pos.y, 110.0)
+	_touch_box.position = pos
+
+
+## The placement hint sits above the HUD hotbar when that is always shown (touch layout).
+func _place_hint() -> void:
+	var bottom := _root.size.y - 64.0
+	var hud := HUD.find()
+	if hud and hud.hotbar and hud.hotbar.always_visible and hud.hotbar.is_visible_in_tree():
+		bottom = minf(bottom, _to_root(hud.hotbar.get_global_rect().position).y - 10.0)
+	_hint.offset_bottom = bottom - _root.size.y
+	_hint.offset_top = _hint.offset_bottom - maxf(86.0, _hint.get_combined_minimum_size().y)
 
 
 func _process(_delta: float) -> void:
+	# a pad picked up on the phone hides the touch block (and brings it back on the next touch)
+	if _touch:
+		_touch.visible = _selected != &"" and InputGlyphs.current() == InputGlyphs.TOUCH
+	if _touch and _touch.visible:
+		_place_touch_box()
+	if _hint and _hint.visible:
+		_place_hint()
 	if _hammer_btn:
-		var want := Settings.is_mobile() and not picker_open and _selected == &"" and Game.is_playing() \
+		var want := InputGlyphs.current() == InputGlyphs.TOUCH and not picker_open and _selected == &"" and Game.is_playing() \
 			and get_tree().get_first_node_in_group(&"touch_controls") == null
 		_hammer_btn.visible = want

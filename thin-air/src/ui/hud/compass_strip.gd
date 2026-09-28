@@ -158,5 +158,5 @@ func _text(t: String, pos: Vector2, fs: int, col: Color, f: Font, centered: bool
 		return
 	var ts := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
 	var p := pos - Vector2(ts.x * 0.5 if centered else 0.0, 0.0)
-	draw_string_outline(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.35 * col.a))
+	draw_string_outline(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 5, Color(0, 0, 0, 0.62 * col.a))
 	draw_string(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)

@@ -25,16 +25,21 @@ var _cap_tween: Tween
 var _chap_tween: Tween
 var _credits: Control = null
 var _touch_held := false
+var _root: Control
 
 
 func _ready() -> void:
 	layer = 97
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# scaled like every other screen (UITheme.fit_root): prologue subtitles and act cards stay readable on phones
 	var root := Control.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root = root
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = UITheme.get_theme()
 	add_child(root)
+	_layout()
+	get_viewport().size_changed.connect(_layout)
+	Events.settings_changed.connect(_layout)
 	black = ColorRect.new()
 	black.color = Color(0, 0, 0, 0)
 	black.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -108,6 +113,10 @@ func _ready() -> void:
 	Events.subtitle.connect(_on_subtitle)
 
 
+func _layout() -> void:
+	UITheme.fit_root(_root, 1000.0, 560.0)
+
+
 func _process(delta: float) -> void:
 	if _sub_t > 0.0:
 		_sub_t -= delta
@@ -119,7 +128,7 @@ func _process(delta: float) -> void:
 			if InputMap.has_action(a) and Input.is_action_pressed(a):
 				held = true
 		_skip_t = _skip_t + delta if held else maxf(0.0, _skip_t - delta * 2.0)
-		var w := get_viewport().get_visible_rect().size.x * 0.27 * clampf(_skip_t / SKIP_HOLD, 0.0, 1.0)
+		var w := _root.size.x * 0.27 * clampf(_skip_t / SKIP_HOLD, 0.0, 1.0)
 		_skip_bar.offset_left = -w
 		_skip_bar.visible = _skip_t > 0.0
 		if _skip_t >= SKIP_HOLD:

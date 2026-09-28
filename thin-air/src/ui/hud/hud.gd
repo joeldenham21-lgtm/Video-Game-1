@@ -445,6 +445,22 @@ func _ensure_touch_controls() -> void:
 
 # ============================================================================================== input
 
+## Phones: leaving the app (home, app switch, a call) pauses the game and autosaves where saving is allowed —
+## Android may kill a backgrounded game, and the mountain shouldn't keep running when the player returns.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_PAUSED or (what == NOTIFICATION_APPLICATION_FOCUS_OUT and Settings.is_handheld()):
+		on_app_suspended()
+
+
+func on_app_suspended() -> void:
+	if touch_controls and is_instance_valid(touch_controls) and touch_controls.has_method("release_all"):
+		touch_controls.call("release_all")          # a finger held on the stick when the app left
+	if Game.state == Game.State.PLAYING and PauseMenu.can_save():
+		Save.save_game(0)
+	if can_open_screen():
+		open_pause()
+
+
 func can_open_screen() -> bool:
 	return Game.state == Game.State.PLAYING and not get_tree().paused and _screens.is_empty() \
 		and not _dead and not _cinematic and Engine.get_process_frames() - _screen_closed_frame > 1 \
@@ -561,10 +577,27 @@ func _process(delta: float) -> void:
 func _place_subtitles() -> void:
 	if not subtitles.visible:
 		return
+	subtitles.max_width = _subtitle_max_width()
 	var sz := subtitles.get_combined_minimum_size()
 	subtitles.size = sz
 	var bottom := hotbar.position.y - (18.0 if hotbar.always_visible or hotbar.modulate.a > 0.0 else -40.0)
 	subtitles.position = Vector2((root.size.x - sz.x) * 0.5, bottom - sz.y)
+
+
+## Touch layout: centred lines must end before the thumb cluster (jump is its left-most button) and, by
+## symmetry, clear the move-stick hint on the left.
+func _subtitle_max_width() -> float:
+	if not touch_mode or touch_controls == null or not is_instance_valid(touch_controls) \
+			or not touch_controls.has_method("button_center") or not bool(touch_controls.get("active")):
+		return HUDSubtitles.MAX_W
+	var tr: Control = touch_controls.get("root")
+	if tr == null:
+		return HUDSubtitles.MAX_W
+	var to_hud := root.get_global_transform_with_canvas().affine_inverse() * tr.get_global_transform_with_canvas()
+	var edge := (to_hud * (touch_controls.call("button_center", &"jump") as Vector2)).x \
+		- float(touch_controls.call("button_radius", &"jump")) * to_hud.x.length()
+	var pad := 44.0 + 20.0          # panel margins + a gap to the button
+	return clampf((edge - root.size.x * 0.5) * 2.0 - pad * 2.0, 360.0, HUDSubtitles.MAX_W)
 
 
 func _update_readout(p: Node3D) -> void:

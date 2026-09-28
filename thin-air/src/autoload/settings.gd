@@ -103,19 +103,29 @@ func apply_preset(p: StringName, apply_now := true) -> void:
 
 
 func auto_detect_preset() -> StringName:
-	if OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios"):
-		var gpu := RenderingServer.get_video_adapter_name().to_lower()
-		# Adreno 7xx/8xx (S23+/S24/S25), Mali-G7xx Immortalis, Xclipse 9xx → high
-		for tag in ["adreno (tm) 8", "adreno (tm) 7", "immortalis", "xclipse 9"]:
+	return preset_for_gpu(RenderingServer.get_video_adapter_name(), is_handheld())
+
+
+## Pure GPU-name → preset rule (tested): phones with Adreno 7xx/8xx (S23–S25 Ultra), Immortalis or Xclipse 9xx
+## get mobile_high, other phones mobile_low; desktop RTX / Radeon RX / Arc A7 get high, Intel iGPUs low,
+## software rasterisers and anything unknown medium. Adapter strings vary by driver and API ("Adreno (TM) 830",
+## "Qualcomm(R) Adreno(TM) 830 GPU", "NVIDIA GeForce RTX 4060 Laptop GPU/PCIe/SSE2"), so match loosely.
+static func preset_for_gpu(adapter: String, handheld: bool) -> StringName:
+	var gpu := adapter.to_lower()
+	if handheld:
+		var rx := RegEx.create_from_string("adreno\\D{0,8}(\\d)\\d\\d")
+		var m := rx.search(gpu)
+		if m and int(m.get_string(1)) >= 7:
+			return &"mobile_high"
+		for tag in ["immortalis", "xclipse 9"]:
 			if gpu.contains(tag):
 				return &"mobile_high"
 		return &"mobile_low"
-	var name := RenderingServer.get_video_adapter_name().to_lower()
-	if name.contains("llvmpipe") or name.contains("swiftshader"):
+	if gpu.contains("llvmpipe") or gpu.contains("swiftshader") or gpu.contains("lavapipe"):
 		return &"medium"
-	if name.contains("rtx") or name.contains("radeon rx") or name.contains("arc a7"):
+	if gpu.contains("rtx") or gpu.contains("radeon rx") or gpu.contains("arc a7"):
 		return &"high"
-	if name.contains("intel") or name.contains("uhd") or name.contains("iris"):
+	if gpu.contains("intel") or gpu.contains("uhd") or gpu.contains("iris"):
 		return &"low"
 	return &"medium"
 
@@ -123,6 +133,12 @@ func auto_detect_preset() -> StringName:
 func is_mobile() -> bool:
 	return OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios") \
 		or String(preset).begins_with("mobile")
+
+
+## The device itself is a phone/tablet (touch-first input, no mouse to capture). Unlike is_mobile(), a
+## desktop running a "Phone" quality preset is not handheld: it keeps mouse capture and keyboard glyphs.
+func is_handheld() -> bool:
+	return OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios")
 
 
 func is_forward_plus() -> bool:
