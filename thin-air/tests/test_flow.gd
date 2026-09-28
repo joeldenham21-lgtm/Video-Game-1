@@ -11,10 +11,12 @@ const SLOT := 0
 var _backup := ""
 var _had_backup := false
 var _t0 := 0
+var _errs0 := 0
 
 
 func run() -> void:
 	_t0 = Time.get_ticks_msec()
+	_errs0 = Game.errors.errors + Game.errors.script_errors
 	_backup_save()
 	# The runner is the current scene: detach it so Game's scene changes don't free the test.
 	get_tree().current_scene = null
@@ -42,6 +44,8 @@ func run() -> void:
 	await _death_and_continue(snap, &"fall")
 	await _new_game_is_clean()
 	await _difficulty_survives_relaunch()
+	var errs := Game.errors.errors + Game.errors.script_errors - _errs0
+	check(errs == 0, "no engine/script errors through the whole first hour (%d: %s)" % [errs, str(Game.errors.first)])
 	_restore_save()
 
 
@@ -135,9 +139,16 @@ func _prologue_full() -> void:
 	check(Game.state == Game.State.CINEMATIC, "prologue (no skip): CINEMATIC")
 	var pl: Player = Game.player as Player
 	var h0 := Climate.hours
-	Engine.time_scale = 40.0
-	var ok := await _until(func() -> bool: return Story.events.has("woke"), 60.0)
+	# play it 20x faster, keeping the physics step at 1/60 s so the world simulates as it would
+	var tps := Engine.physics_ticks_per_second
+	var mps := Engine.max_physics_steps_per_frame
+	Engine.physics_ticks_per_second = tps * 20
+	Engine.max_physics_steps_per_frame = mps * 20
+	Engine.time_scale = 20.0
+	var ok := await _until(func() -> bool: return Story.events.has("woke"), 120.0)
 	Engine.time_scale = 1.0
+	Engine.physics_ticks_per_second = tps
+	Engine.max_physics_steps_per_frame = mps
 	check(ok, "the prologue plays to the end and wakes the player")
 	ok = await _until(func() -> bool: return Game.state == Game.State.PLAYING, 10.0)
 	check(ok and pl.is_input_enabled(), "after the full prologue: PLAYING with control")
@@ -750,9 +761,9 @@ func _first_night() -> void:
 	check(Climate.get_daylight() < 0.1, "night is dark (daylight %.2f)" % Climate.get_daylight())
 	var mus: Variant = Audio.music.get(&"state") if Audio.music else null
 	_log("music state at night: %s" % str(mus))
-	Engine.time_scale = 30.0
+	Climate.time_scale = 40.0      # the clock runs fast (as while sleeping); physics and AI keep real time
 	await _until(func() -> bool: return Climate.day > d0 and Climate.hours > 0.5, 60.0)
-	Engine.time_scale = 1.0
+	Climate.time_scale = 1.0
 	check(Climate.day == d0 + 1, "midnight rolls over to day %d" % Climate.day)
 	var pl: Player = Game.player as Player
 	check(not pl.vitals.is_dead() and Game.state == Game.State.PLAYING, "survived into the night at the cabin (hp %.0f)" % pl.vitals.health)
