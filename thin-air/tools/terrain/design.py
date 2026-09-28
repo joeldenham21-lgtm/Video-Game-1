@@ -172,6 +172,61 @@ RAMPS = [
 	dict(id="lookout_ramp", width=80.0, points=[(-620, 600, 1492), (-760, 420, 1600), (-900, 260, 1716)]),
 ]
 
+# Designed roads, graded into the macro terrain (MID stage) as a shelf: corner points (x, z, y) with the tread height
+# at each corner (linear in arc length between them), corners rounded (Chaikin) into hairpins with level landings.
+# The Ashford ore road (1930s): from the bench above Ashford Creek it drops to a ford below the falls, climbs the east
+# flank of the ravine in four long switchbacks (<= ~14 deg) and contours back across the creek at the lip of the
+# step onto the mine bench from the north-east - the mine bench sits on the lip of a ~200 m valley step walled at
+# 45-60 deg, so there is no other graded way in. pad: the mine bench the road ends on (MID carves the road at the
+# heights the fine stage's POI altitude correction will bring to the design values).
+ROADS = [
+	dict(id="ashford_ore_road", width=12.0, pad="ashford_mine",
+		 points=[(727, 45, 1777.0), (800, 62, 1784.0), (842, 64, 1787.0), (905, 22, 1789.0),
+				 (1040, 75, 1822.0), (968, -40, 1857.0), (1062, 18, 1884.0), (1001, -78, 1914.0),
+				 (935, -116, 1929.0), (880, -147, 1943.0), (859, -129, 1945.6), (838, -107, 1950.0),
+				 (820, -80, 1950.0)]),
+]
+
+
+def road_polyline(road, step=1.5, rounds=3):
+	"""Dense centre line of a designed road: [[x, z, y], ...]. Corners are rounded by Chaikin corner cutting; the
+	tread height is linear in arc length between the corners' heights (each corner's height sits at the nearest
+	point of the rounded line, so hairpins are level landings between legs of even grade)."""
+	import numpy as np
+	C = np.array(road["points"], dtype=np.float64)
+	# cut each corner back by at most `cut` metres (Chaikin then only rounds the corner, not the whole leg)
+	cut = road.get("corner_cut", 14.0)
+	P = [C[0, :2]]
+	for k in range(1, len(C) - 1):
+		a, c, b = C[k - 1, :2], C[k, :2], C[k + 1, :2]
+		la, lb = np.hypot(*(c - a)), np.hypot(*(b - c))
+		P += [c + (a - c) * min(cut, 0.4 * la) / la, c, c + (b - c) * min(cut, 0.4 * lb) / lb]
+	P.append(C[-1, :2])
+	P = np.array(P)
+	for _ in range(rounds):
+		Q = [P[0]]
+		for a, b in zip(P[:-1], P[1:]):
+			Q.append(0.75 * a + 0.25 * b)
+			Q.append(0.25 * a + 0.75 * b)
+		Q.append(P[-1])
+		P = np.array(Q)
+	seg = np.hypot(*np.diff(P, axis=0).T)
+	S = np.concatenate([[0.0], np.cumsum(seg)])
+	s = np.linspace(0.0, S[-1], max(2, int(S[-1] / step) + 1))
+	P = np.column_stack([np.interp(s, S, P[:, 0]), np.interp(s, S, P[:, 1])])
+	# arc position of each corner = nearest point of the rounded line (searched in order along it)
+	sc = [0.0]
+	k0 = 0
+	for c in C[1:-1, :2]:
+		d = np.hypot(P[k0:, 0] - c[0], P[k0:, 1] - c[1])
+		k = k0 + int(np.argmin(d))
+		sc.append(float(s[k]))
+		k0 = k
+	sc.append(float(s[-1]))
+	y = np.interp(s, np.array(sc), C[:, 2])
+	return np.column_stack([P, y])
+
+
 # --------------------------------------------------------------------------------------------- water
 LOON_LAKE = dict(id="loon_lake", name="Loon Lake", level=1420.0, max_depth=17.0,
 				 outline=[(170, 452), (238, 462), (300, 478), (352, 505), (392, 538), (405, 590), (398, 650),
@@ -222,11 +277,14 @@ TRAILS = [
 			   dict(to=(282, 842), via=[(120, 850)], ford=True),
 			   dict(to=(420, 520), via=[(385, 780), (428, 650)])]),
 	# the old mine road: a wide bench, long traverses and few hairpins up the Ashford flank
+	# (the last leg follows the designed ore road of ROADS instead of the router)
 	dict(id="ashford_road", name="Ashford Mine Road", width=3.4, max_grade_deg=17.0, golden=True, min_leg=50.0,
 		 turn_w=18.0,
 		 legs=[dict(to=(420, 520), via=[]),
-			   dict(to=(820, -80), via=[(590, 430)])]),
-	dict(id="burke_route", name="Burke's Route", width=2.8, max_grade_deg=22.0, golden=True, min_leg=30.0,
+			   dict(to=(727, 45), via=[(590, 430)]),
+			   dict(to=(820, -80), via=[], road="ashford_ore_road")]),
+	# river_pen: routing cost per stream cell (a steep creek is forded once, square, not zig-zagged across)
+	dict(id="burke_route", name="Burke's Route", width=2.8, max_grade_deg=22.0, golden=True, min_leg=30.0, river_pen=160.0,
 		 legs=[dict(to=(820, -80), via=[]),
 			   dict(to=(380, -520), via=[(720, -300), (560, -420)])]),
 	# the icefall leg is one designated snow ramp through the seracs (<= 30 deg, crampons), wider than the path

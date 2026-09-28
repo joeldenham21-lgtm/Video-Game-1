@@ -30,7 +30,7 @@ sys.path.insert(0, HERE)
 import design as D  # noqa: E402
 import macro  # noqa: E402
 import tlib  # noqa: E402
-from fields import blur, grid, resample, smoothstep  # noqa: E402
+from fields import bilinear, blur, grid, open_spline, resample, smoothstep  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 ASSETS = os.path.join(ROOT, "assets", "terrain")
@@ -107,6 +107,61 @@ def grade_ramps(h, n, x0, dx, max_cross_deg=24.0):
 		h = h + (target - h) * w
 		wsum = np.maximum(wsum, w)
 	return h.astype(np.float32), wsum.astype(np.float32)
+
+
+def carve_roads(h, n, x0, dx):
+	"""Grade the designed roads (design.ROADS) into the macro terrain as a shelf: the tread (road width, level
+	across) at the road's designed height, cut / fill slopes (46 / 38 deg) from the nearest tread point beyond it,
+	limited to a band beside the road (stacked switchback legs are reconciled at 1.5 m by the fine bench carve). Heights near the road's pad are offset by the pad's current height error, which the fine stage's POI
+	altitude correction removes again (the road then meets the pad at its design height).
+	Returns (h, road weight 0..1 for the fine stage's detail suppression)."""
+	from scipy.spatial import cKDTree
+	from fine import wendland
+	X, Z = grid(n, x0, dx)
+	h = h.astype(np.float64)
+	rw = np.zeros_like(h)
+	hb = blur(h.astype(np.float32), 9.0 / dx)
+	for road in D.ROADS:
+		P = D.road_polyline(road, step=min(1.5, dx * 0.25))
+		i0 = max(0, int((P[:, 0].min() - 90.0 - x0) / dx))
+		i1 = min(n, int((P[:, 0].max() + 90.0 - x0) / dx) + 2)
+		j0 = max(0, int((P[:, 1].min() - 90.0 - x0) / dx))
+		j1 = min(n, int((P[:, 1].max() + 90.0 - x0) / dx) + 2)
+		sl = (slice(j0, j1), slice(i0, i1))
+		Xc, Zc = X[sl], Z[sl]
+		d, k = cKDTree(P[:, :2]).query(np.column_stack([Xc.ravel(), Zc.ravel()]))
+		d, k = d.reshape(Xc.shape), k.reshape(Xc.shape)
+		y = P[k, 2]
+		if road.get("pad"):
+			pp = D.POI[road["pad"]]
+			hp = float(bilinear(hb, x0, dx, np.array([pp["x"]]), np.array([pp["z"]]))[0])
+			y = y + (hp - pp["y"]) * wendland(np.hypot(Xc - pp["x"], Zc - pp["z"]) / 170.0)
+		half = road["width"] * 0.5
+		# streams keep their channels and banks (the fine stage fords them; the water profile stays as designed)
+		rc = np.ones_like(d)
+		for R in D.RIVERS:
+			Pr = open_spline(np.array(R["points"], dtype=np.float64), 1.5)
+			dr, kr = cKDTree(Pr[:, :2]).query(np.column_stack([Xc.ravel(), Zc.ravel()]))
+			wr = Pr[kr.reshape(Xc.shape), 2] * 0.5
+			rc = np.minimum(rc, smoothstep(wr + 4.0, wr + 26.0, dr.reshape(Xc.shape)))
+		tread = (d <= half) & (rc > 0.5)
+		e = np.maximum(d - half, 0.0)
+		# cut / fill cones from the nearest tread point only (a global envelope would let a low leg's cut cone
+		# reach far up the slope and shave the legs and the bench above it)
+		tc, tf = np.tan(np.radians(46.0)), np.tan(np.radians(38.0))
+		cut = y + e * tc
+		fill = y - e * tf
+		w = (1 - smoothstep(25.0, 45.0, e)) * rc
+		hc = h[sl].copy()
+		t = hc + np.maximum(fill - hc, 0.0) * w
+		t = t - np.maximum(t - cut, 0.0) * w
+		t = np.where(tread, hc + (y - hc) * rc, t)
+		h[sl] = t
+		rw[sl] = np.maximum(rw[sl], 1 - smoothstep(half + 6.0, half + 30.0, d))
+		dd = (t - hc)[d < half + 40.0]
+		log("MID: road %s  %.0f m, cut max %.1f m, fill max %.1f m" % (road["id"], float(np.sum(np.hypot(*np.diff(P[:, :2], axis=0).T))),
+			float(-dd.min()), float(dd.max())))
+	return h.astype(np.float32), rw.astype(np.float32)
 
 
 def make_profile(n, x0, dx):
@@ -260,6 +315,8 @@ def stage_mid(args):
 	q = t * t * (2.0 - t)
 	h = np.where(floor, h, Hv + (h - Hv) * q).astype(np.float32)
 	h, ramp_w = grade_ramps(h, MID_N, MID_X0, MID_DX)
+	h, road_w = carve_roads(h, MID_N, MID_X0, MID_DX)
+	ramp_w = np.maximum(ramp_w, road_w)
 	# keep the outer ring equal to FAR
 	X, Z = grid(MID_N, MID_X0, MID_DX)
 	edge = np.minimum(np.minimum(X - MID_X0, -MID_X0 - X), np.minimum(Z - MID_X0, -MID_X0 - Z))
